@@ -563,29 +563,25 @@ embedded in `TestCkModel.dll`; nothing resolves them from a GitHub catalog. Both
 removed from `construction-kit-libraries-build` and `meshmakers.github.io` on 2026-10-08. A new
 test-only CK model project must set the same property.
 
-Two pipeline variables are in play and only one of them is the routing decision. Both come
-from `templates/steps/update-build-number.yml` in `meshmakers/octo-pipeline-templates`
-(pinned by the `ref:` of the `pipelineTemplates` resource in `azure-pipelines.yml`):
-
-| Variable | Meaning |
-| -------- | ------- |
-| `OctoPublishCatalog` | "where would a GitHub publish go": `PrivateGitHubCatalog` on every branch, `PublicGitHubCatalog` on `r*` tags. The agent exports it as an **environment variable**, so MSBuild picks it up as a global property on any step that does not override it. **Not** the gate. |
-| `effectivePublishCatalog` | The gate. `main` / `refs/tags/r*` → `$(OctoPublishCatalog)`; every other branch → `LocalFileSystemCatalog`. |
-
-Resulting truth table:
+Since `tpl-v1.0.0` of `meshmakers/octo-pipeline-templates` (pinned by the `ref:` of the
+`pipelineTemplates` resource in `azure-pipelines.yml`, `tpl-v1.3.1` since AB#6394) no MSBuild step
+publishes to a shared catalog. `update-build-number.yml` no longer exports `OctoPublishCatalog` /
+`effectivePublishCatalog`. The shared catalogs are published only by
+`templates/steps/validate-and-publish-ck-versions.yml`, which runs **after build and tests**, validates
+System and System.StreamData against the last published version, compiles them and publishes them
+(never replacing a published version):
 
 | Branch / ref | Catalog that receives System, System.StreamData (Test / System.TestIdentity: LocalFileSystemCatalog only, always) |
 | ------------ | -------------------------------------------------------------------------- |
 | `refs/heads/main` | `PrivateGitHubCatalog` → `meshmakers/construction-kit-libraries-build` |
-| `refs/tags/r<X.Y.Z>` | `PublicGitHubCatalog` |
-| `refs/heads/test/0.2-dev` | `LocalFileSystemCatalog` (per-run, `Agent.TempDirectory`). The lane catalog `meshmakers/octo-catalog-dev` needs the `publishCkModelsToLaneCatalog` opt-in introduced in `tpl-v0.6.x`; this branch line deliberately does not set it. |
-| `refs/heads/dev/*`, feature branches | `LocalFileSystemCatalog` (per-run) |
+| `refs/tags/r<X.Y.Z>` | private **and** `PublicGitHubCatalog` |
+| every other branch (`test/0.2-dev`, `dev/*`, feature branches) | validate only, nothing published. The lane catalog `meshmakers/octo-catalog-dev` needs the `publishCkModelsToLaneCatalog` opt-in; this repo does not set it. |
 
-**Therefore every MSBuild step that can reach `CkCompile` must pass
-`/p:OctoPublishCatalog="$(effectivePublishCatalog)"` explicitly** — `Build src`,
-`Build samples`, `Build test CK model`, `Build tests` and `Test` all do. Omitting it on any one of them lets MSBuild read
-`OctoPublishCatalog` from the environment, which says `PrivateGitHubCatalog` on *every*
-branch, so a non-main build force-publishes into the main-lane catalog (AB#5413).
+**Every MSBuild step that can reach `CkCompile` passes `/p:OctoPublishCatalog=LocalFileSystemCatalog`
+explicitly** — `Build src`, `Build samples`, `Build test CK model`, `Build tests` and `Test` all do (the
+exception the template documents for solutions whose CK models depend on each other; the local catalog is
+run-isolated through `OctoLocalCatalogRootPath`). Omitting it on any one of them lets this repo's own
+`Directory.Build.targets` publish with whatever `OctoPublishCatalog` the environment holds (AB#5413).
 
 **CI build/test layout (AB#6093).** The job builds every project exactly once and the
 `Test` step runs with `--no-build --no-restore`:

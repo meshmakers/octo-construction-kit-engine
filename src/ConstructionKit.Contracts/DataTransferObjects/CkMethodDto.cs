@@ -195,7 +195,9 @@ public class CkMethodErrorDto
 public class CkMethodAuthorizationDto
 {
     /// <summary>
-    ///     Any-of role names (role claim).
+    ///     Any-of role names (role claim): one listed role suffices. DEFAULT-DENY (AB#6338, platform-owner decision
+    ///     2026-10-10): an omitted or empty list — and an omitted authorization block — admits administrators only, not
+    ///     every caller with <c>octo_api</c>. Adding a role is looser, removing one (or emptying the list) stricter.
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public List<string>? Roles { get; set; }
@@ -207,7 +209,8 @@ public class CkMethodAuthorizationDto
     public bool AllowSelf { get; set; }
 
     /// <summary>
-    ///     Additional required scopes.
+    ///     Additional required scopes, all-of: every listed scope is required in addition to <c>octo_api</c>. Adding a
+    ///     scope is stricter, removing one looser (AB#6338).
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public List<string>? Scopes { get; set; }

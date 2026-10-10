@@ -448,24 +448,86 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             case "timeoutSeconds":
                 return (CkSemVerLevel.Minor, "method timeout changed — behavioural change, no contract break (row M11)");
             case "authorization":
-                return change.NewValue == "none"
-                    ? (CkSemVerLevel.Minor, "method authorization removed — looser (row M12)")
-                    : (CkSemVerLevel.Major, "method authorization added — callers may lose access (row M12)");
-            case "roles" or "scopes":
-                // Assumption (no gateway yet, Phase 3): roles and scopes are any-of. Removing an entry is stricter,
-                // adding one looser; a mix of both is stricter.
-                var before = SplitNames(change.OldValue);
-                var after = SplitNames(change.NewValue);
-                return before.Except(after).Any()
-                    ? (CkSemVerLevel.Major, $"method authorization {change.Property} narrowed — callers may lose access (row M12)")
-                    : (CkSemVerLevel.Minor, $"method authorization {change.Property} widened — looser (row M12)");
+                return ClassifyAuthorizationBlockChange(change);
+            case "roles":
+                // AB#6338 (platform-owner decision 2026-10-10): roles are any-of under DEFAULT-DENY — empty roles mean
+                // "administrators only". Removing a role (also emptying the list) is stricter; adding one, also to an
+                // empty list, is looser.
+                return SplitNames(change.OldValue).Except(SplitNames(change.NewValue)).Any()
+                    ? (CkSemVerLevel.Major, "method authorization roles narrowed — callers holding a removed role lose access (row M12)")
+                    : (CkSemVerLevel.Minor, "method authorization roles widened — looser; security: method access widened (row M12)");
+            case "scopes":
+                // AB#6338: scopes are all-of (every listed scope is required in addition to octo_api).
+                return SplitNames(change.NewValue).Except(SplitNames(change.OldValue)).Any()
+                    ? (CkSemVerLevel.Major, "method authorization scope added — callers without it lose access, scopes are all-of (row M12)")
+                    : (CkSemVerLevel.Minor, "method authorization scope removed — looser, scopes are all-of; security: method access widened (row M12)");
             case "allowSelf":
                 return change.NewValue == "false"
                     ? (CkSemVerLevel.Major, "method no longer callable on the caller's own entity — stricter (row M12)")
-                    : (CkSemVerLevel.Minor, "method callable on the caller's own entity — looser (row M12)");
+                    : (CkSemVerLevel.Minor, "method callable on the caller's own entity — looser; security: method access widened (row M12)");
             default:
                 return (CkSemVerLevel.Major, DefensiveDefaultReasonPrefix + "method change — defensively classified as major");
         }
+    }
+
+    /// <summary>
+    ///     AB#6338 row M12, block added or removed. DEFAULT-DENY (platform-owner decision 2026-10-10): an omitted block
+    ///     admits administrators only — like empty roles and no scopes. Whether the owner of an instance may call a
+    ///     method without a block is the gateway's decision (F3.4); the classifier assumes the stricter reading on the
+    ///     side that matters: removing a block that allowed self-calls loses them, adding a block that forbids them may
+    ///     lose an owner access the omitted block granted. Major when any part is stricter, otherwise Minor.
+    /// </summary>
+    private static (CkSemVerLevel, string) ClassifyAuthorizationBlockChange(CkModelChange change)
+    {
+        var before = ParseAuthorization(change.OldValue);
+        var after = ParseAuthorization(change.NewValue);
+        var stricter = new List<string>();
+        if (before.Roles.Except(after.Roles).Any())
+        {
+            stricter.Add("roles narrowed");
+        }
+
+        if (after.Scopes.Except(before.Scopes).Any())
+        {
+            stricter.Add("scope required");
+        }
+
+        if (before.Declared ? before.AllowSelf && !after.AllowSelf : !after.AllowSelf)
+        {
+            stricter.Add("self-calls not admitted");
+        }
+
+        var what = before.Declared ? "authorization block removed" : "authorization block added";
+        return stricter.Count > 0
+            ? (CkSemVerLevel.Major,
+                $"method {what} — stricter under default-deny ({string.Join(", ", stricter)}); an omitted block admits " +
+                "administrators only (row M12)")
+            : (CkSemVerLevel.Minor,
+                $"method {what} — looser under default-deny; security: method access widened (row M12)");
+    }
+
+    private static (bool Declared, HashSet<string> Roles, bool AllowSelf, HashSet<string> Scopes) ParseAuthorization(
+        string? value)
+    {
+        if (value == null || value == "none")
+        {
+            return (false, [], false, []);
+        }
+
+        string Part(string name)
+        {
+            var start = value.IndexOf(name + " ", StringComparison.Ordinal);
+            if (start < 0)
+            {
+                return "";
+            }
+
+            start += name.Length + 1;
+            var end = value.IndexOf(';', start);
+            return (end < 0 ? value.Substring(start) : value.Substring(start, end - start)).Trim().Trim('[', ']');
+        }
+
+        return (true, SplitNames(Part("roles")), Part("allowSelf") == "true", SplitNames(Part("scopes")));
     }
 
     private static HashSet<string> SplitNames(string? value) =>
@@ -728,6 +790,10 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             { ElementKind: CkModelElementKind.TypeAttribute or CkModelElementKind.RecordAttribute
                 or CkModelElementKind.AssociationRoleAttribute, Property: "autoCompleteValues" or "autoIncrementReference" } => true,
             { ElementKind: CkModelElementKind.TypeMethod or CkModelElementKind.InterfaceMethod, Property: "timeoutSeconds" } => true,
+            // AB#6338: every looser authorization change is listed under "Behavioural changes" (security: method
+            // access widened), so reviewers see it; the level is unchanged.
+            { ElementKind: CkModelElementKind.TypeMethod or CkModelElementKind.InterfaceMethod,
+                Property: "roles" or "scopes" or "allowSelf" or "authorization" } => classified.Level == CkSemVerLevel.Minor,
             { ElementKind: CkModelElementKind.TypeIndex, ChangeKind: CkModelChangeKind.Removed } => true,
             { ElementKind: CkModelElementKind.TypeIndex } => !IsUniqueIndex(change.NewValue),
             _ => false

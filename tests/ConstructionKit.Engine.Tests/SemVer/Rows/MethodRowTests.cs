@@ -145,18 +145,82 @@ public class MethodRowTests
     [InlineData("interface")]
     public void M12_AuthorizationStricter_IsMajor_Looser_IsMinor(string owner)
     {
-        // stricter
+        // AB#6338 (platform-owner decision 2026-10-10): roles any-of, scopes all-of, DEFAULT-DENY — an omitted block
+        // or empty roles admit administrators only. The same rules apply to interface methods (metadata, not part of
+        // the invocation contract, row I12).
+        // roles: removed / emptied = stricter; added (also to an empty list) = looser
         Assert.Equal(CkSemVerLevel.Major, Required(Change(owner, m => m.Authorization!.Roles = [])));
-        Assert.Equal(CkSemVerLevel.Major, Required(Change(owner, m => m.Authorization!.Scopes = [])));
-        Assert.Equal(CkSemVerLevel.Major, Required(Change(owner, m => m.Authorization!.AllowSelf = false)));
-        // mixed: one role removed, another added
-        Assert.Equal(CkSemVerLevel.Major, Required(Change(owner, m => m.Authorization!.Roles = ["Other"])));
-        // looser
         Assert.Equal(CkSemVerLevel.Minor, Required(Change(owner, m => m.Authorization!.Roles = ["UserManagement", "Other"])));
+        var noRoles = Model();
+        Method(noRoles, owner).Authorization!.Roles = [];
+        Assert.Equal(CkSemVerLevel.Minor, Level(noRoles, Model()));
+        // scopes: added = stricter (all-of, gate case 7f), removed = looser
+        Assert.Equal(CkSemVerLevel.Major, Required(Change(owner, m => m.Authorization!.Scopes = ["extra_scope", "s2"])));
+        Assert.Equal(CkSemVerLevel.Minor, Required(Change(owner, m => m.Authorization!.Scopes = [])));
+        var noScopes = Model();
+        Method(noScopes, owner).Authorization!.Scopes = [];
+        Assert.Equal(CkSemVerLevel.Major, Level(noScopes, Model())); // gate case 7c: [] -> [s]
+        // allowSelf
+        Assert.Equal(CkSemVerLevel.Major, Required(Change(owner, m => m.Authorization!.AllowSelf = false)));
+        var noSelf = Model();
+        Method(noSelf, owner).Authorization!.AllowSelf = false;
+        Assert.Equal(CkSemVerLevel.Minor, Level(noSelf, Model()));
+        // mixed: stricter + looser = Major; looser + looser = Minor (the corpus "role added and scope removed")
+        Assert.Equal(CkSemVerLevel.Major, Required(Change(owner, m => m.Authorization!.Roles = ["Other"])));
+        Assert.Equal(CkSemVerLevel.Minor, Required(Change(owner, m =>
+        {
+            m.Authorization!.Roles = ["UserManagement", "Viewer"];
+            m.Authorization.Scopes = [];
+        })));
+    }
 
+    [Theory]
+    [InlineData("type")]
+    [InlineData("interface")]
+    public void M12_AuthorizationBlockRemovedOrAdded_IsOneChange_UnderDefaultDeny(string owner)
+    {
+        // Gate case 7a: removing the whole block is ONE change (no contradictory field lines). Under default-deny it
+        // empties the roles and drops self-calls: stricter, Major.
+        var removed = Change(owner, m => m.Authorization = null);
+        var authorization = Assert.Single(removed, c => c.Change.Property is "authorization" or "roles" or "scopes" or "allowSelf");
+        Assert.Equal("authorization", authorization.Change.Property);
+        Assert.Equal(CkSemVerLevel.Major, authorization.Level);
+        Assert.Contains("default-deny", authorization.Reason);
+
+        // Adding a block that only grants roles (and self-calls) is looser: Minor, listed as a security change.
         var baseline = Model();
-        Method(baseline, owner).Authorization!.AllowSelf = false;
-        Assert.Equal(CkSemVerLevel.Minor, Level(baseline, Model()));
+        Method(baseline, owner).Authorization = null;
+        var current = Model();
+        Method(current, owner).Authorization = new CkMethodAuthorizationDto { Roles = ["Ops"], AllowSelf = true };
+        var added = Assert.Single(Classify(baseline, current), c => c.Change.Property == "authorization");
+        Assert.Equal(CkSemVerLevel.Minor, added.Level);
+        Assert.True(added.IsBehavioural);
+        Assert.Contains("security: method access widened", added.Reason);
+
+        // Adding a block that requires a scope is stricter.
+        current = Model();
+        Method(current, owner).Authorization = new CkMethodAuthorizationDto { Roles = ["Ops"], AllowSelf = true, Scopes = ["s1"] };
+        Assert.Equal(CkSemVerLevel.Major, Level(baseline, current));
+    }
+
+    [Theory]
+    [InlineData("type")]
+    [InlineData("interface")]
+    public void M12_LooserAuthorization_IsListedAsBehaviouralSecurityChange(string owner)
+    {
+        foreach (var classified in new[]
+                 {
+                     Change(owner, m => m.Authorization!.Roles = ["UserManagement", "Other"]),
+                     Change(owner, m => m.Authorization!.Scopes = [])
+                 })
+        {
+            var change = Assert.Single(classified, c => c.Level == CkSemVerLevel.Minor);
+            Assert.True(change.IsBehavioural);
+            Assert.Contains("security: method access widened", change.Reason);
+        }
+
+        Assert.All(Change(owner, m => m.Authorization!.Roles = []).Where(c => c.Level == CkSemVerLevel.Major),
+            c => Assert.False(c.IsBehavioural));
     }
 
     [Theory]

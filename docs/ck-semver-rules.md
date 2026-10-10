@@ -317,7 +317,7 @@ are members of their own. The rendered `signature` is still reported as a readab
 | M9 | `kind` static ↔ instance | Major |
 | M10 | `idempotent` true → false / false → true | Major / Minor |
 | M11 | `timeoutSeconds` changed | Minor (behavioural) |
-| M12 | Authorization stricter (role or scope removed, `allowSelf` true → false, authorization added) / looser | Major / Minor; mixed → Major. **Assumption:** roles and scopes are any-of (any one listed role or scope suffices); Phase 3 (method gateway) confirms it |
+| M12 | Authorization stricter (role removed or roles emptied, **scope added**, `allowSelf` true → false, block removed) / looser (role added — also to an empty list —, **scope removed**, `allowSelf` set, block added that only grants) | Major / Minor; mixed → Major. Roles are any-of, **scopes all-of**, and authorization is **default-deny**: an omitted block or empty roles admit administrators only (AB#6338, platform-owner decision 2026-10-10; the F3.4 gateway enforces the same). A block added or removed is one change compared field by field: an omitted block counts as no roles and no scopes; for self-calls the stricter reading applies (removing a block that allowed them, or adding one that forbids them, is Major — whether an owner may call without a block is decided by F3.4). Every looser change is also listed under "Behavioural changes" as "security: method access widened" |
 | M13 | Parameter `sensitive` changed | Minor (interface method: Major, row I12) |
 | M14 | Description of the method, a parameter or an error | Patch |
 

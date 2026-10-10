@@ -538,15 +538,23 @@ public class CkModelDiffService : ICkModelDiffService
                     FormatTimeout(baselineMethod), FormatTimeout(currentMethod));
                 AddModified(methodChanges, kind, id, "idempotent",
                     baselineMethod.Execution?.Idempotent ?? false, currentMethod.Execution?.Idempotent ?? false);
-                AddModified(methodChanges, kind, id, "authorization",
-                    baselineMethod.Authorization == null ? "none" : "declared",
-                    currentMethod.Authorization == null ? "none" : "declared");
-                AddModified(methodChanges, kind, id, "roles",
-                    FormatNameSet(baselineMethod.Authorization?.Roles), FormatNameSet(currentMethod.Authorization?.Roles));
-                AddModified(methodChanges, kind, id, "scopes",
-                    FormatNameSet(baselineMethod.Authorization?.Scopes), FormatNameSet(currentMethod.Authorization?.Scopes));
-                AddModified(methodChanges, kind, id, "allowSelf",
-                    baselineMethod.Authorization?.AllowSelf ?? false, currentMethod.Authorization?.AllowSelf ?? false);
+                // AB#6338: a block added or removed is ONE change carrying both blocks (FormatAuthorization), so the
+                // classifier can compare them under default-deny; the field lines are only emitted when both versions
+                // declare a block (no contradictory "removed — looser" + "narrowed" lines).
+                if ((baselineMethod.Authorization == null) != (currentMethod.Authorization == null))
+                {
+                    AddModified(methodChanges, kind, id, "authorization",
+                        FormatAuthorization(baselineMethod.Authorization), FormatAuthorization(currentMethod.Authorization));
+                }
+                else
+                {
+                    AddModified(methodChanges, kind, id, "roles",
+                        FormatNameSet(baselineMethod.Authorization?.Roles), FormatNameSet(currentMethod.Authorization?.Roles));
+                    AddModified(methodChanges, kind, id, "scopes",
+                        FormatNameSet(baselineMethod.Authorization?.Scopes), FormatNameSet(currentMethod.Authorization?.Scopes));
+                    AddModified(methodChanges, kind, id, "allowSelf",
+                        baselineMethod.Authorization?.AllowSelf ?? false, currentMethod.Authorization?.AllowSelf ?? false);
+                }
 
                 DiffElements(methodChanges, CkModelElementKind.MethodParameter, baselineMethod.Parameters,
                     currentMethod.Parameters, p => $"{id}/{p.Name}",
@@ -594,6 +602,16 @@ public class CkModelDiffService : ICkModelDiffService
 
     private static string FormatTimeout(CkMethodDto method) =>
         (method.Execution?.TimeoutSeconds ?? CkMethodExecutionDto.DefaultTimeoutSeconds).ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>
+    ///     AB#6338: <c>none</c> for an omitted block, otherwise <c>roles [..]; allowSelf ..; scopes [..]</c> (sorted,
+    ///     de-duplicated sets) — parsed back by the classifier.
+    /// </summary>
+    internal static string FormatAuthorization(CkMethodAuthorizationDto? authorization) =>
+        authorization == null
+            ? "none"
+            : $"roles [{FormatNameSet(authorization.Roles)}]; allowSelf {FormatBool(authorization.AllowSelf)}; " +
+              $"scopes [{FormatNameSet(authorization.Scopes)}]";
 
     private static string FormatNameSet(IEnumerable<string>? names) =>
         string.Join(", ", (names ?? []).Distinct(StringComparer.Ordinal).OrderBy(n => n, StringComparer.Ordinal));

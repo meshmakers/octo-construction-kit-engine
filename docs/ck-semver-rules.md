@@ -272,7 +272,7 @@ internal element — transitively — is treated as public and the cap of N1/N2 
 public interface follows I11. **Inbound associations (N1, platform-owner decision 2026-10-10):** an association of an internal
 type that targets a public type (of this model or a dependency) adds an inbound navigation to that public type in
 GraphQL, which derived types in other models inherit; the association and its role (inbound name, multiplicities) are
-therefore public surface — removing the association or renaming the role is Major. The compiler does not forbid such
+therefore public surface — removing the association or renaming the role is Major, and so is removing or renaming the internal type that owns such an association (P3-1; an internal type without one stays removable as Minor). The compiler does not forbid such
 associations (classifier rule only). `CkVisibilityReferenceCoverageTests` fails when a CK DTO gains an element reference that the
 visibility walk does not cover.
 

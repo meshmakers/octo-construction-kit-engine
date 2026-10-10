@@ -342,7 +342,7 @@ dependency changed → Minor" is F2.4 (AB#5686).
 | D4 | Range or floor moves to another major | Major |
 | D5 | Range dependency added / removed | Minor / Major (as for exact pins) |
 | D6 | Model switches from exact pins to range retention, or back (`rangeRetention`) | Minor, reason points to the one-time re-pin (F2.6) |
-| D7 | `usedSurface` changed | not classified on its own (derived from the model's own changes); documented exclusion once it exists (AB#4472) |
+| D7 | `usedSurface` / `usedSurfaceHash` changed | not classified on its own (derived from the model's own changes); listed in `CkModelDiffService.ExcludedProperties` with that reason (AB#4472) |
 
 ### usedSurface (AB#4472)
 

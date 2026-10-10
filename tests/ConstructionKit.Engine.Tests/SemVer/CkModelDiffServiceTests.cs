@@ -358,4 +358,31 @@ public class CkModelDiffServiceTests
 
         Assert.DoesNotContain(new CkModelDiffService().Diff(baseline, current), c => c.Property == "derivedFromCkTypeId");
     }
+
+    [Fact]
+    public void RangeRetainingDiff_RendersAllForeignReferencesMajorQualified()
+    {
+        // N6 (gate case 5f): the previous release pinned Aux 2.0.0 exactly, the new one is range-retaining on Aux@1 —
+        // both sides render '@', never 'Aux-2' next to 'Aux@1'.
+        var baseline = SemVerTestModels.CreateModel();
+        SemVerTestModels.GetMachine(baseline).DerivedFromCkTypeId =
+            new CkId<CkTypeId>(new CkModelId("Aux-2.0.0"), new CkTypeId("Asset-1"));
+        var current = SemVerTestModels.CreateModel();
+        current.DependencyRanges = [new CkModelDependencyDto { Range = "Aux-[1.0,2.0)", Floor = "1.0.0" }];
+        SemVerTestModels.GetMachine(current).DerivedFromCkTypeId =
+            new CkId<CkTypeId>(CkModelId.MajorQualified("Aux", 1), new CkTypeId("Asset-1"));
+
+        var change = Assert.Single(new CkModelDiffService().Diff(baseline, current),
+            c => c.Property == "derivedFromCkTypeId");
+        Assert.Equal("Aux@2/Asset-1", change.OldValue);
+        Assert.Equal("Aux@1/Asset-1", change.NewValue);
+
+        // A pure v1 diff keeps the v1 rendering.
+        var v1Current = SemVerTestModels.CreateModel();
+        SemVerTestModels.GetMachine(v1Current).DerivedFromCkTypeId =
+            new CkId<CkTypeId>(new CkModelId("Aux-3.0.0"), new CkTypeId("Asset-1"));
+        var v1Change = Assert.Single(new CkModelDiffService().Diff(baseline, v1Current),
+            c => c.Property == "derivedFromCkTypeId");
+        Assert.Equal("Aux-2/Asset-1", v1Change.OldValue);
+    }
 }

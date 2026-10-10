@@ -256,6 +256,26 @@ public class CkModelDiffService : ICkModelDiffService
     /// <inheritdoc />
     public IReadOnlyList<CkModelChange> Diff(CkCompiledModelRoot baseline, CkCompiledModelRoot current)
     {
+        // AB#6342 / N6: when either version is range-retaining, references into other models render major-qualified
+        // ('Aux@2/Asset-1') everywhere — also exact pins and composite renderings — so an exact 'Aux-2...' and a
+        // major-qualified 'Aux@2' never show up side by side. Same major = same string, so comparisons are unchanged;
+        // pure v1 diffs keep their rendering.
+        var previous = MajorQualifiedRendering.Value;
+        MajorQualifiedRendering.Value = baseline.IsRangeRetaining || current.IsRangeRetaining;
+        try
+        {
+            return DiffCore(baseline, current);
+        }
+        finally
+        {
+            MajorQualifiedRendering.Value = previous;
+        }
+    }
+
+    private static readonly AsyncLocal<bool> MajorQualifiedRendering = new();
+
+    private IReadOnlyList<CkModelChange> DiffCore(CkCompiledModelRoot baseline, CkCompiledModelRoot current)
+    {
         var changes = new List<CkModelChange>();
         var modelName = current.ModelId.Name;
 
@@ -936,8 +956,13 @@ public class CkModelDiffService : ICkModelDiffService
             return null;
         }
 
-        return reference.ModelId.Name == modelName
-            ? $"{reference.ModelId.Name}/{reference.ElementId.FullName}"
+        if (reference.ModelId.Name == modelName)
+        {
+            return $"{reference.ModelId.Name}/{reference.ElementId.FullName}";
+        }
+
+        return MajorQualifiedRendering.Value
+            ? $"{reference.ModelId.Name}@{reference.ModelId.Version.Major}/{reference.ElementId.FullName}"
             : $"{reference.ModelId.SemanticVersionedFullName}/{reference.ElementId.FullName}";
     }
 

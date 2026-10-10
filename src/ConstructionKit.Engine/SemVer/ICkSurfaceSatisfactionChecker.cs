@@ -17,6 +17,8 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.SemVer;
 ///             <see cref="CkDependentVerdict.NeedsRepin" /> with the level of today's dependency rule.</item>
 ///         <item><b>Name collisions</b> (rows H6 / N2): an attribute or method the candidate newly declares on a type
 ///             collides with a member declared by a derived type of the dependent.</item>
+///         <item><b>Transitive dependent</b> without a dependency entry on the candidate: <see cref="CkDependentVerdict.Compatible" />
+///             (it is affected only through the dependents it depends on, which are checked on their own).</item>
 ///         <item>Not provable here: behavioural changes (<c>IsBehavioural</c>) and runtime data; the dry run only
 ///             proves that the surface still binds.</item>
 ///     </list>

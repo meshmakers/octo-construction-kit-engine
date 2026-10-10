@@ -1,0 +1,58 @@
+using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Engine.SemVer;
+
+namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.SemVer;
+
+/// <summary>
+///     AB#5437: edge cases of the surface satisfaction checker that need no catalog. The end-to-end verdicts on
+///     compiled models live in <c>CkCascadeTests</c> (Compiler.Tests).
+/// </summary>
+public class CkSurfaceSatisfactionCheckerTests
+{
+    private static CkSurfaceCandidate Candidate(string version = "2.3.0") =>
+        CkSurfaceCandidate.Create(
+            new CkCompiledModelRoot { ModelId = new CkModelId("Base", version), Types = [], Attributes = [] }, null, []);
+
+    private static CkCompiledModelRoot Dependent(params string[] dependencies) => new()
+    {
+        ModelId = new CkModelId("Dep", "1.0.0"), Dependencies = dependencies.Select(d => new CkModelId(d)).ToList()
+    };
+
+    private static readonly CkSurfaceSatisfactionChecker Checker = new(new CkSemVerClassifier());
+
+    [Fact]
+    public void A_model_that_names_the_candidate_nowhere_is_compatible_and_says_it_is_only_indirectly_affected()
+    {
+        var check = Checker.Check(Candidate(), Dependent("Other-1.0.0"));
+
+        Assert.Equal(CkDependentVerdict.Compatible, check.Verdict);
+        Assert.Contains("no direct dependency on Base", Assert.Single(check.Reasons));
+    }
+
+    [Fact]
+    public void An_exact_pin_of_another_major_is_not_in_range()
+    {
+        var check = Checker.Check(Candidate("3.0.0"), Dependent("Base-2.5.0"));
+
+        Assert.Equal(CkDependentVerdict.NotInRange, check.Verdict);
+    }
+
+    [Fact]
+    public void An_exact_pin_of_the_candidate_version_itself_is_compatible_without_a_repin()
+    {
+        var check = Checker.Check(Candidate("2.5.0"), Dependent("Base-2.5.0"));
+
+        Assert.Equal(CkDependentVerdict.Compatible, check.Verdict);
+        Assert.Null(check.RequiredLevel);
+    }
+
+    [Fact]
+    public void An_exact_pin_of_an_older_minor_needs_a_minor_repin()
+    {
+        var check = Checker.Check(Candidate("2.6.0"), Dependent("Base-2.5.0"));
+
+        Assert.Equal(CkDependentVerdict.NeedsRepin, check.Verdict);
+        Assert.Equal(Contracts.SemVer.CkSemVerLevel.Minor, check.RequiredLevel);
+    }
+}

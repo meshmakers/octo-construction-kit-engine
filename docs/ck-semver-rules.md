@@ -254,6 +254,9 @@ local and cached catalogs.
 | `Breaks` | A referenced element is gone or re-identified (`System-2.2.2/Entity-1`), became internal, or changed incompatibly (a Major change of the classifier); the candidate is below the dependent's floor (`floor not met`); or a name collision (below). The finding names the member. |
 | `NotInRange` | The dependent's range or pin does not cover the candidate's major, or the candidate is older than the pin. Listed, not counted. |
 
+A model that is listed only because it depends on a dependent (no entry for the candidate in its own dependencies) is `Compatible`
+("no direct dependency"): it is affected only through the dependents it depends on, which are checked on their own.
+
 **Name collisions (rows H6 / N2).** The classifier sees two versions of one model, so an addition to a stable base stays Minor.
 The dry run, which sees the dependents, reports as `Breaks` an attribute (compile error 13) or method (error 100) the candidate
 newly declares on a type when a type of the dependent that derives from it already declares the same name. Row N2: a stable base

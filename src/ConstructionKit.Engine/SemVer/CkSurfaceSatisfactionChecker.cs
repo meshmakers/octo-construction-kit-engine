@@ -39,7 +39,9 @@ public class CkSurfaceSatisfactionChecker : ICkSurfaceSatisfactionChecker
 
         if (entry == null && pin == null)
         {
-            return Result(CkDependentVerdict.NotInRange, [$"does not depend on {baseName}"]);
+            // Listed because it depends on a dependent of the candidate: nothing in it binds to the candidate directly.
+            return Result(CkDependentVerdict.Compatible,
+                [$"no direct dependency on {baseName}; affected only through the dependents it depends on"]);
         }
 
         // 1. Range / pin: is the candidate's major the one the dependent uses?

@@ -3,7 +3,9 @@ attributes:
   - id: CkArchiveConflictKey.Column
     description: "Attribute path of the archive column this key compares — the same spelling the author already used in Columns[].Path. The column must be declared on this archive and must be comparable (timestamp, numeric or enum key)."
     valueType: String
+    ownership: SeedOwned
   - id: CkArchiveConflictKey.Order
     description: "Which direction of this key counts as better."
     valueType: Enum
     valueCkEnumId: ${this}/CkConflictKeyOrder
+    ownership: SeedOwned

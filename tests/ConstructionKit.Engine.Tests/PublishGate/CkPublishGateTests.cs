@@ -25,12 +25,12 @@ public sealed class CkPublishGateTests : IDisposable
     {
         await _h.SeedAsync(GateModels.Create("2.4.0"));
 
-        var exception = await Assert.ThrowsAsync<CompilerException>(() =>
+        var exception = await Assert.ThrowsAsync<CkPublishRefusedException>(() =>
             _h.PublishAsync(GateModels.Create("2.5.0", enumValues: "A")));
 
-        Assert.Contains("OCTO-CK200", exception.Message);
-        Assert.Contains("MAJOR", exception.Message);
-        Assert.Contains("3.0.0", exception.Message);
+        Assert.Contains("OCTO-CK200", exception.AllText());
+        Assert.Contains("MAJOR", exception.AllText());
+        Assert.Contains("3.0.0", exception.AllText());
         Assert.Equal(0, _h.Stub.PublishCount);
         Assert.DoesNotContain(_h.Stub.ModelIds, id => id.Version == new CkVersion("2.5.0"));
         Assert.Contains(exception.OperationResult.Messages, m => m.MessageNumber == 200);
@@ -191,10 +191,10 @@ public sealed class CkPublishGateTests : IDisposable
         await _h.SeedAsync(GateModels.Create("2.4.0"));
         await _h.SeedAsync(GateModels.Create("2.5.0"));
 
-        var exception = await Assert.ThrowsAsync<CompilerException>(() =>
+        var exception = await Assert.ThrowsAsync<CkPublishRefusedException>(() =>
             _h.PublishAsync(GateModels.Create("2.5.0", enumValues: "A,B,C"), force: force));
 
-        Assert.Contains("OCTO-CK205", exception.Message);
+        Assert.Contains("OCTO-CK205", exception.AllText());
         Assert.Equal(0, _h.Stub.PublishCount);
     }
 
@@ -226,7 +226,7 @@ public sealed class CkPublishGateTests : IDisposable
     public async Task A_refused_publish_leaves_the_next_baseline_unchanged()
     {
         await _h.SeedAsync(GateModels.Create("2.4.0"));
-        await Assert.ThrowsAsync<CompilerException>(() => _h.PublishAsync(GateModels.Create("2.5.0", enumValues: "A")));
+        await Assert.ThrowsAsync<CkPublishRefusedException>(() => _h.PublishAsync(GateModels.Create("2.5.0", enumValues: "A")));
 
         var next = await _h.EvaluateAsync(GateModels.Create("2.5.0", enumValues: "A,B,C"));
 

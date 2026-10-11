@@ -55,9 +55,9 @@ public sealed class CkPublishEquivalenceTests : IDisposable
         var changed = Restated();
         changed.Enums![0].Values!.Add(new CkEnumValueDto { Key = 2, Name = "C" });
 
-        var exception = await Assert.ThrowsAsync<CompilerException>(() => _h.PublishAsync(changed));
+        var exception = await Assert.ThrowsAsync<CkPublishRefusedException>(() => _h.PublishAsync(changed));
 
-        Assert.Contains("OCTO-CK205", exception.Message);
+        Assert.Contains("OCTO-CK205", exception.AllText());
         Assert.Equal(0, _h.Stub.PublishCount);
     }
 

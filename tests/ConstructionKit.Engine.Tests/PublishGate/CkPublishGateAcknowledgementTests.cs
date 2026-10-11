@@ -126,10 +126,10 @@ public sealed class CkPublishGateAcknowledgementTests : IDisposable
         await _h.SeedAsync(Publishable("1.4.0"));
         var model = await FromJsonAsync(Publishable("1.5.0", CkAttributeAccessDto.Hidden), null);
 
-        var exception = await Assert.ThrowsAsync<CompilerException>(() => _h.PublishAsync(model));
+        var exception = await Assert.ThrowsAsync<CkPublishRefusedException>(() => _h.PublishAsync(model));
 
-        Assert.Contains("OCTO-CK203", exception.Message);
-        Assert.Contains($"\"{RecordKey}\"", exception.Message);
+        Assert.Contains("OCTO-CK203", exception.AllText());
+        Assert.Contains($"\"{RecordKey}\"", exception.AllText());
         Assert.Equal(0, _h.Stub.PublishCount);
         Assert.DoesNotContain(_h.Stub.ModelIds, id => id.Version == new CkVersion("1.5.0"));
     }
@@ -240,9 +240,9 @@ public sealed class CkPublishGateAcknowledgementTests : IDisposable
         await _h.SeedAsync(Publishable("1.4.0"));
         var model = Forged(Publishable("1.5.0", CkAttributeAccessDto.Hidden), (change, reason));
 
-        var exception = await Assert.ThrowsAsync<CompilerException>(() => _h.PublishAsync(model));
+        var exception = await Assert.ThrowsAsync<CkPublishRefusedException>(() => _h.PublishAsync(model));
 
-        Assert.Contains("OCTO-CK206", exception.Message);
+        Assert.Contains("OCTO-CK206", exception.AllText());
         Assert.Equal(0, _h.Stub.PublishCount);
     }
 

@@ -35,9 +35,9 @@ public sealed class CkPublishGateRepositoryTests : IDisposable
         await PublishAsync(V2("2.4.0"));
         var before = _h.Repository.Snapshot();
 
-        var exception = await Assert.ThrowsAsync<CompilerException>(() => PublishAsync(V2("2.5.0", "A")));
+        var exception = await Assert.ThrowsAsync<CkPublishRefusedException>(() => PublishAsync(V2("2.5.0", "A")));
 
-        Assert.Contains("OCTO-CK200", exception.Message);
+        Assert.Contains("OCTO-CK200", exception.AllText());
         Assert.Equal(before, _h.Repository.Snapshot());
 
         await PublishAsync(V2("3.0.0", "A"));
@@ -93,10 +93,10 @@ public sealed class CkPublishGateRepositoryTests : IDisposable
 
         // Same version, now ckLanguage 2: it would land in the other root with different content.
         var result = await EvaluateAsync(V2("3.0.0"));
-        var exception = await Assert.ThrowsAsync<CompilerException>(() => _h.PublishAsync(V2("3.0.0"), Catalog, true));
+        var exception = await Assert.ThrowsAsync<CkPublishRefusedException>(() => _h.PublishAsync(V2("3.0.0"), Catalog, true));
 
         Assert.Equal(["OCTO-CK205"], GateHarness.ErrorCodes(result));
-        Assert.Contains("OCTO-CK205", exception.Message);
+        Assert.Contains("OCTO-CK205", exception.AllText());
         Assert.False(HasFile("ck-models/v3/g/GateModel/3/ck-gatemodel-3.0.0.json"));
     }
 
@@ -141,9 +141,9 @@ public sealed class CkPublishGateRepositoryTests : IDisposable
 
         var payload = lane.Repository.Files["ck-models/v3/g/GateModel/2/ck-gatemodel-2.5.0.json"];
         Assert.Contains("\"C\"", payload);
-        var breaking = await Assert.ThrowsAsync<CompilerException>(() =>
+        var breaking = await Assert.ThrowsAsync<CkPublishRefusedException>(() =>
             lane.PublishAsync(V2("2.5.0", "A"), Catalog, force: true));
-        Assert.Contains("OCTO-CK200", breaking.Message);
+        Assert.Contains("OCTO-CK200", breaking.AllText());
     }
 
     [Fact]

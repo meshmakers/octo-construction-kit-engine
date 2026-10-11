@@ -82,7 +82,7 @@ internal static class GitHubCatalogDescription
 /// <summary>
 /// Construction kit model catalog for GitHub base class
 /// </summary>
-public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog
+public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog, IWithdrawnVersionCatalog
 {
     /// <summary>
     ///     Name of the GitHub repository of the development lane catalog (<c>meshmakers/octo-catalog-dev</c>, the private
@@ -519,6 +519,21 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog
         }
 
         return null;
+    }
+
+    /// <inheritdoc />
+    public async Task<WithdrawnVersionInfo?> FindWithdrawnVersionAsync(CkModelId modelId)
+    {
+        try
+        {
+            var entry = await FindWithdrawnAsync(modelId, CreateGitHubClient()).ConfigureAwait(false);
+            return entry == null ? null : new WithdrawnVersionInfo(entry.WithdrawnAt, entry.Reason);
+        }
+        catch (ApiException)
+        {
+            // The gate must not fail on an unreadable record; the write checks the record again and refuses there.
+            return null;
+        }
     }
 
     private async Task ThrowIfWithdrawnAsync(CkModelId modelId, IGitHubClientWrapper gitHubClient)

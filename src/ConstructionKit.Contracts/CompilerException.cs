@@ -64,20 +64,6 @@ public class CompilerException : Exception
             $"because it could not be resolved: {errors}", operationResult);
     }
 
-    /// <summary>
-    ///     The compatibility gate of the publish refused the model (AB#6386): nothing was written to the catalog.
-    ///     Carries the findings (<c>OCTO-CK200</c> to <c>OCTO-CK205</c>) in the exception text and in the
-    ///     <see cref="OperationResult" />.
-    /// </summary>
-    internal static Exception PublishRefusedByGate(string catalogName, CkModelId ckModelId,
-        IEnumerable<(string? Code, string Text)> findings, OperationResult operationResult)
-    {
-        var text = string.Join(" ", findings.Select(f => $"{f.Code}: {f.Text}"));
-        return new CompilerException(
-            $"Construction kit model '{ckModelId.FullName}' was NOT published to catalog '{catalogName}' because " +
-            $"it is refused by the compatibility gate. {text}", operationResult);
-    }
-
     internal static Exception DirectoryMustBeEmpty(string rootPath, OperationResult operationResult)
     {
         return new CompilerException($"Directory '{rootPath}' must be empty", operationResult);

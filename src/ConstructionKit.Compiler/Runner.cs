@@ -15,6 +15,16 @@ internal class Runner(ILogger<Runner> logger, ICommandParser parser)
 
             return 0;
         }
+        catch (CkPublishRefusedException ex)
+        {
+            // AB#6389: the publish gate refused the model. Summary first, then one line per reason (ordered,
+            // deduplicated), then the process ends with the code of every other verdict (-6).
+            logger.LogError("{Message}", ex.Message);
+
+            ex.OperationResult.WriteMessagesToLogger(logger);
+
+            return -6;
+        }
         catch (ModelValidationException ex) 
         {
             logger.LogError("{Message}", ex.Message);

@@ -16,8 +16,12 @@ public class PublicGitHubCatalog(
     IHttpClientFactory httpClientFactory,
     IGitHubClientFactory gitHubClientFactory,
     IOptions<PublicGitHubCatalogOptions> gitHubOptions) : GitHubCatalog(ckJsonSerializer, httpClientFactory,
-    gitHubClientFactory, gitHubOptions.Value, 20, "PublicGitHubCatalog",
-    GitHubCatalogDescription.ForRepository("Public GitHub catalog", gitHubOptions.Value));
+    gitHubClientFactory, gitHubOptions.Value, 20, PublicGitHubCatalog.Name,
+    GitHubCatalogDescription.ForRepository("Public GitHub catalog", gitHubOptions.Value))
+{
+    /// <summary>The name of the public catalog; unpublishing from it needs a reason (AB#5433).</summary>
+    public const string Name = "PublicGitHubCatalog";
+}
 
 /// <summary>
 /// Private catalog on GitHub for construction kit models.
@@ -78,8 +82,15 @@ internal static class GitHubCatalogDescription
 /// <summary>
 /// Construction kit model catalog for GitHub base class
 /// </summary>
-public abstract class GitHubCatalog : CachedCatalog
+public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog
 {
+    /// <summary>
+    ///     Name of the GitHub repository of the development lane catalog (<c>meshmakers/octo-catalog-dev</c>, the private
+    ///     catalog slot of the 0.2-dev instance, AB#5139). Published versions in this catalog may be replaced; in every
+    ///     other GitHub catalog they are immutable (AB#6386).
+    /// </summary>
+    public const string LaneCatalogRepositoryName = "octo-catalog-dev";
+
     private const string CatalogFileName = "catalog.json";
     private const int MaxCacheFileAgeSeconds = 60;
 
@@ -130,6 +141,11 @@ public abstract class GitHubCatalog : CachedCatalog
     {
         return sourceIdentifier == null;
     }
+
+    /// <inheritdoc />
+    public bool AllowsReplacingPublishedVersions =>
+        string.Equals(_gitHubOptions.GitHubRepositoryName, LaneCatalogRepositoryName,
+            StringComparison.OrdinalIgnoreCase);
 
     /// <inheritdoc />
     public override async Task<CkCompiledModelRoot> GetAsync(CkModelId modelId, OperationResult operationResult,
@@ -268,6 +284,17 @@ public abstract class GitHubCatalog : CachedCatalog
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
         var gitHubClient = CreateGitHubClient();
+
+        // AB#5433: an unpublished version number is burned, also for a forced publish.
+        try
+        {
+            await ThrowIfWithdrawnAsync(ckCompiledModel.ModelId, gitHubClient).ConfigureAwait(false);
+        }
+        catch (ApiException e)
+        {
+            throw ModelCatalogException.PublishFailed(ckCompiledModel.ModelId, CatalogName, e);
+        }
+
         // F1.1-S6: ckLanguage 2 / range-retaining models are published under ck-models/v3.
         var root = CkCatalogLayout.GetPublishRoot(ckCompiledModel);
         string filePath = CreatePath(root, ckCompiledModel.ModelId);
@@ -354,6 +381,152 @@ public abstract class GitHubCatalog : CachedCatalog
         catch (Exception e) when (e is ModelCatalogException or HttpRequestException or TaskCanceledException)
         {
             // Swallow — the publish itself is complete.
+        }
+    }
+
+    /// <inheritdoc />
+    public override async Task<CatalogUnpublishResult> UnpublishAsync(CkModelId modelId, string? reason = null,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+    {
+        var gitHubClient = CreateGitHubClient();
+        cancellationToken?.ThrowIfCancellationRequested();
+
+        var suffix = string.IsNullOrWhiteSpace(reason) ? "" : $": {reason!.Trim()}";
+        try
+        {
+            // The roots that hold the version: the model file exists or the per-major index lists it.
+            var holdingRoots = new List<string>();
+            foreach (var root in CkCatalogLayout.ReadRoots)
+            {
+                var file = await gitHubClient.GetFileAsync(CreatePath(root, modelId)).ConfigureAwait(false);
+                var versions = await gitHubClient
+                    .GetFileAsync(CatalogUnpublishIndex.VersionsCatalogPath(root, modelId)).ConfigureAwait(false);
+                if (file.HasValue || CatalogUnpublishIndex.ListsVersion(versions?.Item1, modelId))
+                {
+                    holdingRoots.Add(root);
+                }
+            }
+
+            if (holdingRoots.Count == 0)
+            {
+                if (await FindWithdrawnAsync(modelId, gitHubClient).ConfigureAwait(false) != null)
+                {
+                    return CatalogUnpublishResult.AlreadyWithdrawn;
+                }
+
+                throw ModelCatalogException.ModelNotFound(modelId, CatalogName);
+            }
+
+            _modelPayloadCache.TryRemove(modelId, out _);
+            foreach (var root in holdingRoots)
+            {
+                cancellationToken?.ThrowIfCancellationRequested();
+
+                // Safe order, like the blueprint unpublish: burn the number, prune the index tree (version, major,
+                // model), THEN delete the model file. A failure in between leaves a burned number and an orphan file
+                // that running unpublish again removes - never an index entry pointing at a deleted file.
+                await gitHubClient.UpsertFileWithMergeAsync(CatalogUnpublishIndex.WithdrawnFilePath(root, modelId.Name),
+                        $"Withdraw {modelId.FullName}{suffix}",
+                        existing => CatalogUnpublishIndex.AddWithdrawn(existing, modelId, reason))
+                    .ConfigureAwait(false);
+
+                var majorEmpty = false;
+                var versionsPath = CatalogUnpublishIndex.VersionsCatalogPath(root, modelId);
+                await gitHubClient.UpsertFileWithMergeAsync(versionsPath,
+                        $"Unpublish {modelId.FullName}{suffix}",
+                        existing =>
+                        {
+                            var merged = CatalogUnpublishIndex.RemoveVersion(existing, modelId, out majorEmpty);
+                            // The last version of the major: the file itself goes away below, not an empty index.
+                            return majorEmpty ? null : merged;
+                        })
+                    .ConfigureAwait(false);
+
+                if (majorEmpty)
+                {
+                    var modelEmpty = false;
+                    var libraryPath = CatalogUnpublishIndex.LibraryCatalogPath(root, modelId.Name);
+                    await gitHubClient.UpsertFileWithMergeAsync(libraryPath,
+                            $"Unpublish {modelId.FullName}{suffix}",
+                            existing =>
+                            {
+                                var merged = CatalogUnpublishIndex.RemoveMajor(existing, modelId.Version.Major,
+                                    out modelEmpty);
+                                return modelEmpty ? null : merged;
+                            })
+                        .ConfigureAwait(false);
+
+                    if (modelEmpty)
+                    {
+                        await gitHubClient.UpsertFileWithMergeAsync(CatalogUnpublishIndex.RootCatalogPath(root),
+                                $"Unpublish {modelId.FullName}{suffix}",
+                                existing => CatalogUnpublishIndex.RemoveModel(existing, modelId.Name))
+                            .ConfigureAwait(false);
+                        await DeleteIfExistsAsync(gitHubClient, libraryPath, $"Unpublish {modelId.FullName}{suffix}")
+                            .ConfigureAwait(false);
+                    }
+
+                    await DeleteIfExistsAsync(gitHubClient, versionsPath, $"Unpublish {modelId.FullName}{suffix}")
+                        .ConfigureAwait(false);
+                }
+
+                await DeleteIfExistsAsync(gitHubClient, CreatePath(root, modelId),
+                    $"Unpublish {modelId.FullName}{suffix}").ConfigureAwait(false);
+            }
+        }
+        catch (ApiException e)
+        {
+            throw ModelCatalogException.UnpublishFailed(modelId, CatalogName, e);
+        }
+
+        _modelPayloadCache.TryRemove(modelId, out _);
+
+        try
+        {
+            // Best effort, as after a publish: the refresh reads the gh-pages mirror, which lags the commits.
+            await RefreshCatalogAsync(true).ConfigureAwait(false);
+        }
+        catch (Exception e) when (e is ModelCatalogException or HttpRequestException or TaskCanceledException)
+        {
+            // Swallow - the unpublish itself is complete.
+        }
+
+        return CatalogUnpublishResult.Removed;
+    }
+
+    private static async Task DeleteIfExistsAsync(IGitHubClientWrapper gitHubClient, string path, string commitMessage)
+    {
+        var file = await gitHubClient.GetFileAsync(path).ConfigureAwait(false);
+        if (file.HasValue)
+        {
+            await gitHubClient.DeleteFileAsync(path, commitMessage, file.Value.Item2).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>AB#5433: the withdrawn record of the version in either root, or null. Read through the API (consistent).</summary>
+    private static async Task<SharedCatalogTypes.WithdrawnVersionEntry?> FindWithdrawnAsync(CkModelId modelId,
+        IGitHubClientWrapper gitHubClient)
+    {
+        foreach (var root in CkCatalogLayout.ReadRoots)
+        {
+            var file = await gitHubClient.GetFileAsync(CatalogUnpublishIndex.WithdrawnFilePath(root, modelId.Name))
+                .ConfigureAwait(false);
+            var entry = CatalogUnpublishIndex.FindWithdrawn(file?.Item1, modelId.Version);
+            if (entry != null)
+            {
+                return entry;
+            }
+        }
+
+        return null;
+    }
+
+    private async Task ThrowIfWithdrawnAsync(CkModelId modelId, IGitHubClientWrapper gitHubClient)
+    {
+        var entry = await FindWithdrawnAsync(modelId, gitHubClient).ConfigureAwait(false);
+        if (entry != null)
+        {
+            throw ModelCatalogException.VersionWithdrawn(modelId, CatalogName, entry.Reason, entry.WithdrawnAt);
         }
     }
 

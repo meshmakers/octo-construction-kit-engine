@@ -70,4 +70,27 @@ internal static class SharedCatalogTypes
         public string FilePath { get; set; } = string.Empty;
         public DateTime PublishedAt { get; set; }
     }
+
+    /// <summary>
+    /// AB#5433: the version numbers of one model that were unpublished ("burned"). Stored next to the model
+    /// directory in <c>withdrawn.json</c> — a file of its own, so a publish by an older engine, which rewrites the
+    /// index files it knows, cannot drop the records.
+    /// </summary>
+    internal class WithdrawnVersionsCatalog
+    {
+        public string Version { get; init; } = "1.0";
+        public string ModelId { get; init; } = string.Empty;
+        public List<WithdrawnVersionEntry> Withdrawn { get; set; } = [];
+        public DateTime UpdatedAt { get; set; }
+    }
+
+    /// <summary>
+    /// A burned version number
+    /// </summary>
+    internal class WithdrawnVersionEntry
+    {
+        public string Version { get; init; } = string.Empty;
+        public DateTime WithdrawnAt { get; init; }
+        public string? Reason { get; init; }
+    }
 }

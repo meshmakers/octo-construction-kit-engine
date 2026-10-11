@@ -332,6 +332,26 @@ internal class CatalogManager : ICatalogManager
             .ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
+    public async Task<CatalogUnpublishResult> UnpublishAsync(string catalogName, CkModelId modelId, string? reason,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+    {
+        var catalog = GetCatalogOrThrow(catalogName);
+
+        if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier))
+        {
+            throw ModelCatalogException.CatalogDoesNotSupportSourceIdentifier(catalogName);
+        }
+
+        if (!catalog.CanWrite)
+        {
+            throw ModelCatalogException.CatalogNotWritable(catalogName);
+        }
+
+        return await catalog.UnpublishAsync(modelId, reason, sourceIdentifier, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<bool> IsExistingAsync(string catalogName, CkModelId ckModelId, object? sourceIdentifier = null)
     {
         var catalog = _catalogs.FirstOrDefault(x => string.Compare(x.CatalogName,

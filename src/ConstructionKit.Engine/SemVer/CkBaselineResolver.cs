@@ -50,6 +50,53 @@ public class CkBaselineResolver : ICkBaselineResolver
         return resolution;
     }
 
+    /// <inheritdoc />
+    public async Task<CkBaselineResolution> ResolvePublishBaselineAsync(string modelName, CkVersion declaredVersion,
+        string targetCatalog)
+    {
+        var spellings = await GetSpellingsAsync(targetCatalog, modelName);
+        var listing = await _catalogService.ListAsync(targetCatalog, 0, int.MaxValue);
+        var known = (listing?.ModelResultItems ?? [])
+            .Select(i => i.ModelId)
+            .Where(id => string.Equals(id.Name, modelName, StringComparison.OrdinalIgnoreCase))
+            .Distinct()
+            .OrderBy(id => id.Version)
+            .ThenBy(id => id.Name, StringComparer.Ordinal)
+            .ToList();
+
+        // One range query for the reachability flag and the cache timestamp of the target catalog.
+        var majorStart = new CkVersion(declaredVersion.Major, 0, 0);
+        var probe = await QueryAsync(targetCatalog, spellings, majorStart, new CkVersion(declaredVersion.Major + 1, 0, 0));
+
+        var declaredEntry = known.FirstOrDefault(id => id.Version.CompareTo(declaredVersion) == 0);
+        var others = known.Where(id => id.Version.CompareTo(declaredVersion) != 0).ToList();
+        var sameMajor = others.Where(id => id.Version.Major == declaredVersion.Major &&
+                                           (declaredEntry == null || id.Version.CompareTo(declaredVersion) < 0))
+            .ToList();
+        var isFromLowerMajor = false;
+        CkModelId? baseline = sameMajor.LastOrDefault();
+        // An unreachable source may hide the same-major baseline: never fall back to a lower major then (OCTO-CK102).
+        if (baseline == null && !probe.SourceUnreachable && declaredVersion.Major > 0)
+        {
+            baseline = others.LastOrDefault(id => id.Version.Major < declaredVersion.Major);
+            isFromLowerMajor = baseline != null;
+        }
+
+        return new CkBaselineResolution
+        {
+            ModelName = modelName,
+            DeclaredVersion = declaredVersion,
+            Baseline = baseline,
+            CatalogName = baseline == null ? null : targetCatalog,
+            IsLocal = false,
+            IsFromLowerMajor = isFromLowerMajor,
+            CacheUpdatedAt = probe.CacheUpdatedAt,
+            SourceUnreachable = probe.SourceUnreachable,
+            DeclaredVersionPublished = declaredEntry,
+            KnownVersions = known
+        };
+    }
+
     private async Task<CkBaselineResolution> ResolveCoreAsync(string modelName, CkVersion declaredVersion,
         List<string> catalogs)
     {
@@ -60,21 +107,24 @@ public class CkBaselineResolver : ICkBaselineResolver
 
         // Rule 1 + 3: newest version of the declared major; local entries only below the declared version.
         var candidates = new List<Candidate>();
+        var spellings = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
         for (var order = 0; order < catalogs.Count; order++)
         {
             var catalog = catalogs[order];
             var isLocal = IsLocalCatalog(catalog);
+            var names = await GetSpellingsAsync(catalog, modelName);
+            spellings[catalog] = names;
             var upper = isLocal ? declaredVersion : nextMajorStart;
             if (upper.CompareTo(majorStart) > 0)
             {
-                var result = await QueryAsync(catalog, modelName, majorStart, upper);
+                var result = await QueryAsync(catalog, names, majorStart, upper);
                 sourceUnreachable |= result.SourceUnreachable;
                 AddCandidate(candidates, result, catalog, isLocal, order);
             }
 
             if (isLocal)
             {
-                ignored.AddRange(await ListLocalEntriesAsync(catalog, modelName, declaredVersion, nextMajorStart));
+                ignored.AddRange(await ListLocalEntriesAsync(catalog, names, declaredVersion, nextMajorStart));
             }
         }
 
@@ -86,7 +136,7 @@ public class CkBaselineResolver : ICkBaselineResolver
             for (var order = 0; order < catalogs.Count; order++)
             {
                 var catalog = catalogs[order];
-                var result = await QueryAsync(catalog, modelName, new CkVersion(0, 0, 0), majorStart);
+                var result = await QueryAsync(catalog, spellings[catalog], new CkVersion(0, 0, 0), majorStart);
                 sourceUnreachable |= result.SourceUnreachable;
                 AddCandidate(candidates, result, catalog, IsLocalCatalog(catalog), order);
             }
@@ -121,23 +171,68 @@ public class CkBaselineResolver : ICkBaselineResolver
     public static bool IsLocalCatalog(string catalogName) =>
         string.Equals(catalogName, LocalFileSystemCatalog.Name, StringComparison.OrdinalIgnoreCase);
 
-    private Task<ModelExistingResult> QueryAsync(string catalog, string modelName, CkVersion fromInclusive,
-        CkVersion toExclusive) =>
-        _catalogService.IsExistingAsync(catalog,
-            new CkModelIdVersionRange(modelName, $"[{fromInclusive},{toExclusive})"));
+    /// <summary>
+    ///     Asks one catalog for the newest version in <c>[from, to)</c> under any of the given spellings of the model name
+    ///     and keeps the highest hit; the unreachable flag is the OR over all answers.
+    /// </summary>
+    private async Task<ModelExistingResult> QueryAsync(string catalog, IReadOnlyList<string> spellings,
+        CkVersion fromInclusive, CkVersion toExclusive)
+    {
+        ModelExistingResult? best = null;
+        var unreachable = false;
+        foreach (var name in spellings)
+        {
+            var result = await _catalogService.IsExistingAsync(catalog,
+                new CkModelIdVersionRange(name, $"[{fromInclusive},{toExclusive})"));
+            unreachable |= result.SourceUnreachable;
+            if (result is { Exists: true, ModelId: not null } &&
+                (best?.ModelId == null || result.ModelId.Version.CompareTo(best.ModelId.Version) > 0))
+            {
+                best = result;
+            }
+        }
+
+        return (best ?? new ModelExistingResult { Exists = false, CatalogName = catalog }) with
+        {
+            SourceUnreachable = unreachable
+        };
+    }
+
+    /// <summary>
+    ///     AB#6386 (condition of the F2.2 acceptance, Odin 2026-10-10): the catalogs match model names case-sensitively,
+    ///     so a model published as <c>System.Bot</c> was invisible to a lookup of <c>system.bot</c> and looked like a first
+    ///     publication. This is the one place that discovers the other spellings of a model name in a catalog; every
+    ///     baseline lookup (compile gate, <c>ValidateVersion</c>, publish gate) goes through it. The exact spelling
+    ///     always comes first.
+    /// </summary>
+    internal async Task<IReadOnlyList<string>> GetSpellingsAsync(string catalog, string modelName)
+    {
+        var result = await _catalogService.ListAsync(catalog, 0, int.MaxValue);
+        var names = new List<string> { modelName };
+        foreach (var item in result?.ModelResultItems ?? [])
+        {
+            var name = item.ModelId.Name;
+            if (string.Equals(name, modelName, StringComparison.OrdinalIgnoreCase) && !names.Contains(name))
+            {
+                names.Add(name);
+            }
+        }
+
+        return names;
+    }
 
     /// <summary>
     ///     Lists the local entries in <c>[from, to)</c>, newest first, by narrowing the upper bound after each hit (the
     ///     local catalog answers range lookups from the files on disk).
     /// </summary>
-    private async Task<List<CkModelId>> ListLocalEntriesAsync(string catalog, string modelName, CkVersion from,
-        CkVersion to)
+    private async Task<List<CkModelId>> ListLocalEntriesAsync(string catalog, IReadOnlyList<string> spellings,
+        CkVersion from, CkVersion to)
     {
         var entries = new List<CkModelId>();
         var upper = to;
         while (upper.CompareTo(from) > 0 && entries.Count < MaxIgnoredLocalEntries)
         {
-            var result = await QueryAsync(catalog, modelName, from, upper);
+            var result = await QueryAsync(catalog, spellings, from, upper);
             if (!result.Exists || result.ModelId == null || result.ModelId.Version.CompareTo(upper) >= 0)
             {
                 break;

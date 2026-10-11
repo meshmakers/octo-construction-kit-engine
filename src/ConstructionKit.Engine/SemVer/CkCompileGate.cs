@@ -195,7 +195,7 @@ public class CkCompileGate
         return new CkCompileGateResult { Messages = messages, Verdict = verdict };
     }
 
-    private static void AddErrors(List<CkCompileGateMessage> messages, CkCompatibilityVerdict verdict,
+    internal static void AddErrors(List<CkCompileGateMessage> messages, CkCompatibilityVerdict verdict,
         string modelName, CkVersion declared, string? modelPath)
     {
         var validation = verdict.Validation;

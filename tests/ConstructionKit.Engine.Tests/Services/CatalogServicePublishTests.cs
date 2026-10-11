@@ -8,6 +8,7 @@ using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
+using Meshmakers.Octo.ConstructionKit.Engine.SemVer;
 using Meshmakers.Octo.ConstructionKit.Engine.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -36,7 +37,10 @@ public class CatalogServicePublishTests
     public CatalogServicePublishTests()
     {
         _sut = new CatalogService(NullLogger<CatalogService>.Instance, _catalogManager,
-            A.Fake<ICkSerializer>(), _catalogModelResolver, A.Fake<ICkCacheService>());
+            A.Fake<ICkSerializer>(), _catalogModelResolver, A.Fake<ICkCacheService>(),
+            // AB#6386: a gate that knows no catalog (not gated); the gate itself is tested in CkPublishGateTests
+            new Lazy<CkPublishGate>(() => new CkPublishGate(A.Fake<ICkBaselineResolver>(),
+                A.Fake<ICkCompatibilityVerdictService>(), A.Fake<ICatalogService>(), [], A.Fake<ICkJsonSerializer>())));
     }
 
     /// <summary>

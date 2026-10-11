@@ -96,6 +96,24 @@ public interface ICatalog
         CancellationToken? cancellationToken = null);
 
     /// <summary>
+    ///     Removes a published model version from the catalog (AB#5433) and records the version number as withdrawn
+    ///     ("burned"): it can never be published again with this catalog, because tenants and caches may already
+    ///     hold the old file. The index is pruned first, then the model file is removed. This method does not check
+    ///     for dependents; <c>ICatalogService.UnpublishAsync</c> does.
+    /// </summary>
+    /// <param name="modelId">The construction kit model id including the exact version</param>
+    /// <param name="reason">Optional reason; written to the commit message of a GitHub catalog and to the withdrawn record</param>
+    /// <param name="sourceIdentifier">An object, which describes the source which the catalog should search,
+    /// set it to null to use default</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
+    /// <returns><see cref="CatalogUnpublishResult.Removed" /> or, when the version was unpublished before,
+    /// <see cref="CatalogUnpublishResult.AlreadyWithdrawn" />. A version that was never published throws
+    /// <see cref="ModelCatalogException" />.</returns>
+    Task<CatalogUnpublishResult> UnpublishAsync(CkModelId modelId, string? reason = null,
+        object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null);
+
+    /// <summary>
     /// Lists all CK models in the catalog for the defined source identifier.
     /// </summary>
     /// <param name="sourceIdentifier">An object, which describes the source which the catalog should search,

@@ -79,9 +79,14 @@ public static class ServiceCollectionExtensions
         // AB#6294: one shared verdict (baseline model, diff, classification, validation) for every compatibility gate
         services.AddTransient<ICkCompatibilityVerdictService, CkCompatibilityVerdictService>();
         services.AddTransient<CkCompileGate>();
+        // AB#6386: gate 2, the compatibility verdict of every publish; lazy because it reads through ICatalogService
+        services.AddTransient<CkPublishGate>();
+        services.AddTransient<Lazy<CkPublishGate>>(sp => new Lazy<CkPublishGate>(sp.GetRequiredService<CkPublishGate>));
         // AB#5437: surface satisfaction checker and the cascade dry run built on it (read-only)
         services.AddTransient<ICkSurfaceSatisfactionChecker, CkSurfaceSatisfactionChecker>();
         services.AddTransient<ICkCascadeService, CkCascadeService>();
+        // AB#4469: whole-catalog consistency check behind octo-ckc -c ValidateCatalog (read-only)
+        services.AddTransient<ICkCatalogValidationService, CkCatalogValidationService>();
         services.AddTransient<ICkChangelogGenerator, CkChangelogGenerator>();
 
         // Add here sources of Ck model repositories

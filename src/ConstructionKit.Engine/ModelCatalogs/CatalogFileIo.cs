@@ -66,6 +66,25 @@ internal static class CatalogFileIo
     }
 
     /// <summary>
+    ///     Atomically writes <paramref name="text" /> to <paramref name="path" /> (temp file next to it, then rename).
+    /// </summary>
+    public static void WriteTextAtomically(string path, string text)
+    {
+        var directory = Path.GetDirectoryName(Path.GetFullPath(path))!;
+        Directory.CreateDirectory(directory);
+        var tempPath = Path.Combine(directory, $".{Path.GetFileName(path)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            File.WriteAllText(tempPath, text);
+            MoveIntoPlace(tempPath, path);
+        }
+        finally
+        {
+            TryDelete(tempPath);
+        }
+    }
+
+    /// <summary>
     ///     Acquires an exclusive cross-process lock (an OS-level exclusive open of <paramref name="lockFilePath" />;
     ///     on Unix .NET maps <see cref="FileShare.None" /> to an advisory <c>flock</c>). Dispose to release.
     /// </summary>

@@ -168,6 +168,13 @@ internal sealed class InMemoryGitHubClientWrapper : IGitHubClientWrapper
     private int _shaCounter;
 
     public int FileCount => _files.Count;
+
+    /// <summary>The commit messages of every write and delete, in order (AB#5433).</summary>
+    public List<string> CommitMessages { get; } = [];
+
+    /// <summary>All files with their content (AB#5433: byte-identical checks).</summary>
+    public Dictionary<string, string> Snapshot() => _files.ToDictionary(kv => kv.Key, kv => kv.Value.content);
+
     public bool Has(string path) => _files.ContainsKey(path);
     public string? Content(string path) => _files.TryGetValue(path, out var v) ? v.content : null;
 
@@ -176,12 +183,14 @@ internal sealed class InMemoryGitHubClientWrapper : IGitHubClientWrapper
 
     public Task UpdateFileAsync(string filePath, string commitMessage, string content, string sha)
     {
+        CommitMessages.Add(commitMessage);
         _files[filePath] = (content, NextSha());
         return Task.CompletedTask;
     }
 
     public Task CreateFileAsync(string filePath, string commitMessage, string content)
     {
+        CommitMessages.Add(commitMessage);
         _files[filePath] = (content, NextSha());
         return Task.CompletedTask;
     }
@@ -191,6 +200,7 @@ internal sealed class InMemoryGitHubClientWrapper : IGitHubClientWrapper
         var merged = merge(Content(filePath));
         if (merged != null)
         {
+            CommitMessages.Add(commitMessage);
             _files[filePath] = (merged, NextSha());
         }
 
@@ -199,6 +209,7 @@ internal sealed class InMemoryGitHubClientWrapper : IGitHubClientWrapper
 
     public Task DeleteFileAsync(string filePath, string commitMessage, string sha)
     {
+        CommitMessages.Add(commitMessage);
         _files.Remove(filePath);
         return Task.CompletedTask;
     }

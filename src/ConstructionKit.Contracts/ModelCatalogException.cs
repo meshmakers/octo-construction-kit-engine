@@ -52,7 +52,45 @@ public class ModelCatalogException : Exception
             $"GitHub {operation} of '{path}' failed after {tries} with HTTP {statusCode}{detail}", inner);
     }
 
-    internal static Exception ModelAlreadyExists(CkModelId ckModelId, string catalogName)
+    internal static Exception UnpublishFailed(CkModelId modelId, string catalogName, Exception exception)
+    {
+        return new ModelCatalogException(
+            $"Unpublishing model '{modelId}' from catalog '{catalogName}' failed: {exception.Message}", exception);
+    }
+
+    /// <summary>
+    ///     AB#5433: the version number was unpublished earlier and is burned — it is never published again, because
+    ///     tenants and caches may hold the old file.
+    /// </summary>
+    internal static Exception VersionWithdrawn(CkModelId modelId, string catalogName, string? reason,
+        DateTime? withdrawnAt)
+    {
+        var detail = withdrawnAt == null ? "" : $" on {withdrawnAt:yyyy-MM-dd}";
+        var because = string.IsNullOrWhiteSpace(reason) ? "" : $" ({reason})";
+        return new ModelCatalogException(
+            $"Version '{modelId}' was unpublished from catalog '{catalogName}'{detail}{because}. A withdrawn version " +
+            "number is burned and is never published again; publish the next free version number instead.");
+    }
+
+    /// <summary>AB#5433: unpublish is refused while published models still depend on the version.</summary>
+    internal static Exception UnpublishRefusedDependents(CkModelId modelId, string catalogName,
+        IReadOnlyList<ModelCatalogs.UnpublishDependent> dependents)
+    {
+        var list = string.Join(", ", dependents.Select(d => $"{d.ModelId} (needs {d.Range})"));
+        return new ModelCatalogException(
+            $"Cannot unpublish '{modelId}' from catalog '{catalogName}': published models still depend on it and would " +
+            $"be left with an unresolvable dependency: {list}. Unpublish or replace the dependents first.");
+    }
+
+    /// <summary>AB#5433: the public catalog needs a reason for every unpublish.</summary>
+    internal static Exception UnpublishReasonRequired(string catalogName)
+    {
+        return new ModelCatalogException(
+            $"Unpublishing from the public catalog '{catalogName}' requires a reason (--reason); it is written to the " +
+            "commit message of the catalog change.");
+    }
+
+        internal static Exception ModelAlreadyExists(CkModelId ckModelId, string catalogName)
     {
         return new ModelCatalogException($"Model '{ckModelId}' already exists in catalog '{catalogName}'.");
     }

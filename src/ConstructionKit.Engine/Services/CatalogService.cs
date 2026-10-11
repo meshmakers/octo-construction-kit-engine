@@ -3,6 +3,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
@@ -141,6 +142,99 @@ internal class CatalogService : ICatalogService
         await _catalogManager
             .PublishAsync(catalogName, ckCompiledModel, isForced, sourceIdentifier, cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<UnpublishPlan> PlanUnpublishAsync(string catalogName, CkModelId modelId,
+        CancellationToken? cancellationToken = null)
+    {
+        await _catalogManager.RefreshCatalogCacheAsync(catalogName, null, true).ConfigureAwait(false);
+        var models = await ListCatalogModelsAsync(catalogName, cancellationToken).ConfigureAwait(false);
+        var isPublished = models.Contains(modelId);
+        if (!isPublished)
+        {
+            return new UnpublishPlan { ModelId = modelId, CatalogName = catalogName, IsPublished = false };
+        }
+
+        var dependents = await FindUnpublishDependentsAsync(catalogName, modelId, models, cancellationToken)
+            .ConfigureAwait(false);
+        return new UnpublishPlan
+        {
+            ModelId = modelId, CatalogName = catalogName, IsPublished = true, Dependents = dependents
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<CatalogUnpublishResult> UnpublishAsync(string catalogName, CkModelId modelId, string? reason,
+        CancellationToken? cancellationToken = null)
+    {
+        if (string.Equals(catalogName, PublicGitHubCatalog.Name, StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrWhiteSpace(reason))
+        {
+            throw ModelCatalogException.UnpublishReasonRequired(catalogName);
+        }
+
+        var plan = await PlanUnpublishAsync(catalogName, modelId, cancellationToken).ConfigureAwait(false);
+        if (plan.Dependents.Count > 0)
+        {
+            throw ModelCatalogException.UnpublishRefusedDependents(modelId, catalogName, plan.Dependents);
+        }
+
+        _logger.LogInformation("Unpublishing {ModelId} from catalog {CatalogName}", modelId, catalogName);
+        return await _catalogManager.UnpublishAsync(catalogName, modelId, reason, null, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<HashSet<CkModelId>> ListCatalogModelsAsync(string catalogName,
+        CancellationToken? cancellationToken)
+    {
+        var result = await _catalogManager.ListAsync(catalogName, 0, int.MaxValue, null, cancellationToken)
+            .ConfigureAwait(false);
+        return new HashSet<CkModelId>(result.ModelResultItems.Select(i => i.ModelId));
+    }
+
+    /// <summary>
+    ///     The published models of the catalog that would be left without a satisfying version: a dependency range
+    ///     (the exact pin of a classic model, the declared range of a range-retaining one) that the unpublished version
+    ///     satisfies and no remaining version of the same model satisfies.
+    /// </summary>
+    private async Task<IReadOnlyList<UnpublishDependent>> FindUnpublishDependentsAsync(string catalogName,
+        CkModelId target, HashSet<CkModelId> models, CancellationToken? cancellationToken)
+    {
+        var remaining = models.Where(m => string.Equals(m.Name, target.Name, StringComparison.OrdinalIgnoreCase) &&
+                                          m != target).ToList();
+        var candidates = models.Where(m => !string.Equals(m.Name, target.Name, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(m => m.Name, StringComparer.Ordinal).ThenBy(m => m.Version).ToList();
+
+        var dependents = new System.Collections.Concurrent.ConcurrentBag<UnpublishDependent>();
+        using var gate = new SemaphoreSlim(8);
+        var tasks = candidates.Select(async candidate =>
+        {
+            await gate.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                cancellationToken?.ThrowIfCancellationRequested();
+                var operationResult = new OperationResult();
+                var compiled = await _catalogManager
+                    .GetAsync(catalogName, candidate, operationResult, cancellationToken).ConfigureAwait(false);
+                foreach (var range in compiled.GetResolutionRanges())
+                {
+                    if (string.Equals(range.Name, target.Name, StringComparison.OrdinalIgnoreCase) &&
+                        range.IsSatisfiedBy(target) && !remaining.Any(range.IsSatisfiedBy))
+                    {
+                        dependents.Add(new UnpublishDependent(candidate, range.ToString()));
+                    }
+                }
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }).ToList();
+        await Task.WhenAll(tasks).ConfigureAwait(false);
+
+        return dependents.OrderBy(d => d.ModelId.Name, StringComparer.Ordinal).ThenBy(d => d.ModelId.Version)
+            .ToList();
     }
 
     public async Task<ModelExistingResult> IsExistingAsync(string catalogName,

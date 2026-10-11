@@ -209,8 +209,9 @@ Gate 2 of the CK v2 compatibility concept (§4.3.3). Whoever publishes a model t
 computed against the catalog being published to. The gate sits in `CatalogService.PublishAsync` (class `CkPublishGate`),
 so `octo-ckc -c Publish`, the MSBuild publish of `CkCompile` and every other caller are covered by one implementation;
 no pipeline step can forget it and there is no bypass switch (`-r/--replace` only decides whether an existing file may be
-overwritten, never whether the gate runs). A refusal throws a `CompilerException` (exit code `-5`, MSBuild error) with one
-message per finding and **writes nothing**.
+overwritten, never whether the gate runs). A refusal throws a `CkPublishRefusedException` (a `ModelValidationException`:
+exit code `-6`, the code of every other verdict, MSBuild error) with one message per reason and **writes nothing**. All
+reasons of one publish are reported together, see "One refusal" below (AB#6389).
 
 | Aspect | Rule |
 | ------ | ---- |
@@ -226,6 +227,60 @@ message per finding and **writes nothing**.
 | ---- | ------- | ----------- |
 | `OCTO-CK205` | The declared version is already published to the catalog with different content | Raise the version in `ckModel.yaml` and publish again; published versions are never replaced (only the dev-lane catalog allows it) |
 | `OCTO-CK206` | An entry of `compatibility.acknowledge` in the compiled model violates the entry rules (empty or wildcard or duplicate `change`, empty `reason`, not single-line plain text) | Recompile the model from a valid `ckModel.yaml`; never edit the compiled file by hand |
+| `OCTO-CK207` | The version number was unpublished earlier (`Unpublish`, AB#5433) and is burned; reported by the gate (AB#6389) instead of the catalog throwing at write time (the write still checks it) | Publish the next free version number |
+
+### One refusal (AB#6389)
+
+A publisher who fixes one reason and then meets the next one publishes five times. The gate therefore collects **every**
+reason and reports them in one refusal:
+
+- **Same-version refusal continues.** `OCTO-CK205` (the version is published with different content) no longer ends the
+  evaluation: the verdict against the baseline strictly below the declared version, the acknowledgement findings and a
+  burned number (`OCTO-CK207`) are reported in the same refusal.
+- **Order**, most fundamental first: `OCTO-CK207`, `OCTO-CK205` (the version number is unusable), `OCTO-CK202`
+  (baseline unknown), `OCTO-CK201`, `OCTO-CK200` (the declared version is too low), `OCTO-CK206`, `OCTO-CK203`,
+  `OCTO-CK204` (acknowledgements). Inside one code the order of detection is kept. Repeated `(code, text)` pairs are
+  dropped (`CkPublishRefusal.Normalize`).
+- **Message contract.** Every reason is one self-contained line:
+  `[compat gate] OCTO-CK200 (model 'Name-1.2.3', catalog 'Catalog'): <what is wrong> Next step: <what to do>`.
+  The exception text is a one-line summary (`... was NOT published to catalog '...': refused by the compat gate with N
+  reason(s) (codes). Nothing was written.`). A compat-gate text never mentions O1.
+- **One output for every caller.** `CatalogService.PublishAsync` writes the lines into the `OperationResult` of the call
+  and throws `CkPublishRefusedException`. `octo-ckc -c Publish` prints the summary and then each line once
+  (`Runner`, exit code `-6`); the MSBuild publish of `CkCompile` logs each line as an MSBuild error (message number
+  = the `CK2xx` number). Same lines, same order.
+- **Exit codes.** A refusal is a verdict about the model and ends with `-6` (`250` in a POSIX shell), like `ValidateVersion`
+  (`OCTO-CK1xx`), `ValidateCascade` and `ValidateCatalog`. `-5` stays for a model that could not be resolved (the publish
+  fails before the gate), `-99` for an unexpected exception. Gate on `-ne 0`, never on a single value.
+
+### The two gates in front of a catalog publish (O1 guard and compat gate)
+
+Two independent gates stand in front of a publish. They never waive each other.
+
+| Gate | Where it lives | Question | Output |
+| ---- | -------------- | -------- | ------ |
+| **O1 guard** (operating rule O1, AB#6277) | Pipeline only: `templates/steps/ck-o1-guard.yml` of `octo-pipeline-templates`, a PowerShell step; the engine does not know it | May a ckLanguage-2 or range-retaining model (or a blueprint on one) go to this target catalog at all? Decided by the model kind and the target catalog; switch `OctoCkO1Lifted`; only `octo-catalog-dev` is the dev exception; an empty or unknown target counts as shared | `##vso[task.logissue type=error]O1: ...` |
+| **Compat gate** (this section) | Engine: `CkPublishGate` in `CatalogService.PublishAsync` | Is this version compatible with what the target catalog holds, and are the acknowledgements, the version number and the baseline in order? | `[compat gate] OCTO-CK2xx ...` lines, exit `-6` |
+
+Order in every lane: **O1 guard, ValidateVersion, cascade check (`ValidateCascade`), publish (compat gate inside)**. A
+model the O1 guard refuses never reaches the compat gate (no compatibility verdict in that log); a model it lets through
+(switch on, or dev-lane target) always passes the other gates. The engine decides from the model and the target catalog
+only; the O1 state is not an input, so lifting O1 (AB#6279) or the dev-catalog exception never switches the compat gate off.
+
+| Target catalog | Model | O1 switch | O1 guard | Compat gate |
+| -------------- | ----- | --------- | -------- | ----------- |
+| private, public | v1 | any | passes | decides (v1 verdict as before) |
+| private, public | ckLanguage 2 / range-retaining | off | **refuses** (`O1`), compat gate not reached | not reached |
+| private, public | ckLanguage 2 / range-retaining | on | lets through (logs "O1 lifted") | decides: breaking without major = `OCTO-CK200` |
+| dev lane (`octo-catalog-dev`) | v1 | any | passes | decides |
+| dev lane | ckLanguage 2 / range-retaining | any | lets through (dev exception) | decides: breaking = `OCTO-CK200`, a replace of a published version is judged against the version strictly below |
+| empty / unknown target | v1 | any | passes | decides |
+| empty / unknown target | ckLanguage 2 / range-retaining | off | **refuses** (counts as shared) | not reached |
+| empty / unknown target | ckLanguage 2 / range-retaining | on | lets through | decides |
+
+The engine rows are covered by `CkPublishRefusalTests`, `CkPublishGateRepositoryTests` (private/public layout, dev lane)
+and `PublishCommandGateTests`; the O1 rows by the Pester fixtures of `octo-pipeline-templates`
+(`tests/ck-o1-guard.Tests.ps1`).
 
 **v1 replay.** Replaying the 152 published versions of the public catalog in release order through the gate (opt-in test
 `PublishGateReplayTests`, set `OCTO_PUBLISH_GATE_REPLAY_DIR`) refuses 18 early releases (2.0.x/2.1.x era patch or minor

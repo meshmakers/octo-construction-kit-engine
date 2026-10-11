@@ -159,6 +159,20 @@ public class CkPublishGate
         var declared = model.ModelId.Version;
         var messages = new List<CkCompileGateMessage>();
 
+        // Burned number (AB#5433): reported together with the other reasons; the write checks it again.
+        if (catalog is IWithdrawnVersionCatalog withdrawnCatalog)
+        {
+            var withdrawn = await withdrawnCatalog.FindWithdrawnVersionAsync(model.ModelId).ConfigureAwait(false);
+            if (withdrawn != null)
+            {
+                var because = string.IsNullOrWhiteSpace(withdrawn.Reason) ? "" : $" ({withdrawn.Reason})";
+                messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Error, CkPublishRefusal.BurnedVersionCode,
+                    $"Version '{model.ModelId.FullName}' was unpublished from catalog '{catalog.CatalogName}' on " +
+                    $"{withdrawn.WithdrawnAt:yyyy-MM-dd}{because}. A withdrawn version number is burned and is never " +
+                    "published again."));
+            }
+        }
+
         // Same-version rule: published versions are immutable.
         if (resolution.DeclaredVersionPublished != null)
         {
@@ -185,21 +199,24 @@ public class CkPublishGate
 
                 return new CkPublishGateResult
                 {
-                    Decision = CkPublishGateDecision.AlreadyPublished, Messages = messages
+                    Decision = CkPublishGateDecision.AlreadyPublished, Messages = CkPublishRefusal.Normalize(messages)
                 };
             }
 
             if (!allowsReplace)
             {
+                // No early return (AB#6389): the publisher raises the version next, so the reasons that apply to the
+                // raised version (compatibility, acknowledgements) are reported now, not one refusal at a time.
                 messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Error, "OCTO-CK205",
                     $"Model '{published.FullName}' is already published to catalog '{catalog.CatalogName}' with " +
                     "different content. Published versions are immutable (also with --replace); raise the version " +
                     "in ckModel.yaml and publish again."));
-                return new CkPublishGateResult { Decision = CkPublishGateDecision.Refused, Messages = messages };
             }
-
-            messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Info, null,
-                $"Model '{published.FullName}' is replaced in lane catalog '{catalog.CatalogName}'."));
+            else
+            {
+                messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Info, null,
+                    $"Model '{published.FullName}' is replaced in lane catalog '{catalog.CatalogName}'."));
+            }
         }
 
         if (resolution.Baseline == null)
@@ -210,7 +227,10 @@ public class CkPublishGate
                     $"The compatibility baseline of model '{modelName}' could not be determined because catalog " +
                     $"'{catalog.CatalogName}' was unreachable during the last cache refresh. Check network " +
                     "connectivity and the catalog access tokens and retry. The gate is not skipped silently."));
-                return new CkPublishGateResult { Decision = CkPublishGateDecision.Refused, Messages = messages };
+                return new CkPublishGateResult
+                {
+                    Decision = CkPublishGateDecision.Refused, Messages = CkPublishRefusal.Normalize(messages)
+                };
             }
 
             messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Info, null,
@@ -226,7 +246,7 @@ public class CkPublishGate
                 Decision = messages.Any(m => m.Severity == CkCompileGateSeverity.Error)
                     ? CkPublishGateDecision.Refused
                     : CkPublishGateDecision.Proceed,
-                Messages = messages
+                Messages = CkPublishRefusal.Normalize(messages)
             };
         }
 
@@ -249,7 +269,7 @@ public class CkPublishGate
         return new CkPublishGateResult
         {
             Decision = failed ? CkPublishGateDecision.Refused : CkPublishGateDecision.Proceed,
-            Messages = messages,
+            Messages = CkPublishRefusal.Normalize(messages),
             Verdict = verdict
         };
     }
@@ -303,5 +323,5 @@ public class CkPublishGate
         new(CkCompileGateSeverity.Error, code, text);
 
     private static CkPublishGateResult Refused(CkCompileGateMessage error) =>
-        new() { Decision = CkPublishGateDecision.Refused, Messages = [error] };
+        new() { Decision = CkPublishGateDecision.Refused, Messages = CkPublishRefusal.Normalize([error]) };
 }

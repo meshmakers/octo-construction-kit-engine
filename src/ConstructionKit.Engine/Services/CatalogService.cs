@@ -154,14 +154,17 @@ internal class CatalogService : ICatalogService
             .ConfigureAwait(false);
         foreach (var message in gateResult.Messages)
         {
-            AddGateMessage(operationResult, ckCompiledModel, message);
+            AddGateMessage(operationResult, catalogName, ckCompiledModel, message);
         }
 
         switch (gateResult.Decision)
         {
             case CkPublishGateDecision.Refused:
-                throw CompilerException.PublishRefusedByGate(catalogName, ckCompiledModel.ModelId,
-                    gateResult.Messages.Where(m => m.Severity == CkCompileGateSeverity.Error).Select(m => (m.Code, m.Text)),
+                // AB#6389: one refusal for every caller. The reasons are already in the operation result (ordered,
+                // deduplicated, one line each); the exception carries the summary and ends the process with -6.
+                throw new CkPublishRefusedException(
+                    CkPublishRefusal.FormatSummary(catalogName, ckCompiledModel.ModelId,
+                        gateResult.Messages.Where(m => m.Severity == CkCompileGateSeverity.Error).ToList()),
                     operationResult);
             case CkPublishGateDecision.AlreadyPublished:
                 _logger.LogInformation("Model {ModelId} is already published to catalog {CatalogName}, nothing to do",
@@ -267,7 +270,7 @@ internal class CatalogService : ICatalogService
             .ToList();
     }
 
-    private void AddGateMessage(OperationResult operationResult, CkCompiledModelRoot model,
+    private void AddGateMessage(OperationResult operationResult, string catalogName, CkCompiledModelRoot model,
         CkCompileGateMessage message)
     {
         if (message.Severity == CkCompileGateSeverity.Error)
@@ -277,7 +280,7 @@ internal class CatalogService : ICatalogService
                 ? n
                 : 0;
             operationResult.AddMessage(new OperationMessage(MessageLevel.Error, model.ModelId.FullName, number,
-                $"{message.Code}: {message.Text}"));
+                CkPublishRefusal.FormatReason(catalogName, model.ModelId, message)));
         }
         else if (message.Severity == CkCompileGateSeverity.Warning)
         {

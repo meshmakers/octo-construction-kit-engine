@@ -9,6 +9,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Tests;
 
@@ -101,10 +102,10 @@ public sealed class PublishCommandGateTests : IDisposable
         var before = await HashesAsync();
         var file = await CompileToFileAsync(WriteModel("2.5.0", "A"));
 
-        var exception = await Assert.ThrowsAsync<CompilerException>(() => PublishAsync(file));
+        var exception = await Assert.ThrowsAsync<CkPublishRefusedException>(() => PublishAsync(file));
 
-        Assert.Contains("OCTO-CK200", exception.Message);
-        Assert.Contains("3.0.0", exception.Message);
+        Assert.Contains("OCTO-CK200", exception.AllText());
+        Assert.Contains("3.0.0", exception.AllText());
         Assert.Equal(before, await HashesAsync());
         Assert.Contains(exception.OperationResult.Messages, m => m.MessageNumber == 200);
     }
@@ -115,9 +116,9 @@ public sealed class PublishCommandGateTests : IDisposable
         await SeedAsync("2.4.0");
         var file = await CompileToFileAsync(WriteModel("2.5.0", "A"));
 
-        var exception = await Assert.ThrowsAsync<CompilerException>(() => PublishAsync(file, replace: true));
+        var exception = await Assert.ThrowsAsync<CkPublishRefusedException>(() => PublishAsync(file, replace: true));
 
-        Assert.Contains("OCTO-CK200", exception.Message);
+        Assert.Contains("OCTO-CK200", exception.AllText());
     }
 
     [Fact]
@@ -141,9 +142,48 @@ public sealed class PublishCommandGateTests : IDisposable
         Assert.Contains("3.0.0", json);
         await File.WriteAllTextAsync(edited, json.Replace("3.0.0", "2.4.1"), TestContext.Current.CancellationToken);
 
-        var exception = await Assert.ThrowsAsync<CompilerException>(() => PublishAsync(edited));
+        var exception = await Assert.ThrowsAsync<CkPublishRefusedException>(() => PublishAsync(edited));
 
-        Assert.Contains("OCTO-CK200", exception.Message);
+        Assert.Contains("OCTO-CK200", exception.AllText());
         Assert.False(await _published.IsExistingAsync(new CkModelId("PublishModel", "2.4.1")));
+    }
+
+    [Fact]
+    public async Task A_refusal_ends_the_process_with_minus_6_like_every_other_verdict_and_prints_each_reason_once()
+    {
+        await SeedAsync("2.4.0");
+        var file = await CompileToFileAsync(WriteModel("2.5.0", "A"));
+        var arguments = new[] { "octo-ckc", "-c", "Publish", "-f", file, "-c", InMemoryPublishedCatalog.Name };
+        A.CallTo(() => _environment.GetCommandLineArgs()).Returns(arguments);
+        var logger = new CapturingLogger<Runner>();
+
+        var exitCode = await new Runner(logger, _fixture.Services.GetRequiredService<ICommandParser>())
+            .DoActionAsync();
+
+        // ValidateVersion, ValidateCascade and ValidateCatalog end with -6 as well.
+        Assert.Equal(-6, exitCode);
+        Assert.Contains("refused by the compat gate", logger.Lines[0]);
+        var reasons = logger.Lines.Skip(1).Where(l => l.Contains("OCTO-CK200")).ToList();
+        Assert.NotEmpty(reasons);
+        Assert.All(reasons, l => Assert.StartsWith("[compat gate] OCTO-CK200", l.Substring(l.IndexOf("[compat gate]", StringComparison.Ordinal))));
+        Assert.Equal(reasons.Distinct().Count(), reasons.Count);
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<string> Lines { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel >= LogLevel.Error)
+            {
+                Lines.Add(formatter(state, exception));
+            }
+        }
     }
 }

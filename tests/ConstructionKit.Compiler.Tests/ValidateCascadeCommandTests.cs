@@ -118,4 +118,50 @@ public sealed class ValidateCascadeCommandTests : IDisposable
 
         Assert.Equal(emptyCatalog, _fixture.Services.GetRequiredService<IOptions<Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs.LocalFileSystemCatalogOptions>>().Value.RootPath);
     }
+
+    [Fact]
+    public async Task A_candidate_already_published_with_the_same_content_is_skipped()
+    {
+        await PublishWorldAsync();
+        // System 2.3.0 breaks Plant, but it is already published (the pre-existing break of AB#6388).
+        var breaking = WriteSystem("2.3.0", withDescription: false);
+        await _fixture.CompileAndPublishAsync(breaking);
+        var report = Path.Combine(_fixture.Root, "cascade-skipped.md");
+        var before = Snapshot(_fixture.CatalogDir);
+
+        // Without the option the break is reported.
+        await Assert.ThrowsAsync<ModelValidationException>(() => RunAsync("-p", breaking));
+
+        // With the target catalog named, the unchanged published version is skipped and the exit is clean.
+        await RunAsync("-p", breaking, "-sp", "LocalFileSystemCatalog", "-o", report);
+
+        var markdown = await File.ReadAllTextAsync(report, TestContext.Current.CancellationToken);
+        Assert.Contains("Skipped: System-2.3.0 is already published", markdown);
+        Assert.Contains("identical content", markdown);
+        Assert.Equal(before, Snapshot(_fixture.CatalogDir));
+    }
+
+    [Fact]
+    public async Task A_candidate_with_different_content_at_a_published_version_is_still_checked()
+    {
+        await PublishWorldAsync();
+        await _fixture.CompileAndPublishAsync(WriteSystem("2.3.0", withDescription: true));
+        // Same version, other content (the Description attribute is gone): not a no-op, so it is checked and breaks.
+        var changed = WriteSystem("2.3.0", withDescription: false);
+
+        await Assert.ThrowsAsync<ModelValidationException>(
+            () => RunAsync("-p", changed, "-sp", "LocalFileSystemCatalog"));
+    }
+
+    [Fact]
+    public async Task A_new_version_is_checked_even_when_the_skip_option_names_the_catalog()
+    {
+        await PublishWorldAsync();
+        var candidate = WriteSystem("2.3.0", withDescription: false);
+
+        var exception = await Assert.ThrowsAsync<ModelValidationException>(
+            () => RunAsync("-p", candidate, "-sp", "LocalFileSystemCatalog"));
+
+        Assert.Contains("System-2.3.0 would break 1 dependent(s): Plant-1.0.0", exception.Message);
+    }
 }

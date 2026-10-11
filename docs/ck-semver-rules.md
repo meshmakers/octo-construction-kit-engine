@@ -381,7 +381,7 @@ the new version. The `OCTO-CK200` message of the compile gate names this command
 repositories). `octo-ckc -c ValidateCascade -p <candidate model path>` is the read-only dry run of a base model's next version:
 
 ```
-octo-ckc -c ValidateCascade -p <candidate model path> [-cn <catalogName>] [-o <report.md>] [-rf] [-lce <bool>] [-lcr <path>]
+octo-ckc -c ValidateCascade -p <candidate model path> [-cn <catalogName>] [-o <report.md>] [-rf] [-sp <targetCatalog>] [-lce <bool>] [-lcr <path>]
 ```
 
 The candidate is compiled in memory (registered nowhere, no catalog is written; catalog reads may fetch uncached remote models, a refresh only happens with `-rf`). The
@@ -396,6 +396,15 @@ local and cached catalogs.
 | `NeedsRepin` | Exact-pinned dependent (ckLanguage 1): everything it references still binds, but it must be recompiled and republished against the candidate. The required level comes from today's dependency rule (same major: minor, other major: major). |
 | `Breaks` | A referenced element is gone or re-identified (`System-2.2.2/Entity-1`), became internal, or changed incompatibly (a Major change of the classifier); the candidate is below the dependent's floor (`floor not met`); or a name collision (below). The finding names the member. |
 | `NotInRange` | The dependent's range or pin does not cover the candidate's major, or the candidate is older than the pin. Listed, not counted. |
+
+**Skipping an unchanged published candidate (`-sp <targetCatalog>`, AB#6388).** A build that checks every CK of the repository
+would otherwise judge versions that are already published and unchanged, and a break that has been in the catalogs for a long time
+(a dependent pinned to an element a published base no longer defines) would turn every later build red. With
+`-sp <targetCatalog>` the command first asks whether the candidate's own version is already published to that catalog with
+identical or equivalent content (`CkPublishEquivalence`, the publish gate's same-version no-op rule). If so it prints
+`Skipped: <model> is already published ... an unchanged published model cannot newly break a dependent`, writes that line as
+the Markdown report and exits 0. A missing version, different content or an unreadable published file is checked as usual
+(a new version keeps its `Breaks`). Use the catalog's name as the engine knows it (`PrivateGitHubCatalog`).
 
 A model that is listed only because it depends on a dependent (no entry for the candidate in its own dependencies) is `Compatible`
 ("no direct dependency"): it is affected only through the dependents it depends on, which are checked on their own.

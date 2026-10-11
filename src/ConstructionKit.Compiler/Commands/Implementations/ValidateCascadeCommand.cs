@@ -26,6 +26,7 @@ internal class ValidateCascadeCommand : CkcCommand
     private readonly IArgument _catalogArg;
     private readonly IArgument _outputArg;
     private readonly IArgument _refreshArg;
+    private readonly IArgument _skipPublishedArg;
     private readonly IArgument _localCatalogEnabled;
     private readonly IArgument _localCatalogRoot;
 
@@ -54,6 +55,11 @@ internal class ValidateCascadeCommand : CkcCommand
 
         _refreshArg = CommandArgumentValue.AddArgument("rf", "refresh",
             ["Forces a catalog cache refresh before the dependents are discovered."], 0);
+
+        _skipPublishedArg = CommandArgumentValue.AddArgument("sp", "skipPublishedIn",
+            ["Name of the target catalog of the publish. When the candidate's version is already published there with identical or " +
+             "equivalent content (the publish gate's no-op rule), nothing is checked: an unchanged published model cannot newly " +
+             "break a dependent. A different or missing published version is checked as usual."], false, 1);
 
         _localCatalogEnabled = CommandArgumentValue.AddArgument("lce", "localCatalogEnabled",
             ["Enable or disable the local Construction Kit Library catalog"], false, 1);
@@ -111,6 +117,28 @@ internal class ValidateCascadeCommand : CkcCommand
         var candidate = await _compilerService.CompileInMemoryAsync(rootPath, operationResult);
         Logger.LogInformation("Checking {Candidate} against its dependents", candidate.ModelId.FullName);
 
+        if (CommandArgumentValue.IsArgumentUsed(_skipPublishedArg))
+        {
+            var targetCatalog = CommandArgumentValue.GetArgumentScalarValue<string>(_skipPublishedArg);
+            var equivalent = await _cascadeService.FindEquivalentPublishedAsync(candidate, targetCatalog);
+            if (equivalent != null)
+            {
+                var how = equivalent.DifferenceClasses.Count == 0
+                    ? "identical"
+                    : "equivalent (differs only in: " + string.Join("; ", equivalent.DifferenceClasses) + ")";
+                var message = $"{candidate.ModelId.FullName} is already published to catalog '{equivalent.CatalogName}' with " +
+                              $"{how} content; skipped: an unchanged published model cannot newly break a dependent.";
+                Console.WriteLine();
+                Console.WriteLine($"Skipped: {message}");
+                if (outputFilePath != null)
+                {
+                    await WriteReportAsync(outputFilePath, $"# Cascade dry run: {candidate.ModelId.FullName}\n\nSkipped: {message}\n");
+                }
+
+                return;
+            }
+        }
+
         var result = await _cascadeService.AnalyzeAsync(candidate, catalogName);
 
         Console.WriteLine();
@@ -118,14 +146,7 @@ internal class ValidateCascadeCommand : CkcCommand
 
         if (outputFilePath != null)
         {
-            var outputDirectory = Path.GetDirectoryName(Path.GetFullPath(outputFilePath));
-            if (!string.IsNullOrEmpty(outputDirectory))
-            {
-                Directory.CreateDirectory(outputDirectory);
-            }
-
-            await File.WriteAllTextAsync(outputFilePath, CkCascadeReport.RenderMarkdown(result));
-            Logger.LogInformation("Markdown report written to '{OutputFilePath}'", outputFilePath);
+            await WriteReportAsync(outputFilePath, CkCascadeReport.RenderMarkdown(result));
         }
 
         if (result.LoadWarnings.Count > 0)
@@ -142,5 +163,17 @@ internal class ValidateCascadeCommand : CkcCommand
                 $"{candidate.ModelId.FullName} would break {breaking.Count} dependent(s): " +
                 string.Join(", ", breaking.Select(d => d.Dependent.FullName)));
         }
+    }
+
+    private async Task WriteReportAsync(string outputFilePath, string markdown)
+    {
+        var outputDirectory = Path.GetDirectoryName(Path.GetFullPath(outputFilePath));
+        if (!string.IsNullOrEmpty(outputDirectory))
+        {
+            Directory.CreateDirectory(outputDirectory);
+        }
+
+        await File.WriteAllTextAsync(outputFilePath, markdown);
+        Logger.LogInformation("Markdown report written to '{OutputFilePath}'", outputFilePath);
     }
 }

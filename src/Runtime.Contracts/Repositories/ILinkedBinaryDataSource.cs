@@ -38,6 +38,8 @@ public interface ILinkedBinaryDataSource
     /// Replaces a large binary file in the repository based on the large binary id
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
+    /// <param name="rtEntityId">The runtime entity that owns the binary. A data source may use it to verify that
+    /// <paramref name="largeBinaryId"/> belongs to this entity (AB#6540) and carries it over to the new bytes.</param>
     /// <param name="largeBinaryId">Object id of the large binary</param>
     /// <param name="filename">Filename of the file</param>
     /// <param name="contentType">Content type of the file</param>
@@ -49,7 +51,7 @@ public interface ILinkedBinaryDataSource
     /// the old bytes stay readable until the commit, and deletes the old bytes only after the commit (or the new
     /// bytes on rollback). Without a transaction the id of <paramref name="largeBinaryId"/> may be returned unchanged.
     /// </returns>
-    Task<OctoObjectId> ReplaceFileSystemBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, string filename, string contentType,
+    Task<OctoObjectId> ReplaceFileSystemBinaryAsync(IOctoSession session, RtEntityId rtEntityId, OctoObjectId largeBinaryId, string filename, string contentType,
         Stream stream, CancellationToken cancellationToken = default);
 
     /// <summary>

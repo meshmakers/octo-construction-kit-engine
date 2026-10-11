@@ -73,15 +73,18 @@ public class BulkRtMutationLinkedBinaryTests
     {
         var oldId = OctoObjectId.GenerateNewId();
         var stagedId = OctoObjectId.GenerateNewId();
-        A.CallTo(() => _dataSource.BinaryDataSource.ReplaceFileSystemBinaryAsync(_session, oldId, "a.txt",
+        var entity = DocumentWith(oldId);
+        A.CallTo(() => _dataSource.BinaryDataSource.ReplaceFileSystemBinaryAsync(_session, IdOf(entity), oldId, "a.txt",
                 "text/plain", A<Stream>._, A<CancellationToken>._))
             .Returns(stagedId);
-        var entity = DocumentWith(oldId);
 
         await ApplyAsync(EntityUpdateInfo<RtEntity>.CreateUpdate(IdOf(entity), entity));
 
         Assert.Equal([stagedId], _binaryIdAtWrite);
         Assert.Equal(stagedId, entity.GetAttributeLinkedBinaryValueOrDefault("File")!.BinaryId);
+        // the owning entity is passed on so that a data source can verify the BinaryId belongs to it (AB#6540)
+        A.CallTo(() => _dataSource.BinaryDataSource.ReplaceFileSystemBinaryAsync(_session, IdOf(entity), oldId,
+            A<string>._, A<string>._, A<Stream>._, A<CancellationToken>._)).MustHaveHappenedOnceExactly();
     }
 
     [Fact]
@@ -98,8 +101,13 @@ public class BulkRtMutationLinkedBinaryTests
         await ApplyAsync(EntityUpdateInfo<RtEntity>.CreateReplace(IdOf(entity), entity));
 
         Assert.Equal([uploadedId], _binaryIdAtWrite);
+        // The order matters for transactional data sources: the ids to delete are collected BEFORE the new bytes
+        // are uploaded, so the new bytes can never end up in the delete list.
         A.CallTo(() => _dataSource.BinaryDataSource.DeleteAllFileSystemBinariesAsync(_session, IdOf(entity),
-            A<CancellationToken>._)).MustHaveHappenedOnceExactly();
+                A<CancellationToken>._)).MustHaveHappenedOnceExactly()
+            .Then(A.CallTo(() => _dataSource.BinaryDataSource.UploadFileSystemBinaryAsync(A<IOctoSession>._,
+                A<RtEntityId>._, A<string>._, A<string>._, A<Stream>._, A<CancellationToken>._))
+                .MustHaveHappenedOnceExactly());
     }
 
     [Fact]
@@ -115,6 +123,41 @@ public class BulkRtMutationLinkedBinaryTests
 
         Assert.Equal([uploadedId], _binaryIdAtWrite);
         A.CallTo(() => _dataSource.BinaryDataSource.ReplaceFileSystemBinaryAsync(A<IOctoSession>._,
-            A<OctoObjectId>._, A<string>._, A<string>._, A<Stream>._, A<CancellationToken>._)).MustNotHaveHappened();
+            A<RtEntityId>._, A<OctoObjectId>._, A<string>._, A<string>._, A<Stream>._, A<CancellationToken>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task GuardedUpdate_WithLinkedBinary_IsRefusedBeforeAnyByteOrEntityIsWritten()
+    {
+        // A non-matching guard skips the entity write silently; the entity would keep the old BinaryId while the
+        // bytes behind it are replaced (and, with a transactional data source, deleted after the commit).
+        var oldId = OctoObjectId.GenerateNewId();
+        var entity = DocumentWith(oldId);
+        var guard = new AttributeNewerThanGuard("RtChangedDateTime", DateTime.UtcNow);
+
+        var ex = await Assert.ThrowsAsync<RuntimeRepositoryException>(() =>
+            ApplyAsync(EntityUpdateInfo<RtEntity>.CreateConditionalUpdate(IdOf(entity), entity, guard)));
+
+        Assert.Contains("update guard", ex.Message);
+        Assert.Contains("File", ex.Message);
+        A.CallTo(() => _dataSource.BinaryDataSource.ReplaceFileSystemBinaryAsync(A<IOctoSession>._,
+            A<RtEntityId>._, A<OctoObjectId>._, A<string>._, A<string>._, A<Stream>._, A<CancellationToken>._)).MustNotHaveHappened();
+        A.CallTo(() => _dataSource.BinaryDataSource.UploadFileSystemBinaryAsync(A<IOctoSession>._, A<RtEntityId>._,
+            A<string>._, A<string>._, A<Stream>._, A<CancellationToken>._)).MustNotHaveHappened();
+        Assert.Empty(_binaryIdAtWrite);
+        Assert.Equal(oldId, entity.GetAttributeLinkedBinaryValueOrDefault("File")!.BinaryId);
+    }
+
+    [Fact]
+    public async Task GuardedUpdate_WithoutLinkedBinary_StillWorks()
+    {
+        var entity = _model.NewDocument();
+        entity.SetAttributeRawValue("Name", "no binary");
+        var guard = new AttributeNewerThanGuard("RtChangedDateTime", DateTime.UtcNow);
+
+        await ApplyAsync(EntityUpdateInfo<RtEntity>.CreateConditionalUpdate(IdOf(entity), entity, guard));
+
+        A.CallTo(() => _collection.UpdateOneIfGuardMatchesAsync(A<IOctoSession>._, A<RtEntity>._, guard))
+            .MustHaveHappenedOnceExactly();
     }
 }

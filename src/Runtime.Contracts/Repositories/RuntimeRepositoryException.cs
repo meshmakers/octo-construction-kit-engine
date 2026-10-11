@@ -123,6 +123,14 @@ public class RuntimeRepositoryException : PersistenceException
             $"Stream data is missing for entity with id '{rtEntityId}'.");
     }
 
+    internal static Exception GuardedUpdateWithLinkedBinary(RtEntityId rtEntityId, string attributeName)
+    {
+        return new RuntimeRepositoryException(
+            $"Entity '{rtEntityId}' is updated with an update guard and a linked binary ('{attributeName}'). " +
+            "A guard that does not match skips the entity write silently, which would leave the entity without the " +
+            "stored binary (AB#6248). Update the linked binary without a guard.");
+    }
+
     internal static Exception InvalidValueType(object value, Type type)
     {
         return new RuntimeRepositoryException(

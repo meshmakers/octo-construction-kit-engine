@@ -10,6 +10,8 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 /// </summary>
 internal sealed class PerRunLocalCatalogScope : IDisposable
 {
+    private const string RunDirectoryPrefix = "octo-ckc-run-catalog-";
+
     private readonly LocalFileSystemCatalogOptions _options;
     private readonly string _originalRootPath;
     private readonly string _originalCacheDirectory;
@@ -35,11 +37,20 @@ internal sealed class PerRunLocalCatalogScope : IDisposable
     /// </summary>
     public static PerRunLocalCatalogScope Create(LocalFileSystemCatalogOptions options)
     {
-        var runRoot = Path.Combine(Path.GetTempPath(), $"octo-ckc-run-catalog-{Guid.NewGuid():N}");
+        var runRoot = Path.Combine(Path.GetTempPath(), $"{RunDirectoryPrefix}{Guid.NewGuid():N}");
         Directory.CreateDirectory(runRoot);
-        if (Directory.Exists(options.RootPath))
+        try
         {
-            CopyCatalog(options.RootPath, runRoot);
+            if (Directory.Exists(options.RootPath))
+            {
+                CopyCatalog(options.RootPath, runRoot);
+            }
+        }
+        catch
+        {
+            // No scope is returned for the caller to dispose: do not leave a half-copied directory behind.
+            TryDeleteDirectory(runRoot);
+            throw;
         }
 
         var scope = new PerRunLocalCatalogScope(options, runRoot);
@@ -51,11 +62,16 @@ internal sealed class PerRunLocalCatalogScope : IDisposable
     {
         _options.RootPath = _originalRootPath;
         _options.CacheDirectory = _originalCacheDirectory;
+        TryDeleteDirectory(RunRootPath);
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
         try
         {
-            if (Directory.Exists(RunRootPath))
+            if (Directory.Exists(path))
             {
-                Directory.Delete(RunRootPath, true);
+                Directory.Delete(path, true);
             }
         }
         catch (IOException)
@@ -73,7 +89,9 @@ internal sealed class PerRunLocalCatalogScope : IDisposable
         foreach (var directory in Directory.EnumerateDirectories(source))
         {
             var name = Path.GetFileName(directory);
-            if (name == "cache")
+            // The cache is rebuilt for the copy; run directories of other (or this) run are never part of a catalog -
+            // when the catalog root is the temp folder itself, copying them would recurse into the copy.
+            if (name == "cache" || name.StartsWith(RunDirectoryPrefix, StringComparison.Ordinal))
             {
                 continue;
             }

@@ -53,7 +53,7 @@ ckc ValidateVersion -p <ck-folder> [-p <ck-folder2> ...]
 > **per-run working copy** of the local file system catalog (or to the `-lcr` directory when one is
 > given, as in CI) so the compile stage of later packages resolves it. Without `-lcr` the command
 > copies the local catalog into a temporary directory, registers the siblings there and deletes the copy
-> at the end of the run: validation never writes into `~/.octo/local-catalog` (AB#5434). The report
+> at the end of the run: without `-lcr`, validation does not write into `~/.octo/local-catalog` (AB#5434). The report
 > names the write (`Registered X for sibling resolution in …; replaced nothing.`) or states that no
 > catalog was written (`-lce false`). This is why the `-p` paths must be in dependency order — a consumer
 > validated *before* its same-run dependency still fails with `OCTO-CK103`, honestly.
@@ -79,8 +79,9 @@ the same resolver, so every gate agrees. It queries each catalog separately (nev
    `OCTO-CK100`. On a version tie the published entry wins over a local copy. Running `ValidateVersion -rf` twice gives
    the same baseline and verdict.
 4. **Read-only.** The resolver never publishes, refreshes or restores. `ValidateVersion` does not write into the
-   catalog other builds read either (AB#5434): its sibling registration goes to a per-run working copy that is removed
-   at the end of the run, so the user's local catalog stays byte-identical (the 2026-09-30 displacement/shadowing case).
+   catalog other builds read either (AB#5434): without `-lcr`, its sibling registration goes to a per-run working copy that
+   is removed at the end of the run, so the user's local catalog stays byte-identical (the 2026-09-30 displacement/shadowing
+   case). With `-lcr` the registration goes to the directory you named - point it at an empty or throw-away directory (CI does).
 5. **Visible.** The report names the baseline version and catalog (e.g. `Published: 3.3.0 (PrivateGitHubCatalog)`),
    marks a local baseline, says when the baseline comes from the previous major line, and lists ignored local entries.
 

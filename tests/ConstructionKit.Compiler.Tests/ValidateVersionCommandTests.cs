@@ -555,6 +555,23 @@ public sealed class ValidateVersionCommandTests : IDisposable
         System.Text.RegularExpressions.Regex.Replace(report, @"octo-ckc-run-catalog-[0-9a-f]{32}", "octo-ckc-run-catalog-X");
 
     [Fact]
+    public void PerRunLocalCatalogScope_NeverCopiesRunDirectories_EvenWhenTheCatalogRootContainsThem()
+    {
+        // e.g. the catalog root is the temp folder itself: the copy must not recurse into other run copies
+        var options = new LocalFileSystemCatalogOptions();
+        options.ApplyRootPath(_catalogDir);
+        var foreignRun = Path.Combine(_catalogDir, "octo-ckc-run-catalog-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(foreignRun);
+        File.WriteAllText(Path.Combine(foreignRun, "x.txt"), "x");
+        File.WriteAllText(Path.Combine(_catalogDir, "keep.txt"), "k");
+
+        using var scope = PerRunLocalCatalogScope.Create(options);
+
+        Assert.True(File.Exists(Path.Combine(scope.RunRootPath, "keep.txt")));
+        Assert.Empty(Directory.GetDirectories(scope.RunRootPath, "octo-ckc-run-catalog-*"));
+    }
+
+    [Fact]
     public void PerRunLocalCatalogScope_CopiesTheCatalog_RestoresTheOptions_AndRemovesTheCopy()
     {
         var options = new LocalFileSystemCatalogOptions();

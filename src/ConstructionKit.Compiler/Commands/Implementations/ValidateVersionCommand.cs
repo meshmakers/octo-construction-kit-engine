@@ -17,8 +17,8 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 ///     Validates that the version declared in <c>ckModel.yaml</c> honestly reflects the changes
 ///     made since the last published version of the model. The command never writes to the model
 ///     sources; with <c>--changelog</c> it additionally maintains a <c>CHANGELOG.md</c> next to
-///     <c>ckModel.yaml</c>. Validation is a read operation: it never writes into a catalog other builds read
-///     (AB#5434). Successfully validated packages are registered in a <b>per-run working copy</b> of the local
+///     <c>ckModel.yaml</c>. Validation is a read operation: without <c>-lcr</c> it does not write into a catalog
+///     other builds read (AB#5434). Successfully validated packages are registered in a <b>per-run working copy</b> of the local
 ///     file system catalog (removed at the end of the run) — or, when <c>-lcr</c> names a root explicitly, in that
 ///     root — so later packages of the same invocation can depend on versions introduced by the same commit. The
 ///     output names every catalog write of the run.

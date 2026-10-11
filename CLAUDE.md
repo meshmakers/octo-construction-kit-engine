@@ -18,6 +18,8 @@ The codebase follows a modular architecture with clear separation of concerns:
 - **Runtime.Engine**: Runtime execution engine for processing data
 - **Runtime.Contracts**: Runtime contracts and interfaces
 - **SystemCkModel**: Base system Construction Kit models
+- **StreamDataCkModel**: `System.StreamData` model (archives, time-series storage); depends on System
+- **SystemFilesCkModel**: `System.Files` model (platform file system: folder roots, folders, files); depends on System
 
 ### Construction Kit Model Structure
 Construction Kit models are defined in YAML files following a specific schema:
@@ -222,6 +224,8 @@ the root `System/Entity` type allocated >60 GB and killed the asset-repo service
   /ConstructionKit.*    # CK-related components
   /Runtime.*            # Runtime components
   /SystemCkModel        # Base system models
+  /StreamDataCkModel    # System.StreamData
+  /SystemFilesCkModel   # System.Files (platform file system)
 /tests                  # Test projects
 /samples                # Example implementations
 azure-pipelines.yml     # CI/CD pipeline definition (the legacy /devops-build folder is gone)
@@ -569,6 +573,29 @@ interfaces are added later.
 `LoggingCkModelImportAuditTrail` and `LoggingArchiveAuditTrail` remain in `Runtime.Engine`
 for backwards-compatible direct instantiation (e.g. the manual fallback in Mongo
 `TenantContext` when no DI is wired) but are no longer the registered defaults.
+
+## CK Models Owned by This Repository
+
+| Model | Path | Package | Depends on | Owner of the source |
+| ----- | ---- | ------- | ---------- | ------------------- |
+| `System` | `src/SystemCkModel` | `Meshmakers.Octo.ConstructionKit.Models.System` | - | this repository |
+| `System.StreamData` | `src/StreamDataCkModel` | `Meshmakers.Octo.ConstructionKit.Models.StreamData` | `System` | this repository |
+| `System.Files` | `src/SystemFilesCkModel` | `Meshmakers.Octo.ConstructionKit.Models.System.Files` | `System-[2.5,3.0)` | this repository (since AB#6479, was octo-asset-repo-services) |
+
+**System.Files (AB#6479).** The model source moved here from `octo-asset-repo-services` so that every consumer
+(asset repository, report services, the platform-services installer) gets it as a package of the libs train.
+The content is **byte-identical** to the `System.Files-1.0.0` that asset-repo published: same `modelId`, same
+YAML, same PackageId, same generated namespace
+(`Meshmakers.Octo.ConstructionKit.Models.System.Files.Generated.System.Files.v1`: `SystemFilesCkIds`,
+`RtFolderRoot`, `RtFolder`, `RtFileSystemItem`, `AddCkModelSystemFilesV1`). The compiled yaml freezes the
+dependency range to the newest System it sees (`System-2.5.0`), so a rebuild only matches the published
+1.0.0 while the System the project builds against is still 2.5.0. Do not edit the YAML without a version
+bump (`octo-ckc ValidateVersion`); the stale description text ("imported by the asset repository") is
+corrected with the next real model change, not before. `SystemFilesCkModel` builds after `SystemCkModel`
+(project reference, same pattern as `StreamDataCkModel`, with `OctoLocalCatalogIsEnabled=true` so that System
+resolves from the freshly built local catalog). `OctoEnforceRuntimeStateMarkers` is deliberately not armed
+(it would demand ownership markers on an unchanged 1.0.0). `Runtime.Engine.Tests`
+(`EmbeddedCkModelResourceTests`) guards the embedded model and the id `System.Files-1.0.0`.
 
 ## CK Model Publishing Lanes (CI)
 

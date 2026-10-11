@@ -32,6 +32,7 @@
         <ProjectReference Include="..\..\src\Runtime.Engine.Formulas\Runtime.Engine.Formulas.csproj" />
         <ProjectReference Include="..\..\src\SystemCkModel\SystemCkModel.csproj" />
         <ProjectReference Include="..\..\src\StreamDataCkModel\StreamDataCkModel.csproj" />
+        <ProjectReference Include="..\..\src\SystemFilesCkModel\SystemFilesCkModel.csproj" />
         <ProjectReference Include="..\TestCkModel\TestCkModel.csproj" />
     </ItemGroup>
 

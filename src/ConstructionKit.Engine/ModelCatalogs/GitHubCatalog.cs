@@ -78,8 +78,15 @@ internal static class GitHubCatalogDescription
 /// <summary>
 /// Construction kit model catalog for GitHub base class
 /// </summary>
-public abstract class GitHubCatalog : CachedCatalog
+public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog
 {
+    /// <summary>
+    ///     Name of the GitHub repository of the development lane catalog (<c>meshmakers/octo-catalog-dev</c>, the private
+    ///     catalog slot of the 0.2-dev instance, AB#5139). Published versions in this catalog may be replaced; in every
+    ///     other GitHub catalog they are immutable (AB#6386).
+    /// </summary>
+    public const string LaneCatalogRepositoryName = "octo-catalog-dev";
+
     private const string CatalogFileName = "catalog.json";
     private const int MaxCacheFileAgeSeconds = 60;
 
@@ -130,6 +137,11 @@ public abstract class GitHubCatalog : CachedCatalog
     {
         return sourceIdentifier == null;
     }
+
+    /// <inheritdoc />
+    public bool AllowsReplacingPublishedVersions =>
+        string.Equals(_gitHubOptions.GitHubRepositoryName, LaneCatalogRepositoryName,
+            StringComparison.OrdinalIgnoreCase);
 
     /// <inheritdoc />
     public override async Task<CkCompiledModelRoot> GetAsync(CkModelId modelId, OperationResult operationResult,

@@ -43,4 +43,24 @@ public interface ICkBaselineResolver
     /// <param name="source">Which catalogs may supply the baseline.</param>
     /// <returns>The baseline decision.</returns>
     Task<CkBaselineResolution> ResolveAsync(string modelName, CkVersion declaredVersion, CkBaselineSource source);
+
+    /// <summary>
+    ///     Resolves the baseline for a publish to <paramref name="targetCatalog" /> (AB#6386, the publish gate). Only the
+    ///     target catalog is asked; the local file-system catalog and every other catalog are ignored. The declared
+    ///     version itself is never its own baseline.
+    /// </summary>
+    /// <remarks>
+    ///     Rules: (1) the baseline is the newest published version of the declared major other than the declared version;
+    ///     when the declared version is already published (a replace), only versions strictly below it count, so a
+    ///     republish is never compared with itself or with a later release. (2) A major without another version is diffed
+    ///     against the newest version of the highest lower major (a first ckLanguage-2 release 3.0.0 against the 2.x
+    ///     under <c>ck-models/v2/</c>). (3) Model names differing only in case are one model. (4) The result carries the
+    ///     entry that already holds the declared version and a snapshot of all versions read.
+    /// </remarks>
+    /// <param name="modelName">Name of the model (without version).</param>
+    /// <param name="declaredVersion">The version of the model about to be published.</param>
+    /// <param name="targetCatalog">The catalog the model is published to.</param>
+    /// <returns>The baseline decision.</returns>
+    Task<CkBaselineResolution> ResolvePublishBaselineAsync(string modelName, CkVersion declaredVersion,
+        string targetCatalog);
 }

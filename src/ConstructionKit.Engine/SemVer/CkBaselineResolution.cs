@@ -40,6 +40,20 @@ public sealed record CkBaselineResolution
     /// </summary>
     public IReadOnlyList<CkModelId> IgnoredLocalEntries { get; init; } = [];
 
+    /// <summary>
+    ///     Publish resolution only (<see cref="ICkBaselineResolver.ResolvePublishBaselineAsync" />, AB#6386): the entry of
+    ///     the target catalog that already holds exactly the declared version (under any spelling of the model name), or
+    ///     null when the declared version is not published there yet.
+    /// </summary>
+    public CkModelId? DeclaredVersionPublished { get; init; }
+
+    /// <summary>
+    ///     Publish resolution only: every version of the model (all spellings) the target catalog held when it was read,
+    ///     ascending. The publish gate compares two snapshots to detect a concurrent publish between the baseline read
+    ///     and the write.
+    /// </summary>
+    public IReadOnlyList<CkModelId> KnownVersions { get; init; } = [];
+
     /// <summary>True when no catalog knows any usable version and every source was reachable.</summary>
     public bool IsFirstPublication => Baseline == null && !SourceUnreachable;
 }

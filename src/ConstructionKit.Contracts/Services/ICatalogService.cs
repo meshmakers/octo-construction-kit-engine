@@ -1,4 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.Services;
@@ -159,6 +160,32 @@ public interface ICatalogService
     /// <returns></returns>
     Task PublishAsync(string catalogName, CkCompiledModelRoot ckCompiledModel, OriginFileResolver originFileResolver,
         bool isForced, OperationResult operationResult, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null);
+
+    /// <summary>
+    ///     Dry run of <see cref="UnpublishAsync" /> (AB#5433): whether the version is published in the catalog and which
+    ///     published models of the same catalog depend on it. Read-only; refreshes the catalog cache first.
+    /// </summary>
+    /// <param name="catalogName">Name of the catalog.</param>
+    /// <param name="modelId">The model id including the exact version.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
+    Task<UnpublishPlan> PlanUnpublishAsync(string catalogName, CkModelId modelId,
+        CancellationToken? cancellationToken = null);
+
+    /// <summary>
+    ///     Withdraws a published model version from a catalog (AB#5433) and burns its version number: the number can
+    ///     never be published again with this catalog. Refused - also when forced by the caller - while another
+    ///     published model of the catalog depends on the version (an exact pin on it, or a range it is the only
+    ///     satisfying version of). Unpublishing from the public catalog requires a <paramref name="reason" />.
+    ///     A version that was unpublished before returns <see cref="CatalogUnpublishResult.AlreadyWithdrawn" />;
+    ///     one that was never published throws <see cref="ModelCatalogException" />.
+    /// </summary>
+    /// <param name="catalogName">Name of the catalog.</param>
+    /// <param name="modelId">The model id including the exact version.</param>
+    /// <param name="reason">Reason; mandatory for the public catalog, written to the commit message of the change.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
+    /// <exception cref="ModelCatalogException">The version is not published, has dependents, or the reason is missing.</exception>
+    Task<CatalogUnpublishResult> UnpublishAsync(string catalogName, CkModelId modelId, string? reason,
         CancellationToken? cancellationToken = null);
 
     /// <summary>

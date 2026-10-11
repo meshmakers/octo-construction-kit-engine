@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <Description>OctoMesh System.Files construction kit model (platform file system)</Description>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <PackageId>Meshmakers.Octo.ConstructionKit.Models.System.Files</PackageId>
+        <AssemblyName>Meshmakers.Octo.ConstructionKit.Models.System.Files</AssemblyName>
+        <RootNamespace>Meshmakers.Octo.ConstructionKit.Models.System.Files</RootNamespace>
+        <Configurations>Debug;Release;DebugL</Configurations>
+        <Platforms>AnyCPU</Platforms>
+        <TargetFramework>net10.0</TargetFramework>
+        <!-- See SystemCkModel.csproj for the rationale on _IsPacking. -->
+        <OctoPublishCkModel Condition="'$(TargetFramework)' == 'net10.0' AND '$(_IsPacking)' != 'true'">true</OctoPublishCkModel>
+        <OctoGenerateCkDocumentation Condition="'$(TargetFramework)' == 'net10.0' AND '$(_IsPacking)' != 'true'">true</OctoGenerateCkDocumentation>
+        <!-- System.Files depends on System, which SystemCkModel (a project reference) publishes to the
+             local file system catalog while it builds. The local catalog must take part in the compile, or
+             the dependency resolves from the remote catalog cache, which only knows the System versions
+             published so far (a new System minor would fail the System floor, AB#5532). -->
+        <OctoLocalCatalogIsEnabled>true</OctoLocalCatalogIsEnabled>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\..\assets\meshmakers64.png">
+            <Pack>True</Pack>
+            <PackagePath/>
+            <Link>meshmakers64.png</Link>
+        </None>
+        <None Include="..\..\LICENSE">
+            <Pack>True</Pack>
+            <PackagePath/>
+            <Link>LICENSE</Link>
+        </None>
+    </ItemGroup>
+
+    <!-- Import the ConstructionKit props and targets only because the package is not used as nuget package -->
+    <Import Project="../ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.props"/>
+
+    <ItemGroup>
+        <ProjectReference Include="..\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" PrivateAssets="all"
+                          ReferenceOutputAssembly="false"
+                          ExcludeAssets="runtime"
+                          OutputItemType="Analyzer">
+        </ProjectReference>
+        <ProjectReference Include="..\Runtime.Contracts\Runtime.Contracts.csproj"/>
+        <ProjectReference Include="..\SystemCkModel\SystemCkModel.csproj"/>
+    </ItemGroup>
+
+    <!-- Build order only: the ConstructionKit build tasks (Directory.Build.targets) are built from this
+         repository, so the task assembly must be built before this project. Nothing flows into the package. -->
+    <ItemGroup>
+        <ProjectReference Include="..\ConstructionKit.MsBuildTasks\ConstructionKit.MsBuildTasks.csproj"
+                          ReferenceOutputAssembly="false" PrivateAssets="all"
+                          SetTargetFramework="TargetFramework=net10.0"
+                          Condition="'$(MSBuildRuntimeType)' == 'Core'" />
+        <ProjectReference Include="..\ConstructionKit.MsBuildTasks\ConstructionKit.MsBuildTasks.csproj"
+                          ReferenceOutputAssembly="false" PrivateAssets="all"
+                          SetTargetFramework="TargetFramework=netstandard2.0"
+                          Condition="'$(MSBuildRuntimeType)' != 'Core'" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ConstructionKitFolder Visible="false" Include="$(MSBuildProjectDirectory)\ConstructionKit"/>
+    </ItemGroup>
+
+</Project>

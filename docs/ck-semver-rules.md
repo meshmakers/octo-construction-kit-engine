@@ -57,8 +57,9 @@ ckc ValidateVersion -p <ck-folder> [-p <ck-folder2> ...]
 ### Baseline (AB#5450)
 
 One shared, read-only resolver (`ICkBaselineResolver` in `ConstructionKit.Engine/SemVer/`) decides which version a
-model is compared against. `ValidateVersion` uses it; the compile gate (AB#6294) and the publish gate (F2.3) will use
-the same resolver, so every gate agrees. It queries each catalog separately (never the merged highest version).
+model is compared against. `ValidateVersion`, the compile gate (AB#6294) and the publish gate (AB#6386, "Publish gate"
+below) use the same resolver, so every gate agrees. It queries each catalog separately (never the merged highest
+version).
 
 1. **Same major.** The baseline is the newest version within `[major.0.0, major+1.0.0)` of the declared version.
    EnergyCommunity `3.4.0` with `3.3.0` and `4.5.0` published is compared against `3.3.0`; a declared `3.2.0` fails
@@ -78,6 +79,12 @@ the same resolver, so every gate agrees. It queries each catalog separately (nev
    validated model in the local catalog for sibling resolution; stopping that write is AB#5434 symptom 1, F2.3.)
 5. **Visible.** The report names the baseline version and catalog (e.g. `Published: 3.3.0 (PrivateGitHubCatalog)`),
    marks a local baseline, says when the baseline comes from the previous major line, and lists ignored local entries.
+6. **Model names compare case-insensitively (AB#6386).** The catalogs match names case-sensitively, so a model published
+   as `System.Bot` used to be invisible to a lookup of `system.bot` and looked like a first publication. The resolver
+   discovers the other spellings of the name in each catalog (`GetSpellingsAsync`, one listing per catalog) and queries
+   every spelling; the highest hit wins and keeps the spelling it was published under (`System.Bot-3.1.0`). This is the one
+   place that does it, so `ValidateVersion`, the compile gate and the publish gate behave alike. A case-only variant is never
+   treated as a first publication. (`ValidateCatalog`, AB#4469, reports such pairs.)
 
 When a catalog source is unreachable and no same-major baseline was found, the resolver does not fall back to a
 lower major: the result is `OCTO-CK102`, as before.
@@ -169,8 +176,8 @@ Accepted by the platform owner on 2026-10-10; the guarantee is the catalog gate 
 1. **Deleting the local baseline** leaves a `Local` gate without a baseline (a model without a baseline is a first publication).
 2. **A downgrade below a local copy** is not detected in `Local` mode: local-catalog entries at or above the declared version
    are never the baseline (AB#5434). `OCTO-CK201` needs a published baseline.
-3. **A model name that differs only in case** from a published one has no remote baseline (the remote lookup is case-sensitive,
-   the local file system is not).
+3. ~~A model name that differs only in case from a published one has no remote baseline.~~ Closed by AB#6386: the baseline
+   lookup is case-insensitive (rule 6 of "Baseline").
 4. **CI detection** uses `TF_BUILD` and `ContinuousIntegrationBuild` only; other CI systems pass
    `-p:OctoCkCompatibilityBaseline=Remote`. A project file that sets the property to `Local` switches the Remote gate off, so
    pipelines should pass it as a global property.
@@ -188,6 +195,35 @@ Compatibility: model 'GateModel', declared 2.5.0, baseline GateModel-2.4.0 (Loca
 ```
 
 A first publication logs `first publication (no baseline in the Remote baseline source)`.
+
+## Publish gate (AB#6386)
+
+Gate 2 of the CK v2 compatibility concept (§4.3.3). Whoever publishes a model to a **writable catalog other than the
+`LocalFileSystemCatalog`** — the private, the public and the dev-lane GitHub catalog — gets the compile gate's verdict,
+computed against the catalog being published to. The gate sits in `CatalogService.PublishAsync` (class `CkPublishGate`),
+so `octo-ckc -c Publish`, the MSBuild publish of `CkCompile` and every other caller are covered by one implementation;
+no pipeline step can forget it and there is no bypass switch (`-r/--replace` only decides whether an existing file may be
+overwritten, never whether the gate runs). A refusal throws a `CompilerException` (exit code `-5`, MSBuild error) with one
+message per finding and **writes nothing**.
+
+| Aspect | Rule |
+| ------ | ---- |
+| Verdict | `ICkCompatibilityVerdictService` and `ICkSemVerClassifier`, the same as `ValidateVersion` and the compile gate; codes `OCTO-CK200` to `OCTO-CK202`. ckLanguage 1 and 2 alike (platform owner, 2026-10-10): for a v1 model the gate repeats the verdict CI already enforces with `validate-ck-versions`. |
+| Baseline | `ICkBaselineResolver.ResolvePublishBaselineAsync`: **the target catalog only** (the local catalog and a run-isolated catalog are never a baseline), remote state refreshed first. The newest published version of the declared major **other than the declared version**; none in that major: the newest version of the highest lower major. Both catalog roots count: a first ckLanguage 2 release `3.0.0` is diffed against the newest `2.x` under `ck-models/v2/`, `3.1.0` against `3.0.0` under `ck-models/v3/`. A maintenance release `3.4.1` with `3.4.0` and `4.0.0` published is judged against `3.4.0`. |
+| Unreachable target | `OCTO-CK202` (also when the catalog is not readable); never treated as a first publication. |
+| Same version | The declared version is already published: identical content (compared by the serialized model) is a **no-op** (nothing is written); different content is refused with `OCTO-CK205` on the private and the public catalog, also with `--replace` (published versions are immutable). The dev-lane catalog (GitHub repository `octo-catalog-dev`, `IReplaceablePublishCatalog`) keeps its replace behaviour, but the verdict always uses the newest version **strictly below** the declared one, so a replace is never compared with itself; after a refused or replaced publish the next publish gets the same baseline. |
+| Race | The catalog is read, the verdict computed, and the catalog read again (forced refresh) right before the write. If the versions of the model changed in between, the verdict is computed again (at most 3 reads, then `OCTO-CK202`). The write never happens on a stale baseline. GitHub Pages lags the repository, so the re-read narrows the window but does not close it; an exact same-version race is still caught by the GitHub contents API (file already exists). |
+| Not trusted | The verdict is computed from the model content and the target catalog only. A hand-edited compiled file (lowered version, removed members) gets the verdict of its content; nothing in the file lowers the required level. |
+| Acknowledgements | Not enforced by this gate; AB#6387 adds `OCTO-CK203`/`OCTO-CK204` at publish. |
+
+| Code | Meaning | Remediation |
+| ---- | ------- | ----------- |
+| `OCTO-CK205` | The declared version is already published to the catalog with different content | Raise the version in `ckModel.yaml` and publish again; published versions are never replaced (only the dev-lane catalog allows it) |
+
+**v1 replay.** Replaying the 152 published versions of the public catalog in release order through the gate (opt-in test
+`PublishGateReplayTests`, set `OCTO_PUBLISH_GATE_REPLAY_DIR`) refuses 18 early releases (2.0.x/2.1.x era patch or minor
+releases that changed a dependency pin or added elements, e.g. `Basic-2.0.2`, `Industry.Basic-2.1.1`); they predate the
+rules the classifier enforces today. The latest release of each of the 12 `octo-construction-kit` models replays clean.
 
 ## Acknowledge (AB#6295)
 

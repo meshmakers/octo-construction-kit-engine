@@ -34,7 +34,8 @@ public abstract class CatalogUnpublishTestsBase : IDisposable
 
     protected ICatalogService Service => _service ??= new CatalogService(NullLogger<CatalogService>.Instance,
         new CatalogManager(NullLogger<CatalogManager>.Instance, [Catalog]), A.Fake<ICkSerializer>(),
-        A.Fake<ICatalogModelResolver>(), A.Fake<ICkCacheService>());
+        A.Fake<ICatalogModelResolver>(), A.Fake<ICkCacheService>(),
+        new Lazy<Meshmakers.Octo.ConstructionKit.Engine.SemVer.CkPublishGate>(() => throw new InvalidOperationException("publish not used")));
 
     public abstract void Dispose();
 

@@ -12,6 +12,7 @@ using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
+using Meshmakers.Octo.ConstructionKit.Engine.SemVer;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
@@ -26,6 +27,7 @@ internal class CatalogService : ICatalogService
     private readonly ICkSerializer _ckSerializer;
     private readonly ICatalogModelResolver _catalogModelResolver;
     private readonly ICkCacheService _ckCacheService;
+    private readonly Lazy<CkPublishGate> _publishGate;
 
     /// <summary>
     ///     Creates a new instance of the <see cref="CatalogService" /> class.
@@ -35,15 +37,21 @@ internal class CatalogService : ICatalogService
     /// <param name="ckSerializer"></param>
     /// <param name="catalogModelResolver"></param>
     /// <param name="ckCacheService"></param>
+    /// <param name="publishGate">
+    ///     The compatibility gate every publish passes (AB#6386). Lazy because the gate itself reads through
+    ///     <see cref="ICatalogService" />.
+    /// </param>
     public CatalogService(ILogger<CatalogService> logger,
         ICatalogManager catalogManager, ICkSerializer ckSerializer,
-        ICatalogModelResolver catalogModelResolver, ICkCacheService ckCacheService)
+        ICatalogModelResolver catalogModelResolver, ICkCacheService ckCacheService,
+        Lazy<CkPublishGate> publishGate)
     {
         _logger = logger;
         _catalogManager = catalogManager;
         _ckSerializer = ckSerializer;
         _catalogModelResolver = catalogModelResolver;
         _ckCacheService = ckCacheService;
+        _publishGate = publishGate;
     }
 
     public Task<ModelSearchResult> SearchAsync(string searchTerm, int skip, int take, object? sourceIdentifier = null,
@@ -137,6 +145,28 @@ internal class CatalogService : ICatalogService
         {
             throw CompilerException.PublishFailedWithErrors(catalogName, ckCompiledModel.ModelId, resolveMessages,
                 operationResult);
+        }
+
+        // AB#6386: gate 2 of the compatibility concept. Every publish to a writable catalog except the local
+        // file-system catalog gets the compile gate's verdict against the target catalog; there is no bypass switch
+        // (isForced only decides whether an existing file may be overwritten, never whether the gate runs).
+        var gateResult = await _publishGate.Value.EvaluateAsync(catalogName, ckCompiledModel, sourceIdentifier)
+            .ConfigureAwait(false);
+        foreach (var message in gateResult.Messages)
+        {
+            AddGateMessage(operationResult, ckCompiledModel, message);
+        }
+
+        switch (gateResult.Decision)
+        {
+            case CkPublishGateDecision.Refused:
+                throw CompilerException.PublishRefusedByGate(catalogName, ckCompiledModel.ModelId,
+                    gateResult.Messages.Where(m => m.Severity == CkCompileGateSeverity.Error).Select(m => (m.Code, m.Text)),
+                    operationResult);
+            case CkPublishGateDecision.AlreadyPublished:
+                _logger.LogInformation("Model {ModelId} is already published to catalog {CatalogName}, nothing to do",
+                    ckCompiledModel.ModelId, catalogName);
+                return;
         }
 
         await _catalogManager
@@ -235,6 +265,24 @@ internal class CatalogService : ICatalogService
 
         return dependents.OrderBy(d => d.ModelId.Name, StringComparer.Ordinal).ThenBy(d => d.ModelId.Version)
             .ToList();
+    }
+
+    private void AddGateMessage(OperationResult operationResult, CkCompiledModelRoot model,
+        CkCompileGateMessage message)
+    {
+        if (message.Severity == CkCompileGateSeverity.Error)
+        {
+            // "OCTO-CK200" -> message number 200; the code stays in the text so the log reader sees it.
+            var number = message.Code != null && int.TryParse(message.Code.Substring(message.Code.Length - 3), out var n)
+                ? n
+                : 0;
+            operationResult.AddMessage(new OperationMessage(MessageLevel.Error, model.ModelId.FullName, number,
+                $"{message.Code}: {message.Text}"));
+        }
+        else
+        {
+            _logger.LogInformation("{Message}", message.Text);
+        }
     }
 
     public async Task<ModelExistingResult> IsExistingAsync(string catalogName,

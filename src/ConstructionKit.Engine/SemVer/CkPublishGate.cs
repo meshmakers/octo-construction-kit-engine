@@ -215,7 +215,19 @@ public class CkPublishGate
 
             messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Info, null,
                 $"Compatibility: model '{model.ModelId}', first publication (no version in catalog '{catalog.CatalogName}')."));
-            return new CkPublishGateResult { Decision = CkPublishGateDecision.Proceed, Messages = messages };
+            if (model.EffectiveCkLanguage >= 2)
+            {
+                // Nothing to compare with, so no change can be acknowledged: every entry is stale (OCTO-CK204).
+                AddAcknowledgementMessages(messages, model, CkAcknowledgementResult.Evaluate([], model.Compatibility, true));
+            }
+
+            return new CkPublishGateResult
+            {
+                Decision = messages.Any(m => m.Severity == CkCompileGateSeverity.Error)
+                    ? CkPublishGateDecision.Refused
+                    : CkPublishGateDecision.Proceed,
+                Messages = messages
+            };
         }
 
         var verdict = await _verdictService.EvaluateAsync(resolution, model, catalog.CatalogName)
@@ -230,6 +242,9 @@ public class CkPublishGate
         }
 
         CkCompileGate.AddErrors(messages, verdict, modelName, declared, null);
+        // Acknowledgements travel in the compiled model, so the publisher needs no source (AB#6387). An acknowledgement
+        // never lowers a level: OCTO-CK200 above is independent of it. Same rule code as the compile gate.
+        AddAcknowledgementMessages(messages, model, verdict.Acknowledgement);
         var failed = messages.Any(m => m.Severity == CkCompileGateSeverity.Error);
         return new CkPublishGateResult
         {
@@ -237,6 +252,40 @@ public class CkPublishGate
             Messages = messages,
             Verdict = verdict
         };
+    }
+
+    /// <summary>
+    ///     The "Acknowledged changes" lines (audit trail of the publish) and the findings: entries of the compiled model
+    ///     that violate the structural rules (<c>OCTO-CK206</c>), changes that need an acknowledgement and have none
+    ///     (<c>OCTO-CK203</c>) and entries that match no change of this release (<c>OCTO-CK204</c>). Nothing is added
+    ///     when the rule is not enforced (ckLanguage 1 on both sides).
+    /// </summary>
+    private static void AddAcknowledgementMessages(List<CkCompileGateMessage> messages, CkCompiledModelRoot model,
+        CkAcknowledgementResult acknowledgement)
+    {
+        if (!acknowledgement.IsEnforced)
+        {
+            return;
+        }
+
+        var lines = CkAcknowledgementFormatter.GetAcknowledgedLines(acknowledgement);
+        if (lines.Count > 0)
+        {
+            messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Info, null,
+                $"Acknowledged changes of model '{model.ModelId.FullName}' (level, change, reason):"));
+            foreach (var line in lines)
+            {
+                messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Info, null, $"  {line}"));
+            }
+        }
+
+        var findings = CkAcknowledgementFormatter
+            .GetInvalidEntryFindings(model.Compatibility?.Acknowledge, model.ModelId.Name)
+            .Concat(CkAcknowledgementFormatter.GetFindings(acknowledgement, model.ModelId.Name));
+        foreach (var (code, text) in findings)
+        {
+            messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Error, code, text));
+        }
     }
 
     private async Task<CkPublishEquivalenceResult> CompareWithPublishedAsync(ICatalog catalog, CkModelId published,

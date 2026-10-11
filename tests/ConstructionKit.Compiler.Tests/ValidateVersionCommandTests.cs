@@ -713,6 +713,7 @@ public sealed class ValidateVersionCommandTests : IDisposable
 
     /// <summary>
     ///     AB#6295: ValidateVersion and the compile gate give the same acknowledge verdict (OCTO-CK203 / OCTO-CK204),
+    ///     AB#6387: so does the publish gate, which judges the same compiled model against the catalog it publishes to,
     ///     and ValidateVersion lists acknowledged changes in the report and the generated CHANGELOG.
     /// </summary>
     [Theory]
@@ -743,10 +744,15 @@ public sealed class ValidateVersionCommandTests : IDisposable
 
         var gateCodes = gate.Messages.Where(m => m.Code != null && m.Severity == CkCompileGateSeverity.Error)
             .Select(m => m.Code!).ToArray();
+        var publishGate = await _serviceProvider.GetRequiredService<CkPublishGate>()
+            .EvaluateAsync(InMemoryPublishedCatalog.Name, current);
+        Assert.Equal(gateCodes, GatePublishCodes(publishGate));
         if (expectedCode == null)
         {
             Assert.Null(commandMessage);
             Assert.Empty(gateCodes);
+            Assert.Contains(publishGate.Messages,
+                m => m.Text.Contains("acknowledged: Accepted risk R13"));
             var report = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
             Assert.Contains("Acknowledged changes", report);
             Assert.Contains("Accepted risk R13", report);
@@ -762,6 +768,10 @@ public sealed class ValidateVersionCommandTests : IDisposable
             Assert.Equal([expectedCode], gateCodes);
         }
     }
+
+    private static string[] GatePublishCodes(CkPublishGateResult result) =>
+        result.Messages.Where(m => m.Code != null && m.Severity == CkCompileGateSeverity.Error)
+            .Select(m => m.Code!).ToArray();
 
     // ---- AB#4467: --apply -------------------------------------------------------------------------------------
 

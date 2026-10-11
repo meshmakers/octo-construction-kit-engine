@@ -90,7 +90,9 @@ variables:
   # local catalog this repo needs for its interdependent CK models is isolated per run instead
   # of shared via ~/.octo on the agent.
   #
-  # Publish routing truth table for this repo's CK models (System, System.StreamData),
+  # Publish routing truth table for this repo's CK models (System, System.Files, System.StreamData;
+  # this repo is the single publisher of all three, System.Files since AB#6481 - its source moved
+  # here from octo-asset-repo-services in AB#6479, asset-repo CI stops publishing it with AB#6480),
   # decided by validate-and-publish-ck-versions.yml (update-build-number's $(OctoPublishCkCatalogs)):
   #
   #   refs/heads/main          -> PrivateGitHubCatalog  (meshmakers/construction-kit-libraries-build)
@@ -234,13 +236,17 @@ stages:
           # published version). No build publishes to a shared catalog any more: every dotnet
           # step above pins /p:OctoPublishCatalog=LocalFileSystemCatalog (run-isolated through
           # OctoLocalCatalogRootPath), the exception the template documents for solutions whose
-          # CK models depend on each other. Paths in dependency order (System before StreamData).
+          # CK models depend on each other. Paths in dependency order (System first; System.Files and
+          # System.StreamData both depend only on System). System.Files 1.0.0 was published before by
+          # asset-repo CI with identical content (AB#6479), so its first publish from here is the
+          # idempotent "already exists" no-op of the publish step.
           # Note: this validates with the latest RELEASED octo-ckc from the feed — brand-new
           # schema features introduced in this repo may need a toolVersion pin until released.
           - template: templates/steps/validate-and-publish-ck-versions.yml@pipelineTemplates
             parameters:
               constructionKitPaths:
                 - 'src/SystemCkModel/ConstructionKit'
+                - 'src/SystemFilesCkModel/ConstructionKit'
                 - 'src/StreamDataCkModel/ConstructionKit'
           # Multi-arch image (AB#4451): arm64 for Apple-Silicon kind clusters and
           # edge devices, amd64 for the managed clusters.
@@ -260,6 +266,9 @@ stages:
             parameters:
               constructionKitLibraryPaths:
                 - 'src/SystemCkModel/bin/$(buildConfiguration)/$(artifactsFrameworkVersion)/octo-ck-libraries/SystemCkModel'
+                # AB#6481: the model documentation of System.Files is harvested from this artifact
+                # (octo-documentation collect-docs), as for System.
+                - 'src/SystemFilesCkModel/bin/$(buildConfiguration)/$(artifactsFrameworkVersion)/octo-ck-libraries/SystemFilesCkModel'
               apiDocumentationPaths:
                 - '$(Build.SourcesDirectory)/bin/$(buildConfiguration)/$(artifactsFrameworkVersion)/documentation'
           - template: templates/steps/push-nuget-package.yml@pipelineTemplates

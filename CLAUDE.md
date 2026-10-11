@@ -598,8 +598,11 @@ resolves from the freshly built local catalog). `OctoEnforceRuntimeStateMarkers`
 
 **Single publisher (AB#6481).** This repository's CI is the only publisher of `System.Files` to the private and
 public CK catalogs and the only source of its generated model documentation: the `Validate CK model versions`/
-`Publish CK models` step lists `src/SystemFilesCkModel/ConstructionKit` (after `System`), and `handle-artifacts`
-harvests `SystemFilesCkModel/out` for the documentation site. Because 1.0.0 is already published with identical
+`Publish CK models` step lists `src/SystemFilesCkModel/ConstructionKit` (after `System`), and a dedicated `CopyFiles`
+step stages the `.md` files of `SystemFilesCkModel/out` for the documentation site. The yaml is deliberately **not**
+copied via `handle-artifacts.constructionKitLibraryPaths`: that puts it into `ck-libraries/`, which
+`release-catalogs-train` publishes to the public catalog with `-r`, i.e. a second, forcing publisher built against the
+newest System of the commit. The CK gate stays the only publisher. Because 1.0.0 is already published with identical
 content, the first publish from here is the idempotent "already exists" skip. The asset-repository CI stops
 publishing it together with the removal of its model project (AB#6480). A search of all `azure-pipelines.yml`
 files for `SystemFilesCkModel` must therefore find only this repository.

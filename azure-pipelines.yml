@@ -262,13 +262,23 @@ stages:
             inputs:
               filePath: '$(System.DefaultWorkingDirectory)/scripts/createDocumentation.ps1'
               arguments: '-configuration $(buildConfiguration) -frameworkVersion $(artifactsFrameworkVersion)'
+          # AB#6481: model documentation of System.Files (octo-documentation collect-docs harvests the
+          # artifact), copied as .md ONLY. It must NOT go through constructionKitLibraryPaths of
+          # handle-artifacts: that also copies <path>/out/*.yaml into ck-libraries/, which
+          # release-catalogs-train publishes to the public catalog with -r - a second, forcing publisher
+          # built against the newest System of the commit (it would replace the published
+          # System.Files-1.0.0 after the next System bump). The CK gate above stays the only publisher.
+          # Same target as handle-artifacts uses for System; staged before handle-artifacts publishes the artifact.
+          - task: CopyFiles@2
+            displayName: 'Copy System.Files model documentation (.md only, no yaml)'
+            inputs:
+              SourceFolder: 'src/SystemFilesCkModel/bin/$(buildConfiguration)/$(artifactsFrameworkVersion)/octo-ck-libraries/SystemFilesCkModel/out'
+              Contents: '**/*.md'
+              TargetFolder: '$(build.artifactstagingdirectory)/docs/technologyGuide/constructionKits/libraries'
           - template: templates/steps/handle-artifacts.yml@pipelineTemplates
             parameters:
               constructionKitLibraryPaths:
                 - 'src/SystemCkModel/bin/$(buildConfiguration)/$(artifactsFrameworkVersion)/octo-ck-libraries/SystemCkModel'
-                # AB#6481: the model documentation of System.Files is harvested from this artifact
-                # (octo-documentation collect-docs), as for System.
-                - 'src/SystemFilesCkModel/bin/$(buildConfiguration)/$(artifactsFrameworkVersion)/octo-ck-libraries/SystemFilesCkModel'
               apiDocumentationPaths:
                 - '$(Build.SourcesDirectory)/bin/$(buildConfiguration)/$(artifactsFrameworkVersion)/documentation'
           - template: templates/steps/push-nuget-package.yml@pipelineTemplates

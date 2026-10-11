@@ -322,6 +322,48 @@ Candidate change level: MINOR (minimum version 2.3.0, declared 2.3.0: ok)
 The report also prints the catalog cache age of the baseline; `--refresh` forces a refresh
 (mandatory in CI, where a stale cache would validate against the wrong baseline).
 
+## Catalog validation (`ValidateCatalog`, AB#4469)
+
+`ValidateVersion` proves that each model is individually honest; it does not prove that the **catalog as a whole** still resolves.
+`octo-ckc -c ValidateCatalog` is the read-only, standalone check (never part of a plain local build) that loads every model of a
+catalog at its newest version and reports, with reasons, which ones no longer resolve:
+
+```
+octo-ckc -c ValidateCatalog -cn <catalogName> [-m <model> ...] [-o <report.md>] [-rf] [-lce <bool>] [-lcr <path>]
+```
+
+| Aspect | Rule |
+| ------ | ---- |
+| Scope | The whole catalog; `-m System.Bot` (repeatable, case-insensitive) restricts it to the named models **and their transitive dependents**. An unknown name fails with a message listing the catalog's models. |
+| Roots | The listing spans `ck-models/v2/` and `ck-models/v3/`; a v3 model that depends on a v2 model resolves. |
+| Exact pins (ckLanguage 1) | Every pinned dependency version exists in the catalog (a pin to an older version is fine; a missing version is reported with model, dependency and the versions that exist). |
+| Range-retaining | The range (with its floor) admits at least one version of each dependency. Against the **newest admitted version** every referenced element and every `usedSurface` member must exist, be public and not be changed incompatibly: the surface checker of the cascade dry run (`ICkSurfaceSatisfactionChecker`), judged against the dependency's predecessor in the catalog, so a catalog check and the dry run of the same version cannot disagree. A newer major outside the range is only noted as `not in range`; no admitted version at all is a defect. |
+| Case-only name variants | Models whose names differ only in case (`System.Bot` and `system.bot`, in one root or across `v2`/`v3`) are a defect; the report lists both spellings, the newest version and the catalog path of each (`ck-models/v3/s/system.bot/`). |
+| Severity | Follows the catalog: in the Meshmakers-run catalogs (`PrivateGitHubCatalog`, `PublicGitHubCatalog`) a defect is an **error** and the command exits non-zero (`ModelValidationException`, process code `-6`); in any other configured catalog it is listed as a **warning** and the exit code stays 0. |
+| Read-only | Reads only (a cache refresh with `-rf` aside); works offline against the local catalog (`-lce`, `-lcr` as in `ValidateVersion`). |
+
+Exact-pinned models cannot be compared one to one with the dry run: a pin to a published version always resolves, while the dry run
+of a newer base reports `NeedsRepin`/`Breaks` for the re-pin. For range-retaining models `Breaks` and "does not resolve" agree.
+
+Not covered here: pipeline wiring (the catalogs train and the `octo-construction-kit` catalog lane run the command after publishing,
+Platform Ops) and the per-model resolution state in the catalog (AB#4470).
+
+Sample report (`-o`):
+
+```
+Catalog: PrivateGitHubCatalog
+Severity: Meshmakers-run catalog, defects are errors
+
+  ERROR     PlantR-1.0.0 (range-retaining)
+      PlantR-1.0.0 uses System@2/Description-1, which System-2.3.0 does not define (attribute removed or re-identified)
+  ERROR     PlantE-1.0.0 (exact pins)
+      PlantE-1.0.0 pins System-2.2.0, but the catalog has no version of System
+  Resolved  LineR-1.0.0 (range-retaining)
+      not in range: PlantR-2.0.0 is outside PlantR [1.0,2.0); checked against PlantR-1.0.0
+
+3 model(s): 1 resolved, 2 do not resolve - defects are ERRORS in this catalog (exit code non-zero)
+```
+
 ## The fixed rule set (V1)
 
 The highest applicable level in the overall diff determines the minimum bump level. The rule set

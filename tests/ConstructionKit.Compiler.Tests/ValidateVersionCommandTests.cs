@@ -433,8 +433,169 @@ public sealed class ValidateVersionCommandTests : IDisposable
         Assert.Contains("- Published: `1.0.0` (TestPublishedCatalog)", second);
         Assert.Contains("**MINOR** bump → minimum version `1.1.0`", first);
         Assert.Contains("**MINOR** bump → minimum version `1.1.0`", second);
-        Assert.Contains("Local catalog entries at or above the declared version were ignored as baseline", second);
-        Assert.Contains("CmdFixture-1.1.0", second);
+        // AB#5434: the first run registered nothing in the local catalog, so the second run has nothing to ignore.
+        Assert.DoesNotContain("ignored as baseline", second);
+        Assert.Equal(StripVolatile(first), StripVolatile(second));
+    }
+
+    [Fact]
+    public async Task RepeatedRuns_WithAndWithoutExplicitLocalCatalogRoot_GiveTheSameBaselineAndVerdict()
+    {
+        WriteSource("1.0.0", removeEnumValue: true);
+        await PublishBaselineAsync();
+        WriteSource("1.1.0");
+        var isolated = Path.Combine(_root, "isolated-catalog");
+
+        await RunAsync("-p", _sourceDir, "-lcr", isolated, "-o", _reportPath);
+        var first = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
+        await RunAsync("-p", _sourceDir, "-o", _reportPath);
+        var second = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
+
+        Assert.Contains("- Published: `1.0.0` (TestPublishedCatalog)", first);
+        Assert.Contains("- Published: `1.0.0` (TestPublishedCatalog)", second);
+        Assert.Contains("**MINOR** bump → minimum version `1.1.0`", second);
+    }
+
+    // ── AB#5434: validation does not write into the catalog other builds read ──────────────────────────
+
+    [Fact]
+    public async Task Validation_LeavesTheDefaultLocalCatalogByteIdentical_AndKeepsTheOlderVersionResolvable()
+    {
+        // The 2026-09-30 case: System-2.2.2 is in the local catalog, 2.3.0 is validated.
+        WriteSource("2.2.2");
+        await PublishBaselineAsync(LocalFileSystemCatalog.Name);
+        WriteSource("2.3.0");
+        var before = SnapshotCatalog();
+
+        await RunAsync("-p", _sourceDir, "-rf", "-o", _reportPath);
+
+        Assert.Equal(before, SnapshotCatalog());
+        Assert.True(await _serviceProvider.GetRequiredService<ICatalogService>()
+            .IsExistingAsync(new Meshmakers.Octo.ConstructionKit.Contracts.CkModelId("CmdFixture",
+                new Meshmakers.Octo.ConstructionKit.Contracts.CkVersion("2.2.2"))));
+        Assert.False(await _serviceProvider.GetRequiredService<ICatalogService>()
+            .IsExistingAsync(new Meshmakers.Octo.ConstructionKit.Contracts.CkModelId("CmdFixture",
+                new Meshmakers.Octo.ConstructionKit.Contracts.CkVersion("2.3.0"))));
+    }
+
+    [Fact]
+    public async Task Validation_NamesTheCatalogWriteOfTheRun_InTheReport()
+    {
+        WriteSource("1.0.0");
+        await PublishBaselineAsync();
+        WriteSource("1.1.0");
+
+        await RunAsync("-p", _sourceDir, "-o", _reportPath);
+
+        var report = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
+        Assert.Contains("Registered CmdFixture-1.1.0 for sibling resolution in per-run working copy of the local catalog", report);
+        Assert.Contains("replaced nothing", report);
+        Assert.Contains("Your local catalog was not touched", report);
+    }
+
+    [Fact]
+    public async Task Validation_WithExplicitLocalCatalogRoot_WritesThere_AndSaysWhetherItReplacedAnEntry()
+    {
+        WriteSource("1.0.0");
+        await PublishBaselineAsync();
+        WriteSource("1.1.0");
+        var isolated = Path.Combine(_root, "isolated-catalog");
+        var before = SnapshotCatalog();
+
+        await RunAsync("-p", _sourceDir, "-lcr", isolated, "-o", _reportPath);
+
+        var report = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
+        Assert.Contains($"in the local catalog at '{isolated}' (chosen with -lcr); replaced nothing.", report);
+        Assert.Equal(before, SnapshotCatalog());
+        Assert.True(Directory.Exists(isolated));
+    }
+
+    [Fact]
+    public async Task Validation_WithDisabledLocalCatalog_StatesThatNothingWasWritten()
+    {
+        WriteSource("1.0.0");
+        await PublishBaselineAsync();
+        WriteSource("1.1.0");
+        var before = SnapshotCatalog();
+
+        await RunAsync("-p", _sourceDir, "-lce", "false", "-o", _reportPath);
+
+        var report = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
+        Assert.Contains("No catalog was written (the local catalog is disabled)", report);
+        Assert.Equal(before, SnapshotCatalog());
+    }
+
+    [Fact]
+    public async Task DependentPackagesStillValidateTogether_WithoutTouchingTheDefaultLocalCatalog()
+    {
+        WriteSource("1.0.0");
+        await PublishBaselineAsync();
+        var dependentDir = WriteDependentSource("1.0.0", "CmdFixture-[1.0,2.0)");
+        await PublishDependentBaselineAsync(dependentDir);
+        WriteSource("1.1.0");
+        WriteDependentSource("1.1.0", "CmdFixture-[1.1,2.0)");
+        var before = SnapshotCatalog();
+
+        await RunAsync("-p", _sourceDir, "-p", dependentDir, "-o", _reportPath);
+
+        var report = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
+        Assert.DoesNotContain("OCTO-CK103", report);
+        Assert.DoesNotContain("ERROR", report);
+        Assert.Equal(before, SnapshotCatalog());
+    }
+
+    /// <summary>All files of the default local catalog with their content (cache files excluded).</summary>
+    private Dictionary<string, string> SnapshotCatalog() =>
+        Directory.GetFiles(_catalogDir, "*", SearchOption.AllDirectories)
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}cache{Path.DirectorySeparatorChar}"))
+            .ToDictionary(f => Path.GetRelativePath(_catalogDir, f), f => Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(f))));
+
+    private static string StripVolatile(string report) =>
+        System.Text.RegularExpressions.Regex.Replace(report, @"octo-ckc-run-catalog-[0-9a-f]{32}", "octo-ckc-run-catalog-X");
+
+    [Fact]
+    public void PerRunLocalCatalogScope_NeverCopiesRunDirectories_EvenWhenTheCatalogRootContainsThem()
+    {
+        // e.g. the catalog root is the temp folder itself: the copy must not recurse into other run copies
+        var options = new LocalFileSystemCatalogOptions();
+        options.ApplyRootPath(_catalogDir);
+        var foreignRun = Path.Combine(_catalogDir, "octo-ckc-run-catalog-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(foreignRun);
+        File.WriteAllText(Path.Combine(foreignRun, "x.txt"), "x");
+        File.WriteAllText(Path.Combine(_catalogDir, "keep.txt"), "k");
+
+        using var scope = PerRunLocalCatalogScope.Create(options);
+
+        Assert.True(File.Exists(Path.Combine(scope.RunRootPath, "keep.txt")));
+        Assert.Empty(Directory.GetDirectories(scope.RunRootPath, "octo-ckc-run-catalog-*"));
+    }
+
+    [Fact]
+    public void PerRunLocalCatalogScope_CopiesTheCatalog_RestoresTheOptions_AndRemovesTheCopy()
+    {
+        var options = new LocalFileSystemCatalogOptions();
+        options.ApplyRootPath(_catalogDir);
+        var marker = Path.Combine(_catalogDir, "ck-models", "v2", "x.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(marker)!);
+        File.WriteAllText(marker, "x");
+        Directory.CreateDirectory(Path.Combine(_catalogDir, "cache"));
+        File.WriteAllText(Path.Combine(_catalogDir, "cache", "c.json"), "{}");
+        string runRoot;
+
+        using (var scope = PerRunLocalCatalogScope.Create(options))
+        {
+            runRoot = scope.RunRootPath;
+            Assert.Equal(runRoot, options.RootPath);
+            Assert.Equal(Path.Combine(runRoot, "cache"), options.CacheDirectory);
+            Assert.True(File.Exists(Path.Combine(runRoot, "ck-models", "v2", "x.txt")));
+            Assert.False(File.Exists(Path.Combine(runRoot, "cache", "c.json")));
+        }
+
+        Assert.Equal(_catalogDir, options.RootPath);
+        Assert.Equal(Path.Combine(_catalogDir, "cache"), options.CacheDirectory);
+        Assert.False(Directory.Exists(runRoot));
+        Assert.True(File.Exists(marker));
     }
 
     [Fact]
@@ -461,7 +622,7 @@ public sealed class ValidateVersionCommandTests : IDisposable
         await RunAsync("-p", _sourceDir, "-o", _reportPath);
 
         var report = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
-        Assert.Contains("- Published: `1.0.0` (LocalFileSystemCatalog, local, not published)", report);
+        Assert.Contains("- Published: `1.0.0` (LocalFileSystemCatalog, local build, not a publish)", report);
     }
 
     private async Task PublishDependentBaselineAsync(string dependentDir)

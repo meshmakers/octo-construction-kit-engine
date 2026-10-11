@@ -17,9 +17,11 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 ///     Validates that the version declared in <c>ckModel.yaml</c> honestly reflects the changes
 ///     made since the last published version of the model. The command never writes to the model
 ///     sources; with <c>--changelog</c> it additionally maintains a <c>CHANGELOG.md</c> next to
-///     <c>ckModel.yaml</c>. Successfully validated packages are published to the local file system
-///     catalog (run-isolated in CI via <c>-lcr</c>) so later packages of the same invocation can
-///     depend on versions introduced by the same commit.
+///     <c>ckModel.yaml</c>. Validation is a read operation: without <c>-lcr</c> it does not write into a catalog
+///     other builds read (AB#5434). Successfully validated packages are registered in a <b>per-run working copy</b> of the local
+///     file system catalog (removed at the end of the run) — or, when <c>-lcr</c> names a root explicitly, in that
+///     root — so later packages of the same invocation can depend on versions introduced by the same commit. The
+///     output names every catalog write of the run.
 /// </summary>
 internal class ValidateVersionCommand : CkcCommand
 {
@@ -136,6 +138,33 @@ internal class ValidateVersionCommand : CkcCommand
                 CommandArgumentValue.GetArgumentScalarValue<string>(_localCatalogRoot));
         }
 
+        // AB#5434: without an explicit -lcr the sibling registration must not write into the catalog other builds read
+        // (it used to lift the model's latest version there and shadow the remote catalogs). It goes to a per-run copy.
+        _perRunCatalogDescription = null;
+        PerRunLocalCatalogScope? perRunCatalog = null;
+        if (!CommandArgumentValue.IsArgumentUsed(_localCatalogRoot) && _localCatalogOptions.Value.IsEnabled)
+        {
+            perRunCatalog = PerRunLocalCatalogScope.Create(_localCatalogOptions.Value);
+            _perRunCatalogDescription =
+                $"per-run working copy of the local catalog at '{perRunCatalog.OriginalRootPath}', removed at the end of the run";
+        }
+
+        try
+        {
+            await ExecuteCoreAsync(rootPaths, catalogName, outputFilePath, writeChangelog, requireMigrationForMajor,
+                apply);
+        }
+        finally
+        {
+            perRunCatalog?.Dispose();
+        }
+    }
+
+    private string? _perRunCatalogDescription;
+
+    private async Task ExecuteCoreAsync(List<string> rootPaths, string? catalogName, string? outputFilePath,
+        bool writeChangelog, bool requireMigrationForMajor, bool apply)
+    {
         if (CommandArgumentValue.IsArgumentUsed(_refreshArg))
         {
             try
@@ -284,7 +313,7 @@ internal class ValidateVersionCommand : CkcCommand
             }
 
             await RegisterValidatedSiblingAsync(rootPath, modelName, declaredVersion, null, validatedSiblings,
-                warnings);
+                warnings, notes);
             WriteReport(markdownReport, modelName, rootPath, null, declaredVersion, null, [], errors, warnings, notes);
 
             if (writeChangelog)
@@ -416,7 +445,7 @@ internal class ValidateVersionCommand : CkcCommand
         if (errors.Count == 0)
         {
             await RegisterValidatedSiblingAsync(rootPath, modelName, declaredVersion, current, validatedSiblings,
-                warnings);
+                warnings, notes);
         }
 
         // 10. Emit the report
@@ -487,7 +516,8 @@ internal class ValidateVersionCommand : CkcCommand
     ///     produces a warning — the dependent package then reports the actionable finding itself.
     /// </summary>
     private async Task RegisterValidatedSiblingAsync(string rootPath, string modelName, CkVersion declaredVersion,
-        CkCompiledModelRoot? compiledModel, Dictionary<string, CkModelId> validatedSiblings, List<string> warnings)
+        CkCompiledModelRoot? compiledModel, Dictionary<string, CkModelId> validatedSiblings, List<string> warnings,
+        List<string> notes)
     {
         var modelId = new CkModelId(modelName, declaredVersion);
         validatedSiblings[modelName] = modelId;
@@ -496,7 +526,8 @@ internal class ValidateVersionCommand : CkcCommand
         {
             warnings.Add(
                 $"The local catalog is disabled — sibling packages of this run cannot compile against '{modelId.FullName}'. " +
-                "Enable it (-lce true) with an isolated root (-lcr <empty-dir>) when validating dependent packages together.");
+                "Enable it (-lce true) when validating dependent packages together.");
+            notes.Add("No catalog was written (the local catalog is disabled).");
             return;
         }
 
@@ -515,8 +546,16 @@ internal class ValidateVersionCommand : CkcCommand
                 }
             }
 
+            var replaced = LocalCatalogHasModelFile(modelId);
             await _catalogService.PublishAsync(LocalFileSystemCatalog.Name, compiledModel,
                 new OriginFileResolver(rootPath), isForced: true);
+            var target = _perRunCatalogDescription != null
+                ? _perRunCatalogDescription
+                : $"the local catalog at '{_localCatalogOptions.Value.RootPath}' (chosen with -lcr)";
+            notes.Add(
+                $"Registered {modelId.FullName} for sibling resolution in {target}; " +
+                (replaced ? $"replaced the existing {modelId.FullName} there." : "replaced nothing.") +
+                (_perRunCatalogDescription != null ? " Your local catalog was not touched." : ""));
             Logger.LogInformation(
                 "Model '{ModelFullName}' registered in the local catalog for sibling dependency resolution",
                 modelId.FullName);
@@ -529,6 +568,10 @@ internal class ValidateVersionCommand : CkcCommand
                 "dependent packages of this run may fail to compile against it.");
         }
     }
+
+    private bool LocalCatalogHasModelFile(CkModelId modelId) =>
+        CkCatalogLayout.ReadRoots.Any(root =>
+            File.Exists(Path.Combine(_localCatalogOptions.Value.RootPath, CkCatalogLayout.ModelFilePath(root, modelId))));
 
     /// <summary>
     ///     Renders the readable catalogs as a comma-separated list for error messages.
@@ -856,7 +899,7 @@ internal class ValidateVersionCommand : CkcCommand
     ///     Baseline catalog for the report; a local baseline is marked, published ones print as before.
     /// </summary>
     private static string FormatCatalog(CkBaselineResolution baseline) =>
-        (baseline.CatalogName ?? "unknown catalog") + (baseline.IsLocal ? ", local, not published" : "");
+        (baseline.CatalogName ?? "unknown catalog") + (baseline.IsLocal ? ", local build, not a publish" : "");
 
     /// <summary>
     ///     AB#5450 rule 5: the report says when the baseline comes from the previous major line and which local

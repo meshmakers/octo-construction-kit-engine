@@ -49,9 +49,13 @@ ckc ValidateVersion -p <ck-folder> [-p <ck-folder2> ...]
 > version is only published *during* the subsequent build. To keep this from dying with a false
 > `OCTO-CK103`, every package that validates successfully (including first publications) is
 > registered for the rest of the invocation: its declared version satisfies the FR-9
-> dependency-existence check of later packages, and its compiled model is published to the local
-> file system catalog (the run-isolated `-lcr` directory in CI) so the compile stage of later
-> packages resolves it. This is why the `-p` paths must be in dependency order — a consumer
+> dependency-existence check of later packages, and its compiled model is published to a
+> **per-run working copy** of the local file system catalog (or to the `-lcr` directory when one is
+> given, as in CI) so the compile stage of later packages resolves it. Without `-lcr` the command
+> copies the local catalog into a temporary directory, registers the siblings there and deletes the copy
+> at the end of the run: without `-lcr`, validation does not write into `~/.octo/local-catalog` (AB#5434). The report
+> names the write (`Registered X for sibling resolution in …; replaced nothing.`) or states that no
+> catalog was written (`-lce false`). This is why the `-p` paths must be in dependency order — a consumer
 > validated *before* its same-run dependency still fails with `OCTO-CK103`, honestly.
 
 ### Baseline (AB#5450)
@@ -69,14 +73,16 @@ version).
    changelog keep working. A major allows any change; when the changes only need a minor or patch bump, the report
    notes a "valid major bump without structural need". Only a model without any version is a first publication.
 3. **Never the model under test (AB#5434, symptom 2).** Entries of the `LocalFileSystemCatalog` at or above the
-   declared version are never the baseline: they come from earlier local builds or from `ValidateVersion`'s own
-   sibling registration, not from a publish. They are listed as ignored in the report. A local entry *below* the
-   declared version can be the baseline (marked "local, not published"). A published (remote) entry equal to the
+   declared version are never the baseline: they come from
+   earlier local builds, not from a publish. They are listed as ignored in the report. A local entry *below* the
+   declared version can be the baseline (marked "local build, not a publish"). A published (remote) entry equal to the
    declared version stays the baseline, so an unchanged version with structural changes still fails with
    `OCTO-CK100`. On a version tie the published entry wins over a local copy. Running `ValidateVersion -rf` twice gives
    the same baseline and verdict.
-4. **Read-only.** The resolver never publishes, refreshes or restores. (`ValidateVersion` itself still registers a
-   validated model in the local catalog for sibling resolution; stopping that write is AB#5434 symptom 1, F2.3.)
+4. **Read-only.** The resolver never publishes, refreshes or restores. `ValidateVersion` does not write into the
+   catalog other builds read either (AB#5434): without `-lcr`, its sibling registration goes to a per-run working copy that
+   is removed at the end of the run, so the user's local catalog stays byte-identical (the 2026-09-30 displacement/shadowing
+   case). With `-lcr` the registration goes to the directory you named - point it at an empty or throw-away directory (CI does).
 5. **Visible.** The report names the baseline version and catalog (e.g. `Published: 3.3.0 (PrivateGitHubCatalog)`),
    marks a local baseline, says when the baseline comes from the previous major line, and lists ignored local entries.
 6. **Model names compare case-insensitively (AB#6386).** The catalogs match names case-sensitively, so a model published
@@ -290,7 +296,7 @@ the new version. The `OCTO-CK200` message of the compile gate names this command
 - The file is written as soon as the version is merely too low; findings that only appear for the new version (for example a
   missing migration with `-rmm`, `OCTO-CK104`) are reported by the validation that follows.
 - No git is involved, and `--apply` writes to no catalog beyond what `ValidateVersion` already does (the validated package is
-  registered in the local catalog for sibling resolution).
+  registered in the per-run catalog copy for sibling resolution, never in the user's local catalog).
 
 ## Cascade dry run (`ValidateCascade`, AB#5437)
 

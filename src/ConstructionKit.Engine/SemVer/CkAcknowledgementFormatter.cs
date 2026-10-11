@@ -1,3 +1,4 @@
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.SemVer;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.SemVer;
@@ -13,6 +14,13 @@ public static class CkAcknowledgementFormatter
 
     /// <summary>The code of an acknowledgement that matches no change of the release.</summary>
     public const string StaleCode = "OCTO-CK204";
+
+    /// <summary>
+    ///     The code of an acknowledgement entry of a compiled model that violates the structural rules (empty reason,
+    ///     wildcard, duplicate key, not plain single-line text). Only the publish gate (AB#6387) reports it: the compiler
+    ///     rejects the same entries at compile time (message 130).
+    /// </summary>
+    public const string InvalidEntryCode = "OCTO-CK206";
 
     /// <summary>
     ///     One finding per unacknowledged change (<c>OCTO-CK203</c>) and per stale entry (<c>OCTO-CK204</c>), without
@@ -51,4 +59,18 @@ public static class CkAcknowledgementFormatter
                 $"{CkModelChangeFormatter.GetLevelLabel(a.Change.Level)}  {CkModelChangeFormatter.Format(a.Change.Change)} " +
                 $"— acknowledged: {a.Reason}")
             .ToList();
+
+    /// <summary>
+    ///     One <c>OCTO-CK206</c> finding per violated rule of the entries of a compiled model (hand-edited or forged
+    ///     JSON; AB#6387). The rules are those of the compiler, <see cref="CkAcknowledgeEntryRules" />.
+    /// </summary>
+    public static IReadOnlyList<(string Code, string Text)> GetInvalidEntryFindings(
+        IReadOnlyList<CkAcknowledgeDto>? entries, string modelName) =>
+        entries == null
+            ? []
+            : CkAcknowledgeEntryRules.FindProblems(entries)
+                .Select(p => (InvalidEntryCode,
+                    $"Entry {p.Index} of 'compatibility.acknowledge' in the compiled model '{modelName}' is invalid: " +
+                    $"{p.Problem}. The compiled file is not trusted; recompile it from a valid ckModel.yaml."))
+                .ToList();
 }

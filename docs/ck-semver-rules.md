@@ -220,11 +220,12 @@ message per finding and **writes nothing**.
 | Same version | The declared version is already published: identical content (compared by the serialized model) is a **no-op** (nothing is written). *Equivalent* content is a no-op too, with a warning naming the difference class and the published file left as it is (AB#6386, `CkPublishEquivalence`): both models are read back and brought into one canonical form, and only what survives is a content change. The allow-list of normalised classes is closed: (1) **restated default ownership** — `ownership: SeedOwned` or `RuntimeState` on an attribute definition (or on an assignment whose definition is in the same model) that equals what the `isRuntimeState` alias resolves to; `TenantOwned` and `Secret` are never normalised, a legacy reader sees them as runtime state; (2) **element order** of the top-level lists; (3) **compiler-stamped metadata** (`minEngineVersion`). Different content is refused with `OCTO-CK205` on the private and the public catalog, also with `--replace` (published versions are immutable). The dev-lane catalog (GitHub repository `octo-catalog-dev`, `IReplaceablePublishCatalog`) keeps its replace behaviour, but the verdict always uses the newest version **strictly below** the declared one, so a replace is never compared with itself; after a refused or replaced publish the next publish gets the same baseline. |
 | Race | The catalog is read, the verdict computed, and the catalog read again (forced refresh) right before the write. If the versions of the model changed in between, the verdict is computed again (at most 3 reads, then `OCTO-CK202`). The write never happens on a stale baseline. GitHub Pages lags the repository, so the re-read narrows the window but does not close it; an exact same-version race is still caught by the GitHub contents API (file already exists). |
 | Not trusted | The verdict is computed from the model content and the target catalog only. A hand-edited compiled file (lowered version, removed members) gets the verdict of its content; nothing in the file lowers the required level. |
-| Acknowledgements | Not enforced by this gate; AB#6387 adds `OCTO-CK203`/`OCTO-CK204` at publish. |
+| Acknowledgements | Enforced from the **compiled model alone** (AB#6387, next section "Acknowledgements at publish"): `OCTO-CK203`, `OCTO-CK204` and `OCTO-CK206`. |
 
 | Code | Meaning | Remediation |
 | ---- | ------- | ----------- |
 | `OCTO-CK205` | The declared version is already published to the catalog with different content | Raise the version in `ckModel.yaml` and publish again; published versions are never replaced (only the dev-lane catalog allows it) |
+| `OCTO-CK206` | An entry of `compatibility.acknowledge` in the compiled model violates the entry rules (empty or wildcard or duplicate `change`, empty `reason`, not single-line plain text) | Recompile the model from a valid `ckModel.yaml`; never edit the compiled file by hand |
 
 **v1 replay.** Replaying the 152 published versions of the public catalog in release order through the gate (opt-in test
 `PublishGateReplayTests`, set `OCTO_PUBLISH_GATE_REPLAY_DIR`) refuses 18 early releases (2.0.x/2.1.x era patch or minor
@@ -268,9 +269,30 @@ Rules:
 - **Visible.** Acknowledged changes appear as "Acknowledged changes" (change, level, reason) in the `ValidateVersion` report, the
   build log of `CkCompile` and the `CHANGELOG.md` section, next to "Behavioural changes". Both gates report the same codes, because
   both use `ICkCompatibilityVerdictService`.
-- **Carried for the publish gate.** The compiled model contains `compatibility` (omitted when empty), so the publish gate (F2.3)
-  can enforce the same rule without the source. ckLanguage 1 models cannot declare entries; for them "requires acknowledge" stays
+- **Carried for the publish gate.** The compiled model contains `compatibility` (omitted when empty), so the publish gate (AB#6387, "Acknowledgements at publish")
+  enforces the same rule without the source. ckLanguage 1 models cannot declare entries; for them "requires acknowledge" stays
   advisory (no `OCTO-CK203`).
+
+### Acknowledgements at publish (AB#6387)
+
+The publish gate (previous section) enforces the acknowledge rule too, from the **compiled model JSON alone**: the publisher
+needs no `ckModel.yaml`, the entries travel in `compatibility.acknowledge`. It uses the same code as the compile gate
+(`CkAcknowledgementResult`, `CkAcknowledgementFormatter`), not a copy, so `ValidateVersion`, the compile gate and the publish
+gate give the same acknowledge verdict for the same model and baseline (pinned by a test over the shared corpus).
+
+| Situation at publish | Result |
+| -------------------- | ------ |
+| A change that needs an acknowledgement and no entry matches | Refused, `OCTO-CK203` naming the change key; the catalog is unchanged |
+| A matching entry (key + reason) | Published; the log lists "Acknowledged changes of model …" with level, change and reason (audit trail without the source repo) |
+| An entry that matches no change of this release, names an ordinary change or another element, or is on a first publication | Refused, `OCTO-CK204` |
+| An entry for an ordinary breaking change | `OCTO-CK200` stays; the entry is stale (`OCTO-CK204`) |
+| An entry for a unique index on a stable base with a lower version | `OCTO-CK200` (major bump required) stays; the entry never waives it |
+| Hand-edited or forged entries: empty or blank `reason`, wildcard or empty `change`, duplicate `change`, control characters, `##vso[` | Refused, `OCTO-CK206` (the reader's schema check usually stops the file first; the gate does not rely on it). The rules are the compiler's (`CkAcknowledgeEntryRules`, shared with message 130) |
+| ckLanguage 1 on both sides, or no `compatibility` section | No new output, no new failure |
+
+The compiled JSON is untrusted input: the verdict (levels, required major bump) is computed from the model content and the
+catalog only; nothing in `compatibility` can lower a level. The same-version no-op (identical or equivalent content already
+published) does not evaluate entries; nothing is written.
 
 ### Applying the minimum version (`--apply`, AB#4467)
 

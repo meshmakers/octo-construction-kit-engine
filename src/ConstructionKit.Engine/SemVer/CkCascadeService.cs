@@ -1,5 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.SemVer;
@@ -15,17 +16,46 @@ public class CkCascadeService : ICkCascadeService
     private readonly ICkBaselineResolver _baselineResolver;
     private readonly ICkCompatibilityVerdictService _verdictService;
     private readonly ICkSurfaceSatisfactionChecker _checker;
+    private readonly ICkJsonSerializer _jsonSerializer;
 
     /// <summary>
     ///     Creates a new instance of the <see cref="CkCascadeService" /> class.
     /// </summary>
     public CkCascadeService(ICatalogService catalogService, ICkBaselineResolver baselineResolver,
-        ICkCompatibilityVerdictService verdictService, ICkSurfaceSatisfactionChecker checker)
+        ICkCompatibilityVerdictService verdictService, ICkSurfaceSatisfactionChecker checker, ICkJsonSerializer jsonSerializer)
     {
+        _jsonSerializer = jsonSerializer;
         _catalogService = catalogService;
         _baselineResolver = baselineResolver;
         _verdictService = verdictService;
         _checker = checker;
+    }
+
+    /// <inheritdoc />
+    public async Task<CkPublishedEquivalent?> FindEquivalentPublishedAsync(CkCompiledModelRoot candidate,
+        string catalogName)
+    {
+        var id = candidate.ModelId;
+        var resolution = await _baselineResolver.ResolvePublishBaselineAsync(id.Name, id.Version, catalogName)
+            .ConfigureAwait(false);
+        var published = resolution.DeclaredVersionPublished;
+        if (published == null)
+        {
+            return null;
+        }
+
+        var operationResult = new OperationResult();
+        var existing = await _catalogService.GetAsync(catalogName, published, operationResult).ConfigureAwait(false);
+        if (existing == null || operationResult.HasErrors || operationResult.HasFatalErrors)
+        {
+            return null;
+        }
+
+        var equivalence = await new CkPublishEquivalence(_jsonSerializer).CompareAsync(existing, candidate)
+            .ConfigureAwait(false);
+        return equivalence.AreEquivalent
+            ? new CkPublishedEquivalent(published, catalogName, equivalence.DifferenceClasses)
+            : null;
     }
 
     /// <inheritdoc />

@@ -1,3 +1,4 @@
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.SemVer;
@@ -27,11 +28,32 @@ public sealed record CkCascadeResult
 }
 
 /// <summary>
+///     The already published model that a candidate equals (AB#6388).
+/// </summary>
+/// <param name="Published">The published model id (the candidate's own version).</param>
+/// <param name="CatalogName">The catalog that holds it.</param>
+/// <param name="DifferenceClasses">Classes of difference normalised away; empty when the content is identical.</param>
+public sealed record CkPublishedEquivalent(CkModelId Published, string CatalogName,
+    IReadOnlyList<string> DifferenceClasses);
+
+/// <summary>
 ///     Cascade dry run (AB#5437): checks a candidate version of a base model against every model in the catalogs that
 ///     depends on it, transitive dependents included. Read-only: it never publishes, registers or refreshes anything.
 /// </summary>
 public interface ICkCascadeService
 {
+    /// <summary>
+    ///     Tells whether <paramref name="candidate" /> is already published to <paramref name="catalogName" /> with the
+    ///     same content (AB#6388): same version, identical or equivalent after canonicalisation
+    ///     (<see cref="CkPublishEquivalence" />, the rule of the publish gate's no-op). Such a candidate cannot newly
+    ///     break a dependent, so the cascade check of a build skips it. Read-only; a missing, unreadable or different
+    ///     published version is <c>null</c> (the candidate is then checked as usual).
+    /// </summary>
+    /// <param name="candidate">The compiled candidate.</param>
+    /// <param name="catalogName">The target catalog of the publish.</param>
+    /// <returns>The published model with the difference classes that were normalised away, or <c>null</c>.</returns>
+    Task<CkPublishedEquivalent?> FindEquivalentPublishedAsync(CkCompiledModelRoot candidate, string catalogName);
+
     /// <summary>
     ///     Checks <paramref name="candidate" /> against its dependents. The dependents are the newest version per major
     ///     line of every model whose dependencies name the candidate (directly or through another dependent).

@@ -27,7 +27,7 @@ public abstract class LinkedBinaryDataSource : ILinkedBinaryDataSource
     }
 
     /// <inheritdoc />
-    public Task ReplaceFileSystemBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, string filename,
+    public Task<OctoObjectId> ReplaceFileSystemBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, string filename,
         string contentType,
         Stream stream, CancellationToken cancellationToken = default)
     {

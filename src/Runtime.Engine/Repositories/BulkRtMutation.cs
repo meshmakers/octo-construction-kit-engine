@@ -247,11 +247,15 @@ internal class BulkRtMutation(
                     }
                     else
                     {
-                        await repositoryDataSource.BinaryDataSource
+                        // AB#6248: the data source may store the new bytes under a new (staging) id so that the old
+                        // bytes survive until the commit. The id it returns is what the entity must reference, and it
+                        // is written here, before the entity write and therefore inside the same transaction.
+                        var replacedBinaryId = await repositoryDataSource.BinaryDataSource
                             .ReplaceFileSystemBinaryAsync(session, entityBinaryInfo.BinaryId.Value,
                                 entityBinaryInfo.Filename, entityBinaryInfo.ContentType, entityBinaryInfo.Stream,
                                 CancellationToken.None)
                             .ConfigureAwait(false);
+                        entityBinaryInfo.BinaryId = replacedBinaryId;
                     }
                 }
             }

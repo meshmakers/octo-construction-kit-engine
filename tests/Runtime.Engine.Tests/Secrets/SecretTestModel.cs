@@ -63,10 +63,15 @@ internal sealed class SecretTestModel
             Attr("Year", AttributeValueTypesDto.Int),
             Attr("Settings", AttributeValueTypesDto.Record, recordId: Settings.CkRecordId));
 
+        // AB#6248: a type with a linked binary attribute for the BulkRtMutation binary-id contract tests.
+        Document = BuildType("Document",
+            Attr("Name", AttributeValueTypesDto.String),
+            Attr("File", AttributeValueTypesDto.BinaryLinked));
+
         Cache = A.Fake<ICkCacheService>();
         A.CallTo(() => Cache.IsTenantLoaded(TenantId)).Returns(true);
-        A.CallTo(() => Cache.GetCkTypes(TenantId)).Returns([Config, OptionalOnly, Plain, Named]);
-        foreach (var type in new[] { Config, OptionalOnly, Plain, Named })
+        A.CallTo(() => Cache.GetCkTypes(TenantId)).Returns([Config, OptionalOnly, Plain, Named, Document]);
+        foreach (var type in new[] { Config, OptionalOnly, Plain, Named, Document })
         {
             RegisterType(type);
         }
@@ -86,6 +91,8 @@ internal sealed class SecretTestModel
     public CkTypeGraph Plain { get; }
 
     public CkTypeGraph Named { get; }
+
+    public CkTypeGraph Document { get; }
 
     public CkRecordGraph Credential { get; }
 
@@ -138,6 +145,11 @@ internal sealed class SecretTestModel
     public RtEntity NewConfig(OctoObjectId? rtId = null)
     {
         return new RtEntity(Config.CkTypeId.ToRtCkId(), rtId ?? OctoObjectId.GenerateNewId());
+    }
+
+    public RtEntity NewDocument(OctoObjectId? rtId = null)
+    {
+        return new RtEntity(Document.CkTypeId.ToRtCkId(), rtId ?? OctoObjectId.GenerateNewId());
     }
 
     public RtEntity NewOptionalOnly(OctoObjectId? rtId = null)

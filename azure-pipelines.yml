@@ -43,7 +43,7 @@ resources:
       type: github
       name: meshmakers/octo-pipeline-templates
       endpoint: meshmakers-access-token
-      ref: refs/tags/tpl-v1.3.1
+      ref: refs/tags/tpl-v1.4.0
 
 trigger:
   batch: true
@@ -130,6 +130,15 @@ stages:
               octoCommVersionOverride: ${{ replace(parameters.octoCommVersion, 'auto', '') }}
           - checkout: self
             clean: true
+          # Redundant-run guard (AB#6439, AB#6344): publishes this run's own input fingerprint as the build tag
+          # inputs:<hash> = sha256(own commit | inputs tag of the triggering parent run), so that the children (and
+          # the leaf service CIs below them) see identical fingerprints for identical inputs across cascade waves.
+          # Mode by the pipeline variable CiGuardMode (unset = report: tags only, nothing is ended; cancel = a
+          # duplicate or superseded main run cancels itself; off = disabled). Fail-open, main only.
+          - template: templates/steps/guard-redundant-run.yml@pipelineTemplates
+            parameters:
+              parentPipelineId: $(resources.pipeline.octo-distributedEventHub.pipelineID)
+              parentRunId: $(resources.pipeline.octo-distributedEventHub.runID)
           - template: templates/steps/set-version.yml@pipelineTemplates
           # This repo builds interdependent CK models in the same run (StreamData ->
           # System, Test/TestIdentity -> System). The glob compiles them alphabetically,

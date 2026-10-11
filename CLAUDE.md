@@ -598,9 +598,20 @@ resolves from the freshly built local catalog). `OctoEnforceRuntimeStateMarkers`
 (it would demand ownership markers on an unchanged 1.0.0). `Runtime.Engine.Tests`
 (`EmbeddedCkModelResourceTests`) guards the embedded model and the id `System.Files-1.0.0`.
 
+**Single publisher (AB#6481).** This repository's CI is the only publisher of `System.Files` to the private and
+public CK catalogs and the only source of its generated model documentation: the `Validate CK model versions`/
+`Publish CK models` step lists `src/SystemFilesCkModel/ConstructionKit` (after `System`), and a dedicated `CopyFiles`
+step stages the `.md` files of `SystemFilesCkModel/out` for the documentation site. The yaml is deliberately **not**
+copied via `handle-artifacts.constructionKitLibraryPaths`: that puts it into `ck-libraries/`, which
+`release-catalogs-train` publishes to the public catalog with `-r`, i.e. a second, forcing publisher built against the
+newest System of the commit. The CK gate stays the only publisher. Because 1.0.0 is already published with identical
+content, the first publish from here is the idempotent "already exists" skip. The asset-repository CI stops
+publishing it together with the removal of its model project (AB#6480). A search of all `azure-pipelines.yml`
+files for `SystemFilesCkModel` must therefore find only this repository.
+
 ## CK Model Publishing Lanes (CI)
 
-This repo publishes its CK models (`System`, `System.StreamData`) from **inside the build**, not from a dedicated publish
+This repo publishes its CK models (`System`, `System.Files`, `System.StreamData`) from **inside the build**, not from a dedicated publish
 step: `Directory.Build.targets`' `CkCompile` target runs `octo-ckc -c publish -c
 $(OctoPublishCatalog) -r` for every project that sets `OctoPublishCkModel=true`. This repo
 is special — it cannot consume its own `Meshmakers.Octo.ConstructionKit.MsBuildTasks`
@@ -620,10 +631,10 @@ Since `tpl-v1.0.0` of `meshmakers/octo-pipeline-templates` (pinned by the `ref:`
 publishes to a shared catalog. `update-build-number.yml` no longer exports `OctoPublishCatalog` /
 `effectivePublishCatalog`. The shared catalogs are published only by
 `templates/steps/validate-and-publish-ck-versions.yml`, which runs **after build and tests**, validates
-System and System.StreamData against the last published version, compiles them and publishes them
+System, System.Files and System.StreamData against the last published version, compiles them and publishes them
 (never replacing a published version):
 
-| Branch / ref | Catalog that receives System, System.StreamData (Test / System.TestIdentity: LocalFileSystemCatalog only, always) |
+| Branch / ref | Catalog that receives System, System.Files, System.StreamData (Test / System.TestIdentity: LocalFileSystemCatalog only, always) |
 | ------------ | -------------------------------------------------------------------------- |
 | `refs/heads/main` | `PrivateGitHubCatalog` → `meshmakers/construction-kit-libraries-build` |
 | `refs/tags/r<X.Y.Z>` | private **and** `PublicGitHubCatalog` |

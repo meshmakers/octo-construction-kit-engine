@@ -55,7 +55,9 @@ public sealed record CkPublishGateResult
 ///         <item>Baseline: <see cref="ICkBaselineResolver.ResolvePublishBaselineAsync" /> (target catalog only, never the
 ///             declared version itself, case-insensitive model names, both catalog roots).</item>
 ///         <item>Same-version rule: identical content already published = <see cref="CkPublishGateDecision.AlreadyPublished" />;
-///             different content = <c>OCTO-CK205</c> unless the catalog allows replacing (<see cref="IReplaceablePublishCatalog" />,
+///             equivalent content (same after canonicalisation, <see cref="CkPublishEquivalence" />: restated default
+///             ownership, element order, compiler-stamped metadata) = <see cref="CkPublishGateDecision.AlreadyPublished" />
+///             with a warning naming the difference class; different content = <c>OCTO-CK205</c> unless the catalog allows replacing (<see cref="IReplaceablePublishCatalog" />,
 ///             the dev lane catalog). There is no bypass switch; <c>--replace</c> does not skip the gate.</item>
 ///         <item>Race: the catalog is re-read right before the write; if it changed since the baseline was read, the verdict
 ///             is computed again (at most <see cref="MaxAttempts" /> reads), never written on a stale baseline.</item>
@@ -161,11 +163,26 @@ public class CkPublishGate
         if (resolution.DeclaredVersionPublished != null)
         {
             var published = resolution.DeclaredVersionPublished;
-            if (await IsIdenticalAsync(catalog, published, model).ConfigureAwait(false))
+            var equivalence = await CompareWithPublishedAsync(catalog, published, model).ConfigureAwait(false);
+            if (equivalence.AreEquivalent)
             {
-                messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Info, null,
-                    $"Model '{published.FullName}' is already published to catalog '{catalog.CatalogName}' with " +
-                    "identical content; nothing to publish."));
+                if (equivalence.DifferenceClasses.Count == 0)
+                {
+                    messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Info, null,
+                        $"Model '{published.FullName}' is already published to catalog '{catalog.CatalogName}' with " +
+                        "identical content; nothing to publish."));
+                }
+                else
+                {
+                    // Equivalent content: only compiler-generated or restated-default differences. The published file
+                    // stays as it is; the next real change brings the new form with its own version.
+                    messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Warning, null,
+                        $"Model '{published.FullName}' is already published to catalog '{catalog.CatalogName}' with " +
+                        "equivalent content; nothing to publish. The compiled file differs only in: " +
+                        string.Join("; ", equivalence.DifferenceClasses) +
+                        ". The published version stays as it is."));
+                }
+
                 return new CkPublishGateResult
                 {
                     Decision = CkPublishGateDecision.AlreadyPublished, Messages = messages
@@ -222,23 +239,12 @@ public class CkPublishGate
         };
     }
 
-    private async Task<bool> IsIdenticalAsync(ICatalog catalog, CkModelId published, CkCompiledModelRoot model)
+    private async Task<CkPublishEquivalenceResult> CompareWithPublishedAsync(ICatalog catalog, CkModelId published,
+        CkCompiledModelRoot model)
     {
         var operationResult = new OperationResult();
         var existing = await catalog.GetAsync(published, operationResult).ConfigureAwait(false);
-        return string.Equals(await SerializeAsync(existing).ConfigureAwait(false),
-            await SerializeAsync(model).ConfigureAwait(false), StringComparison.Ordinal);
-    }
-
-    private async Task<string> SerializeAsync(CkCompiledModelRoot model)
-    {
-        using var stream = new MemoryStream();
-        var writer = new StreamWriter(stream);
-        await _jsonSerializer.SerializeAsync(writer, model).ConfigureAwait(false);
-        await writer.FlushAsync().ConfigureAwait(false);
-        stream.Position = 0;
-        using var reader = new StreamReader(stream);
-        return await reader.ReadToEndAsync().ConfigureAwait(false);
+        return await new CkPublishEquivalence(_jsonSerializer).CompareAsync(existing, model).ConfigureAwait(false);
     }
 
     private static bool SameSnapshot(IReadOnlyList<CkModelId> a, IReadOnlyList<CkModelId> b) =>

@@ -12,6 +12,9 @@ public enum CkCompileGateSeverity
     /// <summary>Plain information for the build log (rendered with high importance).</summary>
     Info,
 
+    /// <summary>A finding the build log must show but that does not fail the build.</summary>
+    Warning,
+
     /// <summary>A finding that fails the build.</summary>
     Error
 }

@@ -590,8 +590,7 @@ YAML, same PackageId, same generated namespace
 `RtFolderRoot`, `RtFolder`, `RtFileSystemItem`, `AddCkModelSystemFilesV1`). The compiled yaml freezes the
 dependency range to the newest System it sees (`System-2.5.0`), so a rebuild only matches the published
 1.0.0 while the System the project builds against is still 2.5.0. Do not edit the YAML without a version
-bump (`octo-ckc ValidateVersion`); the stale description text ("imported by the asset repository") is
-corrected with the next real model change, not before. `SystemFilesCkModel` builds after `SystemCkModel`
+bump (`octo-ckc ValidateVersion`). `SystemFilesCkModel` builds after `SystemCkModel`
 (project reference, same pattern as `StreamDataCkModel`, with `OctoLocalCatalogIsEnabled=true` so that System
 resolves from the freshly built local catalog). `OctoEnforceRuntimeStateMarkers` is deliberately not armed
 (it would demand ownership markers on an unchanged 1.0.0). `Runtime.Engine.Tests`

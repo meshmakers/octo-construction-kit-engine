@@ -444,8 +444,10 @@ MsBuildTasks package, so `Directory.Build.targets` registers the same task from
 `bin/<Configuration>/tasks/<tfm>/` with `TaskFactory="TaskHostFactory"` (no DLL lock in
 a reused node); a model project that sets `OctoEnforceRuntimeStateMarkers=true` adds a
 `ProjectReference` to `ConstructionKit.MsBuildTasks` with `ReferenceOutputAssembly="false"`
-for the build order (see `StreamDataCkModel.csproj`). System.StreamData 1.17.0 got 56
-restating `ownership: SeedOwned` markers (no bump, `ValidateVersion` VALID); the F4
+for the build order (see `StreamDataCkModel.csproj`). System.StreamData got 56
+restating `ownership: SeedOwned` markers. They change the compiled file, so the publish gate (AB#6386, `OCTO-CK205`) refuses them
+under the already published 1.17.0 even though `ValidateVersion` says VALID (resolved ownership unchanged): the model is 1.17.1 (PATCH).
+Rule: any change of the compiled output, also a restatement without semantic effect, needs a version bump before it reaches main; the F4
 retention attributes (`Archive.RawRetentionMs`, `Archive.MaxRetroactiveReachMs`) carry the
 comment "under review in AB#6328". `SystemCkModel` is not armed yet.
 

@@ -61,6 +61,12 @@ internal sealed class NamedStubCatalog(string name, int order) : ICatalog
         return Task.CompletedTask;
     }
 
+    public Task<CatalogUnpublishResult> UnpublishAsync(CkModelId modelId, string? reason = null,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null) =>
+        Task.FromResult(_models.Remove(modelId)
+            ? CatalogUnpublishResult.Removed
+            : throw ModelCatalogException.ModelNotFound(modelId, name));
+
     public async IAsyncEnumerable<CatalogResultItem> ListAsync(object? sourceIdentifier)
     {
         await Task.CompletedTask;

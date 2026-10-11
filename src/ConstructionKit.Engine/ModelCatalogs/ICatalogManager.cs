@@ -1,5 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 
@@ -158,6 +159,19 @@ internal interface ICatalogManager
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
     /// <returns></returns>
     Task PublishAsync(string catalogName, CkCompiledModelRoot ckCompiledModel, bool isForced,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
+
+    /// <summary>
+    ///     Removes a model version from a catalog and burns its version number (AB#5433). Does not check for
+    ///     dependents; <c>ICatalogService.UnpublishAsync</c> does.
+    /// </summary>
+    /// <param name="catalogName">Name of the catalog to unpublish from</param>
+    /// <param name="modelId">The model id including the exact version</param>
+    /// <param name="reason">Optional reason, written to the commit message and the withdrawn record</param>
+    /// <param name="sourceIdentifier">An object that describes the source which the catalog should search,
+    /// set it to null to use default</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
+    Task<CatalogUnpublishResult> UnpublishAsync(string catalogName, CkModelId modelId, string? reason,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
 
     /// <summary>

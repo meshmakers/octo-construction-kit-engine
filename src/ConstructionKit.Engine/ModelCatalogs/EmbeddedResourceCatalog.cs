@@ -104,6 +104,13 @@ public class EmbeddedResourceCatalog : ICatalog
     }
 
     /// <inheritdoc />
+    public Task<CatalogUnpublishResult> UnpublishAsync(CkModelId modelId, string? reason = null,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+    {
+        throw ModelCatalogException.CatalogNotWritable(CatalogName);
+    }
+
+    /// <inheritdoc />
     public async IAsyncEnumerable<CatalogResultItem> ListAsync(object? sourceIdentifier)
     {
         await Task.Yield();

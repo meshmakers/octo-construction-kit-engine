@@ -294,6 +294,9 @@ public class LocalFileSystemCatalog : CachedCatalog
             throw ModelCatalogException.CatalogNotEnabledToWrite(Name);
         }
 
+        // AB#5433: an unpublished version number is burned, also for a forced publish.
+        ThrowIfWithdrawn(ckCompiledModel.ModelId);
+
         // F1.1-S6: ckLanguage 2 / range-retaining models go to ck-models/v3, classic ones to ck-models/v2. A model
         // version exists under one root only: a forced re-publish into the other root removes the old file.
         var root = CkCatalogLayout.GetPublishRoot(ckCompiledModel);
@@ -391,6 +394,135 @@ public class LocalFileSystemCatalog : CachedCatalog
 
 
 
+
+    /// <inheritdoc />
+    public override async Task<CatalogUnpublishResult> UnpublishAsync(CkModelId modelId, string? reason = null,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+    {
+        if (!CanWrite)
+        {
+            throw ModelCatalogException.CatalogNotEnabledToWrite(Name);
+        }
+
+        cancellationToken?.ThrowIfCancellationRequested();
+
+        // The roots that hold the version: the model file exists or the per-major index lists it.
+        var holdingRoots = CkCatalogLayout.ReadRoots
+            .Where(root => File.Exists(CreatePath(root, modelId)) ||
+                           CatalogUnpublishIndex.ListsVersion(
+                               ReadIndexText(CatalogUnpublishIndex.VersionsCatalogPath(root, modelId)), modelId))
+            .ToList();
+
+        if (holdingRoots.Count == 0)
+        {
+            if (FindWithdrawn(modelId) != null)
+            {
+                return CatalogUnpublishResult.AlreadyWithdrawn;
+            }
+
+            throw ModelCatalogException.ModelNotFound(modelId, Name);
+        }
+
+        foreach (var root in holdingRoots)
+        {
+            // Safe order (as for the GitHub catalog): burn the number, prune the index, then remove the file. A crash
+            // in between leaves a burned number with a harmless orphan file; running unpublish again completes it.
+            using (await CatalogFileIo.AcquireLockAsync(IndexLockPath(root)).ConfigureAwait(false))
+            {
+                WriteIndexText(CatalogUnpublishIndex.WithdrawnFilePath(root, modelId.Name),
+                    CatalogUnpublishIndex.AddWithdrawn(
+                        ReadIndexText(CatalogUnpublishIndex.WithdrawnFilePath(root, modelId.Name)), modelId, reason));
+
+                var versionsPath = CatalogUnpublishIndex.VersionsCatalogPath(root, modelId);
+                var newVersions = CatalogUnpublishIndex.RemoveVersion(ReadIndexText(versionsPath), modelId,
+                    out var majorEmpty);
+                if (majorEmpty)
+                {
+                    DeleteIndexFile(versionsPath);
+                }
+                else
+                {
+                    WriteIndexText(versionsPath, newVersions);
+                }
+
+                if (majorEmpty)
+                {
+                    var libraryPath = CatalogUnpublishIndex.LibraryCatalogPath(root, modelId.Name);
+                    var newLibrary = CatalogUnpublishIndex.RemoveMajor(ReadIndexText(libraryPath),
+                        modelId.Version.Major, out var modelEmpty);
+                    if (modelEmpty)
+                    {
+                        DeleteIndexFile(libraryPath);
+                        var rootPath = CatalogUnpublishIndex.RootCatalogPath(root);
+                        WriteIndexText(rootPath,
+                            CatalogUnpublishIndex.RemoveModel(ReadIndexText(rootPath), modelId.Name));
+                    }
+                    else
+                    {
+                        WriteIndexText(libraryPath, newLibrary);
+                    }
+                }
+            }
+
+            var filePath = CreatePath(root, modelId);
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+        }
+
+        await RefreshCatalogAsync(true).ConfigureAwait(false);
+        return CatalogUnpublishResult.Removed;
+    }
+
+    /// <summary>AB#5433: the withdrawn record of the version in either root, or null.</summary>
+    private SharedCatalogTypes.WithdrawnVersionEntry? FindWithdrawn(CkModelId modelId)
+    {
+        foreach (var root in CkCatalogLayout.ReadRoots)
+        {
+            var entry = CatalogUnpublishIndex.FindWithdrawn(
+                ReadIndexText(CatalogUnpublishIndex.WithdrawnFilePath(root, modelId.Name)), modelId.Version);
+            if (entry != null)
+            {
+                return entry;
+            }
+        }
+
+        return null;
+    }
+
+    private void ThrowIfWithdrawn(CkModelId modelId)
+    {
+        var entry = FindWithdrawn(modelId);
+        if (entry != null)
+        {
+            throw ModelCatalogException.VersionWithdrawn(modelId, Name, entry.Reason, entry.WithdrawnAt);
+        }
+    }
+
+    private string? ReadIndexText(string relativePath)
+    {
+        var path = Path.Combine(_options.Value.RootPath, relativePath);
+        return File.Exists(path) ? File.ReadAllText(path) : null;
+    }
+
+    /// <summary>Atomically writes the index text; null means "nothing to change".</summary>
+    private void WriteIndexText(string relativePath, string? text)
+    {
+        if (text != null)
+        {
+            CatalogFileIo.WriteTextAtomically(Path.Combine(_options.Value.RootPath, relativePath), text);
+        }
+    }
+
+    private void DeleteIndexFile(string relativePath)
+    {
+        var path = Path.Combine(_options.Value.RootPath, relativePath);
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+    }
 
     private static readonly JsonSerializerOptions IndexJsonOptions = new()
     {

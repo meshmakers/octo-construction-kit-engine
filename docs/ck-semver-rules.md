@@ -322,6 +322,44 @@ Candidate change level: MINOR (minimum version 2.3.0, declared 2.3.0: ok)
 The report also prints the catalog cache age of the baseline; `--refresh` forces a refresh
 (mandatory in CI, where a stale cache would validate against the wrong baseline).
 
+## Withdrawing a published version (`Unpublish`, AB#5433)
+
+Published versions are immutable, but a publish can turn out to be premature (2026-09-30: `System-2.3.0` broke the platform
+build and could not be taken back). `octo-ckc -c Unpublish` is the escape hatch; it is the model-side twin of `octo-bpm unpublish`:
+
+```
+octo-ckc -c Unpublish -m <model> -ve <version> [-cn <catalogName>] [-f] [-rs <reason>] [-lcr <path>]
+```
+
+(`-ve` because `-v` is the global verbosity switch of every `octo-ckc` command.)
+
+- **Dry run by default.** Without `-f` the command prints whether the version is published and which published models depend on it,
+  and changes nothing. `-f` applies. The default catalog is `LocalFileSystemCatalog`.
+- **Dependents are refused, also with `-f`.** The catalog is scanned: a published model depends on the version when one of its
+  resolution ranges (the exact pins of a classic model, the declared range of a range-retaining one) is satisfied by the version and
+  by no other remaining version of the model - an exact pin on it, or a range it is the only satisfying version of. The refusal names
+  those models; the exit code is non-zero. This keeps the escape hatch from creating dangling references. A range that another
+  version still satisfies does not block (the 2026-09-30 `System.Bot` pinned `System-2.2.2`, not 2.3.0).
+- **The version number is burned.** The removal records the number in `withdrawn.json` next to the model directory
+  (`ck-models/v2|v3/<letter>/<Model>/withdrawn.json`: version, time, reason). Every catalog `PublishAsync` - `octo-ckc Publish`, the
+  `CkCompile` MSBuild publish, also with `--replace`/force - refuses a burned number, also with identical content, because tenants and
+  caches may already hold the old file; the next free number works. The record is a file of its own on purpose: a publish by an older
+  engine rewrites only the index files it knows, so it cannot drop the record (an older engine does not enforce the burn, it only
+  cannot erase it). Withdrawn versions are not in any index any more, so the baseline resolver (AB#5450) never sees them as a baseline.
+- **Index and file order.** The burn record is written first, then the index tree is pruned (per-major index, model index, root index,
+  in both roots; an index with nothing left is deleted), then the model file is removed. A failure in between leaves a burned number and
+  an orphan file, never an index entry that points to a missing file; running the command again completes it.
+- **Idempotent.** Running it again says the version was already unpublished and changes nothing; a version that was never published fails.
+- **Public catalog.** Unpublishing from `PublicGitHubCatalog` needs `-f` and a mandatory `-rs <reason>`; the reason is part of the commit
+  message of every catalog change and of the withdrawn record. The private and dev catalogs need `-f` only (a reason is recorded when given).
+- **Replay of 2026-09-30.** `System-2.3.0` published, nothing depends on it: `octo-ckc -c Unpublish -m System -ve 2.3.0 -cn <catalog> -f`
+  withdraws it; `ValidateVersion` of `2.2.3` afterwards uses `2.2.2` as the baseline.
+
+Engine API: `ICatalog.UnpublishAsync` (per catalog: `LocalFileSystemCatalog`, `GitHubCatalog`; the embedded catalog is read-only),
+`ICatalogService.PlanUnpublishAsync` (the dry run) and `ICatalogService.UnpublishAsync` (reason policy, dependents check, then the catalog).
+A real GitHub catalog is only ever written by an explicit command; the tests run against the local file system catalog and an in-memory
+GitHub client.
+
 ## The fixed rule set (V1)
 
 The highest applicable level in the overall diff determines the minimum bump level. The rule set

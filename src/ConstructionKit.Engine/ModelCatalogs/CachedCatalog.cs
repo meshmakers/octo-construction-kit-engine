@@ -142,6 +142,10 @@ public abstract class CachedCatalog(
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
 
     /// <inheritdoc />
+    public abstract Task<CatalogUnpublishResult> UnpublishAsync(CkModelId modelId, string? reason = null,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
+
+    /// <inheritdoc />
     public async IAsyncEnumerable<CatalogResultItem> ListAsync(object? sourceIdentifier)
     {
         if (!CanRead)

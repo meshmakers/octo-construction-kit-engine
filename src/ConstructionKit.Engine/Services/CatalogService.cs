@@ -279,6 +279,12 @@ internal class CatalogService : ICatalogService
             operationResult.AddMessage(new OperationMessage(MessageLevel.Error, model.ModelId.FullName, number,
                 $"{message.Code}: {message.Text}"));
         }
+        else if (message.Severity == CkCompileGateSeverity.Warning)
+        {
+            // Logger only, not the OperationResult: a warning there fails every build that treats warnings as errors,
+            // and the no-op it announces is a success.
+            _logger.LogWarning("{Message}", message.Text);
+        }
         else
         {
             _logger.LogInformation("{Message}", message.Text);

@@ -221,6 +221,23 @@ internal class BulkRtMutation(
                 SecretWriteOperation.Update, storedById);
         }
 
+        // AB#6248: a guard that does not match skips the entity write without an error, so the entity would keep
+        // the old BinaryId while the bytes behind it are replaced/deleted. Refuse the combination up front, before
+        // any byte is touched.
+        foreach (var ckTypeAttributeGraph in ckTypeGraph.AllAttributes.Values.Where(a =>
+                     a.ValueType == AttributeValueTypesDto.BinaryLinked))
+        {
+            foreach (var rtEntity in rtEntities)
+            {
+                if (updateGuards.ContainsKey(rtEntity.ToRtEntityId()) &&
+                    rtEntity.GetAttributeLinkedBinaryValueOrDefault(ckTypeAttributeGraph.AttributeName) != null)
+                {
+                    throw RuntimeRepositoryException.GuardedUpdateWithLinkedBinary(rtEntity.ToRtEntityId(),
+                        ckTypeAttributeGraph.AttributeName);
+                }
+            }
+        }
+
         foreach (var ckTypeAttributeGraph in ckTypeGraph.AllAttributes.Values.Where(a =>
                      a.ValueType == AttributeValueTypesDto.BinaryLinked))
         {
@@ -247,11 +264,15 @@ internal class BulkRtMutation(
                     }
                     else
                     {
-                        await repositoryDataSource.BinaryDataSource
-                            .ReplaceFileSystemBinaryAsync(session, entityBinaryInfo.BinaryId.Value,
+                        // AB#6248: the data source may store the new bytes under a new (staging) id so that the old
+                        // bytes survive until the commit. The id it returns is what the entity must reference, and it
+                        // is written here, before the entity write and therefore inside the same transaction.
+                        var replacedBinaryId = await repositoryDataSource.BinaryDataSource
+                            .ReplaceFileSystemBinaryAsync(session, rtEntity.ToRtEntityId(), entityBinaryInfo.BinaryId.Value,
                                 entityBinaryInfo.Filename, entityBinaryInfo.ContentType, entityBinaryInfo.Stream,
                                 CancellationToken.None)
                             .ConfigureAwait(false);
+                        entityBinaryInfo.BinaryId = replacedBinaryId;
                     }
                 }
             }

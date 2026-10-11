@@ -184,7 +184,7 @@ internal class LocalLinkedBinaryDataSource(string tenantId, string directoryPath
     }
 
     protected override async Task<OctoObjectId> ReplaceLargeBinaryAsync(IOctoSession session, string filename,
-        string contentType, BinaryType binaryType,
+        string contentType, BinaryType binaryType, RtEntityId? rtEntityId,
         OctoObjectId? binaryId, Stream stream, CancellationToken cancellationToken = default)
     {
         EnsureLargeBinaryDirectory();

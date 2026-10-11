@@ -27,11 +27,13 @@ public abstract class LinkedBinaryDataSource : ILinkedBinaryDataSource
     }
 
     /// <inheritdoc />
-    public Task ReplaceFileSystemBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, string filename,
+    public Task<OctoObjectId> ReplaceFileSystemBinaryAsync(IOctoSession session, RtEntityId rtEntityId,
+        OctoObjectId largeBinaryId, string filename,
         string contentType,
         Stream stream, CancellationToken cancellationToken = default)
     {
-        return ReplaceLargeBinaryAsync(session, filename, contentType, BinaryType.FileSystem, largeBinaryId, stream,
+        return ReplaceLargeBinaryAsync(session, filename, contentType, BinaryType.FileSystem, rtEntityId, largeBinaryId,
+            stream,
             cancellationToken);
     }
 
@@ -40,7 +42,7 @@ public abstract class LinkedBinaryDataSource : ILinkedBinaryDataSource
         string contentType, Stream stream,
         CancellationToken cancellationToken = default)
     {
-        return ReplaceLargeBinaryAsync(session, filename, contentType, BinaryType.Temporary, null, stream,
+        return ReplaceLargeBinaryAsync(session, filename, contentType, BinaryType.Temporary, null, null, stream,
             cancellationToken);
     }
 
@@ -102,11 +104,12 @@ public abstract class LinkedBinaryDataSource : ILinkedBinaryDataSource
     /// <param name="filename">Filename of the file</param>
     /// <param name="contentType">Content type of the file</param>
     /// <param name="binaryType">Binary type of the file</param>
+    /// <param name="rtEntityId">Owning runtime entity (file system binaries), otherwise null</param>
     /// <param name="binaryId">Binary id of the file</param>
     /// <param name="stream">Stream of the file</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns></returns>
     protected abstract Task<OctoObjectId> ReplaceLargeBinaryAsync(IOctoSession session,
-        string filename, string contentType, BinaryType binaryType, OctoObjectId? binaryId,
+        string filename, string contentType, BinaryType binaryType, RtEntityId? rtEntityId, OctoObjectId? binaryId,
         Stream stream, CancellationToken cancellationToken = default);
 }

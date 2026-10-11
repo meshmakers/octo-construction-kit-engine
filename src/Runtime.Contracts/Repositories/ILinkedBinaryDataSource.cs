@@ -38,13 +38,20 @@ public interface ILinkedBinaryDataSource
     /// Replaces a large binary file in the repository based on the large binary id
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
+    /// <param name="rtEntityId">The runtime entity that owns the binary. A data source may use it to verify that
+    /// <paramref name="largeBinaryId"/> belongs to this entity (AB#6540) and carries it over to the new bytes.</param>
     /// <param name="largeBinaryId">Object id of the large binary</param>
     /// <param name="filename">Filename of the file</param>
     /// <param name="contentType">Content type of the file</param>
     /// <param name="stream">Stream of the file</param>
     /// <param name="cancellationToken">An optional cancellation token</param>
-    /// <returns></returns>
-    Task ReplaceFileSystemBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, string filename, string contentType,
+    /// <returns>
+    /// The object id under which the new bytes are stored. Callers MUST store this id in the entity (AB#6248):
+    /// an implementation that takes part in a transaction stores the new bytes under a new (staging) id so that
+    /// the old bytes stay readable until the commit, and deletes the old bytes only after the commit (or the new
+    /// bytes on rollback). Without a transaction the id of <paramref name="largeBinaryId"/> may be returned unchanged.
+    /// </returns>
+    Task<OctoObjectId> ReplaceFileSystemBinaryAsync(IOctoSession session, RtEntityId rtEntityId, OctoObjectId largeBinaryId, string filename, string contentType,
         Stream stream, CancellationToken cancellationToken = default);
 
     /// <summary>

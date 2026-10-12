@@ -39,6 +39,12 @@ public sealed record CkPublishGateResult
     /// <summary>The verdict, null when there was no baseline to compare with or the gate stopped before.</summary>
     public CkCompatibilityVerdict? Verdict { get; init; }
 
+    /// <summary>
+    ///     The state of the version indexes the verdict was computed against (AB#6584); the write is conditional on it.
+    ///     Null for a catalog that cannot tell (it is then read through its cache).
+    /// </summary>
+    public CatalogStateToken? State { get; init; }
+
     /// <summary>True when at least one message is an error.</summary>
     public bool HasErrors => Messages.Any(m => m.Severity == CkCompileGateSeverity.Error);
 }
@@ -143,7 +149,7 @@ public class CkPublishGate
                 if (evaluated != null && evaluatedSnapshot != null &&
                     SameSnapshot(evaluatedSnapshot, resolution.KnownVersions))
                 {
-                    return evaluated;
+                    return evaluated with { State = resolution.State };
                 }
 
                 evaluated = await EvaluateResolvedAsync(catalog, model, resolution, allowsReplace).ConfigureAwait(false);
@@ -166,6 +172,81 @@ public class CkPublishGate
         return Refused(Error("OCTO-CK202",
             $"Catalog '{catalog.CatalogName}' changed while the compatibility of model '{model.ModelId.FullName}' was " +
             $"checked ({MaxAttempts} reads). Nothing was written; retry the publish."));
+    }
+
+    /// <summary>
+    ///     The check after the write (AB#6584), the second half of the race protection: the catalog is read again and
+    ///     the published version is judged against its predecessor as the catalog holds it now. It finds what the
+    ///     conditional write cannot guard: a concurrent publish that landed in an index the write does not compare (a
+    ///     case-variant spelling of the model name, another major). Returns null when the version stands.
+    /// </summary>
+    /// <param name="catalogName">The catalog the model was published to.</param>
+    /// <param name="model">The model that was just written.</param>
+    /// <param name="judgedBaseline">The baseline the verdict before the write used; null for a first publication.</param>
+    /// <param name="sourceIdentifier">The source identifier of the publish.</param>
+    /// <returns>The refusal to report (the version must be withdrawn), or null.</returns>
+    public async Task<CkPublishGateResult?> VerifyAfterWriteAsync(string catalogName, CkCompiledModelRoot model,
+        CkModelId? judgedBaseline, object? sourceIdentifier = null)
+    {
+        var catalog = _catalogs.FirstOrDefault(c =>
+            string.Equals(c.CatalogName, catalogName, StringComparison.OrdinalIgnoreCase));
+        if (catalog == null || !catalog.CanWrite || !catalog.CanRead || !catalog.IsSupportingSourceIdentifier(sourceIdentifier) ||
+            CkBaselineResolver.IsLocalCatalog(catalog.CatalogName))
+        {
+            return null;
+        }
+
+        var modelName = model.ModelId.Name;
+        try
+        {
+            if (catalog is not IAuthoritativeVersionCatalog)
+            {
+                await _catalogService.RefreshCatalogCacheAsync(catalog.CatalogName, sourceIdentifier, forceRefresh: true)
+                    .ConfigureAwait(false);
+            }
+
+            // The version is published now, so the baseline is the newest version below it in its major (or the highest
+            // lower major): its predecessor as the catalog holds it after every concurrent publish.
+            var resolution = await _baselineResolver
+                .ResolvePublishBaselineAsync(modelName, model.ModelId.Version, catalog.CatalogName).ConfigureAwait(false);
+            if (resolution.SourceUnreachable)
+            {
+                return Refused(Error("OCTO-CK202", UnreachableText(modelName, catalog.CatalogName,
+                                                       resolution.SourceUnreachableReason) +
+                                                   $" Model '{model.ModelId.FullName}' was written but could not be verified against a concurrent publish; publishing it again completes the check."));
+            }
+
+            // Nothing changed below the version since the verdict: it stands.
+            if (resolution.Baseline == null || (judgedBaseline != null && resolution.Baseline.Equals(judgedBaseline)))
+            {
+                return null;
+            }
+
+            var verdict = await _verdictService.EvaluateAsync(resolution, model, catalog.CatalogName)
+                .ConfigureAwait(false);
+            var messages = new List<CkCompileGateMessage>();
+            CkCompileGate.AddErrors(messages, verdict, modelName, model.ModelId.Version, null);
+            AddAcknowledgementMessages(messages, model, verdict.Acknowledgement);
+            if (!messages.Any(m => m.Severity == CkCompileGateSeverity.Error))
+            {
+                return null;
+            }
+
+            messages.Add(Error(CkPublishRefusal.ConcurrentPublishCode,
+                $"Model '{model.ModelId.FullName}' was written, but another publish of '{modelName}' landed at the same " +
+                $"time: judged against its predecessor '{resolution.Baseline.FullName}' as the catalog holds it now, the " +
+                "version violates the rules above."));
+            return new CkPublishGateResult
+            {
+                Decision = CkPublishGateDecision.Refused, Messages = CkPublishRefusal.Normalize(messages),
+                Verdict = verdict
+            };
+        }
+        catch (Exception e) when (IsSourceFailure(e))
+        {
+            return Refused(Error("OCTO-CK202", UnreachableText(modelName, catalog.CatalogName, DescribeFailure(e)) +
+                                               $" Model '{model.ModelId.FullName}' was written but could not be verified against a concurrent publish; publishing it again completes the check."));
+        }
     }
 
     /// <summary>The failures of reading the target catalog that the gate turns into <c>OCTO-CK202</c>.</summary>

@@ -349,7 +349,8 @@ internal class CatalogManager : ICatalogManager
 
     /// <inheritdoc />
     public async Task PublishAsync(string catalogName, CkCompiledModelRoot ckCompiledModel, bool isForced,
-        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null,
+        CatalogStateToken? expectedState = null)
     {
         var catalog = _catalogs.FirstOrDefault(x => string.Compare(x.CatalogName,
             catalogName, StringComparison.OrdinalIgnoreCase) == 0);
@@ -366,6 +367,13 @@ internal class CatalogManager : ICatalogManager
         if (!catalog.CanWrite)
         {
             throw ModelCatalogException.CatalogNotWritable(catalogName);
+        }
+
+        if (expectedState != null && catalog is IGuardedPublishCatalog guarded)
+        {
+            await guarded.PublishAsync(ckCompiledModel, isForced, expectedState, sourceIdentifier, cancellationToken)
+                .ConfigureAwait(false);
+            return;
         }
 
         await catalog.PublishAsync(ckCompiledModel, isForced, sourceIdentifier)

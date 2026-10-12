@@ -1,3 +1,4 @@
+using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.SemVer;
@@ -56,6 +57,12 @@ public sealed record CkBaselineResolution
     ///     and the write.
     /// </summary>
     public IReadOnlyList<CkModelId> KnownVersions { get; init; } = [];
+
+    /// <summary>
+    ///     Publish resolution against an authoritative catalog only (AB#6584): the state of the indexes this snapshot was
+    ///     read from, handed back to the catalog so the write can be conditional on it.
+    /// </summary>
+    public CatalogStateToken? State { get; init; }
 
     /// <summary>True when no catalog knows any usable version and every source was reachable.</summary>
     public bool IsFirstPublication => Baseline == null && !SourceUnreachable;

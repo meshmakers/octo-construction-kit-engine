@@ -300,6 +300,14 @@ public class LocalFileSystemCatalog : CachedCatalog
         // F1.1-S6: ckLanguage 2 / range-retaining models go to ck-models/v3, classic ones to ck-models/v2. A model
         // version exists under one root only: a forced re-publish into the other root removes the old file.
         var root = CkCatalogLayout.GetPublishRoot(ckCompiledModel);
+
+        // AB#6584: one writer at a time from the existence check to the last index update. The check, the move into
+        // place and the three index files are one unit; without it two parallel publishes of the same version both
+        // pass the check and the later move silently replaces the earlier file, and two publishes of one model race on
+        // the per-major index. The lock is a cross-process OS lock (Review N3), so it also holds between octo-ckc
+        // processes, and it is held for the whole publish - the retry loop below does not take it again.
+        using var indexLock = await CatalogFileIo.AcquireLockAsync(IndexLockPath(root)).ConfigureAwait(false);
+
         var compiledModelFilePath = CreatePath(root, ckCompiledModel.ModelId);
         var existsElsewhere = TryGetExistingModelPath(ckCompiledModel.ModelId, out var existingPath) &&
                               existingPath != compiledModelFilePath;
@@ -345,22 +353,19 @@ public class LocalFileSystemCatalog : CachedCatalog
                 {
                     CatalogFileIo.MoveIntoPlace(tempFilePath, compiledModelFilePath);
 
-                    // Review N3: the three index files are read-modify-write; parallel octo-ckc processes publishing
-                    // sibling models lost each other's entries. Serialize the updates with a cross-process lock.
-                    using (await CatalogFileIo.AcquireLockAsync(IndexLockPath(root)).ConfigureAwait(false))
-                    {
-                        // Update the major version
-                        await UpdateModelVersionsCatalogAsync(root, ckCompiledModel.ModelId,
-                                ckCompiledModel.Description)
-                            .ConfigureAwait(false);
+                    // Review N3 / AB#6584: the three index files are read-modify-write, serialized by the lock
+                    // taken above.
+                    // Update the major version
+                    await UpdateModelVersionsCatalogAsync(root, ckCompiledModel.ModelId,
+                            ckCompiledModel.Description)
+                        .ConfigureAwait(false);
 
-                        // Update the overall model library catalog
-                        await UpdateModelLibraryCatalogAsync(root, ckCompiledModel.ModelId)
-                            .ConfigureAwait(false);
+                    // Update the overall model library catalog
+                    await UpdateModelLibraryCatalogAsync(root, ckCompiledModel.ModelId)
+                        .ConfigureAwait(false);
 
-                        // Update the root catalog
-                        await UpdateRootCatalogAsync(root, ckCompiledModel.ModelId).ConfigureAwait(false);
-                    }
+                    // Update the root catalog
+                    await UpdateRootCatalogAsync(root, ckCompiledModel.ModelId).ConfigureAwait(false);
 
                     // Refresh the in-memory catalog
                     await RefreshCatalogAsync(true).ConfigureAwait(false);

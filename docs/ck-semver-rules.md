@@ -250,7 +250,7 @@ for the matching model(s) the library index and the index of every major - rough
 A model file that is missing from the mirror is read through the Contents API when the reader holds a token (and always
 first in the lane catalog, whose versions can be replaced); an anonymous reader has the mirror only. Whatever the gate
 reads that fails - also outside the baseline read, e.g. a baseline file the index lists but the repository lacks - ends
-as `OCTO-CK202` (exit `-6`), not as an unhandled exception. Tests: `CkPublishGateFailClosedTests`,
+as `OCTO-CK202` (exit `-6`), not as an unhandled exception (AB#6582: `octo-ckc -c Publish` offline or against a repository that does not exist ends with `-6` and the reason, formerly `-99`/exit 157; the record of burned numbers is no exception). A transport failure in the middle of the write (after the gate passed) is a `ModelCatalogException` "Publishing model ... failed: <reason>" - nothing half-written is reported as success. Tests: `PublishCommandOfflineTests` (real parser, `Runner` and `GitHubCatalog`), `CkPublishGateOfflineTests`, then `CkPublishGateFailClosedTests`,
 `GitHubCatalogMirrorFlagTests`, `GitHubClientWrapperRepositoryStateTests` (the real wrapper against a local HTTP stub of the
 GitHub API).
 
@@ -489,7 +489,7 @@ octo-ckc -c ValidateCatalog -cn <catalogName> [-m <model> ...] [-o <report.md>] 
 | ------ | ---- |
 | Scope | The whole catalog; `-m System.Bot` (repeatable, case-insensitive) restricts it to the named models **and their transitive dependents**. An unknown name fails with a message listing the catalog's models. |
 | Roots | The listing spans `ck-models/v2/` and `ck-models/v3/`; a v3 model that depends on a v2 model resolves. |
-| Exact pins (ckLanguage 1) | Every pinned dependency version exists in the catalog (a pin to an older version is fine; a missing version is reported with model, dependency and the versions that exist). |
+| Exact pins (ckLanguage 1) | Every pinned dependency version exists in the catalog (a pin to an older version is fine; a missing version is reported with model, dependency and the versions that exist) **and its model file loads** (AB#6582): a file deleted by hand while the index entry stays is a defect (`... which the catalog index lists, but the model file could not be loaded`). |
 | Range-retaining | The range (with its floor) admits at least one version of each dependency. Against the **newest admitted version** every referenced element and every `usedSurface` member must exist, be public and not be changed incompatibly: the surface checker of the cascade dry run (`ICkSurfaceSatisfactionChecker`), judged against the dependency's predecessor in the catalog, so a catalog check and the dry run of the same version cannot disagree. A newer major outside the range is only noted as `not in range`; no admitted version at all is a defect. |
 | Case-only name variants | Models whose names differ only in case (`System.Bot` and `system.bot`, in one root or across `v2`/`v3`) are a defect; the report lists both spellings, the newest version and the catalog path of each (`ck-models/v3/s/system.bot/`). |
 | Severity | Follows the catalog: in the Meshmakers-run catalogs (`PrivateGitHubCatalog`, `PublicGitHubCatalog`) a defect is an **error** and the command exits non-zero (`ModelValidationException`, process code `-6`); in any other configured catalog it is listed as a **warning** and the exit code stays 0. |

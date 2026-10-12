@@ -15,7 +15,8 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.PublishGate;
 /// </summary>
 internal sealed class GateHarness : IDisposable
 {
-    private readonly ServiceProvider _provider;
+    private readonly bool _lane;
+    private ServiceProvider _provider;
 
     public GateHarness(bool lane = false)
     {
@@ -24,7 +25,13 @@ internal sealed class GateHarness : IDisposable
         Directory.CreateDirectory(LocalDir);
         Directory.CreateDirectory(Path.Combine(Root, "cache"));
 
+        _lane = lane;
         Stub.AllowsReplacingPublishedVersions = lane;
+        _provider = Build();
+    }
+
+    private ServiceProvider Build()
+    {
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddConstructionKit();
@@ -38,8 +45,18 @@ internal sealed class GateHarness : IDisposable
         services.AddSingleton<ICatalog>(Stub);
         services.AddSingleton<ICatalog>(sp =>
             new RepositoryBackedCatalog(sp.GetRequiredService<ICkJsonSerializer>(), Repository,
-                Path.Combine(Root, "cache"), lane));
-        _provider = services.BuildServiceProvider();
+                Path.Combine(Root, "cache"), _lane));
+        return services.BuildServiceProvider();
+    }
+
+    /// <summary>
+    ///     A new process on the same repository and cache directory: the in-memory state of the services (model payloads read
+    ///     earlier, singletons) is gone.
+    /// </summary>
+    public void Restart()
+    {
+        _provider.Dispose();
+        _provider = Build();
     }
 
     public string Root { get; }

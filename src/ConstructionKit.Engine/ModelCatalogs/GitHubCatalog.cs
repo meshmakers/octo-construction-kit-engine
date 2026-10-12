@@ -312,7 +312,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
         {
             await ThrowIfWithdrawnAsync(ckCompiledModel.ModelId, gitHubClient).ConfigureAwait(false);
         }
-        catch (ApiException e)
+        catch (Exception e) when (e is ApiException or HttpRequestException or TaskCanceledException)
         {
             throw ModelCatalogException.PublishFailed(ckCompiledModel.ModelId, CatalogName, e);
         }
@@ -382,8 +382,10 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
 
             cancellationToken?.ThrowIfCancellationRequested();
         }
-        catch (ApiException e)
+        catch (Exception e) when (e is ApiException or HttpRequestException or TaskCanceledException)
         {
+            // AB#6582: a transport failure in the middle of the write ends as a publish failure with a readable message,
+            // not as an unhandled exception.
             throw ModelCatalogException.PublishFailed(ckCompiledModel.ModelId, CatalogName, e);
         }
 
@@ -496,7 +498,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
                     $"Unpublish {modelId.FullName}{suffix}").ConfigureAwait(false);
             }
         }
-        catch (ApiException e)
+        catch (Exception e) when (e is ApiException or HttpRequestException or TaskCanceledException)
         {
             throw ModelCatalogException.UnpublishFailed(modelId, CatalogName, e);
         }
@@ -546,16 +548,10 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
     /// <inheritdoc />
     public async Task<WithdrawnVersionInfo?> FindWithdrawnVersionAsync(CkModelId modelId)
     {
-        try
-        {
-            var entry = await FindWithdrawnAsync(modelId, CreateGitHubClient()).ConfigureAwait(false);
-            return entry == null ? null : new WithdrawnVersionInfo(entry.WithdrawnAt, entry.Reason);
-        }
-        catch (ApiException)
-        {
-            // The gate must not fail on an unreadable record; the write checks the record again and refuses there.
-            return null;
-        }
+        // AB#6582: a record that cannot be read is not "no record". Failures propagate; the publish gate turns them into
+        // OCTO-CK202 and nothing is written (the write checks the record again as well).
+        var entry = await FindWithdrawnAsync(modelId, CreateGitHubClient()).ConfigureAwait(false);
+        return entry == null ? null : new WithdrawnVersionInfo(entry.WithdrawnAt, entry.Reason);
     }
 
     /// <inheritdoc />

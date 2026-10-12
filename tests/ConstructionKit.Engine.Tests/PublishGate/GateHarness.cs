@@ -47,6 +47,15 @@ internal sealed class GateHarness : IDisposable
     public StubCatalog Stub { get; } = new();
     public InMemoryGitHubRepository Repository { get; } = new();
 
+    /// <summary>A new process: the index cache of the GitHub catalogs is gone and the next read has to rebuild it.</summary>
+    public void ClearCatalogCache()
+    {
+        foreach (var file in Directory.GetFiles(Path.Combine(Root, "cache")))
+        {
+            File.Delete(file);
+        }
+    }
+
     public CkPublishGate Gate => _provider.GetRequiredService<CkPublishGate>();
     public ICatalogService CatalogService => _provider.GetRequiredService<ICatalogService>();
     public T Get<T>() where T : notnull => _provider.GetRequiredService<T>();

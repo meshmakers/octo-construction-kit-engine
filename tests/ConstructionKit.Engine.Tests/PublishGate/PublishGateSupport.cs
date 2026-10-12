@@ -120,13 +120,55 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClie
 {
     public Dictionary<string, string> Files { get; } = new(StringComparer.Ordinal);
 
+    /// <summary>What the Contents API says about the repository itself (AB#6580).</summary>
+    public GitHubRepositoryState State { get; set; } = GitHubRepositoryState.Ready;
+
+    /// <summary>
+    ///     Makes a Contents API call fail: called with the file path (<see cref="RepositoryStatePath" /> for the repository
+    ///     query); a non-null result is thrown. The real wrapper throws exactly these after its retries.
+    /// </summary>
+    public Func<string, Exception?>? ApiFault { get; set; }
+
+    public const string RepositoryStatePath = "<repository>";
+
+    /// <summary>What the gh-pages mirror answers for a path (AB#6580): by default the repository content.</summary>
+    public Func<string, PagesAnswer>? PagesBehavior { get; set; }
+
+    /// <summary>The mirror as of an earlier deployment (AB#6581): when set, it serves this instead of <see cref="Files" />.</summary>
+    public Dictionary<string, string>? PagesSnapshot { get; set; }
+
+    /// <summary>The mirror stops following the repository from now on.</summary>
+    public void FreezePages() => PagesSnapshot = new Dictionary<string, string>(Files, StringComparer.Ordinal);
+
+    /// <summary>The mirror catches up.</summary>
+    public void ThawPages() => PagesSnapshot = null;
+
+    private Dictionary<string, string> PagesFiles => PagesSnapshot ?? Files;
+
     public IGitHubClientWrapper CreateClient(IGitHubOptions gitHubOptions) => this;
     public IHttpClientWrapper CreateClient(Uri baseAddress) => this;
 
     private static string Sha(string content) => Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(content)));
 
-    public Task<(string, string)?> GetFileAsync(string filePath) =>
-        Task.FromResult<(string, string)?>(Files.TryGetValue(filePath, out var content) ? (content, Sha(content)) : null);
+    public Task<(string, string)?> GetFileAsync(string filePath)
+    {
+        var fault = ApiFault?.Invoke(filePath);
+        if (fault != null)
+        {
+            return Task.FromException<(string, string)?>(fault);
+        }
+
+        return Task.FromResult<(string, string)?>(Files.TryGetValue(filePath, out var content) && State is
+            GitHubRepositoryState.Ready
+            ? (content, Sha(content))
+            : null);
+    }
+
+    public Task<GitHubRepositoryState> GetRepositoryStateAsync()
+    {
+        var fault = ApiFault?.Invoke(RepositoryStatePath);
+        return fault != null ? Task.FromException<GitHubRepositoryState>(fault) : Task.FromResult(State);
+    }
 
     public Task UpdateFileAsync(string filePath, string commitMessage, string content, string sha)
     {
@@ -172,19 +214,50 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClie
             .Where(f => f.Key.StartsWith(directoryPath.TrimEnd('/') + "/", StringComparison.Ordinal))
             .Select(f => (f.Key, Sha(f.Value))).ToList());
 
+    private PagesAnswer PagesAnswerFor(string? requestUri)
+    {
+        var answer = PagesBehavior?.Invoke(requestUri ?? "") ?? PagesAnswer.Serve;
+        return answer == PagesAnswer.Serve && (requestUri == null || !PagesFiles.ContainsKey(requestUri))
+            ? PagesAnswer.NotFound
+            : answer;
+    }
+
     public Task<string?> GetStringAsync(string? requestUri) =>
-        requestUri != null && Files.TryGetValue(requestUri, out var content)
-            ? Task.FromResult<string?>(content)
-            : throw new HttpRequestException($"404 {requestUri}", null, HttpStatusCode.NotFound);
+        PagesAnswerFor(requestUri) switch
+        {
+            PagesAnswer.Serve => Task.FromResult<string?>(PagesFiles[requestUri!]),
+            PagesAnswer.NotFound => throw new HttpRequestException($"404 {requestUri}", null, HttpStatusCode.NotFound),
+            PagesAnswer.ServerError => throw new HttpRequestException($"500 {requestUri}", null,
+                HttpStatusCode.InternalServerError),
+            PagesAnswer.Timeout => throw new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout"),
+            _ => throw new HttpRequestException("Connection refused")
+        };
 
     public Task<HttpResponseMessage> GetAsync(string? requestUri, CancellationToken cancellationToken) =>
-        Task.FromResult(requestUri != null && Files.TryGetValue(requestUri, out var content)
-            ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(content) }
-            : new HttpResponseMessage(HttpStatusCode.NotFound));
+        PagesAnswerFor(requestUri) switch
+        {
+            PagesAnswer.Serve => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                { Content = new StringContent(PagesFiles[requestUri!]) }),
+            PagesAnswer.NotFound => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)),
+            PagesAnswer.ServerError => Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError)),
+            PagesAnswer.Timeout => throw new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout"),
+            _ => throw new HttpRequestException("Connection refused")
+        };
 
     /// <summary>A byte-level fingerprint of the whole repository: path and content hash of every file.</summary>
     public string Snapshot() =>
         string.Join("|", Files.OrderBy(f => f.Key, StringComparer.Ordinal).Select(f => $"{f.Key}:{Sha(f.Value)}"));
+}
+
+/// <summary>How the gh-pages mirror of an <see cref="InMemoryGitHubRepository" /> answers one request.</summary>
+public enum PagesAnswer
+{
+    /// <summary>The file, when the mirror has it (otherwise 404).</summary>
+    Serve,
+    NotFound,
+    ServerError,
+    Timeout,
+    Offline
 }
 
 /// <summary>

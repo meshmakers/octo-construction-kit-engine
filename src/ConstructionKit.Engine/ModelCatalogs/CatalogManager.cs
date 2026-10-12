@@ -232,7 +232,7 @@ internal class CatalogManager : ICatalogManager
                 .ConfigureAwait(false);
         }
 
-        return null;
+        return await TryGetFromSourceOfTruthAsync(catalog, ckModelId, operationResult).ConfigureAwait(false);
     }
 
         /// <inheritdoc />
@@ -290,7 +290,31 @@ internal class CatalogManager : ICatalogManager
                 .ConfigureAwait(false);
         }
 
-        throw ModelCatalogException.ModelNotFoundInCatalogs(ckModelId);
+        return await TryGetFromSourceOfTruthAsync(catalog, ckModelId, operationResult).ConfigureAwait(false) ??
+               throw ModelCatalogException.ModelNotFoundInCatalogs(ckModelId);
+    }
+
+    /// <summary>
+    ///     A named-catalog lookup that the cache does not know (AB#6581): the cache of a catalog with an authoritative source
+    ///     is filled from a mirror that lags the repository, so a version published seconds ago is missing from it. The
+    ///     catalog's own read decides; its "not found" (and only that) stays "not found".
+    /// </summary>
+    private static async Task<CkCompiledModelRoot?> TryGetFromSourceOfTruthAsync(ICatalog catalog, CkModelId ckModelId,
+        OperationResult operationResult)
+    {
+        if (catalog is not IAuthoritativeVersionCatalog)
+        {
+            return null;
+        }
+
+        try
+        {
+            return await catalog.GetAsync(ckModelId, operationResult).ConfigureAwait(false);
+        }
+        catch (ModelCatalogException e) when (e.IsModelNotFound)
+        {
+            return null;
+        }
     }
 
     /// <inheritdoc />

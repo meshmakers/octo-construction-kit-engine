@@ -82,7 +82,8 @@ internal static class GitHubCatalogDescription
 /// <summary>
 /// Construction kit model catalog for GitHub base class
 /// </summary>
-public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog, IWithdrawnVersionCatalog
+public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog, IWithdrawnVersionCatalog,
+    IAuthoritativeVersionCatalog
 {
     /// <summary>
     ///     Name of the GitHub repository of the development lane catalog (<c>meshmakers/octo-catalog-dev</c>, the private
@@ -121,6 +122,10 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
     // that Octokit pulls from. Prefer the pages URL for every read; the Octokit client is
     // only fallback for setups that explicitly disabled gh-pages, plus the publish path.
     private bool IsPagesUriConfigured => !string.IsNullOrWhiteSpace(_gitHubOptions.GitHubPagesUri);
+
+    // A publisher (token present) can ask the repository itself whenever the Pages mirror lags or fails (AB#6580,
+    // AB#6581); an anonymous reader only has the mirror.
+    private bool HasApiToken => !string.IsNullOrWhiteSpace(_gitHubOptions.GitHubApiToken);
 
     /// <summary>
     /// Creates a new instance of the <see cref="Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs.GitHubCatalog"/> class.
@@ -215,9 +220,16 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             return await DeserializeAndCacheAsync(modelId, cachedPayload, operationResult).ConfigureAwait(false);
         }
 
-        if (IsPagesUriConfigured)
+        // The Pages mirror lags the repository by up to a minute after a publish and briefly answers 404 while a
+        // deployment is replaced (AB#4872, AB#6581). A reader that holds a token therefore asks the Contents API
+        // whenever the mirror does not deliver the file; only an anonymous reader takes the mirror's 404 at face value.
+        // The lane catalog (AllowsReplacingPublishedVersions) replaces published versions, so there the mirror may
+        // serve an outdated file with a 200: its reads go to the repository first.
+        var canAskRepository = HasApiToken;
+        if (IsPagesUriConfigured && !(canAskRepository && AllowsReplacingPublishedVersions))
         {
             var httpClient = CreateHttpClient();
+            Exception? mirrorFailure = null;
             try
             {
                 var response = await httpClient.GetAsync(pagesUrl, cancellationToken ?? CancellationToken.None).ConfigureAwait(false);
@@ -229,20 +241,30 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
 
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    return null;
+                    if (!canAskRepository)
+                    {
+                        return null;
+                    }
                 }
-
-                throw ModelCatalogException.InvalidGitHubRepository(CatalogName,
-                    _gitHubOptions.GitHubPagesUri);
+                else
+                {
+                    mirrorFailure = ModelCatalogException.InvalidGitHubRepository(CatalogName,
+                        _gitHubOptions.GitHubPagesUri);
+                }
             }
             catch (HttpRequestException)
             {
-                throw ModelCatalogException.InvalidGitHubRepository(CatalogName, _gitHubOptions.GitHubPagesUri);
+                mirrorFailure = ModelCatalogException.InvalidGitHubRepository(CatalogName, _gitHubOptions.GitHubPagesUri);
             }
             catch (TaskCanceledException)
             {
-                throw ModelCatalogException.RequestTimeoutGitHubRepository(CatalogName,
+                mirrorFailure = ModelCatalogException.RequestTimeoutGitHubRepository(CatalogName,
                     _gitHubOptions.GitHubPagesUri);
+            }
+
+            if (mirrorFailure != null && !canAskRepository)
+            {
+                throw mirrorFailure;
             }
         }
 
@@ -536,6 +558,119 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
         }
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    ///     AB#6580: reads the index files through the authenticated Contents API (as the publish does when it merges them),
+    ///     never through the Pages mirror. A <c>404</c> only means "the catalog does not hold this" when the repository and
+    ///     its branch exist (<see cref="IGitHubClientWrapper.GetRepositoryStateAsync" />) and no index that lists the model
+    ///     is missing; everything else - a missing repository or branch, a transport error, a rate limit that outlasted the
+    ///     retries, a timeout, an unreadable or inconsistent index - is reported as unreachable. Cost: two root indexes
+    ///     plus, per matching model, one library index and one index per major.
+    /// </remarks>
+    public async Task<CatalogVersionsResult> ReadVersionsAsync(string? modelName,
+        CancellationToken? cancellationToken = null)
+    {
+        try
+        {
+            var gitHubClient = CreateGitHubClient();
+            var repository = $"{_gitHubOptions.GitHubRepositoryOwner}/{_gitHubOptions.GitHubRepositoryName}";
+            switch (await gitHubClient.GetRepositoryStateAsync().ConfigureAwait(false))
+            {
+                case GitHubRepositoryState.RepositoryNotFound:
+                    return CatalogVersionsResult.Unreachable(
+                        $"repository '{repository}' of catalog '{CatalogName}' does not exist or the token cannot see it");
+                case GitHubRepositoryState.BranchNotFound:
+                    return CatalogVersionsResult.Unreachable(
+                        $"branch '{_gitHubOptions.GitHubRepositoryBranch}' of repository '{repository}' (catalog " +
+                        $"'{CatalogName}') does not exist");
+                case GitHubRepositoryState.Empty:
+                    return CatalogVersionsResult.Found([]);
+            }
+
+            var versions = new List<CkModelId>();
+            foreach (var root in CkCatalogLayout.ReadRoots)
+            {
+                cancellationToken?.ThrowIfCancellationRequested();
+                var rootPath = $"{root}{CatalogFileName}";
+                var rootCatalog = await ReadCatalogIndexAsync<SharedCatalogTypes.RootCatalog>(gitHubClient, rootPath)
+                    .ConfigureAwait(false);
+                if (rootCatalog == null)
+                {
+                    // The repository exists and has no index under this root: it holds no model of this layout.
+                    continue;
+                }
+
+                foreach (var entry in rootCatalog.Models.Where(m =>
+                             modelName == null || string.Equals(m.ModelName, modelName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    cancellationToken?.ThrowIfCancellationRequested();
+                    // An index that lists a model must be followed down to the versions: a listed sub-index that is
+                    // missing is a damaged or half-deployed catalog, not an empty one.
+                    var library = await ReadCatalogIndexAsync<SharedCatalogTypes.ModelLibraryCatalog>(gitHubClient,
+                        entry.CatalogPath).ConfigureAwait(false);
+                    if (library == null)
+                    {
+                        return CatalogVersionsResult.Unreachable(
+                            $"index '{rootPath}' lists model '{entry.ModelName}', but '{entry.CatalogPath}' does not exist");
+                    }
+
+                    var name = string.IsNullOrWhiteSpace(library.ModelId) ? entry.ModelName : library.ModelId;
+                    foreach (var major in library.MajorVersions)
+                    {
+                        var majorCatalog = await ReadCatalogIndexAsync<SharedCatalogTypes.ModelLibraryVersionsCatalog>(
+                            gitHubClient, major.CatalogPath).ConfigureAwait(false);
+                        if (majorCatalog == null)
+                        {
+                            return CatalogVersionsResult.Unreachable(
+                                $"index '{entry.CatalogPath}' lists major {major.MajorVersion} of model '{name}', but " +
+                                $"'{major.CatalogPath}' does not exist");
+                        }
+
+                        versions.AddRange(majorCatalog.Versions.Select(v => new CkModelId(name, new CkVersion(v.Version))));
+                    }
+                }
+            }
+
+            return CatalogVersionsResult.Found(versions);
+        }
+        catch (OperationCanceledException) when (cancellationToken?.IsCancellationRequested == true)
+        {
+            throw;
+        }
+        catch (Exception e) when (e is ApiException or HttpRequestException or OperationCanceledException
+                                      or ModelCatalogException or System.Text.Json.JsonException or InvalidDataException
+                                      or IOException)
+        {
+            return CatalogVersionsResult.Unreachable(DescribeSourceFailure(e));
+        }
+    }
+
+    private static string DescribeSourceFailure(Exception e) => e switch
+    {
+        OperationCanceledException => "the request timed out",
+        ApiException api => $"GitHub answered HTTP {(int)api.StatusCode}: {api.ApiError?.Message ?? api.Message}",
+        _ => e.Message
+    };
+
+    /// <summary>Reads and parses an index file; null when the file does not exist, an exception when it is unreadable.</summary>
+    private static async Task<T?> ReadCatalogIndexAsync<T>(IGitHubClientWrapper gitHubClient, string path)
+        where T : class
+    {
+        var file = await gitHubClient.GetFileAsync(path).ConfigureAwait(false);
+        if (file == null)
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(file.Value.Item1))
+        {
+            throw new InvalidDataException($"index '{path}' is empty");
+        }
+
+        return DeserializeCatalog<T>(file.Value.Item1)
+               ?? throw new InvalidDataException($"index '{path}' could not be parsed");
+    }
+
     private async Task ThrowIfWithdrawnAsync(CkModelId modelId, IGitHubClientWrapper gitHubClient)
     {
         var entry = await FindWithdrawnAsync(modelId, gitHubClient).ConfigureAwait(false);
@@ -794,6 +929,15 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
 
         // F1.1-S6: the ck-models/v3 root (ckLanguage 2 / range-retaining models) is optional — a catalog without
         // such models has no index there, so a 404 is not retried (it would spend the retry budget on every refresh).
+        // AB#6580: the mirror answering 404 for the root index is "the catalog is empty" only when the repository agrees.
+        // A publisher asks it; a mirror that disagrees (lagging or being replaced) is an unreachable source, never an
+        // empty catalog. Anonymous readers have only the mirror.
+        if (catalog == null && !sourceUnreachable &&
+            !await RootIndexAbsentConfirmedAsync(CkCatalogLayout.V2Root).ConfigureAwait(false))
+        {
+            sourceUnreachable = true;
+        }
+
         var (v3Catalog, v3Unreachable) =
             await GetRootCatalogWithReachabilityAsync(CkCatalogLayout.V3Root).ConfigureAwait(false);
         sourceUnreachable |= v3Unreachable;
@@ -808,10 +952,9 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             catalogs.Add((CkCatalogLayout.V2Root, catalog));
         }
 
-        CacheTypes.CacheCatalog cacheCatalog = new()
+        var cacheCatalog = new CacheTypes.CacheCatalog
         {
-            UpdatedAt = DateTime.UtcNow,
-            SourceUnreachable = sourceUnreachable
+            UpdatedAt = DateTime.UtcNow
         };
 
         foreach (var (root, rootCatalog) in catalogs)
@@ -823,6 +966,9 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
 
                 if (modelLibraryCatalog == null)
                 {
+                    // The root index lists the model, so its index should exist: the mirror failed to deliver it
+                    // (AB#6580). The cache is written anyway, flagged, and never reads as "the model does not exist".
+                    sourceUnreachable = true;
                     continue;
                 }
 
@@ -846,6 +992,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
 
                     if (versionsCatalog == null)
                     {
+                        sourceUnreachable = true;
                         continue;
                     }
 
@@ -866,7 +1013,38 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             }
         }
 
+        cacheCatalog.SourceUnreachable = sourceUnreachable;
         await WriteCacheAsync(cacheCatalog).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     True when the mirror's 404 for a root index is confirmed by the repository (it exists and holds no such index),
+    ///     or when the reader has no token to ask with. False when the repository holds the index, does not exist, or
+    ///     could not be asked.
+    /// </summary>
+    private async Task<bool> RootIndexAbsentConfirmedAsync(string root)
+    {
+        if (!HasApiToken)
+        {
+            return true;
+        }
+
+        try
+        {
+            var gitHubClient = CreateGitHubClient();
+            return await gitHubClient.GetRepositoryStateAsync().ConfigureAwait(false) switch
+            {
+                GitHubRepositoryState.Empty => true,
+                GitHubRepositoryState.Ready => await gitHubClient.GetFileAsync($"{root}{CatalogFileName}")
+                    .ConfigureAwait(false) == null,
+                _ => false
+            };
+        }
+        catch (Exception e) when (e is ApiException or HttpRequestException or OperationCanceledException
+                                      or ModelCatalogException)
+        {
+            return false;
+        }
     }
 
 

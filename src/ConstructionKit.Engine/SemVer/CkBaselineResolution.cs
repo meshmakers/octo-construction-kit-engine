@@ -34,6 +34,9 @@ public sealed record CkBaselineResolution
     /// <summary>True when at least one queried catalog could not reach its source during the last cache refresh.</summary>
     public bool SourceUnreachable { get; init; }
 
+    /// <summary>Why the source counts as unreachable (publish resolution against an authoritative catalog), or null.</summary>
+    public string? SourceUnreachableReason { get; init; }
+
     /// <summary>
     ///     Local file-system catalog entries of the declared major at or above the declared version, ascending. They come
     ///     from earlier local builds or sibling registrations, never from a publish, and are never the baseline.

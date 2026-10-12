@@ -1,4 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 
@@ -14,13 +15,20 @@ public class CkBaselineResolver : ICkBaselineResolver
     private const int MaxIgnoredLocalEntries = 1000;
 
     private readonly ICatalogService _catalogService;
+    private readonly IReadOnlyList<ICatalog> _catalogs;
 
     /// <summary>
     ///     Creates a new instance of the <see cref="CkBaselineResolver" /> class.
     /// </summary>
-    public CkBaselineResolver(ICatalogService catalogService)
+    /// <param name="catalogService">The read side of the catalogs (cache-backed).</param>
+    /// <param name="catalogs">
+    ///     The catalogs themselves. A catalog that implements <see cref="IAuthoritativeVersionCatalog" /> is read at its
+    ///     source of truth for the publish baseline (AB#6580); without this list every catalog is read through its cache.
+    /// </param>
+    public CkBaselineResolver(ICatalogService catalogService, IEnumerable<ICatalog>? catalogs = null)
     {
         _catalogService = catalogService;
+        _catalogs = (catalogs ?? []).ToList();
     }
 
     /// <inheritdoc />
@@ -54,19 +62,48 @@ public class CkBaselineResolver : ICkBaselineResolver
     public async Task<CkBaselineResolution> ResolvePublishBaselineAsync(string modelName, CkVersion declaredVersion,
         string targetCatalog)
     {
-        var spellings = await GetSpellingsAsync(targetCatalog, modelName);
-        var listing = await _catalogService.ListAsync(targetCatalog, 0, int.MaxValue);
-        var known = (listing?.ModelResultItems ?? [])
-            .Select(i => i.ModelId)
-            .Where(id => string.Equals(id.Name, modelName, StringComparison.OrdinalIgnoreCase))
-            .Distinct()
-            .OrderBy(id => id.Version)
-            .ThenBy(id => id.Name, StringComparer.Ordinal)
-            .ToList();
+        List<CkModelId> known;
+        bool sourceUnreachable;
+        string? unreachableReason = null;
+        DateTime? cacheUpdatedAt;
+        if (_catalogs.FirstOrDefault(c => string.Equals(c.CatalogName, targetCatalog, StringComparison.OrdinalIgnoreCase))
+            is IAuthoritativeVersionCatalog authoritative)
+        {
+            // AB#6580/AB#6581: the publish baseline is read from the repository of the catalog, not from the cache
+            // (which is filled from a mirror that lags and can answer 404). An unreadable source leaves no baseline at
+            // all - the gate refuses with OCTO-CK202, it never sees an empty list.
+            var read = await authoritative.ReadVersionsAsync(modelName).ConfigureAwait(false);
+            sourceUnreachable = read.SourceUnreachable;
+            unreachableReason = read.UnreachableReason;
+            cacheUpdatedAt = read.ReadAt;
+            known = sourceUnreachable
+                ? []
+                : read.Versions
+                    .Where(id => string.Equals(id.Name, modelName, StringComparison.OrdinalIgnoreCase))
+                    .Distinct()
+                    .OrderBy(id => id.Version)
+                    .ThenBy(id => id.Name, StringComparer.Ordinal)
+                    .ToList();
+        }
+        else
+        {
+            var spellings = await GetSpellingsAsync(targetCatalog, modelName);
+            var listing = await _catalogService.ListAsync(targetCatalog, 0, int.MaxValue);
+            known = (listing?.ModelResultItems ?? [])
+                .Select(i => i.ModelId)
+                .Where(id => string.Equals(id.Name, modelName, StringComparison.OrdinalIgnoreCase))
+                .Distinct()
+                .OrderBy(id => id.Version)
+                .ThenBy(id => id.Name, StringComparer.Ordinal)
+                .ToList();
 
-        // One range query for the reachability flag and the cache timestamp of the target catalog.
-        var majorStart = new CkVersion(declaredVersion.Major, 0, 0);
-        var probe = await QueryAsync(targetCatalog, spellings, majorStart, new CkVersion(declaredVersion.Major + 1, 0, 0));
+            // One range query for the reachability flag and the cache timestamp of the target catalog.
+            var majorStart = new CkVersion(declaredVersion.Major, 0, 0);
+            var probe = await QueryAsync(targetCatalog, spellings, majorStart,
+                new CkVersion(declaredVersion.Major + 1, 0, 0));
+            sourceUnreachable = probe.SourceUnreachable;
+            cacheUpdatedAt = probe.CacheUpdatedAt;
+        }
 
         var declaredEntry = known.FirstOrDefault(id => id.Version.CompareTo(declaredVersion) == 0);
         var others = known.Where(id => id.Version.CompareTo(declaredVersion) != 0).ToList();
@@ -76,7 +113,7 @@ public class CkBaselineResolver : ICkBaselineResolver
         var isFromLowerMajor = false;
         CkModelId? baseline = sameMajor.LastOrDefault();
         // An unreachable source may hide the same-major baseline: never fall back to a lower major then (OCTO-CK102).
-        if (baseline == null && !probe.SourceUnreachable && declaredVersion.Major > 0)
+        if (baseline == null && !sourceUnreachable && declaredVersion.Major > 0)
         {
             baseline = others.LastOrDefault(id => id.Version.Major < declaredVersion.Major);
             isFromLowerMajor = baseline != null;
@@ -90,8 +127,9 @@ public class CkBaselineResolver : ICkBaselineResolver
             CatalogName = baseline == null ? null : targetCatalog,
             IsLocal = false,
             IsFromLowerMajor = isFromLowerMajor,
-            CacheUpdatedAt = probe.CacheUpdatedAt,
-            SourceUnreachable = probe.SourceUnreachable,
+            CacheUpdatedAt = cacheUpdatedAt,
+            SourceUnreachable = sourceUnreachable,
+            SourceUnreachableReason = unreachableReason,
             DeclaredVersionPublished = declaredEntry,
             KnownVersions = known
         };

@@ -154,7 +154,7 @@ public class CkCascadeService : ICkCascadeService
         // the cache, which is filled from a mirror that lags the repository. An unreadable source fails the check.
         var items = new List<CatalogResultItem>(listed.ModelResultItems);
         foreach (var catalog in _catalogs.Where(c =>
-                     c is IAuthoritativeVersionCatalog { IsAuthoritativeReadAvailable: true } &&
+                     c.CanRead && c is IAuthoritativeVersionCatalog { IsAuthoritativeReadAvailable: true } &&
                      (catalogName == null || string.Equals(c.CatalogName, catalogName, StringComparison.OrdinalIgnoreCase))))
         {
             var read = await ((IAuthoritativeVersionCatalog)catalog).ReadVersionsAsync(null).ConfigureAwait(false);

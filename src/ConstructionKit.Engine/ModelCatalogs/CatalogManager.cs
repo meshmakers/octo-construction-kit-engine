@@ -169,8 +169,9 @@ internal class CatalogManager : ICatalogManager
 
         var versions = await ReadSourceOfTruthVersionsAsync(catalog, range.Name).ConfigureAwait(false);
         var best = versions?.Where(v => range.ModelVersionRange.IsSatisfiedBy(v.Version)).OrderBy(v => v).LastOrDefault();
+        // A successful repository read is a definite answer: it also clears a "cache was unreachable" flag.
         return best == null
-            ? cached
+            ? versions == null ? cached : cached with { SourceUnreachable = false }
             : cached with { Exists = true, ModelId = best, CatalogName = catalog.CatalogName, SourceUnreachable = false };
     }
 

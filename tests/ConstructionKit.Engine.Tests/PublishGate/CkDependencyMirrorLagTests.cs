@@ -123,4 +123,16 @@ public sealed class CkDependencyMirrorLagTests : IDisposable
 
         Assert.Contains(result.Dependents, d => d.Dependent.FullName == "Consumer-1.0.0");
     }
+
+    [Fact]
+    public async Task A_dependency_that_neither_mirror_nor_repository_holds_is_unknown_without_an_unreachable_flag()
+    {
+        await _h.PublishAsync(Provider("1.0.0"), Catalog);
+
+        var result = await _h.Get<Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs.ICatalogManager>()
+            .IsExistingAsync(Catalog, new CkModelIdVersionRange("GateModel", "[2.0.0]"));
+
+        Assert.False(result.Exists);
+        Assert.False(result.SourceUnreachable);
+    }
 }

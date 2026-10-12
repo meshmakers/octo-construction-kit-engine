@@ -608,8 +608,13 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
 
         Assert.Contains("Model 'TestModel-1.0.0' not found in catalog 'PublicGitHubCatalog'", exception.Message);
 
+        // The mirror is asked first; only because it answered 404 does a reader that holds a token ask the repository
+        // (AB#6581: the mirror lags a publish). The normal read path never touches the API quota (next test).
         A.CallTo(() => HttpClientWrapper.GetAsync(A<string>._, A<CancellationToken>._)).MustHaveHappened();
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync(A<string>._)).MustNotHaveHappened();
+        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v3/t/TestModel/1/ck-testmodel-1.0.0.json"))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/1/ck-testmodel-1.0.0.json"))
+            .MustHaveHappenedOnceExactly();
     }
 
     [Fact]

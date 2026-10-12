@@ -181,6 +181,8 @@ internal sealed class InMemoryGitHubClientWrapper : IGitHubClientWrapper
     public Task<(string, string)?> GetFileAsync(string filePath)
         => Task.FromResult(_files.TryGetValue(filePath, out var v) ? ((string, string)?)(v.content, v.sha) : null);
 
+    public Task<GitHubRepositoryState> GetRepositoryStateAsync() => Task.FromResult(GitHubRepositoryState.Ready);
+
     public Task UpdateFileAsync(string filePath, string commitMessage, string content, string sha)
     {
         CommitMessages.Add(commitMessage);

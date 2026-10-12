@@ -1,6 +1,25 @@
 namespace Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 
 /// <summary>
+/// What the Contents API can say about the catalog repository itself (AB#6580). A <c>404</c> on a file means "no such file"
+/// only when the repository and its branch exist; otherwise it means the catalog cannot be asked at all.
+/// </summary>
+public enum GitHubRepositoryState
+{
+    /// <summary>The repository and the configured branch exist.</summary>
+    Ready,
+
+    /// <summary>The repository exists and has no commit yet: a catalog that does not hold anything.</summary>
+    Empty,
+
+    /// <summary>The repository does not exist, or the token cannot see it.</summary>
+    RepositoryNotFound,
+
+    /// <summary>The repository exists and has branches, but not the configured one.</summary>
+    BranchNotFound
+}
+
+/// <summary>
 /// Interface for a wrapper around the GitHub client for easier testing.
 /// </summary>
 public interface IGitHubClientWrapper
@@ -11,6 +30,13 @@ public interface IGitHubClientWrapper
     /// <param name="filePath">File path in the repository.</param>
     /// <returns>A tuple containing the file content and SHA, or null if the file does not exist.</returns>
     Task<(string, string)?> GetFileAsync(string filePath);
+
+    /// <summary>
+    /// Asks GitHub whether the repository and the configured branch exist (AB#6580), so that a <c>null</c> from
+    /// <see cref="GetFileAsync" /> can be told apart from an unreachable or misconfigured catalog.
+    /// </summary>
+    /// <returns>The state of the repository; transport errors, rate limits and server errors are thrown.</returns>
+    Task<GitHubRepositoryState> GetRepositoryStateAsync();
 
     /// <summary>
     /// Updates a file in the GitHub repository.

@@ -19,13 +19,18 @@ internal class GitHubClientWrapper : IGitHubClientWrapper
     private readonly IGitHubOptions gitHubOptions;
     private readonly GitHubClient _client;
 
-    public GitHubClientWrapper(IGitHubOptions gitHubOptions)
+    public GitHubClientWrapper(IGitHubOptions gitHubOptions) : this(gitHubOptions, null)
+    {
+    }
+
+    /// <param name="gitHubOptions">Repository coordinates and token.</param>
+    /// <param name="baseAddress">The API root; null for api.github.com. Tests point it at a local HTTP stub (AB#6580).</param>
+    internal GitHubClientWrapper(IGitHubOptions gitHubOptions, Uri? baseAddress)
     {
         this.gitHubOptions = gitHubOptions;
-        _client = new GitHubClient(new ProductHeaderValue(gitHubOptions.ProductName))
-        {
-            Credentials = new Credentials(gitHubOptions.GitHubApiToken)
-        };
+        var product = new ProductHeaderValue(gitHubOptions.ProductName);
+        _client = baseAddress == null ? new GitHubClient(product) : new GitHubClient(product, baseAddress);
+        _client.Credentials = new Credentials(gitHubOptions.GitHubApiToken);
         _client.SetRequestTimeout(RequestTimeout);
     }
 
@@ -65,6 +70,55 @@ internal class GitHubClientWrapper : IGitHubClientWrapper
         }
 
         throw new InvalidOperationException($"Unreachable: GetFileAsync('{filePath}') left its retry loop");
+    }
+
+    public async Task<GitHubRepositoryState> GetRepositoryStateAsync()
+    {
+        var owner = gitHubOptions.GitHubRepositoryOwner;
+        var name = gitHubOptions.GitHubRepositoryName;
+        const string subject = "repository";
+        for (var attempt = 0; attempt <= MaxRetries; attempt++)
+        {
+            try
+            {
+                try
+                {
+                    await _client.Repository.Get(owner, name).ConfigureAwait(false);
+                }
+                catch (NotFoundException)
+                {
+                    return GitHubRepositoryState.RepositoryNotFound;
+                }
+
+                var branch = gitHubOptions.GitHubRepositoryBranch;
+                if (string.IsNullOrWhiteSpace(branch))
+                {
+                    return GitHubRepositoryState.Ready;
+                }
+
+                try
+                {
+                    await _client.Repository.Branch.Get(owner, name, branch).ConfigureAwait(false);
+                    return GitHubRepositoryState.Ready;
+                }
+                catch (NotFoundException)
+                {
+                    var branches = await _client.Repository.Branch.GetAll(owner, name, new ApiOptions { PageSize = 1, PageCount = 1 })
+                        .ConfigureAwait(false);
+                    return branches.Count == 0 ? GitHubRepositoryState.Empty : GitHubRepositoryState.BranchNotFound;
+                }
+            }
+            catch (ApiException ex) when (attempt < MaxRetries && IsTransient(ex))
+            {
+                await Task.Delay(RetryDelay(ex, attempt)).ConfigureAwait(false);
+            }
+            catch (ApiException ex)
+            {
+                throw Enrich("read", subject, ex, attempt + 1);
+            }
+        }
+
+        throw new InvalidOperationException("Unreachable: GetRepositoryStateAsync left its retry loop");
     }
 
     public async Task UpdateFileAsync(string filePath, string commitMessage, string content, string sha)

@@ -123,28 +123,44 @@ public class CkPublishGate
 
         CkPublishGateResult? evaluated = null;
         IReadOnlyList<CkModelId>? evaluatedSnapshot = null;
-        for (var attempt = 0; attempt < MaxAttempts; attempt++)
+        try
         {
-            // First read: the cache of the catalog as is (it refreshes itself when older than its maximum age). Every
-            // later read, and the confirming read right before the write, forces the refresh.
-            await _catalogService.RefreshCatalogCacheAsync(catalog.CatalogName, sourceIdentifier,
-                forceRefresh: evaluated != null).ConfigureAwait(false);
-
-            var resolution = await _baselineResolver
-                .ResolvePublishBaselineAsync(modelName, declared, catalog.CatalogName).ConfigureAwait(false);
-
-            if (evaluated != null && evaluatedSnapshot != null && SameSnapshot(evaluatedSnapshot, resolution.KnownVersions))
+            for (var attempt = 0; attempt < MaxAttempts; attempt++)
             {
-                return evaluated;
-            }
+                // A catalog with an authoritative source (the GitHub catalogs, AB#6580) is read from its repository by the
+                // baseline resolver on every attempt, so the cache - filled from a lagging mirror - plays no role. Every
+                // other catalog: first read the cache as is (it refreshes itself when older than its maximum age); every
+                // later read, and the confirming read right before the write, forces the refresh.
+                if (catalog is not IAuthoritativeVersionCatalog)
+                {
+                    await _catalogService.RefreshCatalogCacheAsync(catalog.CatalogName, sourceIdentifier,
+                        forceRefresh: evaluated != null).ConfigureAwait(false);
+                }
 
-            evaluated = await EvaluateResolvedAsync(catalog, model, resolution, allowsReplace).ConfigureAwait(false);
-            evaluatedSnapshot = resolution.KnownVersions;
-            // A refusal or a no-op never writes, so a stale read cannot do damage and needs no confirming read.
-            if (evaluated.Decision is CkPublishGateDecision.AlreadyPublished or CkPublishGateDecision.Refused)
-            {
-                return evaluated;
+                var resolution = await _baselineResolver
+                    .ResolvePublishBaselineAsync(modelName, declared, catalog.CatalogName).ConfigureAwait(false);
+
+                if (evaluated != null && evaluatedSnapshot != null &&
+                    SameSnapshot(evaluatedSnapshot, resolution.KnownVersions))
+                {
+                    return evaluated;
+                }
+
+                evaluated = await EvaluateResolvedAsync(catalog, model, resolution, allowsReplace).ConfigureAwait(false);
+                evaluatedSnapshot = resolution.KnownVersions;
+                // A refusal or a no-op never writes, so a stale read cannot do damage and needs no confirming read.
+                if (evaluated.Decision is CkPublishGateDecision.AlreadyPublished or CkPublishGateDecision.Refused)
+                {
+                    return evaluated;
+                }
             }
+        }
+        catch (Exception e) when (IsSourceFailure(e))
+        {
+            // Fail closed (AB#6580): a read of the target catalog that fails anywhere in the gate - offline, rate limit,
+            // timeout, a model file the index lists but the repository lacks - is OCTO-CK202, never an unhandled error
+            // and never a verdict taken from what could not be read.
+            return Refused(Error("OCTO-CK202", UnreachableText(modelName, catalog.CatalogName, DescribeFailure(e))));
         }
 
         return Refused(Error("OCTO-CK202",
@@ -152,12 +168,37 @@ public class CkPublishGate
             $"checked ({MaxAttempts} reads). Nothing was written; retry the publish."));
     }
 
+    /// <summary>The failures of reading the target catalog that the gate turns into <c>OCTO-CK202</c>.</summary>
+    private static bool IsSourceFailure(Exception e) =>
+        e is HttpRequestException or Octokit.ApiException or ModelCatalogException or OperationCanceledException
+            or System.Text.Json.JsonException or IOException;
+
+    private static string DescribeFailure(Exception e) => e switch
+    {
+        OperationCanceledException => "the request timed out",
+        Octokit.ApiException api => $"GitHub answered HTTP {(int)api.StatusCode}: {api.ApiError?.Message ?? api.Message}",
+        _ => e.Message
+    };
+
+    private static string UnreachableText(string modelName, string catalogName, string? reason) =>
+        $"The compatibility baseline of model '{modelName}' could not be determined because catalog '{catalogName}' " +
+        $"could not be read{(string.IsNullOrWhiteSpace(reason) ? "" : $": {reason}")}. Nothing was written. Check network " +
+        "connectivity, the catalog repository and the access token and retry. The gate is not skipped silently.";
+
     private async Task<CkPublishGateResult> EvaluateResolvedAsync(ICatalog catalog, CkCompiledModelRoot model,
         CkBaselineResolution resolution, bool allowsReplace)
     {
         var modelName = model.ModelId.Name;
         var declared = model.ModelId.Version;
         var messages = new List<CkCompileGateMessage>();
+
+        // The authoritative read failed (AB#6580): nothing below can be judged, and the catalog must not be asked again
+        // for the burned numbers - that would only fail the same way.
+        if (resolution is { Baseline: null, SourceUnreachable: true, SourceUnreachableReason: not null })
+        {
+            return Refused(Error("OCTO-CK202",
+                UnreachableText(modelName, catalog.CatalogName, resolution.SourceUnreachableReason)));
+        }
 
         // Burned number (AB#5433): reported together with the other reasons; the write checks it again.
         if (catalog is IWithdrawnVersionCatalog withdrawnCatalog)

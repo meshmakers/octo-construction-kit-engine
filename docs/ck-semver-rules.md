@@ -216,10 +216,10 @@ reasons of one publish are reported together, see "One refusal" below (AB#6389).
 | Aspect | Rule |
 | ------ | ---- |
 | Verdict | `ICkCompatibilityVerdictService` and `ICkSemVerClassifier`, the same as `ValidateVersion` and the compile gate; codes `OCTO-CK200` to `OCTO-CK202`. ckLanguage 1 and 2 alike (platform owner, 2026-10-10): for a v1 model the gate repeats the verdict CI already enforces with `validate-ck-versions`. |
-| Baseline | `ICkBaselineResolver.ResolvePublishBaselineAsync`: **the target catalog only** (the local catalog and a run-isolated catalog are never a baseline), remote state refreshed first. The newest published version of the declared major **other than the declared version**; none in that major: the newest version of the highest lower major. Both catalog roots count: a first ckLanguage 2 release `3.0.0` is diffed against the newest `2.x` under `ck-models/v2/`, `3.1.0` against `3.0.0` under `ck-models/v3/`. A maintenance release `3.4.1` with `3.4.0` and `4.0.0` published is judged against `3.4.0`. |
-| Unreachable target | `OCTO-CK202` (also when the catalog is not readable); never treated as a first publication. |
+| Baseline | `ICkBaselineResolver.ResolvePublishBaselineAsync`: **the target catalog only** (the local catalog and a run-isolated catalog are never a baseline), read from the catalog's **source of truth** (AB#6580, see "Fail closed" below), not from the cache. The newest published version of the declared major **other than the declared version**; none in that major: the newest version of the highest lower major. Both catalog roots count: a first ckLanguage 2 release `3.0.0` is diffed against the newest `2.x` under `ck-models/v2/`, `3.1.0` against `3.0.0` under `ck-models/v3/`. A maintenance release `3.4.1` with `3.4.0` and `4.0.0` published is judged against `3.4.0`. |
+| Unreachable target | `OCTO-CK202` (also when the catalog is not readable); never treated as a first publication. What counts as unreachable, and what as a genuinely new catalog or model: "Fail closed" below. |
 | Same version | The declared version is already published: identical content (compared by the serialized model) is a **no-op** (nothing is written). *Equivalent* content is a no-op too, with a warning naming the difference class and the published file left as it is (AB#6386, `CkPublishEquivalence`): both models are read back and brought into one canonical form, and only what survives is a content change. The allow-list of normalised classes is closed: (1) **restated default ownership** — `ownership: SeedOwned` or `RuntimeState` on an attribute definition (or on an assignment whose definition is in the same model) that equals what the `isRuntimeState` alias resolves to; `TenantOwned` and `Secret` are never normalised, a legacy reader sees them as runtime state; (2) **element order** of the top-level lists; (3) **compiler-stamped metadata** (`minEngineVersion`). Different content is refused with `OCTO-CK205` on the private and the public catalog, also with `--replace` (published versions are immutable). The dev-lane catalog (GitHub repository `octo-catalog-dev`, `IReplaceablePublishCatalog`) keeps its replace behaviour, but the verdict always uses the newest version **strictly below** the declared one, so a replace is never compared with itself; after a refused or replaced publish the next publish gets the same baseline. |
-| Race | The catalog is read, the verdict computed, and the catalog read again (forced refresh) right before the write. If the versions of the model changed in between, the verdict is computed again (at most 3 reads, then `OCTO-CK202`). The write never happens on a stale baseline. GitHub Pages lags the repository, so the re-read narrows the window but does not close it; an exact same-version race is still caught by the GitHub contents API (file already exists). |
+| Race | The catalog is read, the verdict computed, and the catalog read again (forced refresh) right before the write. If the versions of the model changed in between, the verdict is computed again (at most 3 reads, then `OCTO-CK202`). The write never happens on a stale baseline: the GitHub catalogs are read through the Contents API (AB#6580), which is consistent with the repository, so a version published seconds ago is the baseline; an exact same-version race is additionally caught by the contents API at the write (file already exists). |
 | Not trusted | The verdict is computed from the model content and the target catalog only. A hand-edited compiled file (lowered version, removed members) gets the verdict of its content; nothing in the file lowers the required level. |
 | Acknowledgements | Enforced from the **compiled model alone** (AB#6387, next section "Acknowledgements at publish"): `OCTO-CK203`, `OCTO-CK204` and `OCTO-CK206`. |
 
@@ -228,6 +228,31 @@ reasons of one publish are reported together, see "One refusal" below (AB#6389).
 | `OCTO-CK205` | The declared version is already published to the catalog with different content | Raise the version in `ckModel.yaml` and publish again; published versions are never replaced (only the dev-lane catalog allows it) |
 | `OCTO-CK206` | An entry of `compatibility.acknowledge` in the compiled model violates the entry rules (empty or wildcard or duplicate `change`, empty `reason`, not single-line plain text) | Recompile the model from a valid `ckModel.yaml`; never edit the compiled file by hand |
 | `OCTO-CK207` | The version number was unpublished earlier (`Unpublish`, AB#5433) and is burned; reported by the gate (AB#6389) instead of the catalog throwing at write time (the write still checks it) | Publish the next free version number |
+
+### Fail closed (AB#6580, AB#6581)
+
+The publish gate never takes a read that failed for an answer. The GitHub catalogs have two read paths: a cheap one through
+the **GitHub Pages mirror** (cache, listing, anonymous readers) and the **Contents API**, authenticated with the token the
+publisher holds anyway. The mirror lags the repository by up to a minute after a publish, answers `404` while a Pages
+deployment is being replaced and can be throttled. The gate (and the `Unpublish` dependents check) therefore reads the
+versions of the model **from the repository** (`IAuthoritativeVersionCatalog.ReadVersionsAsync`: the two root indexes, and
+for the matching model(s) the library index and the index of every major - roughly 5 API calls per publish):
+
+| What the read meets | Result |
+| ------------------- | ------ |
+| Repository **and** branch exist, no index under a root, or the indexes do not list the model | **Genuinely new**: first publication (no baseline). |
+| Repository without any commit | Genuinely new, too. |
+| Repository or branch not found, token cannot see it, no token | `OCTO-CK202` (nothing could be asked). |
+| Transport error (offline, DNS, TLS), timeout, `5xx`, rate limit that outlasted the wrapper's retries | `OCTO-CK202`, the reason (HTTP status, GitHub's text) is part of the message. |
+| An index lists a model, major or version but the file it points to is missing, empty or unparseable | `OCTO-CK202` (damaged or half-deployed catalog), never "empty". |
+| The mirror answers `404`/`5xx`/times out | No effect on the gate. In the cache refresh it flags the cache `SourceUnreachable` (an index the root lists that the mirror cannot deliver, or a `404` for the root index that the repository contradicts), so a cache answer "model not found" is never read as "model does not exist". |
+
+A model file that is missing from the mirror is read through the Contents API when the reader holds a token (and always
+first in the lane catalog, whose versions can be replaced); an anonymous reader has the mirror only. Whatever the gate
+reads that fails - also outside the baseline read, e.g. a baseline file the index lists but the repository lacks - ends
+as `OCTO-CK202` (exit `-6`), not as an unhandled exception. Tests: `CkPublishGateFailClosedTests`,
+`GitHubCatalogMirrorFlagTests`, `GitHubClientWrapperRepositoryStateTests` (the real wrapper against a local HTTP stub of the
+GitHub API).
 
 ### One refusal (AB#6389)
 

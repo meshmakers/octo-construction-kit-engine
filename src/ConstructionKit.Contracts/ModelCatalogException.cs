@@ -30,6 +30,11 @@ public class ModelCatalogException : Exception
     {
     }
 
+    /// <summary>
+    /// True when the exception says that a model is not in the catalog (as opposed to the catalog not being readable).
+    /// </summary>
+    public bool IsModelNotFound { get; private init; }
+
     internal static Exception PublishFailed(CkModelId modelId, string catalogName, Exception exception)
     {
         return new ModelCatalogException($"Publishing model '{modelId}' to catalog '{catalogName}' failed: {exception.Message}", exception);
@@ -109,7 +114,8 @@ public class ModelCatalogException : Exception
     /// <returns></returns>
     public static Exception ModelNotFound(CkModelId ckModelId, string catalogName)
     {
-        return new ModelCatalogException($"Model '{ckModelId}' not found in catalog '{catalogName}'.");
+        return new ModelCatalogException($"Model '{ckModelId}' not found in catalog '{catalogName}'.")
+            { IsModelNotFound = true };
     }
 
     internal static Exception ModelCatalogNotFound(string catalogName)
@@ -119,7 +125,8 @@ public class ModelCatalogException : Exception
 
     internal static Exception ModelNotFoundInCatalogs(CkModelId ckModelId)
     {
-        return new ModelCatalogException($"Model '{ckModelId}' not found in one of the registered catalogs.");
+        return new ModelCatalogException($"Model '{ckModelId}' not found in one of the registered catalogs.")
+            { IsModelNotFound = true };
     }
 
     internal static Exception CatalogDoesNotSupportSourceIdentifier(string catalogName)

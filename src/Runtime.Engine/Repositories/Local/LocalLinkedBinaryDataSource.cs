@@ -214,6 +214,14 @@ internal class LocalLinkedBinaryDataSource(string tenantId, string directoryPath
                 throw RuntimeRepositoryException.BinaryWithIdNotFound(binaryId.Value);
             }
 
+            // AB#6540: a BinaryId supplied by the caller must belong to the entity being updated. A foreign id is
+            // reported as not found (no existence oracle); a binary without owner is accepted (legacy data).
+            if (binaryType == BinaryType.FileSystem && rtEntityId != null && binaryInfo.RtEntityId != null &&
+                binaryInfo.RtEntityId != rtEntityId)
+            {
+                throw RuntimeRepositoryException.BinaryWithIdNotFound(binaryId.Value);
+            }
+
             binaryId = binaryInfo.BinaryId;
         }
 

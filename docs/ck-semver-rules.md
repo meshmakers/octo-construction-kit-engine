@@ -535,6 +535,9 @@ octo-ckc -c Unpublish -m <model> -ve <version> [-cn <catalogName>] [-f] [-rs <re
   by no other remaining version of the model - an exact pin on it, or a range it is the only satisfying version of. The refusal names
   those models; the exit code is non-zero. This keeps the escape hatch from creating dangling references. A range that another
   version still satisfies does not block (the 2026-09-30 `System.Bot` pinned `System-2.2.2`, not 2.3.0).
+  The scan lists the catalog from its repository ("Fail closed" above), not from the Pages mirror (AB#6581): a dependent published
+  seconds ago blocks the unpublish, a version published seconds ago can be unpublished, and a catalog that cannot be read fails the
+  command with `OCTO-CK202` instead of checking a partial list. A model file the mirror lacks is read through the Contents API.
 - **The version number is burned.** The removal records the number in `withdrawn.json` next to the model directory
   (`ck-models/v2|v3/<letter>/<Model>/withdrawn.json`: version, time, reason). Every catalog `PublishAsync` - `octo-ckc Publish`, the
   `CkCompile` MSBuild publish, also with `--replace`/force - refuses a burned number, also with identical content, because tenants and

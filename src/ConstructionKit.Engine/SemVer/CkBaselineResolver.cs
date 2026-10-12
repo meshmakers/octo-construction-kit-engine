@@ -221,6 +221,37 @@ public class CkBaselineResolver : ICkBaselineResolver
     {
         ModelExistingResult? best = null;
         var unreachable = false;
+
+        // AB#6588: ValidateVersion -rf and the cascade check judge against what the repository holds, like the publish
+        // gate. The cache of a GitHub catalog is filled from a Pages mirror that lags a publish by up to many minutes.
+        // An unreadable source is "unreachable" (OCTO-CK202), never "first publication". Anonymous readers keep the cache.
+        if (_catalogs.FirstOrDefault(c => string.Equals(c.CatalogName, catalog, StringComparison.OrdinalIgnoreCase))
+            is IAuthoritativeVersionCatalog { IsAuthoritativeReadAvailable: true } authoritative)
+        {
+            foreach (var name in spellings)
+            {
+                var read = await authoritative.ReadVersionsAsync(name);
+                if (read.SourceUnreachable)
+                {
+                    return new ModelExistingResult { Exists = false, CatalogName = catalog, SourceUnreachable = true };
+                }
+
+                var hit = read.Versions
+                    .Where(v => string.Equals(v.Name, name, StringComparison.Ordinal) &&
+                                v.Version.CompareTo(fromInclusive) >= 0 && v.Version.CompareTo(toExclusive) < 0)
+                    .OrderBy(v => v.Version).LastOrDefault();
+                if (hit != null && (best?.ModelId == null || hit.Version.CompareTo(best.ModelId.Version) > 0))
+                {
+                    best = new ModelExistingResult
+                    {
+                        Exists = true, ModelId = hit, CatalogName = catalog, CacheUpdatedAt = read.ReadAt
+                    };
+                }
+            }
+
+            return best ?? new ModelExistingResult { Exists = false, CatalogName = catalog };
+        }
+
         foreach (var name in spellings)
         {
             var result = await _catalogService.IsExistingAsync(catalog,

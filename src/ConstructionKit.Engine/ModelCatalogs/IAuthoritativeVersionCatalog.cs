@@ -47,6 +47,14 @@ public sealed record CatalogVersionsResult(
 public interface IAuthoritativeVersionCatalog
 {
     /// <summary>
+    ///     False when this process cannot ask the source of truth (a GitHub catalog without an API token reads through the
+    ///     mirror only). Readers then keep using the cache; publishers never see this, a publish needs the token anyway.
+    ///     AB#6588: dependency resolution, <c>ValidateVersion</c> and the cascade check read the source of truth when it is
+    ///     available and the cache otherwise.
+    /// </summary>
+    bool IsAuthoritativeReadAvailable { get; }
+
+    /// <summary>
     ///     Reads the versions of <paramref name="modelName" /> (matched case-insensitively, every spelling) from the
     ///     source of truth, or of all models when it is null. Never reports a read failure as an empty catalog: any error,
     ///     rate limit, timeout, missing repository or inconsistent index is <see cref="CatalogVersionsResult.SourceUnreachable" />.

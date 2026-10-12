@@ -123,6 +123,9 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
     // only fallback for setups that explicitly disabled gh-pages, plus the publish path.
     private bool IsPagesUriConfigured => !string.IsNullOrWhiteSpace(_gitHubOptions.GitHubPagesUri);
 
+    /// <inheritdoc />
+    public bool IsAuthoritativeReadAvailable => HasApiToken;
+
     // A publisher (token present) can ask the repository itself whenever the Pages mirror lags or fails (AB#6580,
     // AB#6581); an anonymous reader only has the mirror.
     private bool HasApiToken => !string.IsNullOrWhiteSpace(_gitHubOptions.GitHubApiToken);

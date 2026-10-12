@@ -119,6 +119,62 @@ internal class CatalogManager : ICatalogManager
             .ToList();
     }
 
+    /// <summary>
+    ///     AB#6588: the versions of <paramref name="modelName" /> that the source of truth of <paramref name="catalog" />
+    ///     holds, or null when the catalog has no source of truth this process can ask (the cache answer stands then). The
+    ///     cache of a GitHub catalog is filled from a Pages mirror that lags the repository, so a version published seconds
+    ///     ago is missing from it; dependency resolution asks the repository when the cache does not show a version. An
+    ///     unreadable source fails the call (<c>OCTO-CK202</c>): "the mirror does not know it" and "nobody could be asked"
+    ///     must never both read as "unknown dependency".
+    /// </summary>
+    private static async Task<IReadOnlyList<CkModelId>?> ReadSourceOfTruthVersionsAsync(ICatalog catalog,
+        string modelName, CancellationToken? cancellationToken = null)
+    {
+        if (catalog is not IAuthoritativeVersionCatalog { IsAuthoritativeReadAvailable: true } authoritative)
+        {
+            return null;
+        }
+
+        var read = await authoritative.ReadVersionsAsync(modelName, cancellationToken).ConfigureAwait(false);
+        if (read.SourceUnreachable)
+        {
+            throw ModelCatalogException.CatalogUnreachable(catalog.CatalogName, read.UnreachableReason);
+        }
+
+        return read.Versions.Where(v => string.Equals(v.Name, modelName, StringComparison.Ordinal)).ToList();
+    }
+
+    /// <summary>The cache answer, or - when the cache has none - the source of truth's (AB#6588).</summary>
+    private static async Task<bool> IsExistingWithSourceOfTruthAsync(ICatalog catalog, CkModelId ckModelId,
+        object? sourceIdentifier)
+    {
+        if (await catalog.IsExistingAsync(ckModelId, sourceIdentifier).ConfigureAwait(false))
+        {
+            return true;
+        }
+
+        var versions = await ReadSourceOfTruthVersionsAsync(catalog, ckModelId.Name).ConfigureAwait(false);
+        return versions != null && versions.Contains(ckModelId);
+    }
+
+    /// <summary>The cache answer, or - when the cache has none - the highest satisfying version of the source of truth (AB#6588).</summary>
+    private static async Task<ModelExistingResult> IsExistingWithSourceOfTruthAsync(ICatalog catalog,
+        CkModelIdVersionRange range, object? sourceIdentifier)
+    {
+        var cached = await catalog.IsExistingAsync(range, sourceIdentifier).ConfigureAwait(false);
+        if (cached.Exists)
+        {
+            return cached;
+        }
+
+        var versions = await ReadSourceOfTruthVersionsAsync(catalog, range.Name).ConfigureAwait(false);
+        var best = versions?.Where(v => range.ModelVersionRange.IsSatisfiedBy(v.Version)).OrderBy(v => v).LastOrDefault();
+        // A successful repository read is a definite answer: it also clears a "cache was unreachable" flag.
+        return best == null
+            ? versions == null ? cached : cached with { SourceUnreachable = false }
+            : cached with { Exists = true, ModelId = best, CatalogName = catalog.CatalogName, SourceUnreachable = false };
+    }
+
     private ICatalog GetCatalogOrThrow(string catalogName)
     {
         var catalog = _catalogs.FirstOrDefault(x => string.Compare(x.CatalogName,
@@ -193,7 +249,7 @@ internal class CatalogManager : ICatalogManager
             _logger.LogInformation("Checking catalog {CatalogName} for model {CkModelId}",
                 catalog.CatalogName, ckModelId);
 
-            var hasBeenFound = await catalog.IsExistingAsync(ckModelId, sourceIdentifier)
+            var hasBeenFound = await IsExistingWithSourceOfTruthAsync(catalog, ckModelId, sourceIdentifier)
                 .ConfigureAwait(false);
             if (hasBeenFound)
             {
@@ -251,7 +307,7 @@ internal class CatalogManager : ICatalogManager
             _logger.LogInformation("Checking catalog {CatalogName} for model {CkModelId}",
                 catalog.CatalogName, ckModelId);
 
-            var hasBeenFound = await catalog.IsExistingAsync(ckModelId, sourceIdentifier)
+            var hasBeenFound = await IsExistingWithSourceOfTruthAsync(catalog, ckModelId, sourceIdentifier)
                 .ConfigureAwait(false);
             if (hasBeenFound)
             {
@@ -409,7 +465,7 @@ internal class CatalogManager : ICatalogManager
             throw ModelCatalogException.ModelCatalogNotFound(catalogName);
         }
 
-        return await catalog.IsExistingAsync(ckModelId, sourceIdentifier).ConfigureAwait(false);
+        return await IsExistingWithSourceOfTruthAsync(catalog, ckModelId, sourceIdentifier).ConfigureAwait(false);
     }
 
     public async Task<bool> IsExistingAsync(CkModelId ckModelId, object? sourceIdentifier = null)
@@ -421,7 +477,8 @@ internal class CatalogManager : ICatalogManager
                 continue;
             }
 
-            var isExisting = await catalog.IsExistingAsync(ckModelId, sourceIdentifier).ConfigureAwait(false);
+            var isExisting = await IsExistingWithSourceOfTruthAsync(catalog, ckModelId, sourceIdentifier)
+                .ConfigureAwait(false);
             if (isExisting)
             {
                 return true;
@@ -443,7 +500,8 @@ internal class CatalogManager : ICatalogManager
                 continue;
             }
 
-            var modelExistingResult = await catalog.IsExistingAsync(ckModelIdVersionRange, sourceIdentifier).ConfigureAwait(false);
+            var modelExistingResult = await IsExistingWithSourceOfTruthAsync(catalog, ckModelIdVersionRange, sourceIdentifier)
+                .ConfigureAwait(false);
             anySourceUnreachable |= modelExistingResult.SourceUnreachable;
             if (modelExistingResult.Exists)
             {
@@ -475,7 +533,8 @@ internal class CatalogManager : ICatalogManager
             throw ModelCatalogException.ModelCatalogNotFound(catalogName);
         }
 
-        return await catalog.IsExistingAsync(ckModelIdVersionRange, sourceIdentifier).ConfigureAwait(false);
+        return await IsExistingWithSourceOfTruthAsync(catalog, ckModelIdVersionRange, sourceIdentifier)
+            .ConfigureAwait(false);
     }
 
     public async Task RefreshCatalogCacheAsync(string catalogName, object? sourceIdentifier = null,

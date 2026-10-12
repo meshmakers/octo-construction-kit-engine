@@ -65,14 +65,20 @@ public static class CkPublishRefusal
 
     /// <summary>The one-line summary used as the text of the exception.</summary>
     public static string FormatSummary(string catalogName, CkModelId modelId, IReadOnlyList<CkCompileGateMessage> errors,
-        bool writtenThenWithdrawn = false)
+        CkPublishEffect effect = CkPublishEffect.NothingWritten)
     {
         var codes = string.Join(", ", errors.Select(e => e.Code ?? "OCTO-CK2xx").Distinct());
-        var effect = writtenThenWithdrawn
+        if (effect == CkPublishEffect.WrittenUnverified)
+        {
+            return $"Construction kit model '{modelId.FullName}' is published to catalog '{catalogName}', but could not be " +
+                   $"verified afterwards by the {CompatGate} ({codes}). The reason follows with its next step.";
+        }
+
+        var what = effect == CkPublishEffect.WithdrawnAgain
             ? "It was written and then withdrawn again (AB#6584); its version number is burned."
             : "Nothing was written.";
         return $"Construction kit model '{modelId.FullName}' was NOT published to catalog '{catalogName}': refused by " +
-               $"the {CompatGate} with {errors.Count} reason(s) ({codes}). {effect} Every reason follows " +
+               $"the {CompatGate} with {errors.Count} reason(s) ({codes}). {what} Every reason follows " +
                "with its next step, the most fundamental first.";
     }
 
@@ -101,4 +107,17 @@ public static class CkPublishRefusal
         var index = code == null ? -1 : Array.IndexOf(CodeOrder, code);
         return index < 0 ? CodeOrder.Length : index;
     }
+}
+
+/// <summary>What a refused publish left in the catalog (AB#6584).</summary>
+public enum CkPublishEffect
+{
+    /// <summary>Nothing was written.</summary>
+    NothingWritten,
+
+    /// <summary>The version was written and withdrawn again; its number is burned.</summary>
+    WithdrawnAgain,
+
+    /// <summary>The version was written and stays published; the check after the write could not be done.</summary>
+    WrittenUnverified
 }

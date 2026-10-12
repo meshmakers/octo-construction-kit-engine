@@ -224,7 +224,7 @@ internal class CatalogService : ICatalogService
         }
 
         var messages = violation.Messages.ToList();
-        var isSourceFailure = violation.Verdict == null;
+        var isSourceFailure = violation.WrittenButUnverified;
         if (!isSourceFailure)
         {
             // A concurrent publish made the version violate the rules: withdraw it (the number is burned), so the
@@ -253,7 +253,7 @@ internal class CatalogService : ICatalogService
         throw new CkPublishRefusedException(
             CkPublishRefusal.FormatSummary(catalogName, ckCompiledModel.ModelId,
                 messages.Where(m => m.Severity == CkCompileGateSeverity.Error).ToList(),
-                writtenThenWithdrawn: !isSourceFailure),
+                isSourceFailure ? CkPublishEffect.WrittenUnverified : CkPublishEffect.WithdrawnAgain),
             operationResult);
     }
 

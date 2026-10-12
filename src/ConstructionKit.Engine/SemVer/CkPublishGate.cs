@@ -45,6 +45,12 @@ public sealed record CkPublishGateResult
     /// </summary>
     public CatalogStateToken? State { get; init; }
 
+    /// <summary>
+    ///     Post-write check only (AB#6584): the version is written and stays published, but the catalog could not be read to
+    ///     verify it against a concurrent publish.
+    /// </summary>
+    public bool WrittenButUnverified { get; init; }
+
     /// <summary>True when at least one message is an error.</summary>
     public bool HasErrors => Messages.Any(m => m.Severity == CkCompileGateSeverity.Error);
 }
@@ -211,9 +217,7 @@ public class CkPublishGate
                 .ResolvePublishBaselineAsync(modelName, model.ModelId.Version, catalog.CatalogName).ConfigureAwait(false);
             if (resolution.SourceUnreachable)
             {
-                return Refused(Error("OCTO-CK202", UnreachableText(modelName, catalog.CatalogName,
-                                                       resolution.SourceUnreachableReason) +
-                                                   $" Model '{model.ModelId.FullName}' was written but could not be verified against a concurrent publish; publishing it again completes the check."));
+                return Unverified(model, catalog.CatalogName, resolution.SourceUnreachableReason);
             }
 
             // Nothing changed below the version since the verdict: it stands.
@@ -244,10 +248,24 @@ public class CkPublishGate
         }
         catch (Exception e) when (IsSourceFailure(e))
         {
-            return Refused(Error("OCTO-CK202", UnreachableText(modelName, catalog.CatalogName, DescribeFailure(e)) +
-                                               $" Model '{model.ModelId.FullName}' was written but could not be verified against a concurrent publish; publishing it again completes the check."));
+            return Unverified(model, catalog.CatalogName, DescribeFailure(e));
         }
     }
+
+    private static CkPublishGateResult Unverified(CkCompiledModelRoot model, string catalogName, string? reason) =>
+        new()
+        {
+            Decision = CkPublishGateDecision.Refused,
+            WrittenButUnverified = true,
+            Messages = CkPublishRefusal.Normalize([
+                Error("OCTO-CK202",
+                    $"Model '{model.ModelId.FullName}' is published to catalog '{catalogName}', but the catalog could not be " +
+                    $"read afterwards{(string.IsNullOrWhiteSpace(reason) ? "" : $": {reason}")}, so the version was not " +
+                    "verified against a concurrent publish of the same model. It stays published. Check the catalog with " +
+                    "`octo-ckc -c ValidateCatalog` or withdraw the version with `octo-ckc -c Unpublish`; publishing it again " +
+                    "is a no-op and does not repeat the check.")
+            ])
+        };
 
     /// <summary>The failures of reading the target catalog that the gate turns into <c>OCTO-CK202</c>.</summary>
     private static bool IsSourceFailure(Exception e) =>

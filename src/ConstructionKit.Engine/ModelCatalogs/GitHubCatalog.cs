@@ -371,6 +371,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
 
             var existing = await gitHubClient.GetFileAsync(filePath).ConfigureAwait(false);
             var createdModelFile = false;
+            string? replacedContent = null;
             if (existing.HasValue)
             {
                 if (!force)
@@ -378,6 +379,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
                     throw ModelCatalogException.ModelAlreadyExists(ckCompiledModel.ModelId, CatalogName);
                 }
 
+                replacedContent = existing.Value.Item1;
                 await gitHubClient.UpdateFileAsync(filePath, $"Update to {ckCompiledModel.ModelId.FullName}", content,
                     existing.Value.Item2).ConfigureAwait(false);
             }
@@ -398,12 +400,26 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
                         gitHubClient, expectedState, CatalogName)
                     .ConfigureAwait(false);
             }
-            catch (CatalogChangedDuringPublishException) when (createdModelFile)
+            catch (CatalogChangedDuringPublishException) when (createdModelFile || replacedContent != null)
             {
-                // Lost the race after the model file was created: it is not listed in any index, so removing it leaves
-                // the catalog as it was found.
-                await DeleteIfExistsAsync(gitHubClient, filePath, $"Withdraw aborted publish of {ckCompiledModel.ModelId.FullName}")
-                    .ConfigureAwait(false);
+                // Lost the race after the model file was written: undo it, so the catalog is as it was found. A new
+                // file is not listed in any index and is removed; a forced replace (dev lane catalog) gets its
+                // previous content back.
+                var abortMessage = $"Withdraw aborted publish of {ckCompiledModel.ModelId.FullName}";
+                if (createdModelFile)
+                {
+                    await DeleteIfExistsAsync(gitHubClient, filePath, abortMessage).ConfigureAwait(false);
+                }
+                else
+                {
+                    var current = await gitHubClient.GetFileAsync(filePath).ConfigureAwait(false);
+                    if (current.HasValue)
+                    {
+                        await gitHubClient.UpdateFileAsync(filePath, abortMessage, replacedContent!, current.Value.Item2)
+                            .ConfigureAwait(false);
+                    }
+                }
+
                 throw;
             }
 

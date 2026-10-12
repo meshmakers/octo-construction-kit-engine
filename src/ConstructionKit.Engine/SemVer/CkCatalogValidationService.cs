@@ -153,7 +153,7 @@ public class CkCatalogValidationService : ICkCatalogValidationService
         {
             foreach (var pin in model.Dependencies ?? [])
             {
-                CheckPin(model, pin, allVersions, findings, notes);
+                await CheckPinAsync(model, pin, allVersions, cache, findings, notes).ConfigureAwait(false);
             }
         }
 
@@ -169,13 +169,23 @@ public class CkCatalogValidationService : ICkCatalogValidationService
         };
     }
 
-    private static void CheckPin(CkCompiledModelRoot model, CkModelId pin, IReadOnlyList<CkModelId> allVersions,
-        List<string> findings, List<string> notes)
+    private static async Task CheckPinAsync(CkCompiledModelRoot model, CkModelId pin,
+        IReadOnlyList<CkModelId> allVersions, ModelCache cache, List<string> findings, List<string> notes)
     {
         var versions = allVersions
             .Where(v => string.Equals(v.Name, pin.Name, StringComparison.OrdinalIgnoreCase)).ToList();
-        if (versions.Any(v => v.Version.CompareTo(pin.Version) == 0))
+        var listed = versions.FirstOrDefault(v => v.Version.CompareTo(pin.Version) == 0);
+        if (listed != null)
         {
+            // AB#6582: the index listing the pinned version is not enough - the file it points to must load. A pinned file
+            // deleted by hand with its index entry kept resolves in no tenant.
+            if (await cache.GetAsync(listed).ConfigureAwait(false) == null)
+            {
+                findings.Add($"{model.ModelId.FullName} pins {pin.FullName}, which the catalog index lists, but the " +
+                             $"model file could not be loaded: {cache.Error(listed)}");
+                return;
+            }
+
             notes.Add($"{pin.FullName} is in the catalog");
             return;
         }

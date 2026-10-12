@@ -131,6 +131,15 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClie
 
     public const string RepositoryStatePath = "<repository>";
 
+    /// <summary>Makes a write or delete fail (AB#6582): called with the file path, a non-null result is thrown.</summary>
+    public Func<string, Exception?>? WriteFault { get; set; }
+
+    private Task? FailWrite(string path)
+    {
+        var fault = WriteFault?.Invoke(path);
+        return fault == null ? null : Task.FromException(fault);
+    }
+
     /// <summary>What the gh-pages mirror answers for a path (AB#6580): by default the repository content.</summary>
     public Func<string, PagesAnswer>? PagesBehavior { get; set; }
 
@@ -172,6 +181,11 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClie
 
     public Task UpdateFileAsync(string filePath, string commitMessage, string content, string sha)
     {
+        if (FailWrite(filePath) is { } failedUpdate)
+        {
+            return failedUpdate;
+        }
+
         if (!Files.TryGetValue(filePath, out var existing) || Sha(existing) != sha)
         {
             throw new InvalidOperationException($"SHA conflict on '{filePath}'");
@@ -183,6 +197,11 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClie
 
     public Task CreateFileAsync(string filePath, string commitMessage, string content)
     {
+        if (FailWrite(filePath) is { } failedCreate)
+        {
+            return failedCreate;
+        }
+
         if (!Files.TryAdd(filePath, content))
         {
             throw new InvalidOperationException($"'{filePath}' already exists");
@@ -193,6 +212,11 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClie
 
     public Task UpsertFileWithMergeAsync(string filePath, string commitMessage, Func<string?, string?> merge)
     {
+        if (FailWrite(filePath) is { } failedUpsert)
+        {
+            return failedUpsert;
+        }
+
         Files.TryGetValue(filePath, out var existing);
         var merged = merge(existing);
         if (merged != null)
@@ -205,6 +229,11 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClie
 
     public Task DeleteFileAsync(string filePath, string commitMessage, string sha)
     {
+        if (FailWrite(filePath) is { } failedDelete)
+        {
+            return failedDelete;
+        }
+
         Files.Remove(filePath);
         return Task.CompletedTask;
     }

@@ -1,7 +1,9 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.SemVer;
 
@@ -17,13 +19,16 @@ public class CkCascadeService : ICkCascadeService
     private readonly ICkCompatibilityVerdictService _verdictService;
     private readonly ICkSurfaceSatisfactionChecker _checker;
     private readonly ICkJsonSerializer _jsonSerializer;
+    private readonly IReadOnlyList<ICatalog> _catalogs;
 
     /// <summary>
     ///     Creates a new instance of the <see cref="CkCascadeService" /> class.
     /// </summary>
     public CkCascadeService(ICatalogService catalogService, ICkBaselineResolver baselineResolver,
-        ICkCompatibilityVerdictService verdictService, ICkSurfaceSatisfactionChecker checker, ICkJsonSerializer jsonSerializer)
+        ICkCompatibilityVerdictService verdictService, ICkSurfaceSatisfactionChecker checker, ICkJsonSerializer jsonSerializer,
+        IEnumerable<ICatalog>? catalogs = null)
     {
+        _catalogs = (catalogs ?? []).ToList();
         _jsonSerializer = jsonSerializer;
         _catalogService = catalogService;
         _baselineResolver = baselineResolver;
@@ -145,7 +150,24 @@ public class CkCascadeService : ICkCascadeService
             ? await _catalogService.ListAsync(catalogName, 0, int.MaxValue).ConfigureAwait(false)
             : await _catalogService.ListAsync(0, int.MaxValue).ConfigureAwait(false);
 
-        var newest = listed.ModelResultItems
+        // AB#6588: a catalog with a source of truth is listed from it - a dependent published seconds ago is missing from
+        // the cache, which is filled from a mirror that lags the repository. An unreadable source fails the check.
+        var items = new List<CatalogResultItem>(listed.ModelResultItems);
+        foreach (var catalog in _catalogs.Where(c =>
+                     c is IAuthoritativeVersionCatalog { IsAuthoritativeReadAvailable: true } &&
+                     (catalogName == null || string.Equals(c.CatalogName, catalogName, StringComparison.OrdinalIgnoreCase))))
+        {
+            var read = await ((IAuthoritativeVersionCatalog)catalog).ReadVersionsAsync(null).ConfigureAwait(false);
+            if (read.SourceUnreachable)
+            {
+                throw ModelCatalogException.CatalogUnreachable(catalog.CatalogName, read.UnreachableReason);
+            }
+
+            items.RemoveAll(i => string.Equals(i.CatalogName, catalog.CatalogName, StringComparison.OrdinalIgnoreCase));
+            items.AddRange(read.Versions.Select(v => new CatalogResultItem { CatalogName = catalog.CatalogName, ModelId = v }));
+        }
+
+        var newest = items
             .Where(i => !string.Equals(i.ModelId.Name, candidateName, StringComparison.OrdinalIgnoreCase))
             .GroupBy(i => (Name: i.ModelId.Name, i.ModelId.Version.Major))
             .Select(g => g.OrderByDescending(i => i.ModelId.Version).First())

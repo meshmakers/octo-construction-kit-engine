@@ -230,6 +230,18 @@ reasons of one publish are reported together, see "One refusal" below (AB#6389).
 | `OCTO-CK208` | The version was written, but a concurrent publish of the same model landed at the same time and made it violate the rules (AB#6584); the version was withdrawn again and its number is burned | Publish again with the next version above the other publish |
 | `OCTO-CK207` | The version number was unpublished earlier (`Unpublish`, AB#5433) and is burned; reported by the gate (AB#6389) instead of the catalog throwing at write time (the write still checks it) | Publish the next free version number |
 
+### Readers use the repository too (AB#6588)
+
+The gate was not the only reader of the lagging mirror. With a token configured (`IAuthoritativeVersionCatalog.IsAuthoritativeReadAvailable`;
+anonymous readers keep the mirror) these reads now ask the repository as well, and fail with `OCTO-CK202` when it cannot be read:
+
+| Reader | Reads the repository | Why |
+| ------ | -------------------- | --- |
+| Dependency resolution (publish, compile, import: `ICatalogManager.IsExistingAsync`, `TryGetAsync`, `GetAsync` over all catalogs) | when the cache does not show the version | A catalogs train publishes `System-2.5.0` and, seconds later, `System.Notification` that pins it: the mirror does not know `2.5.0` yet and the publish failed with "unknown construction kit model libraries" (release 3.5.16). A version the cache shows costs no extra read. |
+| `ValidateVersion -rf` baseline (`CkBaselineResolver.ResolveAsync`) | always | A baseline from the mirror is the previous-but-one version ("first publication", stale acknowledgement). |
+| Cascade check (`ValidateCascade`, `CkCascadeService`) | always (listing of the catalog) | A dependent published seconds ago must be checked. |
+
+
 ### Fail closed (AB#6580, AB#6581)
 
 The publish gate never takes a read that failed for an answer. The GitHub catalogs have two read paths: a cheap one through

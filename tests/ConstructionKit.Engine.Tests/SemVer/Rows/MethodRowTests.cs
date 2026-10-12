@@ -177,6 +177,37 @@ public class MethodRowTests
     [Theory]
     [InlineData("type")]
     [InlineData("interface")]
+    public void M12_AWidenedAuthorizationIsMinorAndRequiresAnAcknowledgement_AStricterOneDoesNot(string owner)
+    {
+        // AB#6585: who may invoke a method widens (a role - also Everyone -, a dropped scope, self-calls admitted, a
+        // looser block): Minor, but the author must acknowledge it with a reason. Stricter changes are Major anyway.
+        foreach (var classified in new[]
+                 {
+                     Change(owner, m => m.Authorization!.Roles = ["UserManagement", "Everyone"]),
+                     Change(owner, m => m.Authorization!.Scopes = [])
+                 })
+        {
+            var change = Assert.Single(classified, c => c.Level == CkSemVerLevel.Minor);
+            Assert.True(change.RequiresAcknowledge);
+            Assert.Contains("requires acknowledge", change.Reason);
+        }
+
+        var noSelf = Model();
+        Method(noSelf, owner).Authorization!.AllowSelf = false;
+        Assert.True(Assert.Single(Classify(noSelf, Model()), c => c.Change.Property == "allowSelf").RequiresAcknowledge);
+        var noBlock = Model();
+        Method(noBlock, owner).Authorization = null;
+        var withBlock = Model();
+        Method(withBlock, owner).Authorization = new CkMethodAuthorizationDto { Roles = ["Everyone"], AllowSelf = true };
+        Assert.True(Assert.Single(Classify(noBlock, withBlock), c => c.Change.Property == "authorization").RequiresAcknowledge);
+
+        Assert.All(Change(owner, m => m.Authorization!.Roles = []), c => Assert.False(c.RequiresAcknowledge));
+        Assert.All(Change(owner, m => m.Authorization!.Scopes = ["extra_scope", "s2"]), c => Assert.False(c.RequiresAcknowledge));
+    }
+
+    [Theory]
+    [InlineData("type")]
+    [InlineData("interface")]
     public void M12_RoleNamesCompareCaseInsensitively(string owner)
     {
         // P3-3 (platform-owner decision 2026-10-10): like ASP.NET Identity's NormalizedName, 'Admin' and 'admin' are the

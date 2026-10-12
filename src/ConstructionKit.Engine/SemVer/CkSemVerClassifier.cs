@@ -27,13 +27,26 @@ public class CkSemVerClassifier : ICkSemVerClassifier
 
     /// <inheritdoc />
     public IReadOnlyList<CkClassifiedModelChange> Classify(IReadOnlyList<CkModelChange> changes,
-        CkCompiledModelRoot baseline, CkCompiledModelRoot current)
+        CkCompiledModelRoot baseline, CkCompiledModelRoot current) =>
+        Classify(changes, baseline, current, []);
+
+    /// <inheritdoc />
+    public bool NeedsMajorLineHistory(IReadOnlyList<CkModelChange> changes, CkCompiledModelRoot baseline,
+        CkCompiledModelRoot current) =>
+        changes.Any(c => c.ElementKind is CkModelElementKind.TypeAttribute or CkModelElementKind.RecordAttribute
+                             or CkModelElementKind.AssociationRoleAttribute &&
+                         IsAccessTightening(c) && IsSecuritySensitiveInBoth(c, baseline, current));
+
+    /// <inheritdoc />
+    public IReadOnlyList<CkClassifiedModelChange> Classify(IReadOnlyList<CkModelChange> changes,
+        CkCompiledModelRoot baseline, CkCompiledModelRoot current, IReadOnlyList<CkCompiledModelRoot> earlierInMajor)
     {
         // AB#6266: internal elements and members of internal owners are not part of the compatibility surface.
         var baselineVisibility = new CkVisibilityIndex(baseline);
         var currentVisibility = new CkVisibilityIndex(current);
         return changes
-            .Select(change => CapInternal(Mark(ClassifyChange(change, baseline, current), baseline, current),
+            .Select(change => CapInternal(Mark(ClassifyChange(change, baseline, current, earlierInMajor), baseline, current,
+                earlierInMajor),
                 baselineVisibility, currentVisibility))
             .ToList();
     }
@@ -125,7 +138,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
     }
 
     private static CkClassifiedModelChange ClassifyChange(CkModelChange change, CkCompiledModelRoot baseline,
-        CkCompiledModelRoot current)
+        CkCompiledModelRoot current, IReadOnlyList<CkCompiledModelRoot> earlierInMajor)
     {
         var result = change switch
         {
@@ -272,7 +285,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             // ── Attribute assignments on types, records and association roles ──────────────
             { ElementKind: CkModelElementKind.TypeAttribute or CkModelElementKind.RecordAttribute
                 or CkModelElementKind.AssociationRoleAttribute } =>
-                ClassifyAttributeAssignmentChange(change, baseline, current),
+                ClassifyAttributeAssignmentChange(change, baseline, current, earlierInMajor),
 
             // ── Type associations ───────────────────────────────────────────────────────────
             { ElementKind: CkModelElementKind.TypeAssociation, ChangeKind: CkModelChangeKind.Added } =>
@@ -855,7 +868,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
     }
 
     private static (CkSemVerLevel, string) ClassifyAttributeAssignmentChange(CkModelChange change,
-        CkCompiledModelRoot baseline, CkCompiledModelRoot current)
+        CkCompiledModelRoot baseline, CkCompiledModelRoot current, IReadOnlyList<CkCompiledModelRoot> earlierInMajor)
     {
         switch (change.ChangeKind)
         {
@@ -913,12 +926,24 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                         "access/security: access relaxed — GraphQL exposure of this attribute widens (row T7)");
                 }
 
-                return IsSecuritySensitiveInBoth(change, baseline, current)
-                    ? (CkSemVerLevel.Minor,
-                        "access/security: access tightened on a security-sensitive attribute — accepted security " +
-                        "exception, requires acknowledge (row T7)")
-                    : (CkSemVerLevel.Major,
+                if (!IsSecuritySensitiveInBoth(change, baseline, current))
+                {
+                    return (CkSemVerLevel.Major,
                         "access/security: access tightened, generic GraphQL clients and dependents lose write/read access (row T7)");
+                }
+
+                // AB#6585: the exception holds only for an attribute that was security-sensitive in every published
+                // version of this major in which it exists. One that became sensitive within the major line is judged
+                // as if the marker were absent: the two-step "mark in one Minor, tighten in the next" ships a Major
+                // break as Minors.
+                return FirstNonSensitiveVersion(change, earlierInMajor) is { } since
+                    ? (CkSemVerLevel.Major,
+                        $"access/security: access tightened on an attribute that became securitySensitive within this major " +
+                        $"line (not sensitive in {since}) — the security exception does not apply, a Major bump is required " +
+                        "(row T7)")
+                    : (CkSemVerLevel.Minor,
+                        "access/security: access tightened on a security-sensitive attribute (sensitive in every published " +
+                        "version of this major) — accepted security exception, requires acknowledge (row T7)");
 
             default:
                 return (CkSemVerLevel.Major, DefensiveDefaultReasonPrefix + "attribute assignment change — defensively classified as major");
@@ -959,12 +984,42 @@ public class CkSemVerClassifier : ICkSemVerClassifier
     }
 
     /// <summary>
+    ///     AB#6585: the first published version of this major line (ascending) in which the attribute behind the
+    ///     assignment exists and is not <c>securitySensitive</c>, or null when it is sensitive in all of them. A version
+    ///     without the assignment is skipped (an attribute born sensitive qualifies); a definition of another model
+    ///     cannot be inspected and counts as not sensitive.
+    /// </summary>
+    private static CkVersion? FirstNonSensitiveVersion(CkModelChange change,
+        IReadOnlyList<CkCompiledModelRoot> earlierInMajor)
+    {
+        foreach (var model in earlierInMajor.OrderBy(m => m.ModelId.Version))
+        {
+            var assignment = FindAttributeAssignment(model, change.ElementKind, change.ElementId);
+            if (assignment == null)
+            {
+                continue;
+            }
+
+            var sensitive = assignment.CkAttributeId.ModelId.Name == model.ModelId.Name &&
+                            model.Attributes?.FirstOrDefault(a =>
+                                a.AttributeId.FullName == assignment.CkAttributeId.ElementId.FullName)
+                                ?.SecuritySensitive == true;
+            if (!sensitive)
+            {
+                return model.ModelId.Version;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
     ///     AB#6270 rows B1–B4 and the AB#6269 security exception: markers on top of the level. Behavioural changes keep
     ///     their level and are reported in their own section; a unique index on a stable base and a security-sensitive
     ///     access tightening require an acknowledge.
     /// </summary>
     private static CkClassifiedModelChange Mark(CkClassifiedModelChange classified, CkCompiledModelRoot baseline,
-        CkCompiledModelRoot current)
+        CkCompiledModelRoot current, IReadOnlyList<CkCompiledModelRoot> earlierInMajor)
     {
         var change = classified.Change;
         var isBehavioural = change switch
@@ -1005,7 +1060,24 @@ public class CkSemVerClassifier : ICkSemVerClassifier
 
         var requiresAcknowledge = change.ElementKind is CkModelElementKind.TypeAttribute
                                       or CkModelElementKind.RecordAttribute or CkModelElementKind.AssociationRoleAttribute &&
-                                  IsAccessTightening(change) && IsSecuritySensitiveInBoth(change, baseline, current);
+                                  IsAccessTightening(change) && IsSecuritySensitiveInBoth(change, baseline, current) &&
+                                  FirstNonSensitiveVersion(change, earlierInMajor) == null;
+
+        // AB#6585 (row M12): a looser method authorization (a role added - also Everyone -, a scope dropped, self-calls
+        // admitted, a looser block) changes who may invoke the method; it stays Minor but must be acknowledged with a
+        // reason, like the security-sensitive access tightening. Level None (a block that grants nothing) is no change.
+        if (change is { ElementKind: CkModelElementKind.TypeMethod or CkModelElementKind.InterfaceMethod,
+                Property: "roles" or "scopes" or "allowSelf" or "authorization" } &&
+            classified.Level == CkSemVerLevel.Minor)
+        {
+            return classified with
+            {
+                IsBehavioural = true,
+                RequiresAcknowledge = true,
+                Reason = classified.Reason + "; requires acknowledge with a security reason (row M12)"
+            };
+        }
+
         return isBehavioural || requiresAcknowledge
             ? classified with { IsBehavioural = isBehavioural, RequiresAcknowledge = requiresAcknowledge }
             : classified;

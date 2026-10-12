@@ -181,7 +181,6 @@ internal class CatalogService : ICatalogService
     public async Task<UnpublishPlan> PlanUnpublishAsync(string catalogName, CkModelId modelId,
         CancellationToken? cancellationToken = null)
     {
-        await _catalogManager.RefreshCatalogCacheAsync(catalogName, null, true).ConfigureAwait(false);
         var models = await ListCatalogModelsAsync(catalogName, cancellationToken).ConfigureAwait(false);
         var isPublished = models.Contains(modelId);
         if (!isPublished)
@@ -218,9 +217,25 @@ internal class CatalogService : ICatalogService
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    ///     Every published version of the catalog. A catalog with a source of truth (the GitHub catalogs) is read from it,
+    ///     not from the cache, which is filled from a mirror that lags the repository by up to a minute (AB#6581): a version
+    ///     published or withdrawn seconds ago is seen as it is, and a source that cannot be read fails the call
+    ///     (<c>OCTO-CK202</c>) - the dependents check never runs on a partial list.
+    /// </summary>
     private async Task<HashSet<CkModelId>> ListCatalogModelsAsync(string catalogName,
         CancellationToken? cancellationToken)
     {
+        var authoritative = await _catalogManager.ReadAuthoritativeVersionsAsync(catalogName, null, cancellationToken)
+            .ConfigureAwait(false);
+        if (authoritative != null)
+        {
+            return authoritative.SourceUnreachable
+                ? throw ModelCatalogException.CatalogUnreachable(catalogName, authoritative.UnreachableReason)
+                : new HashSet<CkModelId>(authoritative.Versions);
+        }
+
+        await _catalogManager.RefreshCatalogCacheAsync(catalogName, null, true).ConfigureAwait(false);
         var result = await _catalogManager.ListAsync(catalogName, 0, int.MaxValue, null, cancellationToken)
             .ConfigureAwait(false);
         return new HashSet<CkModelId>(result.ModelResultItems.Select(i => i.ModelId));

@@ -236,4 +236,15 @@ internal interface ICatalogManager
     /// <param name="forceRefresh">When true, the refresh bypasses the cache freshness window</param>
     /// <returns></returns>
     Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool forceRefresh = false);
+
+    /// <summary>
+    ///     Reads the versions of a model (all models when <paramref name="modelName" /> is null) from the source of truth of
+    ///     the catalog (AB#6581), bypassing its cache. Null when the catalog has no source of truth beside its cache
+    ///     (<see cref="IAuthoritativeVersionCatalog" />): the caller reads the cache then.
+    /// </summary>
+    /// <param name="catalogName">Name of catalog.</param>
+    /// <param name="modelName">Model name, or null for every model.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
+    Task<CatalogVersionsResult?> ReadAuthoritativeVersionsAsync(string catalogName, string? modelName,
+        CancellationToken? cancellationToken = null);
 }

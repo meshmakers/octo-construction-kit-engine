@@ -294,6 +294,22 @@ internal class CatalogManager : ICatalogManager
                throw ModelCatalogException.ModelNotFoundInCatalogs(ckModelId);
     }
 
+    /// <inheritdoc />
+    public async Task<CatalogVersionsResult?> ReadAuthoritativeVersionsAsync(string catalogName, string? modelName,
+        CancellationToken? cancellationToken = null)
+    {
+        var catalog = _catalogs.FirstOrDefault(x => string.Compare(x.CatalogName,
+            catalogName, StringComparison.OrdinalIgnoreCase) == 0);
+        if (catalog == null)
+        {
+            throw ModelCatalogException.ModelCatalogNotFound(catalogName);
+        }
+
+        return catalog is IAuthoritativeVersionCatalog authoritative
+            ? await authoritative.ReadVersionsAsync(modelName, cancellationToken).ConfigureAwait(false)
+            : null;
+    }
+
     /// <summary>
     ///     A named-catalog lookup that the cache does not know (AB#6581): the cache of a catalog with an authoritative source
     ///     is filled from a mirror that lags the repository, so a version published seconds ago is missing from it. The

@@ -77,6 +77,18 @@ public class ModelCatalogException : Exception
             "number is burned and is never published again; publish the next free version number instead.");
     }
 
+    /// <summary>
+    /// AB#6581: the source of truth of a catalog could not be read, so a decision that needs the whole catalog (the
+    /// unpublish dependents check) is not taken. Same rule and code as the publish gate (<c>OCTO-CK202</c>).
+    /// </summary>
+    internal static Exception CatalogUnreachable(string catalogName, string? reason)
+    {
+        var because = string.IsNullOrWhiteSpace(reason) ? "" : $": {reason}";
+        return new ModelCatalogException(
+            $"OCTO-CK202: catalog '{catalogName}' could not be read{because}. Nothing was changed. Check network " +
+            "connectivity, the catalog repository and the access token and retry.");
+    }
+
     /// <summary>AB#5433: unpublish is refused while published models still depend on the version.</summary>
     internal static Exception UnpublishRefusedDependents(CkModelId modelId, string catalogName,
         IReadOnlyList<ModelCatalogs.UnpublishDependent> dependents)

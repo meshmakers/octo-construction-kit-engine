@@ -157,6 +157,7 @@ public class LinkedBinariesTests(CacheServiceFixture fixture) : IClassFixture<Ca
 
         var victimBefore = await GetRtBinaryEntity(localDirectoryRepository, victim);
         Assert.NotNull(victimBefore);
+        var bytesBefore = await ReadBytesAsync(localDirectoryRepository, victimBefore.Binary.BinaryId!.Value);
 
         var updateSession = await localDirectoryRepository.GetSessionAsync();
         updateSession.StartTransaction();
@@ -180,6 +181,7 @@ public class LinkedBinariesTests(CacheServiceFixture fixture) : IClassFixture<Ca
         Assert.Equal(victimBefore.Binary.BinaryId, victimAfter.Binary.BinaryId);
         Assert.Equal("Customers.xlsx", victimAfter.Binary.Filename);
         Assert.Equal(victimBefore.Binary.Size, victimAfter.Binary.Size);
+        Assert.Equal(bytesBefore, await ReadBytesAsync(localDirectoryRepository, victimAfter.Binary.BinaryId!.Value));
     }
 
     private static async Task<(IOctoSession session, RtBinaryEntity binaryEntity)> InsertCustomers(LocalDirectoryRuntimeRepository localDirectoryRepository)
@@ -216,5 +218,17 @@ public class LinkedBinariesTests(CacheServiceFixture fixture) : IClassFixture<Ca
 
         await sessionRead.CommitTransactionAsync();
         return r;
+    }
+
+    private static async Task<byte[]> ReadBytesAsync(LocalDirectoryRuntimeRepository localDirectoryRepository,
+        OctoObjectId binaryId)
+    {
+        var session = await localDirectoryRepository.GetSessionAsync();
+        session.StartTransaction();
+        using var handler = await localDirectoryRepository.DownloadLargeBinaryAsync(session, binaryId);
+        using var ms = new MemoryStream();
+        await handler.Stream.CopyToAsync(ms);
+        await session.CommitTransactionAsync();
+        return ms.ToArray();
     }
 }

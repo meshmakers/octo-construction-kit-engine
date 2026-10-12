@@ -138,6 +138,49 @@ public class LinkedBinariesTests(CacheServiceFixture fixture) : IClassFixture<Ca
         Assert.Equal(56987, r.Binary.Size);
     }
 
+    [Fact]
+    public async Task FileSystem_UpdateWithBinaryIdOfAnotherEntity_IsRefused_AndLeavesThatBinaryUntouched()
+    {
+        // AB#6540: a forged BinaryId must neither overwrite nor reveal a binary of another entity.
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtSerializer = fixture.GetRtRepositorySerializer();
+        var bulkRtMutation = fixture.GetBulkRtMutation();
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath,
+            ckCacheService,
+            new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
+            bulkRtMutation);
+
+        var (sessionA, victim) = await InsertCustomers(localDirectoryRepository);
+        await sessionA.CommitTransactionAsync();
+        var (sessionB, attacker) = await InsertCustomers(localDirectoryRepository);
+        await sessionB.CommitTransactionAsync();
+
+        var victimBefore = await GetRtBinaryEntity(localDirectoryRepository, victim);
+        Assert.NotNull(victimBefore);
+
+        var updateSession = await localDirectoryRepository.GetSessionAsync();
+        updateSession.StartTransaction();
+        var forged = new RtBinaryEntity
+        {
+            Binary = new EntityBinaryInfo
+            {
+                BinaryId = victimBefore.Binary.BinaryId,
+                Filename = "Products.pdf",
+                ContentType = "application/pdf",
+                Stream = File.OpenRead("sampleData/largeBinaries/Products.pdf")
+            }
+        };
+
+        await Assert.ThrowsAnyAsync<Exception>(() =>
+            localDirectoryRepository.UpdateOneRtEntityByIdAsync(updateSession, attacker.RtId, forged));
+        await updateSession.AbortTransactionAsync();
+
+        var victimAfter = await GetRtBinaryEntity(localDirectoryRepository, victim);
+        Assert.NotNull(victimAfter);
+        Assert.Equal(victimBefore.Binary.BinaryId, victimAfter.Binary.BinaryId);
+        Assert.Equal("Customers.xlsx", victimAfter.Binary.Filename);
+        Assert.Equal(victimBefore.Binary.Size, victimAfter.Binary.Size);
+    }
 
     private static async Task<(IOctoSession session, RtBinaryEntity binaryEntity)> InsertCustomers(LocalDirectoryRuntimeRepository localDirectoryRepository)
     {

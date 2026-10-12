@@ -171,4 +171,67 @@ public sealed class CkPublishRaceTests : IDisposable
         Assert.True(HasFile("1.1.1"));
         Assert.False(_a.Repository.Files.ContainsKey("ck-models/v3/g/GateModel/withdrawn.json"));
     }
+
+    [Fact]
+    public async Task A_forced_replace_that_loses_the_race_gets_the_previous_file_back()
+    {
+        // The dev lane catalog replaces published versions. The replaced file is overwritten before the index is
+        // compared; when the race is lost the previous content must be restored, or the retry judges (and the catalog
+        // keeps) a file no gate accepted.
+        using var lane = new GateHarness(lane: true);
+        using var other = new GateHarness(lane: true, repository: lane.Repository);
+        await lane.PublishAsync(V("1.0.0", "A,B,C,E"), Catalog);
+        await lane.PublishAsync(V("1.1.0", "A,B,C,E,D"), Catalog);
+        var path = FilePath("1.1.0");
+        var before = lane.Repository.Files[path];
+
+        lane.Repository.BeforeWrite = async written =>
+        {
+            // The first write of the replace is the model file itself; the other process slips a version in (written
+            // past its gate, a sibling that was judged against other content) just before the index update.
+            if (written == path)
+            {
+                lane.Repository.BeforeWrite = async indexPath =>
+                {
+                    if (indexPath.EndsWith("/1/catalog.json", StringComparison.Ordinal))
+                    {
+                        await other.SeedAsync(V("1.0.5", "A,B,C,E,G"), Catalog);
+                    }
+                };
+            }
+
+            await Task.CompletedTask;
+        };
+
+        var refused = await Assert.ThrowsAsync<CkPublishRefusedException>(() =>
+            lane.PublishAsync(V("1.1.0", "A,B,C,E,F"), Catalog, force: true));
+
+        Assert.Contains("OCTO-CK200", refused.AllText());
+        Assert.Equal(before, lane.Repository.Files[path]);
+    }
+
+    [Fact]
+    public async Task A_catalog_that_cannot_be_read_after_the_write_says_so_and_keeps_the_version()
+    {
+        await SeedBaselineAsync();
+        // The root index is the last file of a publish; from then on every API read fails.
+        _a.Repository.BeforeWrite = path =>
+        {
+            if (path == "ck-models/v3/catalog.json")
+            {
+                _a.Repository.ApiFault = _ => new HttpRequestException("connection reset");
+            }
+
+            return Task.CompletedTask;
+        };
+
+        var refused = await Assert.ThrowsAsync<CkPublishRefusedException>(() =>
+            _a.PublishAsync(V("1.1.0", AddsDelta), Catalog));
+
+        var text = refused.AllText();
+        Assert.Contains("could not be", text);
+        Assert.Contains("stays published", text);
+        Assert.DoesNotContain("Nothing was written", text);
+        Assert.True(HasFile("1.1.0"));
+    }
 }

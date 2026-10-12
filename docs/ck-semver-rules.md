@@ -317,7 +317,8 @@ rules the classifier enforces today. The latest release of each of the 12 `octo-
 
 Some changes are accepted only when the publisher says so explicitly. The classifier marks them `requiresAcknowledge`
 (F2.1): tightening `access` on a **security-sensitive** attribute (Minor instead of Major, platform-owner decision
-2026-10-09) and a **unique index on a stable base** (row B4, Major). The author acknowledges such a change in
+2026-10-09; only when the attribute was sensitive in every published version of the major, AB#6585), **widening who may invoke a method**
+(a role such as `Everyone`, row M12, AB#6585, Minor) and a **unique index on a stable base** (row B4, Major). The author acknowledges such a change in
 `ckModel.yaml` (ckLanguage 2 only; in a ckLanguage 1 model the section is message 90):
 
 ```yaml
@@ -332,6 +333,11 @@ compatibility:
 | `OCTO-CK203` | A change that needs an acknowledgement has no matching entry. The message prints the **change key** and an example entry | Copy the entry into `compatibility.acknowledge` and give a reason |
 | `OCTO-CK204` | An entry matches no change in this release that needs an acknowledgement (stale, or it names an ordinary change) | Remove the entry; an acknowledgement is valid for one release only |
 
+AB#6585 adds no message code: an access tightening on an attribute that became `securitySensitive` within the major line
+fails with `OCTO-CK200` (a Major is required; an acknowledgement entry for it is stale, `OCTO-CK204`), a method authorization
+widening without an entry with `OCTO-CK203`. `ValidateVersion`, the compile gate, the publish gate and the cascade dry run share
+one classifier and one verdict service, so they agree; the history of the major is read from the baseline's catalog.
+
 Rules:
 
 - **The change key** is stable, free of model version numbers and exact (`CkChangeKey`): `{ElementKind}:{ElementId}#{ChangeKind}`,
@@ -343,7 +349,7 @@ Rules:
   change, `…#Modified:indexType:<old> -> <new>`; two indexes of a type never share a key.
 - **`reason` is mandatory** and, like `change`, a single line of plain text (no line breaks, no `##vso[`). An empty reason or a wildcard key is rejected by the schema (and by the compiler, message 130).
 - **An acknowledgement never lowers a level.** A unique index on a stable base still needs a major bump
-  (`OCTO-CK200` for a lower version); an ordinary breaking change still fails with `OCTO-CK200` even if it is "acknowledged"
+  (`OCTO-CK200` for a lower version); an access tightening of an attribute that became `securitySensitive` within the major line is such a breaking change (AB#6585, row T7); an ordinary breaking change still fails with `OCTO-CK200` even if it is "acknowledged"
   (and the entry is then stale, `OCTO-CK204`).
 - **One release only.** Entries are matched against the diff of exactly this build; on a first publication (no baseline) every
   entry is stale. Nothing carries over to the next release.
@@ -609,6 +615,7 @@ surface in the dependency diff.
 | CK v2: type association `targetCkInterfaceId` set or changed | The allowed targets narrow — existing associations may become invalid |
 | CK v2: method **removed** | Callers of the method break |
 | CK v2: breaking method field change (rows M3–M10, M12) | Callers break — publish a new method version (`ChangePassword-2`) instead |
+| CK v2: `access` tightened on an attribute that **became** `securitySensitive` within the same major line (row T7, AB#6585) | The security exception does not apply and cannot be acknowledged: the marker set in one Minor must not turn the next Minor's tightening into a Minor |
 | CK v2: `ckLanguage` lowered (`2 → 1`) | CK v2 elements may disappear (defensive) |
 | CK v2: attribute-assignment `access` tightened (`ReadWrite < ReadOnly < MethodOnly < Hidden`; row T7) | Generic GraphQL clients and dependents lose write/read access |
 | CK v2: `visibility` `Public → Internal` (type, record, enum, attribute, association role, interface, method; resolved value, omitted = `Public`) | Other models referencing the element break |
@@ -644,7 +651,8 @@ surface in the dependency diff.
 | CK v2: new `implements` entry on a type | Additive |
 | CK v2: new method | Additive |
 | CK v2: attribute-assignment `access` relaxed (resolved value; omitted = `ReadWrite`; row T7) | "access/security" changelog note |
-| CK v2: `access` tightened on an attribute that is `securitySensitive` in both versions (row T7 exception) | Accepted security exception: Minor + `requiresAcknowledge` |
+| CK v2: `access` tightened on an attribute that is `securitySensitive` in the baseline, the current version **and every published version of the major that has the attribute** (row T7 exception, AB#6585) | Accepted security exception: Minor + `requiresAcknowledge` |
+| CK v2: method authorization widened (role added - also `Everyone` -, scope dropped, `allowSelf` set, looser block; row M12, AB#6585) | Minor + `requiresAcknowledge` (reason names the security impact) |
 | CK v2: attribute `securitySensitive` set or cleared (row A3) | Marker only, no data or API change |
 | CK v2: `ckLanguage` raised (`1 → 2`; omitted = 1) | Older engines reject the model with message 91 instead of misreading it. Major instead when it flips a `derivable` default (see Major) |
 | CK v2: `visibility` `Internal → Public` | Relaxation |
@@ -755,7 +763,7 @@ are members of their own. The rendered `signature` is still reported as a readab
 | M9 | `kind` static ↔ instance | Major |
 | M10 | `idempotent` true → false / false → true | Major / Minor |
 | M11 | `timeoutSeconds` changed | Minor (behavioural) |
-| M12 | Authorization stricter (role removed or roles emptied, **scope added**, `allowSelf` true → false, block removed) / looser (role added — also to an empty list —, **scope removed**, `allowSelf` set, block added that only grants) | Major / Minor; mixed → Major. Roles are any-of and compared **case-insensitively** (like ASP.NET Identity's `NormalizedName`: `Admin` and `admin` are one role, a case-only change is no change; P3-3, 2026-10-10), **scopes all-of** and case-sensitive, and authorization is **default-deny**: an omitted block or empty roles admit administrators only (AB#6338, platform-owner decision 2026-10-10; the F3.4 gateway enforces the same). A block added or removed is one change compared field by field: an omitted block counts as no roles, no scopes and no self-calls — administrators only, the owner is not admitted (strict reading confirmed 2026-10-10). Role and scope names are validated by the compiler (message 104: letters, digits, `_ - . : /`, starting with a letter or digit), because they are compared as sets. Every looser change is also listed under "Behavioural changes" as "security: method access widened" |
+| M12 | Authorization stricter (role removed or roles emptied, **scope added**, `allowSelf` true → false, block removed) / looser (role added — also to an empty list —, **scope removed**, `allowSelf` set, block added that only grants) | Major / Minor; mixed → Major. Roles are any-of and compared **case-insensitively** (like ASP.NET Identity's `NormalizedName`: `Admin` and `admin` are one role, a case-only change is no change; P3-3, 2026-10-10), **scopes all-of** and case-sensitive, and authorization is **default-deny**: an omitted block or empty roles admit administrators only (AB#6338, platform-owner decision 2026-10-10; the F3.4 gateway enforces the same). A block added or removed is one change compared field by field: an omitted block counts as no roles, no scopes and no self-calls — administrators only, the owner is not admitted (strict reading confirmed 2026-10-10). Role and scope names are validated by the compiler (message 104: letters, digits, `_ - . : /`, starting with a letter or digit), because they are compared as sets. Every looser change is also listed under "Behavioural changes" as "security: method access widened" and **requires an acknowledgement** (AB#6585, platform-owner decision 2026-10-12): `compatibility.acknowledge` with the change key (`TypeMethod:Machine-1/ChangePassword-1#Modified:roles`) and a reason that names the security impact (who may now invoke the method and why that is acceptable). The reason follows the usual entry rules (`CkAcknowledgeEntryRules`: single line, not empty); missing entry `OCTO-CK203`, stale entry `OCTO-CK204`. Stricter changes stay Major and are not acknowledgeable. A block that grants nothing is no change |
 | M13 | Parameter `sensitive` changed | Minor (interface method: Major, row I12) |
 | M14 | Description of the method, a parameter or an error | Patch |
 
@@ -772,14 +780,14 @@ so T1–T7 apply to them unchanged.
 | T4 | Base type changed | Major |
 | T5 | `isAbstract` / `isFinal` false → true / true → false | Major / Minor |
 | T6 | `derivable` Any → Model / Model → Any | Major / Minor |
-| T7 | Attribute `access` stricter (order `ReadWrite < ReadOnly < MethodOnly < Hidden`) / looser | Major / Minor. **Security exception** (platform-owner decision 2026-10-10): tightening an attribute that is `securitySensitive: true` in the baseline and the current version is Minor + `requiresAcknowledge`; every other change of such an attribute follows the normal rules |
+| T7 | Attribute `access` stricter (order `ReadWrite < ReadOnly < MethodOnly < Hidden`) / looser | Major / Minor. **Security exception** (platform-owner decision 2026-10-10, narrowed by AB#6585): tightening an attribute that is `securitySensitive: true` in the baseline, in the current version **and in every published version of the same major that has the attribute** is Minor + `requiresAcknowledge`. An attribute that became sensitive within the major line (not sensitive in any earlier version of the major that has it) is judged as if it were not marked: Major, and an acknowledgement cannot lower it, so "mark in one Minor, tighten in the next" ships as a Major. An attribute born sensitive (absent in the earliest versions, sensitive in every version that has it) qualifies. Every other change of such an attribute follows the normal rules. The history is the published versions of the baseline's major below the baseline, read from the same catalog as the baseline (the authoritative snapshot at publish); an unreadable version fails the verdict |
 | E1 | Enum value added (also to a non-extensible enum) | Minor |
 | E2 | Enum value removed or renumbered; `useFlags` changed; `isExtensible` true → false | Major |
 | R1 | Optional record attribute added | Minor |
 | R2 | Record attribute removed, its attribute id changed, optional → required | Major |
 | A1 | Attribute definition `description` / `metaData` | Patch / Minor |
 | A2 | Attribute definition value type, record id or enum id (`String → Secret` stays Minor, AB#5528) | Major |
-| A3 | Attribute `securitySensitive` set or cleared (`ckLanguage: 2`, resolved value: omitted = false) | Minor |
+| A3 | Attribute `securitySensitive` set or cleared (`ckLanguage: 2`, resolved value: omitted = false) | Minor. Setting it needs no acknowledgement, but a later tightening in the same major is judged against the major line (row T7, AB#6585), so splitting the change does not help |
 
 `securitySensitive: true` marks password hashes, security stamps, tokens and 2FA secrets (System.Identity marks them in
 Phase 4, F4.2). It is a stored meta-model field (schema, DTO, graph, Mongo, reflection round-trip gate); a v1 model that

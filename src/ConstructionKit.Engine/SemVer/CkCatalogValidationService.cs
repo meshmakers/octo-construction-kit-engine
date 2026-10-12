@@ -242,9 +242,32 @@ public class CkCatalogValidationService : ICkCatalogValidationService
             baselineModel = await cache.GetAsync(predecessor).ConfigureAwait(false);
         }
 
-        var classified = baselineModel == null
-            ? []
-            : _classifier.Classify(_diffService.Diff(baselineModel, candidate), baselineModel, candidate);
+        IReadOnlyList<Contracts.SemVer.CkClassifiedModelChange> classified = [];
+        if (baselineModel != null)
+        {
+            var changes = _diffService.Diff(baselineModel, candidate);
+            // AB#6585: same major-line history as the verdict service (ValidateCatalog and ValidateCascade agree).
+            var earlier = new List<CkCompiledModelRoot>();
+            if (_classifier.NeedsMajorLineHistory(changes, baselineModel, candidate))
+            {
+                var baselineVersion = predecessor!.Version;
+                foreach (var id in versions.Where(v => v.Version.Major == baselineVersion.Major &&
+                                                       v.Version.CompareTo(baselineVersion) < 0))
+                {
+                    if (await cache.GetAsync(id).ConfigureAwait(false) is { } earlierModel)
+                    {
+                        earlier.Add(earlierModel);
+                    }
+                    else
+                    {
+                        findings.Add($"{id.FullName} could not be loaded: {cache.Error(id)}");
+                    }
+                }
+            }
+
+            classified = _classifier.Classify(changes, baselineModel, candidate, earlier);
+        }
+
         var surfaceCandidate = CkSurfaceCandidate.Create(candidate, baselineModel, classified, [model]);
         var check = _checker.Check(surfaceCandidate, model);
         surfaceChecks.Add(check);

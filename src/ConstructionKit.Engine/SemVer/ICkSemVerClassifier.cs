@@ -25,6 +25,33 @@ public interface ICkSemVerClassifier
         CkCompiledModelRoot baseline, CkCompiledModelRoot current);
 
     /// <summary>
+    ///     AB#6585: classifies like <see cref="Classify(IReadOnlyList{CkModelChange}, CkCompiledModelRoot, CkCompiledModelRoot)" />
+    ///     and additionally judges the security exception against the published history of the major line:
+    ///     tightening <c>access</c> of an attribute is a Minor + acknowledge only when the attribute is
+    ///     <c>securitySensitive</c> in the baseline, in the current model and in every version of
+    ///     <paramref name="earlierInMajor" /> that has it; an attribute that became sensitive within the major
+    ///     line needs a Major bump.
+    /// </summary>
+    /// <param name="changes">The changes produced by <see cref="ICkModelDiffService.Diff" /></param>
+    /// <param name="baseline">The baseline model the diff was computed against</param>
+    /// <param name="current">The current model the diff was computed against</param>
+    /// <param name="earlierInMajor">
+    ///     The published versions of the same major below the baseline (any order); empty for the first version of a major
+    ///     line or when the history is not available.
+    /// </param>
+    /// <returns>The classified changes, in the order of the input changes</returns>
+    IReadOnlyList<CkClassifiedModelChange> Classify(IReadOnlyList<CkModelChange> changes,
+        CkCompiledModelRoot baseline, CkCompiledModelRoot current, IReadOnlyList<CkCompiledModelRoot> earlierInMajor);
+
+    /// <summary>
+    ///     AB#6585: true when a change of this diff is judged against the history of the major line (an access
+    ///     tightening of an attribute that is security-sensitive in the baseline and the current model). Callers load
+    ///     the earlier versions of the major only then.
+    /// </summary>
+    bool NeedsMajorLineHistory(IReadOnlyList<CkModelChange> changes, CkCompiledModelRoot baseline,
+        CkCompiledModelRoot current);
+
+    /// <summary>
     ///     Returns the highest level of the classified changes — the minimum bump level the
     ///     declared version must satisfy. Returns <see cref="CkSemVerLevel.None" /> for an
     ///     empty diff.

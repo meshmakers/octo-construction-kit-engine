@@ -136,6 +136,86 @@ public class PublicSurfaceRowTests
         Assert.Equal(CkSemVerLevel.Major, Level(baseline, retyped));
     }
 
+    private static IReadOnlyList<CkClassifiedModelChange> ClassifyWithHistory(CkCompiledModelRoot baseline,
+        CkCompiledModelRoot current, params CkCompiledModelRoot[] earlierInMajor)
+    {
+        var changes = new Engine.SemVer.CkModelDiffService().Diff(baseline, current);
+        return new Engine.SemVer.CkSemVerClassifier().Classify(changes, baseline, current, earlierInMajor);
+    }
+
+    private static CkCompiledModelRoot Sensitive(bool sensitive, string version, bool hasAttribute = true)
+    {
+        var model = Model();
+        model.ModelId = new CkModelId(M, version);
+        SerialDefinition(model).SecuritySensitive = sensitive;
+        if (!hasAttribute)
+        {
+            Machine(model).Attributes!.RemoveAll(a => a.AttributeName == "SerialNumber");
+        }
+
+        return model;
+    }
+
+    [Fact]
+    public void T7_AccessTightenedOnAnAttributeThatBecameSensitiveWithinTheMajor_IsMajorAndCannotBeAcknowledged()
+    {
+        // 1.0.0 not sensitive, 1.1.0 sensitive (row A3, Minor), 1.2.0 tightens: judged against the major line.
+        var baseline = Sensitive(true, "1.1.0");
+        var current = Sensitive(true, "1.2.0");
+        Serial(current).Access = CkAttributeAccessDto.Hidden;
+
+        var change = Assert.Single(ClassifyWithHistory(baseline, current, Sensitive(false, "1.0.0")));
+        Assert.Equal(CkSemVerLevel.Major, change.Level);
+        Assert.False(change.RequiresAcknowledge);
+        Assert.Contains("became securitySensitive within this major line", change.Reason);
+        Assert.Contains("not sensitive in 1.0.0", change.Reason);
+
+        // The version of an earlier release does not matter, any of them counts (order of the input is irrelevant).
+        var viaLater = Assert.Single(ClassifyWithHistory(baseline, current, Sensitive(true, "1.0.0"),
+            Sensitive(false, "1.0.5")));
+        Assert.Equal(CkSemVerLevel.Major, viaLater.Level);
+    }
+
+    [Fact]
+    public void T7_SecurityException_HoldsWhenTheAttributeWasSensitiveInEveryEarlierVersion_OrBornSensitive()
+    {
+        var baseline = Sensitive(true, "1.2.0");
+        var current = Sensitive(true, "1.3.0");
+        Serial(current).Access = CkAttributeAccessDto.Hidden;
+
+        var always = Assert.Single(ClassifyWithHistory(baseline, current, Sensitive(true, "1.0.0"), Sensitive(true, "1.1.0")));
+        Assert.Equal(CkSemVerLevel.Minor, always.Level);
+        Assert.True(always.RequiresAcknowledge);
+
+        // Born sensitive in 1.1.0 (no assignment in 1.0.0): nothing contradicts the marker.
+        var born = Assert.Single(ClassifyWithHistory(baseline, current, Sensitive(true, "1.0.0", hasAttribute: false),
+            Sensitive(true, "1.1.0")));
+        Assert.Equal(CkSemVerLevel.Minor, born.Level);
+        Assert.True(born.RequiresAcknowledge);
+
+        // Born non-sensitive in 1.1.0, marked in 1.2.0: the first version that has it says no.
+        var bornPlain = Assert.Single(ClassifyWithHistory(baseline, current, Sensitive(true, "1.0.0", hasAttribute: false),
+            Sensitive(false, "1.1.0")));
+        Assert.Equal(CkSemVerLevel.Major, bornPlain.Level);
+    }
+
+    [Fact]
+    public void T7_NeedsMajorLineHistory_OnlyForAnAccessTighteningOnASensitiveAttribute()
+    {
+        var classifier = new Engine.SemVer.CkSemVerClassifier();
+        var diff = new Engine.SemVer.CkModelDiffService();
+        var baseline = Sensitive(true, "1.0.0");
+        var tightened = Sensitive(true, "1.1.0");
+        Serial(tightened).Access = CkAttributeAccessDto.Hidden;
+        var plainBaseline = Sensitive(false, "1.0.0");
+        var plainTightened = Sensitive(false, "1.1.0");
+        Serial(plainTightened).Access = CkAttributeAccessDto.Hidden;
+
+        Assert.True(classifier.NeedsMajorLineHistory(diff.Diff(baseline, tightened), baseline, tightened));
+        Assert.False(classifier.NeedsMajorLineHistory(diff.Diff(plainBaseline, plainTightened), plainBaseline, plainTightened));
+        Assert.False(classifier.NeedsMajorLineHistory(diff.Diff(baseline, baseline), baseline, baseline));
+    }
+
     [Fact]
     public void E1_EnumValueAdded_IsMinor_AlsoForANonExtensibleEnum()
     {

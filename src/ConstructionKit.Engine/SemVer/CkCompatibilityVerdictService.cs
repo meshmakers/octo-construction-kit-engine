@@ -46,7 +46,11 @@ public class CkCompatibilityVerdictService : ICkCompatibilityVerdictService
 
         var declaredVersion = resolution.DeclaredVersion;
         var changes = _diffService.Diff(baselineModel, current);
-        var classifiedChanges = _classifier.Classify(changes, baselineModel, current);
+        // AB#6585: the security exception for an access tightening is judged against the whole major line.
+        var earlierInMajor = _classifier.NeedsMajorLineHistory(changes, baselineModel, current)
+            ? await LoadEarlierInMajorAsync(resolution, publishedModelId, baselineCatalogName).ConfigureAwait(false)
+            : [];
+        var classifiedChanges = _classifier.Classify(changes, baselineModel, current, earlierInMajor);
         var requiredLevel = _classifier.GetRequiredLevel(classifiedChanges);
         var validation = _classifier.ValidateDeclaredVersion(publishedModelId.Version, declaredVersion,
             requiredLevel);
@@ -66,6 +70,57 @@ public class CkCompatibilityVerdictService : ICkCompatibilityVerdictService
                 ? classifiedChanges.Where(c => c.Level > coveredLevel).ToList()
                 : []
         };
+    }
+
+    /// <summary>
+    ///     AB#6585: the published versions of the baseline's major below the baseline, read from the baseline's catalog
+    ///     (the authoritative snapshot of a publish resolution when there is one). A version that cannot be loaded fails
+    ///     the verdict: the history decides whether a security exception applies, so it is never guessed.
+    /// </summary>
+    private async Task<IReadOnlyList<CkCompiledModelRoot>> LoadEarlierInMajorAsync(CkBaselineResolution resolution,
+        CkModelId baselineId, string? catalogName)
+    {
+        IEnumerable<CkModelId> known;
+        if (resolution.KnownVersions.Count > 0)
+        {
+            known = resolution.KnownVersions;
+        }
+        else if (catalogName != null)
+        {
+            var listing = await _catalogService.ListAsync(catalogName, 0, int.MaxValue).ConfigureAwait(false);
+            known = (listing?.ModelResultItems ?? []).Select(i => i.ModelId);
+        }
+        else
+        {
+            known = [];
+        }
+
+        var earlier = known
+            .Where(id => string.Equals(id.Name, baselineId.Name, StringComparison.OrdinalIgnoreCase) &&
+                         id.Version.Major == baselineId.Version.Major && id.Version.CompareTo(baselineId.Version) < 0)
+            .GroupBy(id => id.Version)
+            .Select(g => g.First())
+            .OrderBy(id => id.Version)
+            .ToList();
+        var models = new List<CkCompiledModelRoot>();
+        foreach (var id in earlier)
+        {
+            var result = new OperationResult();
+            var model = catalogName != null
+                ? await _catalogService.GetAsync(catalogName, id, result).ConfigureAwait(false)
+                : await _catalogService.GetAsync(id, result).ConfigureAwait(false);
+            if (model == null || result.HasErrors || result.HasFatalErrors)
+            {
+                throw new CompilerException(
+                    $"Error loading '{id.FullName}' from catalog '{catalogName}' to judge the security exception " +
+                    $"against the history of major {id.Version.Major}.",
+                    result);
+            }
+
+            models.Add(model);
+        }
+
+        return models;
     }
 
     /// <summary>

@@ -82,7 +82,7 @@ internal static class GitHubCatalogDescription
 /// <summary>
 /// Construction kit model catalog for GitHub base class
 /// </summary>
-public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog, IWithdrawnVersionCatalog,
+public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog, IWithdrawnVersionCatalog, IGuardedPublishCatalog,
     IAuthoritativeVersionCatalog
 {
     /// <summary>
@@ -302,8 +302,17 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
     }
 
     /// <inheritdoc />
-    public override async Task PublishAsync(CkCompiledModelRoot ckCompiledModel, bool force = false,
-        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+    public override Task PublishAsync(CkCompiledModelRoot ckCompiledModel, bool force = false,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null) =>
+        PublishCoreAsync(ckCompiledModel, force, null, cancellationToken);
+
+    /// <inheritdoc />
+    public Task PublishAsync(CkCompiledModelRoot ckCompiledModel, bool force, CatalogStateToken expectedState,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null) =>
+        PublishCoreAsync(ckCompiledModel, force, expectedState, cancellationToken);
+
+    private async Task PublishCoreAsync(CkCompiledModelRoot ckCompiledModel, bool force,
+        CatalogStateToken? expectedState, CancellationToken? cancellationToken)
     {
         var gitHubClient = CreateGitHubClient();
 
@@ -346,7 +355,22 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
                     .ConfigureAwait(false);
             }
 
+            // AB#6584: the per-major index is what makes a version visible, so it is the point where the publish is
+            // conditional on the state the verdict was computed from. Checked once before anything is written (no
+            // file to clean up) and again, against the content the write itself replaces, inside the index update.
+            var versionsIndexPath = CatalogUnpublishIndex.VersionsCatalogPath(root, ckCompiledModel.ModelId);
+            if (expectedState != null)
+            {
+                var current = await gitHubClient.GetFileAsync(versionsIndexPath).ConfigureAwait(false);
+                if (!expectedState.Matches(versionsIndexPath, current?.Item1))
+                {
+                    throw new CatalogChangedDuringPublishException(CatalogName, ckCompiledModel.ModelId,
+                        versionsIndexPath);
+                }
+            }
+
             var existing = await gitHubClient.GetFileAsync(filePath).ConfigureAwait(false);
+            var createdModelFile = false;
             if (existing.HasValue)
             {
                 if (!force)
@@ -362,14 +386,26 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
                 await gitHubClient.CreateFileAsync(filePath, $"First commit for {ckCompiledModel.ModelId.FullName}",
                         content)
                     .ConfigureAwait(false);
+                createdModelFile = true;
             }
 
             cancellationToken?.ThrowIfCancellationRequested();
 
             // Update the major version
-            await UpdateModelVersionsCatalogAsync(root, ckCompiledModel.ModelId, ckCompiledModel.Description,
-                    gitHubClient)
-                .ConfigureAwait(false);
+            try
+            {
+                await UpdateModelVersionsCatalogAsync(root, ckCompiledModel.ModelId, ckCompiledModel.Description,
+                        gitHubClient, expectedState, CatalogName)
+                    .ConfigureAwait(false);
+            }
+            catch (CatalogChangedDuringPublishException) when (createdModelFile)
+            {
+                // Lost the race after the model file was created: it is not listed in any index, so removing it leaves
+                // the catalog as it was found.
+                await DeleteIfExistsAsync(gitHubClient, filePath, $"Withdraw aborted publish of {ckCompiledModel.ModelId.FullName}")
+                    .ConfigureAwait(false);
+                throw;
+            }
 
             cancellationToken?.ThrowIfCancellationRequested();
 
@@ -584,6 +620,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             }
 
             var versions = new List<CkModelId>();
+            var indexHashes = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var root in CkCatalogLayout.ReadRoots)
             {
                 cancellationToken?.ThrowIfCancellationRequested();
@@ -614,7 +651,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
                     foreach (var major in library.MajorVersions)
                     {
                         var majorCatalog = await ReadCatalogIndexAsync<SharedCatalogTypes.ModelLibraryVersionsCatalog>(
-                            gitHubClient, major.CatalogPath).ConfigureAwait(false);
+                            gitHubClient, major.CatalogPath, indexHashes).ConfigureAwait(false);
                         if (majorCatalog == null)
                         {
                             return CatalogVersionsResult.Unreachable(
@@ -627,7 +664,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
                 }
             }
 
-            return CatalogVersionsResult.Found(versions);
+            return CatalogVersionsResult.Found(versions) with { State = new CatalogStateToken(indexHashes) };
         }
         catch (OperationCanceledException) when (cancellationToken?.IsCancellationRequested == true)
         {
@@ -649,13 +686,19 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
     };
 
     /// <summary>Reads and parses an index file; null when the file does not exist, an exception when it is unreadable.</summary>
-    private static async Task<T?> ReadCatalogIndexAsync<T>(IGitHubClientWrapper gitHubClient, string path)
+    private static async Task<T?> ReadCatalogIndexAsync<T>(IGitHubClientWrapper gitHubClient, string path,
+        Dictionary<string, string>? indexHashes = null)
         where T : class
     {
         var file = await gitHubClient.GetFileAsync(path).ConfigureAwait(false);
         if (file == null)
         {
             return null;
+        }
+
+        if (indexHashes != null)
+        {
+            indexHashes[path] = CatalogStateToken.Hash(file.Value.Item1)!;
         }
 
         if (string.IsNullOrWhiteSpace(file.Value.Item1))
@@ -781,7 +824,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
     // gh-pages (commit b364570, octo-construction-kit-CI 33317) was caused by the
     // O(models × majors) refresh walk, which deliberately stays on gh-pages.
     private static async Task UpdateModelVersionsCatalogAsync(string root, CkModelId modelId, string? description,
-        IGitHubClientWrapper gitHubClient)
+        IGitHubClientWrapper gitHubClient, CatalogStateToken? expectedState = null, string catalogName = "")
     {
         // Catalog file path for this major version
         var catalogPath =
@@ -789,7 +832,17 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
 
         await gitHubClient.UpsertFileWithMergeAsync(catalogPath,
                 $"Update catalog for {modelId.Name} v{modelId.Version.Major}",
-                existingJson => MergeModelVersionsCatalog(existingJson, modelId, description, root))
+                existingJson =>
+                {
+                    // AB#6584: the merge runs against the content the write replaces (again after every SHA conflict),
+                    // so this is the compare-and-swap: a publish that landed since the verdict aborts this one.
+                    if (expectedState != null && !expectedState.Matches(catalogPath, existingJson))
+                    {
+                        throw new CatalogChangedDuringPublishException(catalogName, modelId, catalogPath);
+                    }
+
+                    return MergeModelVersionsCatalog(existingJson, modelId, description, root);
+                })
             .ConfigureAwait(false);
     }
 

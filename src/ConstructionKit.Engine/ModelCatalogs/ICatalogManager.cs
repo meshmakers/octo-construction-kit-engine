@@ -157,9 +157,14 @@ internal interface ICatalogManager
     /// that describes the source
     /// which the catalog should search set it to null to use default</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
+    /// <param name="expectedState">
+    ///     The state of the catalog indexes the publish gate judged the model against (AB#6584); a catalog that supports it
+    ///     (<see cref="IGuardedPublishCatalog" />) writes only while the catalog is still in that state.
+    /// </param>
     /// <returns></returns>
     Task PublishAsync(string catalogName, CkCompiledModelRoot ckCompiledModel, bool isForced,
-        object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null,
+        CatalogStateToken? expectedState = null);
 
     /// <summary>
     ///     Removes a model version from a catalog and burns its version number (AB#5433). Does not check for

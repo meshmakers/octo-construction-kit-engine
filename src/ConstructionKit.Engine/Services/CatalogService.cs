@@ -150,31 +150,111 @@ internal class CatalogService : ICatalogService
         // AB#6386: gate 2 of the compatibility concept. Every publish to a writable catalog except the local
         // file-system catalog gets the compile gate's verdict against the target catalog; there is no bypass switch
         // (isForced only decides whether an existing file may be overwritten, never whether the gate runs).
-        var gateResult = await _publishGate.Value.EvaluateAsync(catalogName, ckCompiledModel, sourceIdentifier)
+        //
+        // AB#6584: the verdict and the write are one unit. The write is conditional on the catalog state the verdict
+        // was computed from; when another publish landed in between the write aborts, the catalog is read again and the
+        // model is judged against that publish (the one that lands second is judged against the first). After the write
+        // the version is verified once more against its predecessor, and withdrawn if a concurrent publish made it
+        // violate the rules.
+        for (var attempt = 1; ; attempt++)
+        {
+            var gateResult = await _publishGate.Value.EvaluateAsync(catalogName, ckCompiledModel, sourceIdentifier)
+                .ConfigureAwait(false);
+            foreach (var message in gateResult.Messages)
+            {
+                AddGateMessage(operationResult, catalogName, ckCompiledModel, message);
+            }
+
+            switch (gateResult.Decision)
+            {
+                case CkPublishGateDecision.Refused:
+                    // AB#6389: one refusal for every caller. The reasons are already in the operation result (ordered,
+                    // deduplicated, one line each); the exception carries the summary and ends the process with -6.
+                    throw new CkPublishRefusedException(
+                        CkPublishRefusal.FormatSummary(catalogName, ckCompiledModel.ModelId,
+                            gateResult.Messages.Where(m => m.Severity == CkCompileGateSeverity.Error).ToList()),
+                        operationResult);
+                case CkPublishGateDecision.AlreadyPublished:
+                    _logger.LogInformation(
+                        "Model {ModelId} is already published to catalog {CatalogName}, nothing to do",
+                        ckCompiledModel.ModelId, catalogName);
+                    return;
+            }
+
+            try
+            {
+                await _catalogManager
+                    .PublishAsync(catalogName, ckCompiledModel, isForced, sourceIdentifier, cancellationToken,
+                        gateResult.State)
+                    .ConfigureAwait(false);
+            }
+            catch (CatalogChangedDuringPublishException e) when (attempt < CkPublishGate.MaxAttempts)
+            {
+                _logger.LogInformation(
+                    "Catalog {CatalogName} changed while {ModelId} was being published ({Reason}); judging it again",
+                    catalogName, ckCompiledModel.ModelId, e.Message);
+                continue;
+            }
+            catch (CatalogChangedDuringPublishException)
+            {
+                var changed = new CkCompileGateMessage(CkCompileGateSeverity.Error, "OCTO-CK202",
+                    $"Catalog '{catalogName}' kept changing while model '{ckCompiledModel.ModelId.FullName}' was " +
+                    $"published ({CkPublishGate.MaxAttempts} attempts). Nothing is visible of this publish; retry it.");
+                AddGateMessage(operationResult, catalogName, ckCompiledModel, changed);
+                throw new CkPublishRefusedException(
+                    CkPublishRefusal.FormatSummary(catalogName, ckCompiledModel.ModelId, [changed]), operationResult);
+            }
+
+            await VerifyAfterWriteAsync(catalogName, ckCompiledModel, gateResult, operationResult, sourceIdentifier,
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+    }
+
+    private async Task VerifyAfterWriteAsync(string catalogName, CkCompiledModelRoot ckCompiledModel,
+        CkPublishGateResult gateResult, OperationResult operationResult, object? sourceIdentifier,
+        CancellationToken? cancellationToken)
+    {
+        var violation = await _publishGate.Value
+            .VerifyAfterWriteAsync(catalogName, ckCompiledModel, gateResult.Verdict?.BaselineId, sourceIdentifier)
             .ConfigureAwait(false);
-        foreach (var message in gateResult.Messages)
+        if (violation == null)
+        {
+            return;
+        }
+
+        var messages = violation.Messages.ToList();
+        var isSourceFailure = violation.Verdict == null;
+        if (!isSourceFailure)
+        {
+            // A concurrent publish made the version violate the rules: withdraw it (the number is burned), so the
+            // catalog does not keep a version no gate judged.
+            try
+            {
+                await _catalogManager.UnpublishAsync(catalogName, ckCompiledModel.ModelId,
+                    "withdrawn by the publish itself: a concurrent publish of the same model made it incompatible " +
+                    "with its predecessor (AB#6584)", sourceIdentifier, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Could not withdraw {ModelId} from catalog {CatalogName} after a concurrent publish",
+                    ckCompiledModel.ModelId, catalogName);
+                messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Error, CkPublishRefusal.ConcurrentPublishCode,
+                    $"Model '{ckCompiledModel.ModelId.FullName}' could not be withdrawn ({e.Message}); unpublish it " +
+                    "manually: `octo-ckc -c Unpublish`."));
+            }
+        }
+
+        foreach (var message in messages)
         {
             AddGateMessage(operationResult, catalogName, ckCompiledModel, message);
         }
 
-        switch (gateResult.Decision)
-        {
-            case CkPublishGateDecision.Refused:
-                // AB#6389: one refusal for every caller. The reasons are already in the operation result (ordered,
-                // deduplicated, one line each); the exception carries the summary and ends the process with -6.
-                throw new CkPublishRefusedException(
-                    CkPublishRefusal.FormatSummary(catalogName, ckCompiledModel.ModelId,
-                        gateResult.Messages.Where(m => m.Severity == CkCompileGateSeverity.Error).ToList()),
-                    operationResult);
-            case CkPublishGateDecision.AlreadyPublished:
-                _logger.LogInformation("Model {ModelId} is already published to catalog {CatalogName}, nothing to do",
-                    ckCompiledModel.ModelId, catalogName);
-                return;
-        }
-
-        await _catalogManager
-            .PublishAsync(catalogName, ckCompiledModel, isForced, sourceIdentifier, cancellationToken)
-            .ConfigureAwait(false);
+        throw new CkPublishRefusedException(
+            CkPublishRefusal.FormatSummary(catalogName, ckCompiledModel.ModelId,
+                messages.Where(m => m.Severity == CkCompileGateSeverity.Error).ToList(),
+                writtenThenWithdrawn: !isSourceFailure),
+            operationResult);
     }
 
     /// <inheritdoc />

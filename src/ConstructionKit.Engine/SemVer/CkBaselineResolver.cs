@@ -65,6 +65,7 @@ public class CkBaselineResolver : ICkBaselineResolver
         List<CkModelId> known;
         bool sourceUnreachable;
         string? unreachableReason = null;
+        CatalogStateToken? state = null;
         DateTime? cacheUpdatedAt;
         if (_catalogs.FirstOrDefault(c => string.Equals(c.CatalogName, targetCatalog, StringComparison.OrdinalIgnoreCase))
             is IAuthoritativeVersionCatalog authoritative)
@@ -76,6 +77,7 @@ public class CkBaselineResolver : ICkBaselineResolver
             sourceUnreachable = read.SourceUnreachable;
             unreachableReason = read.UnreachableReason;
             cacheUpdatedAt = read.ReadAt;
+            state = read.State;
             known = sourceUnreachable
                 ? []
                 : read.Versions
@@ -131,7 +133,8 @@ public class CkBaselineResolver : ICkBaselineResolver
             SourceUnreachable = sourceUnreachable,
             SourceUnreachableReason = unreachableReason,
             DeclaredVersionPublished = declaredEntry,
-            KnownVersions = known
+            KnownVersions = known,
+            State = state
         };
     }
 

@@ -22,12 +22,18 @@ public static class CkPublishRefusal
     /// <summary>The code of a version number that was unpublished and is burned (AB#5433, reported by the gate).</summary>
     public const string BurnedVersionCode = "OCTO-CK207";
 
+    /// <summary>
+    ///     The code of a version that was written and then withdrawn because a concurrent publish of the same model
+    ///     landed at the same time and made it incompatible (AB#6584).
+    /// </summary>
+    public const string ConcurrentPublishCode = "OCTO-CK208";
+
     // Most fundamental first: the version number is unusable (207, 205), the baseline is unknown (202), the declared
     // version is too low (201, 200), then the findings about the acknowledgements (206, 203, 204).
     private static readonly string[] CodeOrder =
     [
         BurnedVersionCode, "OCTO-CK205", "OCTO-CK202", "OCTO-CK201", "OCTO-CK200", "OCTO-CK206", "OCTO-CK203",
-        "OCTO-CK204"
+        "OCTO-CK204", ConcurrentPublishCode
     ];
 
     /// <summary>
@@ -58,11 +64,15 @@ public static class CkPublishRefusal
     }
 
     /// <summary>The one-line summary used as the text of the exception.</summary>
-    public static string FormatSummary(string catalogName, CkModelId modelId, IReadOnlyList<CkCompileGateMessage> errors)
+    public static string FormatSummary(string catalogName, CkModelId modelId, IReadOnlyList<CkCompileGateMessage> errors,
+        bool writtenThenWithdrawn = false)
     {
         var codes = string.Join(", ", errors.Select(e => e.Code ?? "OCTO-CK2xx").Distinct());
+        var effect = writtenThenWithdrawn
+            ? "It was written and then withdrawn again (AB#6584); its version number is burned."
+            : "Nothing was written.";
         return $"Construction kit model '{modelId.FullName}' was NOT published to catalog '{catalogName}': refused by " +
-               $"the {CompatGate} with {errors.Count} reason(s) ({codes}). Nothing was written. Every reason follows " +
+               $"the {CompatGate} with {errors.Count} reason(s) ({codes}). {effect} Every reason follows " +
                "with its next step, the most fundamental first.";
     }
 
@@ -81,6 +91,8 @@ public static class CkPublishRefusal
         "OCTO-CK203" =>
             "add the entry shown to compatibility.acknowledge in ckModel.yaml, with a reason, or revert the change.",
         "OCTO-CK204" => "remove the entry from compatibility.acknowledge; it is valid for one release only.",
+        ConcurrentPublishCode =>
+            "the version was withdrawn and its number is burned; publish again with the next version above the other publish.",
         _ => null
     };
 

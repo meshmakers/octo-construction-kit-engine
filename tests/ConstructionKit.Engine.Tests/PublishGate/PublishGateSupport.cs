@@ -140,6 +140,33 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClie
         return fault == null ? null : Task.FromException(fault);
     }
 
+    /// <summary>
+    ///     Runs before every write or delete reaches the repository (AB#6584): the place where a test lets another
+    ///     publisher - a second process - win the race between the baseline read and the write. Called with the file
+    ///     path; the hook is cleared while it runs, so the other publisher's own writes do not trigger it again.
+    /// </summary>
+    public Func<string, Task>? BeforeWrite { get; set; }
+
+    private async Task RunBeforeWriteAsync(string path)
+    {
+        var hook = BeforeWrite;
+        if (hook == null)
+        {
+            return;
+        }
+
+        BeforeWrite = null;
+        try
+        {
+            await hook(path).ConfigureAwait(false);
+        }
+        finally
+        {
+            // A hook that wants to fire again re-arms itself.
+            BeforeWrite ??= hook;
+        }
+    }
+
     /// <summary>What the gh-pages mirror answers for a path (AB#6580): by default the repository content.</summary>
     public Func<string, PagesAnswer>? PagesBehavior { get; set; }
 
@@ -179,11 +206,12 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClie
         return fault != null ? Task.FromException<GitHubRepositoryState>(fault) : Task.FromResult(State);
     }
 
-    public Task UpdateFileAsync(string filePath, string commitMessage, string content, string sha)
+    public async Task UpdateFileAsync(string filePath, string commitMessage, string content, string sha)
     {
+        await RunBeforeWriteAsync(filePath);
         if (FailWrite(filePath) is { } failedUpdate)
         {
-            return failedUpdate;
+            await failedUpdate;
         }
 
         if (!Files.TryGetValue(filePath, out var existing) || Sha(existing) != sha)
@@ -192,29 +220,28 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClie
         }
 
         Files[filePath] = content;
-        return Task.CompletedTask;
     }
 
-    public Task CreateFileAsync(string filePath, string commitMessage, string content)
+    public async Task CreateFileAsync(string filePath, string commitMessage, string content)
     {
+        await RunBeforeWriteAsync(filePath);
         if (FailWrite(filePath) is { } failedCreate)
         {
-            return failedCreate;
+            await failedCreate;
         }
 
         if (!Files.TryAdd(filePath, content))
         {
             throw new InvalidOperationException($"'{filePath}' already exists");
         }
-
-        return Task.CompletedTask;
     }
 
-    public Task UpsertFileWithMergeAsync(string filePath, string commitMessage, Func<string?, string?> merge)
+    public async Task UpsertFileWithMergeAsync(string filePath, string commitMessage, Func<string?, string?> merge)
     {
+        await RunBeforeWriteAsync(filePath);
         if (FailWrite(filePath) is { } failedUpsert)
         {
-            return failedUpsert;
+            await failedUpsert;
         }
 
         Files.TryGetValue(filePath, out var existing);
@@ -223,19 +250,17 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClie
         {
             Files[filePath] = merged;
         }
-
-        return Task.CompletedTask;
     }
 
-    public Task DeleteFileAsync(string filePath, string commitMessage, string sha)
+    public async Task DeleteFileAsync(string filePath, string commitMessage, string sha)
     {
+        await RunBeforeWriteAsync(filePath);
         if (FailWrite(filePath) is { } failedDelete)
         {
-            return failedDelete;
+            await failedDelete;
         }
 
         Files.Remove(filePath);
-        return Task.CompletedTask;
     }
 
     public Task<IReadOnlyList<(string path, string sha)>> ListFilesRecursiveAsync(string directoryPath) =>

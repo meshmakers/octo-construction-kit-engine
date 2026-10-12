@@ -18,8 +18,14 @@ internal sealed class GateHarness : IDisposable
     private readonly bool _lane;
     private ServiceProvider _provider;
 
-    public GateHarness(bool lane = false)
+    /// <param name="lane">The dev lane catalog (published versions may be replaced).</param>
+    /// <param name="repository">
+    ///     An existing in-memory repository: a second harness on it is a second process (own services, own cache) that
+    ///     publishes to the same repository (AB#6584).
+    /// </param>
+    public GateHarness(bool lane = false, InMemoryGitHubRepository? repository = null)
     {
+        Repository = repository ?? new InMemoryGitHubRepository();
         Root = Path.Combine(Path.GetTempPath(), $"PublishGate_{Guid.NewGuid():N}");
         LocalDir = Path.Combine(Root, "local");
         Directory.CreateDirectory(LocalDir);
@@ -62,7 +68,7 @@ internal sealed class GateHarness : IDisposable
     public string Root { get; }
     public string LocalDir { get; }
     public StubCatalog Stub { get; } = new();
-    public InMemoryGitHubRepository Repository { get; } = new();
+    public InMemoryGitHubRepository Repository { get; }
 
     /// <summary>A new process: the index cache of the GitHub catalogs is gone and the next read has to rebuild it.</summary>
     public void ClearCatalogCache()

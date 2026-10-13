@@ -48,6 +48,27 @@ internal class ImportRtModelCommand(
     private ImportBlueprintLockEnforcer? _lockEnforcer;
     private RtImportBlueprintLockSummary _blueprintLockSummary = RtImportBlueprintLockSummary.Empty;
 
+    /// <summary>
+    /// AB#6652: the command is transient, but callers such as <c>DefaultConfigurationCreatorService</c> (scoped)
+    /// reuse one instance for the imports of many tenants. Every <c>Import*Async</c> entry point therefore starts
+    /// from an empty state; otherwise the duplicate-RtId check reports every id of the second import as
+    /// "already imported", and mandatory violations, guard entries and counters of an earlier tenant leak into
+    /// the next one. Imports on one instance are sequential (the state is per instance, never shared by
+    /// concurrent imports), so the reset needs no locking.
+    /// </summary>
+    private void ResetImportState()
+    {
+        _entityImportIds.Clear();
+        _mandatoryViolations.Clear();
+        _guardEntries.Clear();
+        // A failed import can leave unflushed items behind; they belong to no later import.
+        _importEntityQueue.Clear();
+        _importAssociationQueue.Clear();
+        _associationsCount = 0;
+        _lockEnforcer = null;
+        _blueprintLockSummary = RtImportBlueprintLockSummary.Empty;
+    }
+
     /// <inheritdoc />
     public IReadOnlyList<RtImportGuardEntry> GuardEntries => _guardEntries.ToArray();
 
@@ -59,6 +80,7 @@ internal class ImportRtModelCommand(
         RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep,
         IReadOnlyCollection<RtImportBlankingConfirmation>? confirmedBlankings = null)
     {
+        ResetImportState();
         _blankingPolicy = blankingPolicy;
         _confirmedBlankings = confirmedBlankings;
         _lockEnforcer = null; // AB#6392: text imports are system flows
@@ -93,6 +115,7 @@ internal class ImportRtModelCommand(
         RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep,
         IReadOnlyCollection<RtImportBlankingConfirmation>? confirmedBlankings = null)
     {
+        ResetImportState();
         _blankingPolicy = blankingPolicy;
         _confirmedBlankings = confirmedBlankings;
         _lockEnforcer = null; // AB#6392: model imports are system flows
@@ -147,6 +170,7 @@ internal class ImportRtModelCommand(
         ImportStrategy importStrategy, RtImportCallerContext? caller, CancellationToken? cancellationToken,
         RtImportBlankingPolicy blankingPolicy, IReadOnlyCollection<RtImportBlankingConfirmation>? confirmedBlankings)
     {
+        ResetImportState();
         _blankingPolicy = blankingPolicy;
         _confirmedBlankings = confirmedBlankings;
         logger.LogInformation("Importing RT entities using file started");
@@ -302,9 +326,16 @@ internal class ImportRtModelCommand(
 
             // Atomic check-and-insert across Parallel.ForEachAsync workers; HashSet is not
             // thread-safe and a separate Contains + Add racily hits its internal resize.
+            // AB#6652: the set is per import (see ResetImportState), so a hit is a real duplicate inside this
+            // payload: an input-data problem, not a service error. Upsert stores one of the entries (the bulk
+            // write replaces in queue order, which the parallel loop does not fix), Insert fails on the
+            // second one with a duplicate key.
             if (!_entityImportIds.TryAdd(rtEntity.RtId, 0))
             {
-                logger.LogError("'{RtEntityRtId}' already imported", rtEntity.RtId);
+                logger.LogWarning(
+                    "Duplicate RtId '{RtEntityRtId}' within one import payload; with Upsert only one of the entries " +
+                    "is stored, with Insert the duplicate is rejected by the database",
+                    rtEntity.RtId);
             }
 
             token.ThrowIfCancellationRequested();

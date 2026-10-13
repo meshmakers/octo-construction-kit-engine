@@ -280,6 +280,18 @@ import choke point** so every Upsert caller gets it automatically:
   warning and falls through to imported values rather than blocking the
   import. `Insert` is untouched (it errors on an existing id, so there is
   nothing to preserve).
+- **Per-import state (AB#6652)**: `ImportRtModelCommand` is transient, but
+  scoped callers (`DefaultConfigurationCreatorService`, the seed re-import over
+  all tenants) reuse one instance for many imports. `ResetImportState()` runs at
+  the start of `ImportModelAsync`, `ImportTextAsync` and `ImportFileAsync` and
+  clears the duplicate-RtId set, mandatory violations, guard entries, queues,
+  association counter and the blueprint-lock summary. Without it every id of the
+  second import was logged as "already imported" (ERROR burst at release 3.5.15)
+  and violations/guard entries leaked into the next tenant. A duplicate RtId
+  inside **one** payload is logged as a Warning (Upsert stores one of the
+  entries, Insert is rejected by the database with a duplicate key). Tests:
+  `ImportRtModelCommandStateResetTests`. Imports on one instance must stay
+  sequential.
 - **Who benefits**: because it sits in the import command, all Upsert
   callers are covered with no per-caller code:
   - blueprint seed apply (`BlueprintService.ApplySeedDataForBlueprintAsync`

@@ -66,7 +66,7 @@ i.e. a correction / late value, **not** a fresh forward append.
 
 | Storage shape | Source | Notes |
 |---|---|---|
-| Windowed archives (time-range, rollup) | Existing `was_updated` column (`Constants.WasUpdated`) | Already set `TRUE` on every `ON CONFLICT` upsert and propagated to rollups via `MAX(was_updated)`. Today purely advisory for dashboards — **reused** here as the cheap per-row retro signal. |
+| Windowed archives (time-range, rollup) | Existing `was_updated` column (`Constants.WasUpdated`) | Already set `TRUE` on every `ON CONFLICT` upsert and propagated to rollups via `COALESCE(MAX(was_updated), FALSE)`. Today purely advisory for dashboards — **reused** here as the cheap per-row retro signal. |
 | Raw archives (single `timestamp` column) | **New** | Raw tables have no `was_updated`. Detect a retroactive write as `incoming.timestamp < consumedHighWater` at insert time and record it. |
 
 The signal is materialised as a **dirty-window ledger** on the source archive (Mongo,

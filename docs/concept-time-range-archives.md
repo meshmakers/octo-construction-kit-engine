@@ -329,12 +329,15 @@ contributing source rows). If any source window in the bucket was corrected, the
 downstream bucket inherits the flag. This is what dashboards want — a daily total
 that contains a corrected quarter-hour should itself be flagged.
 
-The chained-rollup aggregation SQL (§7) emits `MAX(was_updated) AS was_updated`
-alongside the user-column aggregates.
+The chained-rollup aggregation SQL (§7) emits
+`COALESCE(MAX(was_updated), FALSE) AS was_updated` alongside the user-column aggregates.
+The `COALESCE` keeps the bucket when no source row of the group carries a stored flag:
+the aggregate would otherwise be NULL, the target column is `NOT NULL`, and CrateDB leaves
+such a row out of `INSERT ... SELECT` without an error.
 
 #### Propagation is bound to (re-)aggregation, not to source-row mutation
 
-The `MAX(was_updated)` propagation runs **inside** the aggregation SQL, so it only fires
+The `was_updated` propagation runs **inside** the aggregation SQL, so it only fires
 when the orchestrator (re-)aggregates a bucket. The default orchestrator advances the
 watermark monotonically: once a bucket has been written, the orchestrator never revisits
 it on its own. Consequence: an external correction to a quarter-hour row that flips
@@ -468,7 +471,7 @@ SELECT
   "rtid",
   '<targetCkTypeId>' AS "cktypeid",
   MAX("rtwellknownname") AS "rtwellknownname",
-  MAX("was_updated") AS "was_updated",   -- inherit correction flag
+  COALESCE(MAX("was_updated"), FALSE) AS "was_updated",   -- inherit correction flag
   <per-aggregation function over source columns>
 FROM "<tenant>"."archive_<source>"
 WHERE "window_start" >= '<B_start>'::timestamp
@@ -638,7 +641,7 @@ Suggested rollout order — each phase ships a coherent slice.
 8. **Chained rollup aggregation over time-range sources** ✅ — orchestrator's SQL builder
    branches on source shape (`RollupAggregationSqlBuilder.Build` takes
    `sourceUsesWindowedStorage`), windowed source ⇒ fully-contained
-   `window_start >= B_start AND window_end <= B_end` predicate and `MAX(was_updated)`
+   `window_start >= B_start AND window_end <= B_end` predicate and `COALESCE(MAX(was_updated), FALSE)`
    propagation. Raw source path unchanged. §7 cascade examples become testable.
 9. **Calendar alignment** ✅ — `BucketAlignment` enum + attribute on `RollupArchive`
    (System.StreamData 1.4.0, additive; pre-1.4.0 entities resolve to `FixedSize`).

@@ -307,6 +307,31 @@ public sealed class RangeRetentionCompileTests : IDisposable
         Assert.Equal(["Lib-1.4.0", "Mid2-1.0.0"], compiled.Dependencies!.Select(d => d.FullName).Order());
     }
 
+    // Review (CodeRabbit on #273): every round of the solver discovers one more level of the closure, so a deep acyclic
+    // chain must not run into a round limit.
+    [Fact]
+    public async Task FlagOn_DeepDependencyChain_ResolvesWithoutRoundLimit()
+    {
+        const int depth = 80;
+        for (var i = 0; i < depth; i++)
+        {
+            await _on.CompileAndPublishAsync(_on.WriteSource($"chain{i}", $"Chain{i}-1.0.0",
+                i == 0 ? [] : [$"Chain{i - 1}-[1.0,2.0)"],
+                new Dictionary<string, string>
+                {
+                    ["attributes/a.yaml"] = "attributes:\n  - id: Code\n    valueType: String\n"
+                }));
+        }
+
+        var compiled = await _on.CompileAsync(_on.WriteSource("chaintop", "ChainTop-1.0.0", [$"Chain{depth - 1}-[1.0,2.0)"],
+            new Dictionary<string, string>
+            {
+                ["attributes/a.yaml"] = "attributes:\n  - id: Code\n    valueType: String\n"
+            }));
+
+        Assert.Equal(depth, compiled.Dependencies!.Count);
+    }
+
     // The solver takes the HIGHEST version that satisfies all constraints when several do.
     [Fact]
     public async Task FlagOn_SeveralVersionsSatisfyAllConstraints_HighestWins()

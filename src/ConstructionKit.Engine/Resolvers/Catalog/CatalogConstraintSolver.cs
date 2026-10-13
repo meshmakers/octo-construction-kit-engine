@@ -23,8 +23,6 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
 /// </summary>
 internal sealed class CatalogConstraintSolver(ICatalogManager catalogManager, ILogger logger)
 {
-    private const int MaxRounds = 64;
-
     /// <summary>One constraint on a model name and the model that contributes it (null = the root).</summary>
     internal sealed record Constraint(CkModelIdVersionRange Range, CkModelId? Origin);
 
@@ -44,7 +42,11 @@ internal sealed class CatalogConstraintSolver(ICatalogManager catalogManager, IL
         var modelCache = new Dictionary<CkModelId, IReadOnlyCollection<CkModelIdVersionRange>?>();
         var chosen = new Dictionary<string, CkModelId>(StringComparer.Ordinal);
 
-        for (var round = 0; round < MaxRounds; round++)
+        // Each round discovers one more level of the closure, so the number of rounds is bounded by the depth of the
+        // chain, not by a constant. The state space is finite (versions per name); a repeated selection that is not a
+        // fixed point is an oscillation and fails instead of looping.
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        while (true)
         {
             var constraints = await CollectAsync(roots, chosen, modelCache, sourceIdentifier).ConfigureAwait(false);
 
@@ -80,12 +82,16 @@ internal sealed class CatalogConstraintSolver(ICatalogManager catalogManager, IL
                 return new Solution(chosen);
             }
 
+            var key = string.Join(";", next.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => kv.Value.FullName));
+            if (!seen.Add(key))
+            {
+                throw new ModelValidationException(
+                    $"The dependency versions of the construction kit models {string.Join(", ", roots.Select(r => $"'{r}'"))} " +
+                    "repeat without settling on one version per model. Narrow the dependency ranges.");
+            }
+
             chosen = next;
         }
-
-        throw new ModelValidationException(
-            $"The dependency versions of the construction kit models {string.Join(", ", roots.Select(r => $"'{r}'"))} " +
-            $"do not settle on one version per model after {MaxRounds} rounds. Narrow the dependency ranges.");
     }
 
     private async Task<Dictionary<string, List<Constraint>>> CollectAsync(List<CkModelIdVersionRange> roots,

@@ -45,10 +45,42 @@ internal class RepositoryDependencyResolver(
                 operationResult.AddMessage(MessageCodes.UnknownCkModel(originFileResolver.Resolve(ckDependency),
                     ckDependency));
             }
-            throw ModelValidationException.UnknownCkModels(resolveResult.UnresolvedDependencyModelIds);
+            throw ModelValidationException.UnknownCkModels(resolveResult.UnresolvedDependencyModelIds,
+                await DescribeVisibleVersionsAsync(resolveResult.UnresolvedDependencyModelIds, sourceIdentifier)
+                    .ConfigureAwait(false));
         }
 
         return resolveResult.RootDependencyModelIds;
+    }
+
+    /// <summary>
+    ///     AB#4468: lists the versions the repository can see for each unresolved dependency, for the error
+    ///     message (the repository counterpart of the catalog resolver's message). Best effort — a repository
+    ///     without <see cref="IRepositoryVersionLister" /> or one that cannot be listed leaves the versions out.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, string>> DescribeVisibleVersionsAsync(
+        IEnumerable<CkModelIdVersionRange> unresolved, object? sourceIdentifier)
+    {
+        var result = new Dictionary<string, string>();
+        if (ckRepositoryManagementService.Value is not IRepositoryVersionLister lister)
+        {
+            return result;
+        }
+
+        foreach (var name in unresolved.Select(u => u.Name).Distinct())
+        {
+            try
+            {
+                var versions = await lister.ListVersionsAsync(name, sourceIdentifier).ConfigureAwait(false);
+                result[name] = string.Join(", ", versions.Select(v => v.Version));
+            }
+            catch (Exception e)
+            {
+                logger.LogDebug(e, "Could not list installed versions of {CkModelName}", name);
+            }
+        }
+
+        return result;
     }
 
     public Task<IReadOnlyCollection<CkModelId>> HardResolveDependenciesAsync(ICollection<CkModelId> dependencies,

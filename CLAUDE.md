@@ -899,6 +899,16 @@ installed version per model, so an exact pin fails on its own (`ResolveFailed`) 
 `RangeRetentionCompileTests` (`…ResolveSystemOnce`, `…ConstraintsNoVersionSatisfies…`, `…ThreeLevelChain…`,
 `…HighestWins`).
 
+**Resolution by SemVer, the matrix (AB#4468).** Range `System-[2.5,3.0)` (floor 2.5.0) against the available versions:
+`{2.5.0}` → 2.5.0; `{2.6.1}` → 2.6.1; `{2.4.9}` and `{3.0.0}` → rejected with a message naming the range and the visible
+versions; `{2.5.0, 2.6.1, 3.0.0}` → 2.6.1 (highest in range). The same table runs through the catalog/compile resolver
+(`DependencyResolutionMatrixTests`, Compiler.Tests; with and without range retention), the repository resolver
+(`RepositoryResolutionMatrixTests`, Engine.Tests) and the tenant re-validation (engine-mongodb). The repository
+side lists the installed versions through the optional `IRepositoryVersionLister` (implemented by
+`RepositoryManagementService` → `IModelRepository`, by `DatabaseCkModelRepository` in engine-mongodb); a repository without
+it reports the range without versions. **No special treatment for System and Meshmakers-shipped models.** Blueprint floor
+semantics are not changed (AB#6672). Rules page: `docs/ck-semver-rules.md`, "Dependency resolution by SemVer".
+
 The CK SemVer diff does not classify `DependencyRanges` yet (documented exclusion, Phase 2 F2.1). The
 element schemas accept `@` in the model part of a reference; the compiled schema accepts
 `dependencyRanges`. Tests: `RangeRetentionCompileTests` (flag on/off, YAML round trip with schema

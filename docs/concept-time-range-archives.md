@@ -324,7 +324,7 @@ anyway). A future revision counter or change-log table can refine this.
 ### Propagation in Chained Rollups
 
 When a `CkRollupArchive` aggregates over a time-range source, the chained row's
-`was_updated` is computed as `MAX(source.was_updated)` (boolean MAX = OR over the
+`was_updated` is computed as `COALESCE(MAX(source.was_updated), FALSE)` (boolean MAX = OR over the
 contributing source rows). If any source window in the bucket was corrected, the
 downstream bucket inherits the flag. This is what dashboards want — a daily total
 that contains a corrected quarter-hour should itself be flagged.

@@ -165,9 +165,22 @@ public class ModelValidationException : CkModelException
             $"Conflicting versions are referenced by: {origins}. " +
             "This typically happens when different catalogs (LocalFileSystem, public/private GitHub) hold dependents that pin different versions of the same model. " +
             "Resolutions: rebuild the conflicting dependents against a single common version, narrow the dependency range in the consumer's ckModel.yaml, " +
-            "or disable catalogs that hold stale entries (MSBuild properties OctoPublicGitHubCatalogIsEnabled / OctoPrivateGitHubCatalogIsEnabled). " +
-            "With range retention (OctoCkRangeRetention=true) this also happens when an exact-pinned (classic) dependency and a range " +
-            "on the same model resolve to different versions: the catalog resolver resolves every range on its own (highest in range) " +
-            "and does not search for one version satisfying all of them — rebuild the exact-pinned dependency with range retention.");
+            "or disable catalogs that hold stale entries (MSBuild properties OctoPublicGitHubCatalogIsEnabled / OctoPrivateGitHubCatalogIsEnabled).");
+    }
+
+    /// <summary>
+    ///     AB#6671: a range-retaining resolve found no catalog version of a model that satisfies all constraints
+    ///     (ranges and exact pins) the closure puts on it.
+    /// </summary>
+    internal static Exception UnsatisfiableDependencyConstraints(string modelName,
+        IEnumerable<(CkModelIdVersionRange Range, CkModelId? Origin)> constraints, string visibleVersions)
+    {
+        var constraintText = string.Join(", ", constraints.Select(c =>
+            $"'{c.Range.FullName}' (required by {(c.Origin == null ? "the model being resolved" : $"'{c.Origin.FullName}'")})"));
+        return new ModelValidationException(
+            $"No version of construction kit model '{modelName}' satisfies all dependency constraints: {constraintText}. " +
+            $"Visible versions: {(string.IsNullOrEmpty(visibleVersions) ? "none" : visibleVersions)}. " +
+            "Resolutions: widen or align the constraints, rebuild the dependency that pins a different version of the model, " +
+            "or publish a version of the model that satisfies all of them.");
     }
 }

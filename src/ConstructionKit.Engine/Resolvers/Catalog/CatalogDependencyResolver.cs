@@ -104,6 +104,13 @@ internal class CatalogDependencyResolver(
                 Tuple.Create(new List<CkModelId>(), range))
         ];
         var rangeMatcher = new DependencyRangeMatcher(ckRootDependencies, dependencies);
+
+        // AB#6671: a range-retaining resolve picks one version per model name over all constraints (ranges and exact
+        // pins) of the closure; the classic resolve keeps resolving every queued range on its own.
+        var solution = ckRootDependencies is RangeRetainingDependencyRanges
+            ? await new CatalogConstraintSolver(catalogManager.Value, logger).SolveAsync(ckRootDependencies,
+                sourceIdentifier).ConfigureAwait(false)
+            : null;
         // List of already resolved dependencies to avoid circular references
         List<CkModelId> resolvedDependencies = [];
 
@@ -125,9 +132,11 @@ internal class CatalogDependencyResolver(
 
             logger.LogInformation("Resolving dependency '{CkModelId}'", ckDependency);
 
-            var modelExistingResult = await catalogManager.Value
-                .IsExistingAsync(ckDependency, sourceIdentifier)
-                .ConfigureAwait(false);
+            var modelExistingResult = solution != null
+                ? solution.Lookup(ckDependency)
+                : await catalogManager.Value
+                    .IsExistingAsync(ckDependency, sourceIdentifier)
+                    .ConfigureAwait(false);
             logger.LogInformation("Resolving dependency '{CkModelId}' found: '{Exists}'", ckDependency,
                 modelExistingResult.Exists);
 
@@ -205,8 +214,9 @@ internal class CatalogDependencyResolver(
             foreach (var childDependencyRange in ckDependencyRootModel.GetResolutionRanges())
             {
                 // Review G3 E-H1: classic children merge by overlap as on main; range-retaining ones structurally (D2).
+                // AB#6671: with the solver every constraint is its own entry (structural match), whatever the child is.
                 rangeMatcher.Add(dependencies, ckDependencyRootModel.ModelId, childDependencyRange,
-                    ckDependencyRootModel.IsRangeRetaining);
+                    solution != null || ckDependencyRootModel.IsRangeRetaining);
             }
 
             ckResolvedModels.Add(ckDependencyRootModel);

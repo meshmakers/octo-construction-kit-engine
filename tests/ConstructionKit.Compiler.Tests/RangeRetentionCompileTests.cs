@@ -208,11 +208,7 @@ public sealed class RangeRetentionCompileTests : IDisposable
         Assert.Equal("2.4.1", compiled.DependencyRanges!.Single().Floor);
     }
 
-    // Review N4 (documented limitation): a classic exact pin and a range on the same model are resolved
-    // independently in the catalog; when they pick different versions the compile fails with error 66, even if
-    // one version would satisfy both.
-    [Fact]
-    public async Task FlagOn_ClassicExactPinAndRangeOnSameModel_FailWithMultipleVersions()
+    private async Task PublishClassicBotAsync()
     {
         await PublishSystemsAsync(_on, "2.5.0");
         await PublishSystemsAsync(_off, "2.5.0");
@@ -224,19 +220,100 @@ public sealed class RangeRetentionCompileTests : IDisposable
         Assert.Equal(["System-2.5.0"], classic.Dependencies!.Select(d => d.FullName));
         await _on.Services.GetRequiredService<ICatalogService>().PublishAsync(
             Engine.ModelCatalogs.LocalFileSystemCatalog.Name, classic, new OriginFileResolver("bot"), true);
+        // The classic build lane (_off) needs Bot as well to compile classic dependents of it (Mid).
+        await _off.Services.GetRequiredService<ICatalogService>().PublishAsync(
+            Engine.ModelCatalogs.LocalFileSystemCatalog.Name, classic, new OriginFileResolver("bot"), true);
         await PublishSystemsAsync(_on, "2.6.0");
+    }
 
-        var source = _on.WriteSource("mixed", "Mixed-1.0.0", ["System-[2.5,3.0)", "Bot-[1.0,2.0)"],
+    private string MixedSource(string systemRange) =>
+        _on.WriteSource("mixed", "Mixed-1.0.0", [systemRange, "Bot-[1.0,2.0)"], new Dictionary<string, string>
+        {
+            ["types/m.yaml"] = "types:\n  - typeId: Mixed\n    derivedFromCkTypeId: ${Bot}/BotThing\n"
+        });
+
+    // AB#6671 (was review N4): a classic exact pin (Bot pins System-2.5.0) and a range on the same model resolve to
+    // ONE version that satisfies both, although the catalog holds a newer minor.
+    [Fact]
+    public async Task FlagOn_ClassicExactPinAndRangeOnSameModel_ResolveSystemOnce()
+    {
+        await PublishClassicBotAsync();
+
+        var compiled = await _on.CompileAsync(MixedSource("System-[2.5,3.0)"));
+
+        Assert.Equal(["Bot-1.0.0", "System-2.5.0"], compiled.Dependencies!.Select(d => d.FullName).Order());
+        var systemRange = compiled.DependencyRanges!.Single(r => r.Range.Name == "System");
+        Assert.Equal("System-[2.5,3.0)", systemRange.Range.FullName);
+        Assert.Equal("2.5.0", systemRange.Floor);
+        Assert.Equal("Bot@1/BotThing-1", compiled.Types!.Single().DerivedFromCkTypeId!.FullName);
+    }
+
+    // AB#6671: no version satisfies [2.6,3.0) and the exact pin 2.5.0 together - the message names both
+    // constraints, who requires them and the visible versions.
+    [Fact]
+    public async Task FlagOn_ConstraintsNoVersionSatisfies_FailsAndNamesConstraintsAndVersions()
+    {
+        await PublishClassicBotAsync();
+
+        var exception = await Assert.ThrowsAsync<ModelValidationException>(() =>
+            _on.CompileAsync(MixedSource("System-[2.6,3.0)")));
+
+        Assert.Contains("No version of construction kit model 'System' satisfies all dependency constraints",
+            exception.Message);
+        Assert.Contains("'System-[2.6,3.0)' (required by the model being resolved)", exception.Message);
+        Assert.Contains("'System-[2.5.0]' (required by 'Bot-1.0.0')", exception.Message);
+        Assert.Contains("2.5.0, 2.6.0", exception.Message);
+    }
+
+    // AB#6671: three levels - Top (range retaining) -> Mid (classic, pins Bot and System) -> Bot (classic, pins System).
+    [Fact]
+    public async Task FlagOn_ThreeLevelChainWithExactPins_ResolvesEveryModelOnce()
+    {
+        await PublishClassicBotAsync();
+        await _on.Services.GetRequiredService<ICatalogService>().PublishAsync(
+            Engine.ModelCatalogs.LocalFileSystemCatalog.Name,
+            await _off.CompileAsync(_off.WriteSource("mid", "Mid-1.0.0", ["System-[2.5,3.0)", "Bot-[1.0,2.0)"],
+                new Dictionary<string, string>
+                {
+                    ["types/m.yaml"] = "types:\n  - typeId: MidThing\n    derivedFromCkTypeId: ${Bot}/BotThing\n"
+                })), new OriginFileResolver("mid"), true);
+        var top = _on.WriteSource("top", "Top-1.0.0", ["System-[2.5,3.0)", "Mid-[1.0,2.0)"],
             new Dictionary<string, string>
             {
-                ["types/m.yaml"] = "types:\n  - typeId: Mixed\n    derivedFromCkTypeId: ${Bot}/BotThing\n"
+                ["types/t.yaml"] = "types:\n  - typeId: TopThing\n    derivedFromCkTypeId: ${Mid}/MidThing\n"
             });
-        var exception = await Assert.ThrowsAsync<ModelValidationException>(() => _on.CompileAsync(source));
 
-        Assert.Contains("Multiple versions of construction kit model 'System'", exception.Message);
-        Assert.Contains("System-2.5.0", exception.Message);
-        Assert.Contains("System-2.6.0", exception.Message);
-        Assert.Contains("rebuild the exact-pinned dependency with range retention", exception.Message);
+        var compiled = await _on.CompileAsync(top);
+
+        Assert.Equal(["Bot-1.0.0", "Mid-1.0.0", "System-2.5.0"], compiled.Dependencies!.Select(d => d.FullName).Order());
+    }
+
+    // AB#6671: two ranges on one model (Lib-[1.0,1.5) of the root, Lib-[1.2,2.0) of a dependency) resolve to the
+    // highest version inside both (1.4), not to 1.4 and 1.8 (error 66 before).
+    [Fact]
+    public async Task FlagOn_TwoRangesOnSameModel_ResolveToHighestVersionInBoth()
+    {
+        foreach (var version in new[] { "1.0.0", "1.4.0", "1.8.0" })
+        {
+            await _on.CompileAndPublishAsync(_on.WriteSource($"lib-{version}", $"Lib-{version}", [],
+                new Dictionary<string, string> { ["attributes/a.yaml"] = "attributes:\n  - id: Code\n    valueType: String\n" }));
+        }
+
+        await _on.CompileAndPublishAsync(_on.WriteSource("mid2", "Mid2-1.0.0", ["Lib-[1.2,2.0)"],
+            new Dictionary<string, string> { ["attributes/b.yaml"] = "attributes:\n  - id: Other\n    valueType: String\n" }));
+        var compiled = await _on.CompileAsync(_on.WriteSource("root2", "Root2-1.0.0", ["Lib-[1.0,1.5)", "Mid2-[1.0,2.0)"],
+            new Dictionary<string, string> { ["attributes/c.yaml"] = "attributes:\n  - id: Third\n    valueType: String\n" }));
+
+        Assert.Equal(["Lib-1.4.0", "Mid2-1.0.0"], compiled.Dependencies!.Select(d => d.FullName).Order());
+    }
+
+    // The solver takes the HIGHEST version that satisfies all constraints when several do.
+    [Fact]
+    public async Task FlagOn_SeveralVersionsSatisfyAllConstraints_HighestWins()
+    {
+        await PublishSystemsAsync(_on, "2.5.0", "2.6.0", "2.7.0");
+        var compiled = await _on.CompileAsync(DependentSource(_on, "System-[2.5,3.0)"));
+        Assert.Equal(["System-2.7.0"], compiled.Dependencies!.Select(d => d.FullName));
     }
 
     // Review L14: references into a TRANSITIVE dependency are floor-checked against the floor the intermediate

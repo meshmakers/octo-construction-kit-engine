@@ -206,33 +206,14 @@ internal class CatalogModelResolver : ModelResolver, ICatalogModelResolver
         return output;
     }
 
-    /// <summary>
-    ///     The floor of a declared range: its lower bound; for an exclusive lower bound (<c>(2.4,3.0)</c>) the
-    ///     next patch, so the floor itself is inside the range (review L13).
-    /// </summary>
-    internal static CkVersion FloorOf(CkVersionRange range)
-    {
-        var min = range.MinVersion ?? new CkVersion(0, 0, 0);
-        return range.MinInclusive || range.MinVersion == null
-            ? min
-            : new CkVersion(min.Major, min.Minor, min.Revision + 1);
-    }
+    internal static CkVersion FloorOf(CkVersionRange range) => CkDependencyRangeRule.FloorOf(range);
 
     /// <summary>
-    ///     True when every version the dependency admits (range ∩ ≥ floor) has the floor's major.
+    ///     True when every version the dependency admits (range ∩ ≥ floor) has the floor's major
+    ///     (<see cref="CkDependencyRangeRule" />, shared with the range audit of <c>octo-ckc -c AuditRanges</c>).
     /// </summary>
-    internal static bool IsWithinOneMajor(CkModelDependencyDto dependency)
-    {
-        var range = dependency.Range.ModelVersionRange;
-        var nextMajor = new CkVersion(dependency.FloorVersion.Major + 1, 0, 0);
-        if (range.MaxVersion == null)
-        {
-            return false;
-        }
-
-        var comparison = range.MaxVersion.Value.CompareTo(nextMajor);
-        return comparison < 0 || (comparison == 0 && !range.MaxInclusive);
-    }
+    internal static bool IsWithinOneMajor(CkModelDependencyDto dependency) =>
+        CkDependencyRangeRule.IsWithinOneMajor(dependency.Range.ModelVersionRange, dependency.FloorVersion);
 
     /// <summary>
     ///     Compile against the floor, verify against the highest (concept §4.3.1): the model was resolved

@@ -8,12 +8,18 @@ using Microsoft.CodeAnalysis.Diagnostics;
 namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.SourceGeneration;
 
 /// <summary>
-///     AB#6673 guard: OM1005 fails the build when run-time code uses a generated versioned CK element id
+///     AB#6673 guard: OM1005 reports (Info by default, error on request) when run-time code uses a generated versioned CK element id
 ///     (<c>FooCkIds.CkThingTypeId</c>) - the tenant may hold a newer model version than the service embeds. The
 ///     version-less <c>RtCk…</c> constants, the model id, and an immediate <c>.ToRtCkId()</c> are fine.
 /// </summary>
 public class CkVersionedIdAnalyzerTests
 {
+    private static class DiagnosticsDescriptorsForTest
+    {
+        public static bool IsEnabledByDefault =>
+            new CkVersionedIdAnalyzer().SupportedDiagnostics.Single().IsEnabledByDefault;
+    }
+
     private const string GeneratedIds = """
         using Meshmakers.Octo.ConstructionKit.Contracts;
         namespace Gen;
@@ -27,7 +33,7 @@ public class CkVersionedIdAnalyzerTests
         """;
 
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string consumer, string assemblyName = "MyService",
-        string? generatedConsumer = null)
+        string? generatedConsumer = null, ReportDiagnostic? severityOverride = null)
     {
         var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator)
@@ -40,7 +46,10 @@ public class CkVersionedIdAnalyzerTests
         }
 
         var compilation = CSharpCompilation.Create(assemblyName, trees, references,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+                .WithSpecificDiagnosticOptions(severityOverride is { } level
+                    ? ImmutableDictionary<string, ReportDiagnostic>.Empty.Add("OM1005", level)
+                    : ImmutableDictionary<string, ReportDiagnostic>.Empty));
         Assert.DoesNotContain(compilation.GetDiagnostics(), d => d.Severity == DiagnosticSeverity.Error);
         var withAnalyzers = compilation.WithAnalyzers([new CkVersionedIdAnalyzer()]);
         return (await withAnalyzers.GetAnalyzerDiagnosticsAsync()).Where(d => d.Id == "OM1005").ToImmutableArray();
@@ -61,9 +70,44 @@ public class CkVersionedIdAnalyzerTests
         var diagnostics = await AnalyzeAsync(Consumer("return FooCkIds.CkThingTypeId;"));
 
         var diagnostic = Assert.Single(diagnostics);
-        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Contains("FooCkIds.CkThingTypeId", diagnostic.GetMessage());
         Assert.Contains("FooCkIds.RtCkThingTypeId", diagnostic.GetMessage());
+    }
+
+    /// <summary>
+    ///     Rollout rule (AB#6673 review): shipping the analyzer must not break any consumer build, not even one with
+    ///     TreatWarningsAsErrors, so the package default is Info (a suggestion), never Warning or Error.
+    /// </summary>
+    [Fact]
+    public async Task DefaultSeverity_IsInfo_SoThatTheBuildOfAConsumerNeverBreaks()
+    {
+        var diagnostic = Assert.Single(await AnalyzeAsync(Consumer("return FooCkIds.CkThingTypeId;")));
+
+        Assert.Equal(DiagnosticSeverity.Info, diagnostic.Severity);
+        Assert.Equal(DiagnosticSeverity.Info, diagnostic.DefaultSeverity);
+        Assert.True(DiagnosticsDescriptorsForTest.IsEnabledByDefault);
+    }
+
+    /// <summary>
+    ///     The switch for a repository that has audited itself: <c>dotnet_diagnostic.OM1005.severity = error</c> or
+    ///     <c>&lt;WarningsAsErrors&gt;OM1005&lt;/WarningsAsErrors&gt;</c> both become a specific diagnostic option of the compilation.
+    /// </summary>
+    [Fact]
+    public async Task Severity_CanBeRaisedToError_PerProject()
+    {
+        var diagnostic = Assert.Single(await AnalyzeAsync(Consumer("return FooCkIds.CkThingTypeId;"),
+            severityOverride: ReportDiagnostic.Error));
+
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+    }
+
+    [Fact]
+    public async Task Severity_CanBeSwitchedOff_PerProject()
+    {
+        var diagnostics = await AnalyzeAsync(Consumer("return FooCkIds.CkThingTypeId;"),
+            severityOverride: ReportDiagnostic.Suppress);
+
+        Assert.Empty(diagnostics);
     }
 
     [Fact]

@@ -16,9 +16,11 @@ internal static class DiagnosticsDescriptors
             "'{0}.{1}' is a generated versioned CK id: the tenant may hold a newer model version than this service " +
             "embeds. Use '{0}.{2}' (version-less RtCkId), or convert with .ToRtCkId() right away.", // message
             "Construction Kit", // category
-            DiagnosticSeverity.Error,
+            DiagnosticSeverity.Info,
             true,
             "Generated 'CkIds.Ck<Element>Id' fields carry the model version the service was compiled against. " +
-            "Run-time lookups must use the version-less 'RtCk<Element>Id'. Opt out for one project with " +
+            "Run-time lookups must use the version-less 'RtCk<Element>Id'. Reported as a suggestion (Info) by " +
+            "default, so shipping the analyzer never breaks a build, not even with TreatWarningsAsErrors. Raise it with " +
+            "dotnet_diagnostic.OM1005.severity = error (or <WarningsAsErrors>OM1005</WarningsAsErrors>), opt out with " +
             "dotnet_diagnostic.OM1005.severity = none.");
 }

@@ -909,6 +909,11 @@ side lists the installed versions through the optional `IRepositoryVersionLister
 it reports the range without versions. **No special treatment for System and Meshmakers-shipped models.** Blueprint floor
 semantics are not changed (AB#6672). Rules page: `docs/ck-semver-rules.md`, "Dependency resolution by SemVer".
 
+**Range audit (AB#6683).** The one-major-per-range rule lives in `CkDependencyRangeRule` (`FloorOf`, `IsWithinOneMajor`), called by
+`CatalogModelResolver` and by `CkModelRangeAudit` / `octo-ckc -c AuditRanges -p <dir>` (read-only scan of `ckModel.yaml` files, non-zero
+exit when a range is rejected) and `scripts/audit-ck-ranges.sh <monorepo-root>` (all repositories with CK sources, list in
+`docs/ck-semver-rules.md`, "Range audit"). `RangeAuditTests.Rule_AgreesWithTheRangeRetainingCompile` pins audit = compiler.
+
 The CK SemVer diff does not classify `DependencyRanges` yet (documented exclusion, Phase 2 F2.1). The
 element schemas accept `@` in the model part of a reference; the compiled schema accepts
 `dependencyRanges`. Tests: `RangeRetentionCompileTests` (flag on/off, YAML round trip with schema

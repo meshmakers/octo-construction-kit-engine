@@ -536,6 +536,35 @@ Severity: Meshmakers-run catalog, defects are errors
 3 model(s): 1 resolved, 2 do not resolve - defects are ERRORS in this catalog (exit code non-zero)
 ```
 
+## Range audit (`AuditRanges`, AB#6683)
+
+A range-retaining compile stores references major-qualified (`System@2/Entity-1`), so every dependency range a model declares
+must stay inside the major of its floor (the one-major-per-range rule, review H6). `System-[2.5,3.0)` is fine; `Basic-[2.4,)`,
+a bare `System` (= `>=1.0.0`; `System-1.0.0` means the same), `System-[2.5,3.0]` and `System-[2.5,4.0)` are rejected, and with
+range retention as the compiler default (AB#6675) such a model no longer compiles. `octo-ckc -c AuditRanges` finds them
+before the flip, repeatably:
+
+```
+octo-ckc -c AuditRanges -p <directory-or-ckModel.yaml> [-p <more> ...]
+```
+
+| Aspect | Rule |
+| ------ | ---- |
+| Input | Every `ckModel.yaml` below the given directories (or the files themselves); `bin`, `obj`, `node_modules`, `.git` and `TestResults` are skipped. Read-only, no catalog, no compile. |
+| Rule | `CkDependencyRangeRule.IsWithinOneMajor` - the **same code** `CatalogModelResolver` calls, so the audit cannot disagree with the compiler. Test `RangeAuditTests.Rule_AgreesWithTheRangeRetainingCompile` compiles a model for every range shape with range retention on and compares. |
+| Output | One line per declaration: `OK` / `REJECTED`, the declaring model, the range, the file; then a summary. A file that cannot be read is a warning, not a stop. |
+| Exit code | Non-zero (`ModelValidationException` naming every rejected `model -> range`) when at least one range is rejected. |
+
+Across the repositories: `scripts/audit-ck-ranges.sh <monorepo-root> [path-to-octo-ckc.dll]` audits every repository directory
+of the monorepo that contains a `ckModel.yaml` (worktrees `wt*` skipped) and prints the rejected declarations per repository.
+Run it on `origin/main` of every repository (`git fetch` and check out / pull first: the audit reads the checked-out files, so a stale or sparse checkout is audited as it is - `energy-community` shows no `ckModel.yaml` in a checkout that predates its CK sources). The 22 repositories with CK
+sources (state 2026-10-14): `demo-energy-iq`, `demo-process-automation`, `energy-community`, `landing-pages`, `meshmakers-app`,
+`octo-adapter-loxone`, `octo-ai-services`, `octo-asset-repo-services`, `octo-bot-services`, `octo-common-services`,
+`octo-communication-controller-services`, `octo-communication-sdk`, `octo-construction-kit`, `octo-construction-kit-engine`,
+`octo-construction-kit-engine-mongodb`, `octo-identity-services`, `octo-mesh-adapter`, `octo-pipeline-templates`,
+`octo-platform-services`, `octo-report-services`, `smart-meter-insights`, `wwc26-landing-page`. After AB#6683 the run reports only the
+two test models of this repository (`tests/TestCkModel/...`, `System-[2.0,)`), which the AB#6675 flip PR fixes itself.
+
 ## Withdrawing a published version (`Unpublish`, AB#5433)
 
 Published versions are immutable, but a publish can turn out to be premature (2026-09-30: `System-2.3.0` broke the platform

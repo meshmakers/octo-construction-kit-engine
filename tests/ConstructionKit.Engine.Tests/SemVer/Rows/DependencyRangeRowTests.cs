@@ -134,6 +134,43 @@ public class DependencyRangeRowTests
     }
 
     [Fact]
+    public void D8_ClosureMoveNextToARangeOrFloorChange_IsNotTheNoBumpCase()
+    {
+        // Same closure move, but the declared range (or floor) changed in the same release: rows D1-D4 and the plain
+        // dependency rule decide as before (shared predicate CkClosureMove).
+        var rangeChanged = Classify(ResolvedAt("2.5.0"), ResolvedAt("2.6.0", "[2.4,2.9)"));
+        Assert.Contains(rangeChanged, c => c.Change.ElementKind == CkModelElementKind.Dependency &&
+                                           c.Level == CkSemVerLevel.Minor);
+        var floorChanged = Classify(ResolvedAt("2.5.0"), ResolvedAt("2.6.0", floor: "2.5.0"));
+        Assert.Contains(floorChanged, c => c.Change.ElementKind == CkModelElementKind.Dependency &&
+                                           c.Level == CkSemVerLevel.Minor);
+    }
+
+    [Fact]
+    public void D8_AddedOrRemovedClosureNames_KeepTheirLevels()
+    {
+        var added = ResolvedAt("2.5.0");
+        added.Dependencies!.Add(new CkModelId("Other-1.0.0"));
+        Assert.Equal(CkSemVerLevel.Minor, Classify(ResolvedAt("2.5.0"), added)
+            .Single(c => c.Change.ElementKind == CkModelElementKind.Dependency).Level);
+        Assert.Equal(CkSemVerLevel.Major, Classify(added, ResolvedAt("2.5.0"))
+            .Single(c => c.Change.ElementKind == CkModelElementKind.Dependency).Level);
+    }
+
+    [Fact]
+    public void D8_SharedPredicate_WholeModel_AgreesWithTheClassifier()
+    {
+        Assert.True(CkClosureMove.IsWithinDeclaredRange(ResolvedAt("2.5.0"), ResolvedAt("2.6.1")));
+        Assert.False(CkClosureMove.IsWithinDeclaredRange(ResolvedAt("2.5.0"), ResolvedAt("2.5.0"))); // nothing moved
+        Assert.False(CkClosureMove.IsWithinDeclaredRange(ResolvedAt("2.6.1"), ResolvedAt("2.5.0"))); // down
+        var v1 = SemVerTestModels.CreateModel();
+        v1.Dependencies = [new CkModelId("Base-2.5.0")];
+        var v1Moved = SemVerTestModels.CreateModel();
+        v1Moved.Dependencies = [new CkModelId("Base-2.6.0")];
+        Assert.False(CkClosureMove.IsWithinDeclaredRange(v1, v1Moved)); // exact-pinned: never
+    }
+
+    [Fact]
     public void D8_ExactPinnedModels_KeepTheMinorRule()
     {
         // Pinned so that nobody removes the exact-pin branch early: its removal belongs to the one-time re-pin

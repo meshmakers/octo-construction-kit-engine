@@ -54,7 +54,9 @@ public sealed class CkPublishEquivalence
         ("restated default ownership (ownership: SeedOwned/RuntimeState equals the isRuntimeState default)",
             NormalizeRestatedOwnership),
         ("element order", NormalizeOrder),
-        ("compiler-stamped metadata (minEngineVersion)", NormalizeCompilerStampedMetadata)
+        ("compiler-stamped metadata (minEngineVersion)", NormalizeCompilerStampedMetadata),
+        ("resolved dependency closure of a range-retaining model (moved inside the declared ranges)",
+            NormalizeResolvedClosure)
     ];
 
     /// <summary>
@@ -230,6 +232,29 @@ public sealed class CkPublishEquivalence
 
         list.Clear();
         list.AddRange(sorted);
+        return true;
+    }
+
+    // ---- resolved closure of a range-retaining model ------------------------------------------------------------------
+
+    /// <summary>
+    ///     AB#5435 (class 4): the <c>dependencies</c> closure of a range-retaining model is what the build resolved, not
+    ///     part of its surface; a rebuild after a dependency minor legitimately writes other versions into it. Normalised
+    ///     away only when <see cref="CkClosureMove.IsWithinDeclaredRange" /> holds (same names, every difference a move up
+    ///     inside the same major and the declared range, ranges and floors identical); any other closure difference stays
+    ///     content. The published file is not touched: only the compared copies are.
+    /// </summary>
+    private static bool NormalizeResolvedClosure(CkCompiledModelRoot a, CkCompiledModelRoot b)
+    {
+        // Direction does not matter for the equivalence: published may be the newer or the older closure (a rebuild
+        // against an older catalog). The predicate is asked in both directions.
+        if (!CkClosureMove.IsWithinDeclaredRange(a, b) && !CkClosureMove.IsWithinDeclaredRange(b, a))
+        {
+            return false;
+        }
+
+        a.Dependencies = null;
+        b.Dependencies = null;
         return true;
     }
 

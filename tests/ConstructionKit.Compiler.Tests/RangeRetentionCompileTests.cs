@@ -332,6 +332,28 @@ public sealed class RangeRetentionCompileTests : IDisposable
         Assert.Equal(depth, compiled.Dependencies!.Count);
     }
 
+    // AB#5435 (Thor's check): usedSurface / usedSurfaceHash are computed from the elements the model uses, not from the
+    // dependency's content or version, so a rebuild against a later System minor yields the identical surface.
+    [Fact]
+    public async Task FlagOn_UsedSurface_IsIndependentOfTheResolvedDependencyVersion()
+    {
+        await PublishSystemsAsync(_on, "2.5.0");
+        var source = DependentSource(_on, "System-[2.5,3.0)");
+        var before = await _on.CompileAsync(source);
+
+        await PublishSystemsAsync(_on, "2.6.0");
+        var after = await _on.CompileAsync(source);
+
+        Assert.Equal(["System-2.5.0"], before.Dependencies!.Select(d => d.FullName));
+        Assert.Equal(["System-2.6.0"], after.Dependencies!.Select(d => d.FullName)); // the closure moved ...
+        var surfaceBefore = before.DependencyRanges!.Single();
+        var surfaceAfter = after.DependencyRanges!.Single();
+        Assert.NotNull(surfaceBefore.UsedSurface);
+        Assert.Equal(surfaceBefore.UsedSurface, surfaceAfter.UsedSurface); // ... the surface did not
+        Assert.Equal(surfaceBefore.UsedSurfaceHash, surfaceAfter.UsedSurfaceHash);
+        Assert.Equal(surfaceBefore.Floor, surfaceAfter.Floor);
+    }
+
     // The solver takes the HIGHEST version that satisfies all constraints when several do.
     [Fact]
     public async Task FlagOn_SeveralVersionsSatisfyAllConstraints_HighestWins()

@@ -232,6 +232,25 @@ azure-pipelines.yml     # CI/CD pipeline definition (the legacy /devops-build fo
 /scripts                # createDocumentation.ps1 and other CI helper scripts
 ```
 
+## `ConstructionKit` dotnet-new template (AB#4418)
+
+`src/ConstructionKit.Templates` packs the public `Meshmakers.Octo.ConstructionKit.Templates` template
+(`dotnet new ConstructionKit`). The scaffold csproj
+(`Templates/ConstructionKit.CSharp/GeneratedConstructionKitProject.csproj`) references three sibling packages of
+this repository (`Runtime.Contracts`, `ConstructionKit.SourceGeneration`, `ConstructionKit.MsBuildTasks`) with the
+placeholder `__OCTO_TEMPLATE_PACKAGE_VERSION__` instead of a version. The target `OctoPackTemplateProjectVersion`
+of `ConstructionKit.Templates.csproj` replaces it at pack time with the pack version of the template package
+itself (`$(PackageVersion)`, falling back to `$(Version)`), writes the result to `obj/.../OctoTemplate/` and packs
+that copy instead of the source file. The sibling packages are built and published by the same pipeline run with
+the same version, so a scaffold restores from the feed the template came from. DebugL packs `999.0.0` (local
+`../nuget`). Never write a version into the scaffold csproj and never pin one in `Directory.Build.props` (versions
+come only from the pipeline, AB#6291). The pack fails with `OCTO-TPL001` (empty version) or `OCTO-TPL002`
+(placeholder missing); keep the scaffold paths forward-slashed (`$(MSBuildProjectDirectory)/ConstructionKit`), the
+copy goes through MSBuild item handling that normalises `\` on Linux/macOS. Tests:
+`tests/ConstructionKit.Engine.Tests/Templates/TemplatePackVersionTests.cs` really run `dotnet pack` into a temp
+folder and assert the scaffold csproj inside the nupkg (explicit version, prerelease and main-line `0.1.*` build
+numbers, DebugL = `999.0.0`).
+
 ## Blueprints and Migrations
 
 The project supports two types of migrations:

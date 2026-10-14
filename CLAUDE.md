@@ -883,15 +883,21 @@ one matching element" when a System minor was imported into a tenant holding exa
 range-retaining models (or silently merged the range into the wrong exact entry). Pinned by
 `RangeRetentionRepositoryResolverTests`. `Equals` itself is unchanged (other callers rely on it).
 
-**Known limitation — mixed pins in the catalog (review N4).** The catalog resolver resolves every queued range on
-its own (highest catalog version in range). When a range-retaining compile pulls in a classic exact pin
-(`System-[2.5.0]` via an exact-pinned dependency) and a range (`System-[2.5,3.0)`) and the catalog already holds
-a newer minor, the two resolve to different versions and the compile fails with error 66 (`Multiple versions of
-construction kit model 'System'`), even though 2.5.0 satisfies both. Chosen over a per-name solver as the smaller
-safe option: the error is deterministic and names the fix (rebuild the exact-pinned dependency with range
-retention — the planned one-time re-pin). The repository side is not affected: a tenant has exactly one installed
-version, so the exact pin fails on its own (`ResolveFailed`) and the range resolves. Pinned by
-`RangeRetentionCompileTests.FlagOn_ClassicExactPinAndRangeOnSameModel_FailWithMultipleVersions`.
+**One version per dependency model (AB#6671, replaces the former limitation N4).** A range-retaining resolve of the
+catalog (`CatalogDependencyResolver` with `RangeRetainingDependencyRanges` roots: compile with the flag on, hard
+resolve of a range-retaining compiled model) no longer resolves every queued range on its own. `CatalogConstraintSolver`
+collects every constraint of one model **name** over the whole closure — ranges and the exact pins of classic
+dependencies — and chooses the **highest catalog version that satisfies all of them** (iterated to a fixed point,
+because a chosen model contributes its own constraints; no backtracking over versions of dependents). Example:
+`System-[2.5,3.0)` next to a classic dependent pinned to `System-[2.5.0]` with System 2.5.0 and 2.6.0 in the catalog
+resolves System once, to 2.5.0 (before: error 66). When no version satisfies all constraints the compile fails with
+`ModelValidationException.UnsatisfiableDependencyConstraints`, which names every constraint, who requires it and the
+versions the catalogs show. In that mode the child ranges are entries of the walk matched structurally (the overlap
+merge of `DependencyRangeMatcher` is not used). Classic resolves (flag off, classic roots) keep the old walk and the
+overlap merge byte for byte (`V1DependencyMergeTests`). The repository side is unaffected: a tenant has exactly one
+installed version per model, so an exact pin fails on its own (`ResolveFailed`) and a range resolves. Pinned by
+`RangeRetentionCompileTests` (`…ResolveSystemOnce`, `…ConstraintsNoVersionSatisfies…`, `…ThreeLevelChain…`,
+`…HighestWins`).
 
 The CK SemVer diff does not classify `DependencyRanges` yet (documented exclusion, Phase 2 F2.1). The
 element schemas accept `@` in the model part of a reference; the compiled schema accepts

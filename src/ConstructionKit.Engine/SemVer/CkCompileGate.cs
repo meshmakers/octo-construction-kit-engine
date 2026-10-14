@@ -240,8 +240,15 @@ public class CkCompileGate
         var resolution = verdict.Resolution;
         var catalog = (resolution.CatalogName ?? "unknown catalog") +
                       (resolution.IsLocal ? ", local, not published" : "");
+        // AB#5435: a resolved dependency that moved inside its range is a change that needs no bump; say so.
+        var moves = verdict.ClassifiedChanges
+            .Where(c => c.Level == CkSemVerLevel.None && c.Change.ElementKind == CkModelElementKind.Dependency)
+            .Select(c => $"{c.Change.ElementId} {c.Change.OldValue} -> {c.Change.NewValue}")
+            .ToList();
         var required = verdict.RequiredLevel == CkSemVerLevel.None
-            ? "none (no structural changes)"
+            ? moves.Count == 0
+                ? "none (no structural changes)"
+                : $"none (no structural changes; resolved dependency moved inside its declared range, no bump needed: {string.Join(", ", moves)})"
             : CkModelChangeFormatter.GetLevelLabel(verdict.RequiredLevel);
         var outcome = verdict.Validation.IsValid ? "ok" : "version does not cover the changes";
         return $"Compatibility: model '{current.ModelId.Name}', declared {current.ModelId.Version}, " +

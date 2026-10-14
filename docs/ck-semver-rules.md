@@ -873,6 +873,7 @@ dependency changed → Minor" is F2.4 (AB#5686).
 | D5 | Range dependency added / removed | Minor / Major (as for exact pins) |
 | D6 | Model switches from exact pins to range retention, or back (`rangeRetention`) | Minor, reason points to the one-time re-pin (F2.6); **Major** when the switch back to exact pins pins a version other than the one the previous release resolved (N3, 2026-10-10) |
 | D7 | `usedSurface` / `usedSurfaceHash` changed | not classified on its own (derived from the model's own changes); listed in `CkModelDiffService.ExcludedProperties` with that reason (AB#4472) |
+| D8 | The resolved dependency (closure entry) of a **range-retaining** model moved **up inside the dependency's major** (AB#5435), e.g. `System` 2.5.0 → 2.6.0 after a rebuild | **None** — no bump needed; the verdict line says why. The model's references are major-qualified and bound at load, so the version the build resolved is not part of its surface; an additive base-model minor no longer forces a bump of every dependent (the cascade of AB#5432). Still Major: a version that goes down, a range or floor that excludes the previous resolution (D1–D4), a major switch, a removed dependency. **Exact-pinned (v1) models keep the Minor rule "compatible dependency version change"** (their compiled references are concrete) until the one-time re-pin (F2.6, AB#5688), which removes that branch |
 
 ### usedSurface (AB#4472)
 
@@ -984,7 +985,7 @@ command is fully read-only.
   definition of another model carries default values cannot be inspected — such additions are
   classified Major defensively.
 - **Dependency ranges of exact-pinned (v1) models are classified via their resolved versions** (range-retaining models
-  are compared on their declared ranges, rows D1–D7). The compiled baseline model
+  are compared on their declared ranges, rows D1–D8). The compiled baseline model
   persists only the *resolved* dependency versions, not the declared ranges (and the compiled
   model schema is closed, so persisting ranges is a catalog-format evolution). A range edit that
   changes the resolved version is classified (major switch → Major, otherwise → Minor); a range

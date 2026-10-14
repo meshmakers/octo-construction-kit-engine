@@ -92,6 +92,88 @@ public class DependencyRangeRowTests
     }
 
     [Fact]
+    public void D8_ResolvedDependencyMovedUpInsideTheRange_IsNone_ForRangeRetainingModels()
+    {
+        // AB#5435: Base 2.5.0 -> 2.6.0 (minor) and 2.6.0 -> 2.6.1 (patch) of the closure, range [2.4,3.0) unchanged.
+        var minor = Assert.Single(Classify(ResolvedAt("2.5.0"), ResolvedAt("2.6.0")));
+        Assert.Equal(CkModelElementKind.Dependency, minor.Change.ElementKind);
+        Assert.Equal(CkSemVerLevel.None, minor.Level);
+        Assert.Contains("no bump needed", minor.Reason);
+        Assert.Contains("[2.4,3.0)", minor.Reason);
+        Assert.Equal(CkSemVerLevel.None, Level(ResolvedAt("2.6.0"), ResolvedAt("2.6.1")));
+    }
+
+    [Fact]
+    public void D8_VerdictLine_SaysWhyNoBumpIsNeeded()
+    {
+        var baseline = ResolvedAt("2.5.0");
+        var current = ResolvedAt("2.6.0");
+        var classifier = new CkSemVerClassifier();
+        var classified = Classify(baseline, current);
+        var required = classifier.GetRequiredLevel(classified);
+        var verdict = new CkCompatibilityVerdict
+        {
+            Resolution = new CkBaselineResolution
+            {
+                ModelName = baseline.ModelId.Name, DeclaredVersion = current.ModelId.Version,
+                Baseline = baseline.ModelId, CatalogName = "PublicGitHubCatalog"
+            },
+            BaselineModel = baseline,
+            ClassifiedChanges = classified,
+            RequiredLevel = required,
+            Validation = classifier.ValidateDeclaredVersion(baseline.ModelId.Version, current.ModelId.Version, required),
+            CoveredLevel = CkSemVerLevel.None,
+            UncoveredChanges = []
+        };
+
+        var line = CkCompileGate.FormatVerdictLine(current, verdict);
+
+        Assert.Contains("required level none (no structural changes; resolved dependency moved inside its declared range, " +
+                        "no bump needed: Base 2.5.0 -> 2.6.0)", line);
+        Assert.EndsWith(": ok.", line);
+    }
+
+    [Fact]
+    public void D8_ExactPinnedModels_KeepTheMinorRule()
+    {
+        // Pinned so that nobody removes the exact-pin branch early: its removal belongs to the one-time re-pin
+        // (F2.6, AB#5688). Both sides exact-pinned, and a range-retaining baseline with an exact-pinned current model.
+        var v1Baseline = SemVerTestModels.CreateModel();
+        v1Baseline.Dependencies = [new CkModelId("Base-2.5.0")];
+        var v1Current = SemVerTestModels.CreateModel();
+        v1Current.Dependencies = [new CkModelId("Base-2.6.0")];
+        var change = Assert.Single(Classify(v1Baseline, v1Current));
+        Assert.Equal(CkSemVerLevel.Minor, change.Level);
+        Assert.Equal("compatible dependency version change", change.Reason);
+
+        // Only one side range-retaining: not the range-retaining case.
+        var mixed = Assert.Single(Classify(v1Baseline, ResolvedAt("2.6.0")),
+            c => c.Change.ElementKind == CkModelElementKind.Dependency);
+        Assert.Equal(CkSemVerLevel.Minor, mixed.Level);
+    }
+
+    [Fact]
+    public void D8_StillMajor_ForAMajorSwitchRemovalOrAVersionBelowTheRange()
+    {
+        // Major switch of the closure entry (range unchanged is impossible for [2.4,3.0), so use a wide-major model).
+        var wide = ResolvedAt("2.6.0", "[2.4,4.0)");
+        var switched = ResolvedAt("3.0.0", "[2.4,4.0)");
+        Assert.Equal(CkSemVerLevel.Major, Level(wide, switched));
+
+        // A resolved version below the previous one (D3) and a removed dependency stay Major.
+        Assert.Equal(CkSemVerLevel.Major, Level(ResolvedAt("2.6.0"), ResolvedAt("2.5.0")));
+        var removed = ResolvedAt("2.6.0");
+        removed.Dependencies = [];
+        Assert.Equal(CkSemVerLevel.Major, Classify(ResolvedAt("2.6.0"), removed)
+            .Where(c => c.Change.ElementKind == CkModelElementKind.Dependency).Max(c => c.Level));
+
+        // A move that leaves the declared range is not the in-range case: defensive Minor, as before.
+        var outside = Assert.Single(Classify(ResolvedAt("2.6.0"), ResolvedAt("2.9.0", "[2.4,2.8)")),
+            c => c.Change.ElementKind == CkModelElementKind.Dependency);
+        Assert.NotEqual(CkSemVerLevel.None, outside.Level);
+    }
+
+    [Fact]
     public void D1_FloorRaised_WithinThePreviousResolution_IsMinor_BeyondIt_IsMajor()
     {
         // N5 (platform-owner decision 2026-10-10): raising the floor up to the version the previous release resolved

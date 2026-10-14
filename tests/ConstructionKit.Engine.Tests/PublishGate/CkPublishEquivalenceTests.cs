@@ -169,6 +169,138 @@ public sealed class CkPublishEquivalenceTests : IDisposable
         Assert.Null(published.Attributes![0].Ownership);
     }
 
+    // ---- AB#5435: the resolved closure of a range-retaining model (class 4) ----------------------------------------
+
+    private static CkCompiledModelRoot RangeRetaining(string system = "2.5.0", string range = "[2.4,3.0)",
+        string floor = "2.4.0", params string[] extraClosure)
+    {
+        var model = Model();
+        model.Dependencies = [new CkModelId($"System-{system}"), .. extraClosure.Select(c => new CkModelId(c))];
+        model.DependencyRanges = [new CkModelDependencyDto { Range = new CkModelIdVersionRange($"System-{range}"), Floor = floor }];
+        return model;
+    }
+
+    private async Task SeedSystemsAsync()
+    {
+        foreach (var version in new[] { "2.4.0", "2.5.0", "2.6.1", "3.0.0" })
+        {
+            await _h.SeedAsync(GateModels.Create(version, name: "System"));
+        }
+    }
+
+    [Fact]
+    public async Task A_rebuild_after_a_dependency_minor_is_a_no_op_not_CK205_for_range_retaining_models()
+    {
+        await SeedSystemsAsync();
+        // The story case: published against System 2.5.0, System 2.6.1 published since, rebuilt unchanged.
+        await _h.SeedAsync(RangeRetaining("2.5.0"));
+        var rebuilt = RangeRetaining("2.6.1");
+
+        var result = await _h.EvaluateAsync(rebuilt);
+        await _h.PublishAsync(rebuilt, force: true);
+
+        Assert.Equal(CkPublishGateDecision.AlreadyPublished, result.Decision);
+        Assert.False(result.HasErrors);
+        var warning = Assert.Single(Warnings(result));
+        Assert.Contains("resolved dependency closure of a range-retaining model", warning);
+        Assert.Equal(0, _h.Stub.PublishCount); // the published file, and so the published closure, stays as it is
+    }
+
+    [Fact]
+    public async Task On_a_dev_lane_catalog_a_closure_only_difference_is_still_a_no_op_not_a_replace()
+    {
+        using var lane = new GateHarness(lane: true);
+        foreach (var version in new[] { "2.4.0", "2.5.0", "2.6.1" })
+        {
+            await lane.SeedAsync(GateModels.Create(version, name: "System"));
+        }
+
+        await lane.SeedAsync(RangeRetaining("2.5.0"));
+
+        var result = await lane.EvaluateAsync(RangeRetaining("2.6.1"));
+
+        Assert.Equal(CkPublishGateDecision.AlreadyPublished, result.Decision);
+        Assert.Contains("resolved dependency closure", Assert.Single(Warnings(result)));
+    }
+
+    [Fact]
+    public async Task A_rebuild_against_an_older_closure_is_equivalent_too()
+    {
+        await SeedSystemsAsync();
+        await _h.SeedAsync(RangeRetaining("2.6.1"));
+
+        var result = await _h.EvaluateAsync(RangeRetaining("2.5.0"));
+
+        Assert.Equal(CkPublishGateDecision.AlreadyPublished, result.Decision);
+    }
+
+    public static TheoryData<string> NotAMoveWithinTheRange() => new()
+    {
+        "major",         // System 3.0.0 is another major
+        "range",         // declared range changed
+        "floor",         // declared floor changed
+        "name-added",    // a closure name appeared
+        "name-removed",  // a closure name disappeared
+        "outside-range", // the move leaves the effective range ([2.4,2.6) vs 2.6.1)
+        "element"        // an unrelated element changed alongside the closure move
+    };
+
+    [Theory]
+    [MemberData(nameof(NotAMoveWithinTheRange))]
+    public async Task Everything_but_a_move_within_the_declared_range_stays_CK205(string kind)
+    {
+        await SeedSystemsAsync();
+        await _h.SeedAsync(GateModels.Create("1.0.0", name: "Other"));
+        var published = RangeRetaining("2.5.0", extraClosure: kind == "name-removed" ? ["Other-1.0.0"] : []);
+        await _h.SeedAsync(published);
+        var changed = kind switch
+        {
+            "major" => RangeRetaining("3.0.0"),
+            "range" => RangeRetaining("2.6.1", range: "[2.4,3.0]"),
+            "floor" => RangeRetaining("2.6.1", floor: "2.5.0"),
+            "name-added" => RangeRetaining("2.6.1", extraClosure: ["Other-1.0.0"]),
+            "name-removed" => RangeRetaining("2.6.1"),
+            "outside-range" => RangeRetaining("2.6.1", range: "[2.4,2.6)"),
+            _ => RangeRetaining("2.6.1")
+        };
+        if (kind == "element")
+        {
+            changed.Enums![0].Values!.Add(new CkEnumValueDto { Key = 2, Name = "C" });
+        }
+
+        var exception = await Assert.ThrowsAsync<CkPublishRefusedException>(() => _h.PublishAsync(changed));
+
+        Assert.Contains("OCTO-CK205", exception.AllText());
+    }
+
+    [Fact]
+    public async Task A_closure_move_together_with_a_range_change_is_not_equivalent()
+    {
+        // A plain down move is equivalent in the equivalence (nothing resolves from the closure; the verdict still calls it
+        // Major, D3, DependencyRangeRowTests); together with a changed range/floor it is content.
+        await SeedSystemsAsync();
+        await _h.SeedAsync(RangeRetaining("2.6.1", range: "[2.4,3.0)"));
+
+        var result = await _h.EvaluateAsync(RangeRetaining("2.5.0", range: "[2.5,3.0)", floor: "2.5.0"));
+
+        Assert.NotEqual(CkPublishGateDecision.AlreadyPublished, result.Decision);
+    }
+
+    [Fact]
+    public async Task Exact_pinned_models_never_take_the_closure_path()
+    {
+        await SeedSystemsAsync();
+        var published = Model();
+        published.Dependencies = [new CkModelId("System-2.5.0")];
+        await _h.SeedAsync(published);
+        var rebuilt = Model();
+        rebuilt.Dependencies = [new CkModelId("System-2.6.1")];
+
+        var exception = await Assert.ThrowsAsync<CkPublishRefusedException>(() => _h.PublishAsync(rebuilt));
+
+        Assert.Contains("OCTO-CK205", exception.AllText());
+    }
+
     private static CkCompiledModelRoot WithAssignment(AttributeOwnershipDto? ownership, AttributeOwnershipDto? definition = null)
     {
         var model = Model();

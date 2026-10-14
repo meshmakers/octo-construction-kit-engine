@@ -850,6 +850,26 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             }
         }
 
+        // AB#5435 (row D8, decision of Thor 2026-10-14): the resolved closure of a range-retaining model is compiler-set
+        // metadata. A move up inside the declared range (same major, same ranges and floors) is not a change of the
+        // model: level None. One shared predicate with the publish gate's same-version equivalence (CkClosureMove).
+        // Exact-pinned (v1) models keep the Minor rule below until the one-time re-pin (F2.6, AB#5688).
+        if (change is { ChangeKind: CkModelChangeKind.Modified, Property: "version" } &&
+            change.OldValue != null && change.NewValue != null)
+        {
+            var from = new CkVersion(change.OldValue);
+            var to = new CkVersion(change.NewValue);
+            if (CkClosureMove.IsMoveWithinDeclaredRange(baseline, current, change.ElementId, from, to))
+            {
+                var declared = current.DependencyRanges!.FirstOrDefault(d => d.Range.Name == change.ElementId);
+                return (CkSemVerLevel.None,
+                    $"resolved dependency {change.ElementId} moved {change.OldValue} -> {change.NewValue} inside " +
+                    (declared == null ? "its major" : $"its declared range {declared.Range.ModelVersionRange}") +
+                    " of a range-retaining model; the closure is compiler-set metadata and the model itself is unchanged, " +
+                    "no bump needed (row D8)");
+            }
+        }
+
         switch (change.ChangeKind)
         {
             case CkModelChangeKind.Added:

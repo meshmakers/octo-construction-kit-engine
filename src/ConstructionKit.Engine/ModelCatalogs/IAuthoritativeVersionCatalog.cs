@@ -47,8 +47,10 @@ public sealed record CatalogVersionsResult(
 public interface IAuthoritativeVersionCatalog
 {
     /// <summary>
-    ///     False when this process cannot ask the source of truth (a GitHub catalog without an API token reads through the
-    ///     mirror only). Readers then keep using the cache; publishers never see this, a publish needs the token anyway.
+    ///     False when this process does not ask the source of truth for READS: a GitHub catalog without an API token, or a
+    ///     process that has one but is not on CI (AB#6719: a token alone does not enable API reads, see
+    ///     <c>GitHubCatalogOptions.ApiReads</c>). Readers then keep using the cache; the publish-gate decision does not look
+    ///     at this, it always reads the repository.
     ///     AB#6588: dependency resolution, <c>ValidateVersion</c> and the cascade check read the source of truth when it is
     ///     available and the cache otherwise.
     /// </summary>

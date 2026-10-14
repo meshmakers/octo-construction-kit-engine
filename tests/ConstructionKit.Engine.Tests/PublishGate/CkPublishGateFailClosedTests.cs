@@ -33,6 +33,8 @@ public sealed class CkPublishGateFailClosedTests : IDisposable
     {
         await _h.PublishAsync(V2("1.0.0"), Catalog);
         await _h.PublishAsync(V2("1.1.0", "A,B,C"), Catalog);
+        // The decision under test is taken by a new process (AB#6719: a process reads each index of the repository once).
+        _h.Restart();
     }
 
     private static CkCompiledModelRoot Breaking() => V2("1.2.0", "A");

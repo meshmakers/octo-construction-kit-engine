@@ -59,6 +59,7 @@
                    PublishCkModel="$(OctoPublishCkModel)"
                    RangeRetention="$(OctoCkRangeRetention)"
                    CompatibilityBaseline="$(OctoCkCompatibilityBaseline)"
+                   CatalogApiReads="$(OctoCkCatalogApiReads)"
                    PublishCatalogName="$(OctoPublishCatalog)"
                    IsLocalCatalogEnabled="$(OctoLocalCatalogIsEnabled)"
                    LocalCatalogRootPath="$(OctoLocalCatalogRootPath)"
@@ -102,6 +103,7 @@
         <!--Calling our custom task-->
         <Message Condition="Exists(%(ConstructionKitConfigFile.Identity))" Importance="High" Text="Restoring construction kit model libraries %(ConstructionKitConfigFile.Identity)"/>
         <CkRestore ConstructionKitModelConfigFiles="@(ConstructionKitConfigFile)"
+                   CatalogApiReads="$(OctoCkCatalogApiReads)"
                    IsLocalCatalogEnabled="$(OctoLocalCatalogIsEnabled)"
                    LocalCatalogRootPath="$(OctoLocalCatalogRootPath)"
                    IsPublicGitHubCatalogEnabled="$(OctoPublicGitHubCatalogIsEnabled)"

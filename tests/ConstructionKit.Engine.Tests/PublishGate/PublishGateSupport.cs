@@ -115,7 +115,7 @@ internal sealed class StubCatalog : ICatalog, IReplaceablePublishCatalog
 ///     <see cref="GitHubCatalog" /> publishes and reads its index files, both catalog roots and its case-sensitive cache
 ///     exactly as against GitHub.
 /// </summary>
-internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClientWrapper, IGitHubClientFactory,
+internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IGitHubTreeReader, IHttpClientWrapper, IGitHubClientFactory,
     IHttpClientFactory
 {
     public Dictionary<string, string> Files { get; } = new(StringComparer.Ordinal);
@@ -130,6 +130,29 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClie
     public Func<string, Exception?>? ApiFault { get; set; }
 
     public const string RepositoryStatePath = "<repository>";
+
+    /// <summary>Every Contents API request this process-side client made (AB#6719), by kind; the mirror is not counted.</summary>
+    public Dictionary<string, int> ApiCalls { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>The number of API requests so far (reads, listings and writes).</summary>
+    public int ApiCallCount => ApiCalls.Values.Sum();
+
+    /// <summary>Forgets the counted requests (call after seeding).</summary>
+    public void ResetApiCalls()
+    {
+        ApiCalls.Clear();
+        ApiTrace.Clear();
+    }
+
+    /// <summary>Counts one API request of <paramref name="kind" />.</summary>
+    public void CountApiCall(string kind, string? path = null)
+    {
+        ApiCalls[kind] = ApiCalls.GetValueOrDefault(kind) + 1;
+        ApiTrace.Add(path == null ? kind : $"{kind} {path}");
+    }
+
+    /// <summary>The counted requests in order, with the path where there is one.</summary>
+    public List<string> ApiTrace { get; } = new();
 
     /// <summary>Makes a write or delete fail (AB#6582): called with the file path, a non-null result is thrown.</summary>
     public Func<string, Exception?>? WriteFault { get; set; }
@@ -188,6 +211,7 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClie
 
     public Task<(string, string)?> GetFileAsync(string filePath)
     {
+        CountApiCall("GetFile", filePath);
         var fault = ApiFault?.Invoke(filePath);
         if (fault != null)
         {
@@ -200,14 +224,28 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClie
             : null);
     }
 
+    /// <summary>Set to false for a client without <see cref="IGitHubTreeReader" /> semantics: GitHub truncated the tree.</summary>
+    public bool TreeTruncated { get; set; }
+
+    public Task<(IReadOnlyList<string> Paths, bool Truncated)> ListBranchFilePathsAsync()
+    {
+        CountApiCall("Tree");
+        var fault = ApiFault?.Invoke("<tree>");
+        return fault != null
+            ? Task.FromException<(IReadOnlyList<string>, bool)>(fault)
+            : Task.FromResult<(IReadOnlyList<string>, bool)>((Files.Keys.ToList(), TreeTruncated));
+    }
+
     public Task<GitHubRepositoryState> GetRepositoryStateAsync()
     {
+        CountApiCall("RepositoryState");
         var fault = ApiFault?.Invoke(RepositoryStatePath);
         return fault != null ? Task.FromException<GitHubRepositoryState>(fault) : Task.FromResult(State);
     }
 
     public async Task UpdateFileAsync(string filePath, string commitMessage, string content, string sha)
     {
+        CountApiCall("UpdateFile");
         await RunBeforeWriteAsync(filePath);
         if (FailWrite(filePath) is { } failedUpdate)
         {
@@ -224,6 +262,7 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClie
 
     public async Task CreateFileAsync(string filePath, string commitMessage, string content)
     {
+        CountApiCall("CreateFile");
         await RunBeforeWriteAsync(filePath);
         if (FailWrite(filePath) is { } failedCreate)
         {
@@ -238,6 +277,7 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClie
 
     public async Task UpsertFileWithMergeAsync(string filePath, string commitMessage, Func<string?, string?> merge)
     {
+        CountApiCall("UpsertFile");
         await RunBeforeWriteAsync(filePath);
         if (FailWrite(filePath) is { } failedUpsert)
         {
@@ -254,6 +294,7 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClie
 
     public async Task DeleteFileAsync(string filePath, string commitMessage, string sha)
     {
+        CountApiCall("DeleteFile");
         await RunBeforeWriteAsync(filePath);
         if (FailWrite(filePath) is { } failedDelete)
         {
@@ -263,10 +304,13 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IHttpClie
         Files.Remove(filePath);
     }
 
-    public Task<IReadOnlyList<(string path, string sha)>> ListFilesRecursiveAsync(string directoryPath) =>
-        Task.FromResult<IReadOnlyList<(string path, string sha)>>(Files
+    public Task<IReadOnlyList<(string path, string sha)>> ListFilesRecursiveAsync(string directoryPath)
+    {
+        CountApiCall("ListFiles");
+        return Task.FromResult<IReadOnlyList<(string path, string sha)>>(Files
             .Where(f => f.Key.StartsWith(directoryPath.TrimEnd('/') + "/", StringComparison.Ordinal))
             .Select(f => (f.Key, Sha(f.Value))).ToList());
+    }
 
     private PagesAnswer PagesAnswerFor(string? requestUri)
     {
@@ -323,19 +367,23 @@ internal sealed class RepositoryBackedCatalog : GitHubCatalog
     public const string Name = "RepositoryBackedCatalog";
 
     public RepositoryBackedCatalog(ICkJsonSerializer serializer, InMemoryGitHubRepository repository,
-        string cacheDirectory, bool isLane = false)
-        : base(serializer, repository, repository, Options(cacheDirectory, isLane), 15, Name, "In-memory GitHub catalog")
+        string cacheDirectory, bool isLane = false, CatalogApiReadMode apiReads = CatalogApiReadMode.Enabled,
+        string? token = "t")
+        : base(serializer, repository, repository, Options(cacheDirectory, isLane, apiReads, token), 15, Name,
+            "In-memory GitHub catalog")
     {
     }
 
-    private static PrivateGitHubCatalogOptions Options(string cacheDirectory, bool isLane) => new()
+    private static PrivateGitHubCatalogOptions Options(string cacheDirectory, bool isLane, CatalogApiReadMode apiReads,
+        string? token) => new()
     {
         CacheDirectory = cacheDirectory,
         GitHubPagesUri = "https://test.github.io/repo",
         GitHubRepositoryOwner = "meshmakers",
         GitHubRepositoryName = isLane ? LaneCatalogRepositoryName : "construction-kit-libraries-build",
         GitHubRepositoryBranch = "main",
-        GitHubApiToken = "t",
+        GitHubApiToken = token,
+        ApiReads = apiReads,
         RefreshNotFoundRetryCount = 0,
         RefreshNotFoundRetryDelaySeconds = 0
     };

@@ -16,6 +16,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.PublishGate;
 internal sealed class GateHarness : IDisposable
 {
     private readonly bool _lane;
+    private readonly CatalogApiReadMode _apiReads;
     private ServiceProvider _provider;
 
     /// <param name="lane">The dev lane catalog (published versions may be replaced).</param>
@@ -23,8 +24,10 @@ internal sealed class GateHarness : IDisposable
     ///     An existing in-memory repository: a second harness on it is a second process (own services, own cache) that
     ///     publishes to the same repository (AB#6584).
     /// </param>
-    public GateHarness(bool lane = false, InMemoryGitHubRepository? repository = null)
+    public GateHarness(bool lane = false, InMemoryGitHubRepository? repository = null,
+        CatalogApiReadMode apiReads = CatalogApiReadMode.Enabled)
     {
+        _apiReads = apiReads;
         Repository = repository ?? new InMemoryGitHubRepository();
         Root = Path.Combine(Path.GetTempPath(), $"PublishGate_{Guid.NewGuid():N}");
         LocalDir = Path.Combine(Root, "local");
@@ -51,7 +54,7 @@ internal sealed class GateHarness : IDisposable
         services.AddSingleton<ICatalog>(Stub);
         services.AddSingleton<ICatalog>(sp =>
             new RepositoryBackedCatalog(sp.GetRequiredService<ICkJsonSerializer>(), Repository,
-                Path.Combine(Root, "cache"), _lane));
+                Path.Combine(Root, "cache"), _lane, _apiReads));
         return services.BuildServiceProvider();
     }
 

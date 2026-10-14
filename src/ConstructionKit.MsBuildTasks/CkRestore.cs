@@ -2,6 +2,7 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 using Microsoft.Build.Framework;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -50,6 +51,12 @@ public class CkRestore : Microsoft.Build.Utilities.Task
     /// When true, the public GitHub catalog is consulted during dependency resolution.
     /// </summary>
     public bool IsPublicGitHubCatalogEnabled { get; set; } = true;
+
+    /// <summary>
+    /// AB#6719 (MSBuild property <c>OctoCkCatalogApiReads</c>): <c>Auto</c> (default; API reads on a CI build only),
+    /// <c>Enabled</c> or <c>Disabled</c>. A token alone does not make a local build read through the GitHub API.
+    /// </summary>
+    public string? CatalogApiReads { get; set; }
 
     /// <summary>
     /// When true, the private GitHub catalog is consulted during dependency resolution.
@@ -124,11 +131,13 @@ public class CkRestore : Microsoft.Build.Utilities.Task
         services.Configure<PublicGitHubCatalogOptions>(options =>
         {
             options.IsEnabled = IsPublicGitHubCatalogEnabled;
+            ApplyApiReads(options);
         });
 
         services.Configure<PrivateGitHubCatalogOptions>(options =>
         {
             options.IsEnabled = IsPrivateGitHubCatalogEnabled;
+            ApplyApiReads(options);
             PrivateGitHubCatalogCoordinates.Apply(options, PrivateGitHubCatalogOwner,
                 PrivateGitHubCatalogRepositoryName, PrivateGitHubCatalogBranch, PrivateGitHubCatalogPagesUri);
         });
@@ -226,6 +235,13 @@ public class CkRestore : Microsoft.Build.Utilities.Task
                 "that OctoPrivateGitHubApiKey / OctoPublicGitHubApiKey are not rate-limited.");
             return false;
         }
+        catch (Exception ex) when (FindRateLimit(ex) is { } rateLimit)
+        {
+            Log.LogError("{0} Local builds need no GitHub token (OctoCkCompatibilityBaseline=Local, " +
+                         "OctoCkCatalogApiReads=Disabled); on CI wait for the reset or use another token.",
+                rateLimit.Message);
+            return false;
+        }
         catch (Exception ex)
         {
             // This logging helper method is designed to capture and display information
@@ -235,6 +251,43 @@ public class CkRestore : Microsoft.Build.Utilities.Task
         }
 
         return !Log.HasLoggedErrors;
+    }
+
+    /// <summary>
+    ///     AB#6719: the GitHub API limit is exhausted: the build stops at once with the reset time instead of waiting for the
+    ///     task timeout.
+    /// </summary>
+    private void ApplyApiReads(GitHubCatalogOptions options)
+    {
+        if (GitHubCatalogOptions.ParseApiReads(CatalogApiReads) is { } mode)
+        {
+            options.ApiReads = mode;
+        }
+    }
+
+    private static GitHubRateLimitExhaustedException? FindRateLimit(Exception ex)
+    {
+        for (var e = ex; e != null; e = e.InnerException)
+        {
+            if (e is GitHubRateLimitExhaustedException rl)
+            {
+                return rl;
+            }
+
+            if (e is AggregateException agg)
+            {
+                foreach (var inner in agg.InnerExceptions)
+                {
+                    var found = FindRateLimit(inner);
+                    if (found != null)
+                    {
+                        return found;
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     private void LogOperationResults(OperationResult operationResult)

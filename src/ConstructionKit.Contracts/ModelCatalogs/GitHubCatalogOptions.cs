@@ -89,4 +89,49 @@ public abstract class GitHubCatalogOptions(string cacheFileName) : CatalogOption
     /// Delay in seconds between the retries of <see cref="RefreshNotFoundRetryCount"/>.
     /// </summary>
     public int RefreshNotFoundRetryDelaySeconds { get; set; } = 10;
+
+    /// <summary>
+    /// AB#6719: whether a process that holds an API token may use the GitHub Contents API for READS (the source-of-truth
+    /// read of dependency resolution, <c>ValidateVersion</c>, the cascade check and the API fallback of a model read).
+    /// <see cref="CatalogApiReadMode.Auto" /> (default): on a CI build only. A token that merely happens to be configured on a
+    /// developer machine does not switch local builds to API reads; they use the Pages mirror and the cached catalogs and
+    /// need no token. A publish needs the token and always reads authoritatively, whatever this says.
+    /// </summary>
+    public CatalogApiReadMode ApiReads { get; set; } =
+        ParseApiReads(Environment.GetEnvironmentVariable("OctoCkCatalogApiReads")) ?? CatalogApiReadMode.Auto;
+
+    /// <summary>Parses <c>Auto</c> / <c>Enabled</c> / <c>Disabled</c> (case-insensitive); null for an empty or unknown value.</summary>
+    public static CatalogApiReadMode? ParseApiReads(string? value) =>
+        value != null && value.Trim().Length > 0 && Enum.TryParse<CatalogApiReadMode>(value.Trim(), true, out var mode)
+            ? mode
+            : null;
+
+    /// <summary>The effective value of <see cref="ApiReads" />: true when reads may use the API (a token is still required).</summary>
+    public bool ApiReadsEnabled => ApiReads switch
+    {
+        CatalogApiReadMode.Enabled => true,
+        CatalogApiReadMode.Disabled => false,
+        _ => IsContinuousIntegrationEnvironment()
+    };
+
+    /// <summary>True on an Azure Pipelines build (<c>TF_BUILD</c>), a build that sets <c>ContinuousIntegrationBuild</c> or <c>CI</c>.</summary>
+    public static bool IsContinuousIntegrationEnvironment() =>
+        IsTrue(Environment.GetEnvironmentVariable("TF_BUILD")) ||
+        IsTrue(Environment.GetEnvironmentVariable("ContinuousIntegrationBuild")) ||
+        IsTrue(Environment.GetEnvironmentVariable("CI"));
+
+    private static bool IsTrue(string? value) => string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+}
+
+/// <summary>When a GitHub catalog may read through the Contents API instead of the Pages mirror (AB#6719).</summary>
+public enum CatalogApiReadMode
+{
+    /// <summary>On a CI build (TF_BUILD / ContinuousIntegrationBuild / CI), not on a developer machine.</summary>
+    Auto,
+
+    /// <summary>Always, when a token is present.</summary>
+    Enabled,
+
+    /// <summary>Never; reads use the mirror and the cache only.</summary>
+    Disabled
 }

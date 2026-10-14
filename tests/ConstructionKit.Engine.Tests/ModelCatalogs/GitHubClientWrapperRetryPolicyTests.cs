@@ -70,4 +70,42 @@ public class GitHubClientWrapperRetryPolicyTests
         Assert.True(third > second);
         Assert.Equal(TimeSpan.FromSeconds(30), late);
     }
+
+    private static RateLimitExceededException PrimaryRateLimit(TimeSpan untilReset) =>
+        new(new FakeResponse(DateTimeOffset.UtcNow.Add(untilReset).ToUnixTimeSeconds()));
+
+    private sealed class FakeResponse(long resetEpochSeconds) : IResponse
+    {
+        public object Body => "{\"message\":\"API rate limit exceeded\"}";
+        public IReadOnlyDictionary<string, string> Headers { get; } = new Dictionary<string, string>();
+        public ApiInfo ApiInfo { get; } = new(new Dictionary<string, Uri>(), new List<string>(), new List<string>(), "",
+            new RateLimit(5000, 0, resetEpochSeconds));
+        public HttpStatusCode StatusCode => HttpStatusCode.Forbidden;
+        public string ContentType => "application/json";
+    }
+
+    // AB#6719: a limit that resets within a minute or two is waited for (the build proceeds), one that resets later is
+    // reported at once with the reset time instead of sitting in the retry loop until a 5-minute task timeout.
+    [Fact]
+    public void A_primary_limit_that_resets_soon_is_transient()
+    {
+        Assert.True(GitHubClientWrapper.IsTransient(PrimaryRateLimit(TimeSpan.FromSeconds(30))));
+    }
+
+    [Fact]
+    public void A_primary_limit_that_resets_in_more_than_two_minutes_is_not_transient()
+    {
+        Assert.False(GitHubClientWrapper.IsTransient(PrimaryRateLimit(TimeSpan.FromMinutes(40))));
+    }
+
+    [Fact]
+    public void The_exhausted_limit_is_named_with_its_reset_time_and_carries_no_secret()
+    {
+        var ex = PrimaryRateLimit(TimeSpan.FromMinutes(40));
+
+        var named = new GitHubRateLimitExhaustedException(ex.Reset, ex);
+
+        Assert.Matches(@"^GitHub rate limit exhausted, resets at \d\d:\d\dZ\.$", named.Message);
+        Assert.Equal(ex.Reset, named.ResetAt);
+    }
 }

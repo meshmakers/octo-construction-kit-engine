@@ -237,8 +237,8 @@ reasons of one publish are reported together, see "One refusal" below (AB#6389).
 
 ### Readers use the repository too (AB#6588)
 
-The gate was not the only reader of the lagging mirror. With a token configured (`IAuthoritativeVersionCatalog.IsAuthoritativeReadAvailable`;
-anonymous readers keep the mirror) these reads now ask the repository as well, and fail with `OCTO-CK202` when it cannot be read:
+The gate was not the only reader of the lagging mirror. With a token configured **and API reads enabled** (`IAuthoritativeVersionCatalog.IsAuthoritativeReadAvailable`;
+CI by default, see "The API budget of the catalog reads" below; anonymous readers and local builds keep the mirror) these reads now ask the repository as well, and fail with `OCTO-CK202` when it cannot be read:
 
 | Reader | Reads the repository | Why |
 | ------ | -------------------- | --- |
@@ -246,6 +246,36 @@ anonymous readers keep the mirror) these reads now ask the repository as well, a
 | `ValidateVersion -rf` baseline (`CkBaselineResolver.ResolveAsync`) | always | A baseline from the mirror is the previous-but-one version ("first publication", stale acknowledgement). |
 | Cascade check (`ValidateCascade`, `CkCascadeService`) | always (listing of the catalog) | A dependent published seconds ago must be checked. |
 
+
+### The API budget of the catalog reads (AB#6719)
+
+AB#6580/6581/6588 moved the reads of a CI run from the free Pages mirror to the GitHub Contents API (5000 requests/hour per user,
+shared by every pipeline). A libs cascade plus a 12-model CK publish exhausted it. The rules now:
+
+| Read | Source | Cost |
+| ---- | ------ | ---- |
+| Publish-gate decision (`ResolvePublishBaselineAsync`, the check after the write) | **always the repository** (indexes, authoritative), any read mode | the indexes of the one model, once per process (memo), compare-and-swap state kept |
+| Dependency resolution, `ValidateVersion` baseline (Remote), cascade | the repository **only when API reads are enabled** (CI by default), else the mirror and the cache | index files memoised per path for the life of the process, dropped when this process publishes or loses a race (AB#6584) |
+| The whole catalog (`ReadVersionsAsync(null)`, the cascade check) | one request: the recursive file tree of the branch; the version is the file name | 1 request instead of two root indexes plus two per model, once per model of the repository. A truncated tree walks the indexes. |
+| `OctoCkCompatibilityBaseline=Local` | never the repository | 0 requests (the baseline is the local catalog plus the cached mirror) |
+
+**A token alone does not enable API reads.** `GitHubCatalogOptions.ApiReads` (MSBuild property / environment variable
+`OctoCkCatalogApiReads`: `Auto` default, `Enabled`, `Disabled`): `Auto` means API reads on a CI build (`TF_BUILD`,
+`ContinuousIntegrationBuild`, `CI`) only. A developer machine with a token configured compiles and runs `ValidateVersion` against the local catalog and the
+cached mirror and needs no token; without a token no request goes to api.github.com in any mode. A publish needs the token and decides authoritatively
+whatever the mode says.
+
+**Why the stale-mirror verdict of AB#6588 cannot come back.** The decision read of a publish and the cascade/dependency reads on CI are
+still taken from the repository (the tree and the indexes at the time of the call); the memo only spares a process asking twice, and it is dropped
+when this process writes or the compare-and-swap loses a race. Regression tests: `CkDependencyMirrorLagTests`, `CkPublishGateMirrorLagTests`,
+`CatalogApiBudgetTests.A_publish_that_lost_the_race_reads_the_repository_again_not_its_memo`.
+
+**A limit that resets later than a build waits is named.** An exhausted primary limit with a reset more than 2 minutes away throws
+`GitHubRateLimitExhaustedException` at once ("GitHub rate limit exhausted, resets at HH:MMZ.", no token or user in the text): `CkCompile`/`CkRestore`
+log it as the build error, the gate reports it as the reason of `OCTO-CK202`. A reset within 2 minutes is still waited for.
+
+Measured (`CatalogApiBudgetTests`, 12 candidates in a catalog of 72 models: `ValidateVersion` of 12 models in one process, the cascade read of 12 models
+in one process each, the publish of 12 models in one process each): before 2882 requests (62 + 2484 + 336), after 340 (40 + 24 + 276).
 
 ### Fail closed (AB#6580, AB#6581)
 

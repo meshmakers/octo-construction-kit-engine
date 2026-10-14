@@ -31,12 +31,13 @@ public class EmbeddedCkModelResourceTests
 
     /// <summary>
     /// AB#6479: System.Files moved from the asset repository into this repository without a model change.
-    /// Consumers (asset repository, report services) resolve the model through the generated ids; the id must
-    /// stay System.Files-1.0.0 so no tenant needs a migration.
+    /// AB#6691: 1.1.0 is the one-time MINOR bump forced by range retention becoming the compiler default (SemVer
+    /// row D6, OCTO-CK100): same content, dependency pinned as a range. A further bump is a deliberate change of
+    /// this model and must update this assertion.
     /// </summary>
     [Fact]
-    public void SystemFilesCkModel_KeepsModelId_1_0_0()
+    public void SystemFilesCkModel_HasModelId_1_1_0()
     {
-        Assert.Equal("System.Files-1.0.0", SystemFilesCkIds.CkModelId.ToString());
+        Assert.Equal("System.Files-1.1.0", SystemFilesCkIds.CkModelId.ToString());
     }
 }

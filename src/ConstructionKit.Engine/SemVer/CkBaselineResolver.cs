@@ -37,7 +37,7 @@ public class CkBaselineResolver : ICkBaselineResolver
         ResolveCoreAsync(modelName, declaredVersion,
             catalogName != null
                 ? [catalogName]
-                : _catalogService.GetCatalogList().Select(c => c.Item1).ToList());
+                : _catalogService.GetCatalogList().Select(c => c.Item1).ToList(), allowAuthoritative: true);
 
     /// <inheritdoc />
     public async Task<CkBaselineResolution> ResolveAsync(string modelName, CkVersion declaredVersion,
@@ -45,7 +45,10 @@ public class CkBaselineResolver : ICkBaselineResolver
     {
         var catalogs = _catalogService.GetCatalogList().Select(c => c.Item1)
             .Where(c => source == CkBaselineSource.Local || !IsLocalCatalog(c)).ToList();
-        var resolution = await ResolveCoreAsync(modelName, declaredVersion, catalogs).ConfigureAwait(false);
+        // AB#6719: the Local baseline is "local file-system catalog plus cached remote catalogs": it never asks GitHub,
+        // whether or not this process happens to hold a token.
+        var resolution = await ResolveCoreAsync(modelName, declaredVersion, catalogs,
+            allowAuthoritative: source == CkBaselineSource.Remote).ConfigureAwait(false);
 
         // Remote with no readable catalog beyond the embedded one (e.g. both GitHub catalogs disabled by a missing
         // token) cannot tell "first publication" from "nothing could be asked": treat it as unreachable (OCTO-CK202).
@@ -139,7 +142,7 @@ public class CkBaselineResolver : ICkBaselineResolver
     }
 
     private async Task<CkBaselineResolution> ResolveCoreAsync(string modelName, CkVersion declaredVersion,
-        List<string> catalogs)
+        List<string> catalogs, bool allowAuthoritative)
     {
         var majorStart = new CkVersion(declaredVersion.Major, 0, 0);
         var nextMajorStart = new CkVersion(declaredVersion.Major + 1, 0, 0);
@@ -158,14 +161,15 @@ public class CkBaselineResolver : ICkBaselineResolver
             var upper = isLocal ? declaredVersion : nextMajorStart;
             if (upper.CompareTo(majorStart) > 0)
             {
-                var result = await QueryAsync(catalog, names, majorStart, upper);
+                var result = await QueryAsync(catalog, names, majorStart, upper, allowAuthoritative);
                 sourceUnreachable |= result.SourceUnreachable;
                 AddCandidate(candidates, result, catalog, isLocal, order);
             }
 
             if (isLocal)
             {
-                ignored.AddRange(await ListLocalEntriesAsync(catalog, names, declaredVersion, nextMajorStart));
+                ignored.AddRange(await ListLocalEntriesAsync(catalog, names, declaredVersion, nextMajorStart,
+                    allowAuthoritative));
             }
         }
 
@@ -177,7 +181,8 @@ public class CkBaselineResolver : ICkBaselineResolver
             for (var order = 0; order < catalogs.Count; order++)
             {
                 var catalog = catalogs[order];
-                var result = await QueryAsync(catalog, spellings[catalog], new CkVersion(0, 0, 0), majorStart);
+                var result = await QueryAsync(catalog, spellings[catalog], new CkVersion(0, 0, 0), majorStart,
+                    allowAuthoritative);
                 sourceUnreachable |= result.SourceUnreachable;
                 AddCandidate(candidates, result, catalog, IsLocalCatalog(catalog), order);
             }
@@ -217,7 +222,7 @@ public class CkBaselineResolver : ICkBaselineResolver
     ///     and keeps the highest hit; the unreachable flag is the OR over all answers.
     /// </summary>
     private async Task<ModelExistingResult> QueryAsync(string catalog, IReadOnlyList<string> spellings,
-        CkVersion fromInclusive, CkVersion toExclusive)
+        CkVersion fromInclusive, CkVersion toExclusive, bool allowAuthoritative = true)
     {
         ModelExistingResult? best = null;
         var unreachable = false;
@@ -225,7 +230,8 @@ public class CkBaselineResolver : ICkBaselineResolver
         // AB#6588: ValidateVersion -rf and the cascade check judge against what the repository holds, like the publish
         // gate. The cache of a GitHub catalog is filled from a Pages mirror that lags a publish by up to many minutes.
         // An unreadable source is "unreachable" (OCTO-CK202), never "first publication". Anonymous readers keep the cache.
-        if (_catalogs.FirstOrDefault(c => string.Equals(c.CatalogName, catalog, StringComparison.OrdinalIgnoreCase))
+        if (allowAuthoritative &&
+            _catalogs.FirstOrDefault(c => string.Equals(c.CatalogName, catalog, StringComparison.OrdinalIgnoreCase))
             is IAuthoritativeVersionCatalog { IsAuthoritativeReadAvailable: true } authoritative)
         {
             foreach (var name in spellings)
@@ -298,13 +304,13 @@ public class CkBaselineResolver : ICkBaselineResolver
     ///     local catalog answers range lookups from the files on disk).
     /// </summary>
     private async Task<List<CkModelId>> ListLocalEntriesAsync(string catalog, IReadOnlyList<string> spellings,
-        CkVersion from, CkVersion to)
+        CkVersion from, CkVersion to, bool allowAuthoritative)
     {
         var entries = new List<CkModelId>();
         var upper = to;
         while (upper.CompareTo(from) > 0 && entries.Count < MaxIgnoredLocalEntries)
         {
-            var result = await QueryAsync(catalog, spellings, from, upper);
+            var result = await QueryAsync(catalog, spellings, from, upper, allowAuthoritative);
             if (!result.Exists || result.ModelId == null || result.ModelId.Version.CompareTo(upper) >= 0)
             {
                 break;

@@ -118,17 +118,31 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
     private const int MaxCachedModelPayloads = 512;
     private readonly ConcurrentDictionary<CkModelId, byte[]> _modelPayloadCache = new();
 
+    // AB#6719: index files read from the repository by ReadVersionsAsync (path -> content and SHA; null = does not exist),
+    // memoised for the life of this process so that ValidateVersion of 12 models reads each root and library index once.
+    // Dropped as a whole whenever this process writes to the catalog or learns that it changed under a publish (the verdict
+    // and the write of a publish are still one unit, AB#6584: the written indexes are compared with what was read).
+    private readonly ConcurrentDictionary<string, Lazy<Task<(string, string)?>>> _indexMemo = new();
+    private GitHubRepositoryState? _repositoryStateMemo;
+
+    private void ForgetReadMemo() => _indexMemo.Clear(); // the repository state (Ready) does not change by publishing
+
     // Static gh-pages reads cost nothing against the per-user 5000/h GitHub REST quota
     // that Octokit pulls from. Prefer the pages URL for every read; the Octokit client is
     // only fallback for setups that explicitly disabled gh-pages, plus the publish path.
     private bool IsPagesUriConfigured => !string.IsNullOrWhiteSpace(_gitHubOptions.GitHubPagesUri);
 
     /// <inheritdoc />
-    public bool IsAuthoritativeReadAvailable => HasApiToken;
+    public bool IsAuthoritativeReadAvailable => CanReadViaApi;
 
     // A publisher (token present) can ask the repository itself whenever the Pages mirror lags or fails (AB#6580,
     // AB#6581); an anonymous reader only has the mirror.
     private bool HasApiToken => !string.IsNullOrWhiteSpace(_gitHubOptions.GitHubApiToken);
+
+    // AB#6719: a token alone does not switch READS to the Contents API. Local builds (a token may be configured on a
+    // developer machine) use the mirror and the caches and need no token; reads go to the API on a CI build (or when
+    // GitHubCatalogOptions.ApiReads says Enabled). Writes and the publish-gate decision need the token and never ask this.
+    private bool CanReadViaApi => HasApiToken && _gitHubOptions.ApiReadsEnabled;
 
     /// <summary>
     /// Creates a new instance of the <see cref="Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs.GitHubCatalog"/> class.
@@ -228,7 +242,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
         // whenever the mirror does not deliver the file; only an anonymous reader takes the mirror's 404 at face value.
         // The lane catalog (AllowsReplacingPublishedVersions) replaces published versions, so there the mirror may
         // serve an outdated file with a 200: its reads go to the repository first.
-        var canAskRepository = HasApiToken;
+        var canAskRepository = CanReadViaApi;
         if (IsPagesUriConfigured && !(canAskRepository && AllowsReplacingPublishedVersions))
         {
             var httpClient = CreateHttpClient();
@@ -317,6 +331,21 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
     private async Task PublishCoreAsync(CkCompiledModelRoot ckCompiledModel, bool force,
         CatalogStateToken? expectedState, CancellationToken? cancellationToken)
     {
+        try
+        {
+            await PublishCoreCoreAsync(ckCompiledModel, force, expectedState, cancellationToken).ConfigureAwait(false);
+        }
+        catch (CatalogChangedDuringPublishException)
+        {
+            // Another publisher won the race: what this process read is outdated, the re-read must go to the repository.
+            ForgetReadMemo();
+            throw;
+        }
+    }
+
+    private async Task PublishCoreCoreAsync(CkCompiledModelRoot ckCompiledModel, bool force,
+        CatalogStateToken? expectedState, CancellationToken? cancellationToken)
+    {
         var gitHubClient = CreateGitHubClient();
 
         // AB#5433: an unpublished version number is burned, also for a forced publish.
@@ -338,6 +367,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
         try
         {
             _modelPayloadCache.TryRemove(ckCompiledModel.ModelId, out _);
+        ForgetReadMemo();
             var content = await ReadContentAsync(ckCompiledModel).ConfigureAwait(false);
 
             // Review G3 E-M5: a version lives under one root only, as in the local catalog — the same version in v2
@@ -367,6 +397,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
                 var current = await gitHubClient.GetFileAsync(versionsIndexPath).ConfigureAwait(false);
                 if (!expectedState.Matches(versionsIndexPath, current?.Item1))
                 {
+                    ForgetReadMemo();
                     throw new CatalogChangedDuringPublishException(CatalogName, ckCompiledModel.ModelId,
                         versionsIndexPath);
                 }
@@ -446,6 +477,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
 
         // Drop again: a read racing the upload may have cached the pre-publish file.
         _modelPayloadCache.TryRemove(ckCompiledModel.ModelId, out _);
+        ForgetReadMemo();
 
         try
         {
@@ -497,6 +529,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             }
 
             _modelPayloadCache.TryRemove(modelId, out _);
+            ForgetReadMemo();
             foreach (var root in holdingRoots)
             {
                 cancellationToken?.ThrowIfCancellationRequested();
@@ -559,6 +592,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
         }
 
         _modelPayloadCache.TryRemove(modelId, out _);
+            ForgetReadMemo();
 
         try
         {
@@ -625,7 +659,8 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
         {
             var gitHubClient = CreateGitHubClient();
             var repository = $"{_gitHubOptions.GitHubRepositoryOwner}/{_gitHubOptions.GitHubRepositoryName}";
-            switch (await gitHubClient.GetRepositoryStateAsync().ConfigureAwait(false))
+            var state = _repositoryStateMemo ?? await gitHubClient.GetRepositoryStateAsync().ConfigureAwait(false);
+            switch (state)
             {
                 case GitHubRepositoryState.RepositoryNotFound:
                     return CatalogVersionsResult.Unreachable(
@@ -636,6 +671,19 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
                         $"'{CatalogName}') does not exist");
                 case GitHubRepositoryState.Empty:
                     return CatalogVersionsResult.Found([]);
+            }
+
+            _repositoryStateMemo = GitHubRepositoryState.Ready;
+
+            // AB#6719: the read of the WHOLE catalog (the cascade check, one process per model) is one request: the
+            // file tree of the branch (see ParseVersionsFromTree).
+            if (modelName == null && gitHubClient is IGitHubTreeReader treeReader)
+            {
+                var tree = await treeReader.ListBranchFilePathsAsync().ConfigureAwait(false);
+                if (!tree.Truncated)
+                {
+                    return CatalogVersionsResult.Found(ParseVersionsFromTree(tree.Paths)!);
+                }
             }
 
             var versions = new List<CkModelId>();
@@ -691,10 +739,58 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
         }
         catch (Exception e) when (e is ApiException or HttpRequestException or OperationCanceledException
                                       or ModelCatalogException or System.Text.Json.JsonException or InvalidDataException
-                                      or IOException)
+                                      or IOException or GitHubRateLimitExhaustedException)
         {
             return CatalogVersionsResult.Unreachable(DescribeSourceFailure(e));
         }
+    }
+
+    /// <summary>
+    ///     AB#6719: the versions of the WHOLE catalog from one request - the recursive file tree of the branch - instead of two
+    ///     root indexes plus a library and a per-major index of every model (hundreds of requests; the cascade check reads
+    ///     the whole catalog once per model of a repository). A published version is a file
+    ///     <c>ck-models/v{2|3}/&lt;x&gt;/&lt;Model&gt;/&lt;major&gt;/ck-&lt;model&gt;-&lt;version&gt;.json</c>; the model name is the folder (its
+    ///     spelling), the version the rest of the file name. A tree that GitHub truncated cannot be trusted: null, the caller
+    ///     walks the indexes. Used for the read-only cascade check, never for the publish-gate decision: that one needs the
+    ///     indexes (a version is only visible through them, AB#6584) and their hashes for the compare-and-swap.
+    /// </summary>
+    private static List<CkModelId>? ParseVersionsFromTree(IReadOnlyList<string> paths)
+    {
+        var versions = new List<CkModelId>();
+        foreach (var path in paths)
+        {
+            var root = CkCatalogLayout.ReadRoots.FirstOrDefault(r => path.StartsWith(r, StringComparison.Ordinal));
+            if (root == null)
+            {
+                continue;
+            }
+
+            // <root><x>/<Model>/<major>/ck-<model>-<version>.json
+            var parts = path.Substring(root.Length).Split('/');
+            if (parts.Length != 4 || !parts[3].StartsWith("ck-", StringComparison.Ordinal) ||
+                !parts[3].EndsWith(".json", StringComparison.Ordinal) || parts[3].EndsWith(".cache.json", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var prefix = $"ck-{parts[1].ToLowerInvariant()}-";
+            if (!parts[3].StartsWith(prefix, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var version = parts[3].Substring(prefix.Length, parts[3].Length - prefix.Length - ".json".Length);
+            try
+            {
+                versions.Add(new CkModelId(parts[1], new CkVersion(version)));
+            }
+            catch (Exception e) when (e is ArgumentException or FormatException)
+            {
+                // not a version file
+            }
+        }
+
+        return versions;
     }
 
     private static string DescribeSourceFailure(Exception e) => e switch
@@ -704,14 +800,30 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
         _ => e.Message
     };
 
-    /// <summary>Reads and parses an index file; null when the file does not exist, an exception when it is unreadable.</summary>
-    private static async Task<T?> ReadCatalogIndexAsync<T>(IGitHubClientWrapper gitHubClient, string path,
+    /// <summary>
+    ///     Reads and parses an index file; null when the file does not exist, an exception when it is unreadable. The request
+    ///     is memoised per path for the life of the process (AB#6719); a failed request is not memoised.
+    /// </summary>
+    private async Task<T?> ReadCatalogIndexAsync<T>(IGitHubClientWrapper gitHubClient, string path,
         Dictionary<string, string>? indexHashes = null)
         where T : class
     {
-        var file = await gitHubClient.GetFileAsync(path).ConfigureAwait(false);
+        var lazy = _indexMemo.GetOrAdd(path, p => new Lazy<Task<(string, string)?>>(() => gitHubClient.GetFileAsync(p)));
+        (string, string)? file;
+        try
+        {
+            file = await lazy.Value.ConfigureAwait(false);
+        }
+        catch
+        {
+            _indexMemo.TryRemove(path, out _);
+            throw;
+        }
+
         if (file == null)
         {
+            // "does not exist" is not memoised: a publish of another process may create the index any moment.
+            _indexMemo.TryRemove(path, out _);
             return null;
         }
 
@@ -1092,7 +1204,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
     /// </summary>
     private async Task<bool> RootIndexAbsentConfirmedAsync(string root)
     {
-        if (!HasApiToken)
+        if (!CanReadViaApi)
         {
             return true;
         }

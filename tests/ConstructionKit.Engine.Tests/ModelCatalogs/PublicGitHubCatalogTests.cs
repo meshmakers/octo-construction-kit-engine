@@ -42,6 +42,8 @@ public abstract class PublicGitHubCatalogTestsBase
             GitHubRepositoryName = "testrepo",
             GitHubRepositoryBranch = "main",
             GitHubApiToken = withToken ? "test-token" : null,
+            // AB#6719: a token alone does not switch reads to the API outside CI; these tests are about the token holder that may.
+            ApiReads = CatalogApiReadMode.Enabled,
             // Deterministic tests: an unstubbed fake read returns null, which the refresh treats
             // as 404. No implicit retries here — retry-specific tests raise the count themselves.
             RefreshNotFoundRetryCount = 0,

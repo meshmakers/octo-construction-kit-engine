@@ -5,7 +5,7 @@ using Octokit;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 
-internal class GitHubClientWrapper : IGitHubClientWrapper
+internal class GitHubClientWrapper : IGitHubClientWrapper, IGitHubTreeReader
 {
     private const int MaxRetries = 5;
     private const int BaseDelayMs = 500;
@@ -70,6 +70,30 @@ internal class GitHubClientWrapper : IGitHubClientWrapper
         }
 
         throw new InvalidOperationException($"Unreachable: GetFileAsync('{filePath}') left its retry loop");
+    }
+
+    /// <inheritdoc />
+    public async Task<(IReadOnlyList<string> Paths, bool Truncated)> ListBranchFilePathsAsync()
+    {
+        for (var attempt = 0; attempt <= MaxRetries; attempt++)
+        {
+            try
+            {
+                var tree = await _client.Git.Tree.GetRecursive(gitHubOptions.GitHubRepositoryOwner,
+                    gitHubOptions.GitHubRepositoryName, gitHubOptions.GitHubRepositoryBranch).ConfigureAwait(false);
+                return (tree.Tree.Where(i => i.Type == TreeType.Blob).Select(i => i.Path).ToList(), tree.Truncated);
+            }
+            catch (ApiException ex) when (attempt < MaxRetries && IsTransient(ex))
+            {
+                await Task.Delay(RetryDelay(ex, attempt)).ConfigureAwait(false);
+            }
+            catch (ApiException ex)
+            {
+                throw Enrich("read", "branch tree", ex, attempt + 1);
+            }
+        }
+
+        throw new InvalidOperationException("Unreachable: ListBranchFilePathsAsync left its retry loop");
     }
 
     public async Task<GitHubRepositoryState> GetRepositoryStateAsync()
@@ -345,6 +369,13 @@ internal class GitHubClientWrapper : IGitHubClientWrapper
     /// </summary>
     internal static bool IsTransient(ApiException ex)
     {
+        // AB#6719: a primary limit that resets later than a build waits is not "try again": fail at once with the reset
+        // time (Enrich) instead of sleeping in the retry loop until a task timeout fires.
+        if (IsLongRateLimit(ex))
+        {
+            return false;
+        }
+
         if (ex is SecondaryRateLimitExceededException or AbuseException or RateLimitExceededException)
         {
             return true;
@@ -395,9 +426,20 @@ internal class GitHubClientWrapper : IGitHubClientWrapper
     /// </summary>
     private static Exception Enrich(string operation, string path, ApiException ex, int attempts)
     {
+        if (ex is RateLimitExceededException { } limit && IsLongRateLimit(ex))
+        {
+            return new GitHubRateLimitExhaustedException(limit.Reset, ex);
+        }
+
         return ModelCatalogException.GitHubRequestFailed(operation, path, (int)ex.StatusCode,
             ex.ApiError?.Message, attempts, ex);
     }
+
+    /// <summary>A reset further away than this is not waited for (AB#6719).</summary>
+    internal static readonly TimeSpan MaxRateLimitWait = TimeSpan.FromMinutes(2);
+
+    internal static bool IsLongRateLimit(ApiException ex) =>
+        ex is RateLimitExceededException limit && limit.Reset - DateTimeOffset.UtcNow > MaxRateLimitWait;
 
     private static bool IsShaConflict(ApiException ex)
     {

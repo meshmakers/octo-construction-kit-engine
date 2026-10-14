@@ -87,3 +87,13 @@ public interface IGitHubClientWrapper
     /// <returns>The path and SHA of every file under the directory; empty when the directory does not exist.</returns>
     Task<IReadOnlyList<(string path, string sha)>> ListFilesRecursiveAsync(string directoryPath);
 }
+
+/// <summary>
+/// Optional capability of a GitHub client (AB#6719): the paths of every file of the configured branch in ONE request
+/// (the recursive git tree). Lists the published versions of the whole catalog without reading hundreds of index files.
+/// </summary>
+public interface IGitHubTreeReader
+{
+    /// <summary>The paths of all files of the branch; <c>Truncated</c> when GitHub could not return the complete tree.</summary>
+    Task<(IReadOnlyList<string> Paths, bool Truncated)> ListBranchFilePathsAsync();
+}

@@ -175,6 +175,11 @@ the verdict line.
 
 `OCTO-CK203` / `OCTO-CK204` belong to the acknowledge mechanism (next section).
 
+`OCTO-CK300` is a deprecation *warning*, not a gate verdict: a build still sets `OctoCkRangeRetention` / passes `-rr`.
+Range retention is the compiler default (AB#6675) and the value is ignored. Because of it, the first compile of every
+existing model with dependencies is classified D6 (Minor, the one-time re-pin): the declared version must be raised by a
+MINOR before the compile gate and the publish gate accept it (`ValidateVersion -ap` applies the minimum).
+
 ### Accepted limitations of the compile gate
 
 Accepted by the platform owner on 2026-10-10; the guarantee is the catalog gate at publish time (F2.3, AB#6386), not the local build.

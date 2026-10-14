@@ -70,8 +70,8 @@ public class CkCompile : Microsoft.Build.Utilities.Task
     public bool PublishCkModel { get; set; } = true;
 
     /// <summary>
-    /// CK v2 range retention (AB#5664, spike, default off): MSBuild property OctoCkRangeRetention.
-    /// Empty keeps the compiler default (environment variable OctoCkRangeRetention).
+    /// Obsolete (AB#6675): the MSBuild property OctoCkRangeRetention. Range retention is the compiler default; a
+    /// non-empty value only produces the deprecation warning OCTO-CK300 and is ignored.
     /// </summary>
     public string? RangeRetention { get; set; }
 
@@ -187,8 +187,8 @@ public class CkCompile : Microsoft.Build.Utilities.Task
 
         if (!string.IsNullOrWhiteSpace(RangeRetention))
         {
-            var rangeRetention = string.Equals(RangeRetention, "true", StringComparison.OrdinalIgnoreCase);
-            services.Configure<CkCompilerOptions>(options => options.RangeRetention = rangeRetention);
+            Log.LogWarning(null, CkCompilerOptions.RangeRetentionObsoleteCode, null, null, 0, 0, 0, 0,
+                CkCompilerOptions.RangeRetentionObsoleteText);
         }
 
         services.Configure<LocalFileSystemCatalogOptions>(options =>

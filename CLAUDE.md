@@ -807,11 +807,18 @@ Other repositories with sibling CK models must follow the same two rules (checke
 without a ProjectReference; `octo-construction-kit-engine-mongodb` test models depend only on
 System).
 
-## CK v2 Range Retention (AB#5664 / AB#5665, Phase 1 F1.1-S2 AB#5905 — behind a flag, default off)
+## CK v2 Range Retention (AB#5664 / AB#5665, Phase 1 F1.1-S2 AB#5905 — compiler default since AB#6675)
 
-Behind the flag **`OctoCkRangeRetention=true`** (default **off**; MSBuild property, octo-ckc `-rr true`,
-or the environment variable of the same name — MSBuild also picks an exported variable up as property).
-Flag off ⇒ compiled output is byte-identical to before (verified on System.StreamData).
+Range retention is the **compiler default**: every compile (MSBuild `CkCompile` and `octo-ckc Compile`, CK
+language 1 and 2) writes the retained ranges. The switch is gone: the MSBuild property / environment
+variable `OctoCkRangeRetention` and `octo-ckc -rr` are **obsolete and ignored** — a build that still sets
+them logs the deprecation warning **`OCTO-CK300`** (`CkCompile` task warning; `ObsoleteOptionFilteringEnvironmentService`
+strips `-rr` from the ckc arguments and warns on stderr). `CkCompilerOptions.RangeRetention` (default `true`)
+remains only as a code seam for tests and re-pin tooling (`RangeRetention = false` = classic exact pins).
+Compiled output of unchanged sources therefore differs (added `dependencyRanges`, `minEngineVersion: 3.5.1`,
+`Name@major/` references); the first publish of an existing model needs a MINOR bump (SemVer row D6).
+Audit sources before rebuilding: `octo-ckc -c AuditRanges -p <dir>` / `scripts/audit-ck-ranges.sh` (AB#6683).
+Merge/release only after the O1 lift (AB#6279).
 
 **Compile side (`CatalogModelResolver.CompileAsync` → `ApplyRangeRetentionAsync`).** The model is still
 resolved and validated against the *highest* catalog version (the returned graph stays concrete — the

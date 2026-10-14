@@ -50,6 +50,9 @@ public sealed class ValidateVersionCommandTests : IDisposable
         });
         services.Configure<PublicGitHubCatalogOptions>(options => options.IsEnabled = false);
         services.Configure<PrivateGitHubCatalogOptions>(options => options.IsEnabled = false);
+        // AB#6675: range retention is the compiler default; these tests pin the sibling-version mechanism of
+        // ValidateVersion on classic exact-pinned models (with range retention a raised floor is judged by rows D1-D4).
+        services.Configure<CkCompilerOptions>(o => o.RangeRetention = false);
         services.AddSingleton<ICatalog, InMemoryPublishedCatalog>();
 
         _environment = A.Fake<IEnvironmentService>();

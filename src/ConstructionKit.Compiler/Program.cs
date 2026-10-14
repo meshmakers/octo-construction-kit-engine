@@ -83,7 +83,7 @@ internal static class Program
         });
 
         services.AddSingleton<IConsoleService, ConsoleService>();
-        services.AddSingleton<IEnvironmentService, EnvironmentService>();
+        services.AddSingleton<IEnvironmentService>(new ObsoleteOptionFilteringEnvironmentService(new EnvironmentService()));
         services.AddSingleton<IParserService, ParserService>();
         services.AddSingleton<ICommandParser, CommandParser>();
         services.AddSingleton<IConfigWriter, ConfigWriter>(provider =>

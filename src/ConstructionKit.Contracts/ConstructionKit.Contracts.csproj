@@ -18,6 +18,15 @@
         <PackageReference Include="Meshmakers.Common.Shared" Version="$(MeshmakerVersion)" />
     </ItemGroup>
 
+    <!-- AB#6673: the OM1005 analyzer (generated versioned CK id used at run time) ships inside this package, so every
+         project that uses CkId/RtCkId gets it. The analyzer is built first and only packed, never referenced. -->
+    <ItemGroup>
+        <ProjectReference Include="..\ConstructionKit.Analyzers\ConstructionKit.Analyzers.csproj"
+                          ReferenceOutputAssembly="false" PrivateAssets="all" />
+        <None Include="..\ConstructionKit.Analyzers\bin\$(Configuration)\netstandard2.0\Meshmakers.Octo.ConstructionKit.Analyzers.dll"
+              Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    </ItemGroup>
+
     <ItemGroup>
         <PackageReference Include="JsonSchema.Net" Version="9.4.0" />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />

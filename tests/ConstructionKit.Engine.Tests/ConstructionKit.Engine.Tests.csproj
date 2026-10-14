@@ -151,7 +151,16 @@
         <Compile Include="..\..\src\ConstructionKit.SourceGeneration\CkTypeCodeGenerator.cs" Link="SourceGeneration\CkTypeCodeGenerator.cs" />
         <Compile Include="..\..\src\ConstructionKit.SourceGeneration\ICkTypeCodeGenerator.cs" Link="SourceGeneration\ICkTypeCodeGenerator.cs" />
         <Compile Include="..\..\src\ConstructionKit.SourceGeneration\CkMethodCodeGenerator.cs" Link="SourceGeneration\CkMethodCodeGenerator.cs" />
+        <!-- AB#6673: the OM1005 analyzer (generated versioned CK id used at run time) is tested with Roslyn here. -->
+        <Compile Include="..\..\src\ConstructionKit.Analyzers\CkVersionedIdAnalyzer.cs" Link="SourceGeneration\CkVersionedIdAnalyzer.cs" />
+        <Compile Include="..\..\src\ConstructionKit.Analyzers\DiagnosticsDescriptors.cs" Link="SourceGeneration\AnalyzerDiagnosticsDescriptors.cs" />
     </ItemGroup>
+
+    <PropertyGroup>
+        <!-- The linked analyzer source is compiled into a normal net10 test assembly: the Roslyn-component authoring rules
+             (target framework, release tracking) belong to the netstandard2.0 analyzer project, not to this one. -->
+        <NoWarn>$(NoWarn);RS1036;RS1041;RS2000;RS2008</NoWarn>
+    </PropertyGroup>
 
 
 </Project>

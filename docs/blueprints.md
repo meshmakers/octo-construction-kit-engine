@@ -229,6 +229,23 @@ declared range is kept untouched (no seed re-import, no installation-row change,
 `--force`, which only applies to the root). A newer installed version outside a declared range fails
 the apply instead of downgrading it.
 
+The same rule holds for a `ckModelDependencies` range, **for classic (exact-pinned) and range-retaining
+CK models alike** (AB#6672; it is about the declared range, not about how a model was compiled). The floor
+of the range is a minimum, never a target:
+
+| The tenant runs the model in … | The apply … |
+|--------------------------------|-------------|
+| a version **inside** the range (at or above the floor, e.g. System 2.6.0 against `[2.4,3.0)`) | keeps it: no import, no seed re-import, no installation-row change, also with `--force` |
+| a version **below the floor** | installs the floor version (service-managed models: the version the services ship) |
+| a version **outside the range** above its upper bound (e.g. System 3.0.0 against `[2.4,3.0)`) | **fails before anything is installed**; the message names the blueprint, the model, the installed version and the range, and nothing is downgraded or half-installed |
+| no version | installs the floor version as before |
+
+The first install (`ApplyBlueprintAsync`) and the update (`ApplyUpdateAsync`) check the ranges the same way
+(`BlueprintService.AddOutOfRangeInstalledCkModelErrorsAsync`, message 53), before any CK model of the
+blueprint is installed. Tests: `BlueprintServiceCkDependencyRangeTests` (engine, unit) and
+`BlueprintCkDependencyRangeIntegrationTests` (engine-mongodb, real MongoDB; `RrBase` range-retaining and
+`ClassicBase` exact-pinned side by side, first install and update).
+
 ## Application Flow
 
 ```

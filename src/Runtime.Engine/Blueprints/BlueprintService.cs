@@ -297,6 +297,17 @@ internal class BlueprintService : IBlueprintService
                 .ToList();
             loadedCkModels.AddRange(aggregatedCkDeps);
 
+            // 2b. AB#6672: a CK model the tenant runs in a version OUTSIDE the declared range (e.g. System 3.0.0
+            //     against [2.4,3.0)) stops the apply before anything is installed. A newer version inside the range
+            //     is kept by the install step; an older one (below the floor) is installed.
+            await AddOutOfRangeInstalledCkModelErrorsAsync(tenantId, blueprintId, aggregatedCkDeps, operationResult,
+                cancellationToken).ConfigureAwait(false);
+            if (operationResult.HasErrors)
+            {
+                await NotifyApplyFailedAsync(tenantId, blueprintId, operationResult, correlationId).ConfigureAwait(false);
+                return BlueprintApplicationResult.Failed(operationResult);
+            }
+
             // 3. Install missing CK model schemas into the tenant. The blueprint contract
             //    promises that ckModelDependencies are auto-imported on apply
             //    (docs/blueprints.md); UpgradeModelsAsync only runs in-place version
@@ -582,6 +593,60 @@ internal class BlueprintService : IBlueprintService
         }
 
         return kept;
+    }
+
+    /// <summary>
+    ///     AB#6672: refuses a blueprint whose CK model dependency range excludes the version the tenant runs. The floor
+    ///     of a range is a minimum, never a target: a newer installed version INSIDE the range is kept untouched by the
+    ///     install step (no seed re-import, no downgrade), a version BELOW the floor is installed, but a version
+    ///     outside the range (above its upper bound, e.g. System 3.0.0 against <c>[2.4,3.0)</c>) cannot satisfy the
+    ///     blueprint — the dependent models would not resolve — and the embedded-import guard would otherwise keep it
+    ///     silently. The check runs before any CK model is installed, so nothing is half-installed.
+    /// </summary>
+    private async Task AddOutOfRangeInstalledCkModelErrorsAsync(string tenantId, BlueprintId blueprintId,
+        IEnumerable<CkModelIdVersionRange> ckDependencies, OperationResult operationResult,
+        CancellationToken cancellationToken)
+    {
+        var dependencies = ckDependencies.ToList();
+        if (dependencies.Count == 0)
+        {
+            return;
+        }
+
+        var installed = await _runtimeRepositoryProvider.GetSchemaVersionsAsync(tenantId, cancellationToken)
+            .ConfigureAwait(false);
+        foreach (var dependency in dependencies)
+        {
+            if (!installed.TryGetValue(dependency.Name, out var installedVersionText))
+            {
+                continue;
+            }
+
+            CkVersion installedVersion;
+            try
+            {
+                installedVersion = new CkVersion(installedVersionText);
+            }
+            catch (ArgumentException)
+            {
+                continue;
+            }
+
+            var installedId = new CkModelId(dependency.Name, installedVersion.ToString()!);
+            var floor = dependency.ModelVersionRange.MinVersion;
+            var belowFloor = floor != null && installedVersion.CompareTo(floor.Value) < 0;
+            if (belowFloor || dependency.IsSatisfiedBy(installedId))
+            {
+                continue;
+            }
+
+            operationResult.AddMessage(new OperationMessage(
+                MessageLevel.Error, null, 53,
+                $"Blueprint '{blueprintId.FullName}' requires CK model '{dependency.FullName}', but tenant " +
+                $"'{tenantId}' runs '{installedId.FullName}', which is outside the declared range. Refusing to " +
+                "downgrade an installed CK model; nothing was installed. Update the blueprint to a version that " +
+                "supports the installed model, or move the tenant back into the range explicitly."));
+        }
     }
 
     private async Task NotifyApplyFailedAsync(
@@ -1646,6 +1711,22 @@ internal class BlueprintService : IBlueprintService
             }
 
             var ckDependencies = targetBlueprint.CkModelDependencies ?? [];
+
+            // 4a. AB#6672: same pre-flight as the first install, before any CK model is installed.
+            if (ckDependencies.Count > 0 && !options.DryRun)
+            {
+                var rangeCheck = new OperationResult();
+                await AddOutOfRangeInstalledCkModelErrorsAsync(tenantId, targetVersion, ckDependencies, rangeCheck,
+                    cancellationToken).ConfigureAwait(false);
+                if (rangeCheck.HasErrors)
+                {
+                    result.Success = false;
+                    result.Errors.AddRange(rangeCheck.Messages
+                        .Where(m => m.MessageLevel == MessageLevel.Error).Select(m => m.MessageText));
+                    await NotifyUpdateFailedAsync(tenantId, targetVersion, result.Errors, correlationId).ConfigureAwait(false);
+                    return result;
+                }
+            }
 
             // 4b. Install missing CK model schemas. A blueprint update may introduce
             //     new ckModelDependencies that the tenant has never seen — auto-import

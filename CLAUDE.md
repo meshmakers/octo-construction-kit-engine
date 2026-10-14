@@ -598,7 +598,7 @@ for backwards-compatible direct instantiation (e.g. the manual fallback in Mongo
 
 **System.Files (AB#6479).** The model source moved here from `octo-asset-repo-services` so that every consumer
 (asset repository, report services, the platform-services installer) gets it as a package of the libs train.
-The content is **byte-identical** to the `System.Files-1.0.0` that asset-repo published: same `modelId`, same
+The content is **identical** to the `System.Files-1.0.0` that asset-repo published (the model is now `System.Files-1.1.0`, see "AB#6691" below): same
 YAML, same PackageId, same generated namespace
 (`Meshmakers.Octo.ConstructionKit.Models.System.Files.Generated.System.Files.v1`: `SystemFilesCkIds`,
 `RtFolderRoot`, `RtFolder`, `RtFileSystemItem`, `AddCkModelSystemFilesV1`). The compiled yaml freezes the
@@ -608,7 +608,18 @@ bump (`octo-ckc ValidateVersion`). `SystemFilesCkModel` builds after `SystemCkMo
 (project reference, same pattern as `StreamDataCkModel`, with `OctoLocalCatalogIsEnabled=true` so that System
 resolves from the freshly built local catalog). `OctoEnforceRuntimeStateMarkers` is deliberately not armed
 (it would demand ownership markers on an unchanged 1.0.0). `Runtime.Engine.Tests`
-(`EmbeddedCkModelResourceTests`) guards the embedded model and the id `System.Files-1.0.0`.
+(`EmbeddedCkModelResourceTests`) guards the embedded model and the id `System.Files-1.1.0`.
+
+**AB#6691 - one-time MINOR bumps after the range-retention flip (AB#6675).** With range retention as the compiler default, the first
+compile of `System.Files` (1.0.0 -> **1.1.0**) and `System.StreamData` (1.17.1 -> **1.18.0**) is classified MINOR by SemVer row D6 ("the one-time
+re-pin": exact pin -> declared range), so `ValidateVersion` fails with `OCTO-CK100` until the declared version is raised
+(`octo-ckc -c ValidateVersion --apply` wrote exactly these two versions; `System` has no dependencies and needs no bump). **Compat impact:** the
+compiled yaml of both models now carries `dependencyRanges`, `minEngineVersion: 3.5.1` and `System@2/...` references and is published under
+`ck-models/v3/`; engines below 3.5.1 do not see them (message 126 / catalog path), so every service of an environment must run the CK v2 engine
+before these versions are imported. Published versions stay immutable. **Why `main` stayed green:** the `Validate CK model versions` step installs
+`octo-ckc` of the build's own version line from the private feed (`Derived octo-ckc toolVersion from version line`), i.e. the compiler of the
+previous main build; the flip commit itself was validated with the pre-flip compiler (`Range retention: False`, "no bump required"), a later PR
+or main build derives the flip compiler and fails.
 
 **Single publisher (AB#6481).** This repository's CI is the only publisher of `System.Files` to the private and
 public CK catalogs and the only source of its generated model documentation: the `Validate CK model versions`/

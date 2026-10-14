@@ -919,6 +919,31 @@ element schemas accept `@` in the model part of a reference; the compiled schema
 `dependencyRanges`. Tests: `RangeRetentionCompileTests` (flag on/off, YAML round trip with schema
 validation, floor violation, resolve against a later minor without recompile, two-level chain).
 
+## Versioned generated CK ids at run time - guard OM1005 (AB#6673)
+
+Rule (also in the monorepo `CLAUDE.md`): runtime code never looks up CK elements by a generated **versioned** id. The generated
+`<Model>CkIds` classes carry both forms per element: `RtCk<X>TypeId` / `RtCk<X>RoleId` / ... (version-less `RtCkId<T>`, what the CK
+cache is queried with) and `Ck<X>TypeId` / ... (`CkId<T>` bound to the model version the service was compiled against). A tenant may
+hold a **newer** System than the service embeds (the embedded-import downgrade guard keeps it), so the versioned id is not in the
+tenant's CK cache - an entity insert of an older service failed that way (AutoIncrement, F1.0). `CkModelId` (the embedded model id
+for import / `IsCkModelSatisfiedAsync`, which compares by name and minimum version) is not an element id and stays allowed.
+
+Guard: the Roslyn analyzer `CkVersionedIdAnalyzer` (project `src/ConstructionKit.Analyzers`) reports **OM1005** for every
+reference to a `…CkIds.Ck<Element>Id` field of type `CkId<T>`; allowed are the `RtCk…` constants, `CkModelId`, and a versioned id that is
+converted at once with `.ToRtCkId()`. Not analysed: generated code and assemblies whose name ends with `Tests`. It ships inside the
+`Meshmakers.Octo.ConstructionKit.Contracts` package (`analyzers/dotnet/cs`), so every project that uses `CkId` / `RtCkId` gets it.
+
+**Severity and rollout (review of PR #278).** OM1005 is **Info (suggestion) by default**: the package never breaks a consumer build, not
+even with `TreatWarningsAsErrors` (a Warning would break it too, an Error certainly). A repository raises it after it has audited itself:
+`.editorconfig` `dotnet_diagnostic.OM1005.severity = error` (or `warning`), or `<WarningsAsErrors>$(WarningsAsErrors);OM1005</WarningsAsErrors>`
+in `Directory.Build.props` (verified: both turn the Info diagnostic into a build error, with `TreatWarningsAsErrors` on or off);
+`= none` opts out. Sequence: (1) audit the consumers (git grep `\w+CkIds\.Ck(?!ModelId\b)\w+`, see `docs/ck-versioned-id-guard.md`), fix
+or list the offenders; (2) release the package - consumers see a suggestion only; (3) each repo that is clean sets the severity to `error`
+in the same PR as its package update. Tests: `CkVersionedIdAnalyzerTests` (Roslyn `CompilationWithAnalyzers`: reported with the version-less
+replacement, every occurrence, allowed forms, test projects and generated code skipped, default severity Info, raised to error and
+switched off through the specific diagnostic options). Verified end to end with a real `dotnet build` of a consumer project with
+`TreatWarningsAsErrors`: default builds green, `WarningsAsErrors=OM1005` and the `.editorconfig` line fail with OM1005.
+
 ## CK v2: interfaces, attribute access, method definitions, visibility/derivable (AB#5667 / AB#5668 / AB#5669; Phase 1 F1.1-S1 AB#5904, F1.2-S1 AB#5910, F1.1-S4 AB#5907, F1.1-S5 AB#5908)
 
 Gated by **`ckLanguage: 2`** in `ckModel.yaml` (`CkModelPropertiesDto.CkLanguage`, `null` = 1). A model

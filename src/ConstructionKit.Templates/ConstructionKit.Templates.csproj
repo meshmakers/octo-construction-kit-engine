@@ -17,6 +17,11 @@
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>
         <OutputPath>..\..\bin\$(Configuration)\</OutputPath>
+        <!-- AB#4418: the scaffold references the sibling packages of this repo (Runtime.Contracts,
+             SourceGeneration, MsBuildTasks) at the pack version of THIS package, so a scaffold
+             restores from the feed the template came from. DebugL packs 999.0.0 (local ../nuget). -->
+        <OctoTemplateProjectFile>Templates\ConstructionKit.CSharp\GeneratedConstructionKitProject.csproj</OctoTemplateProjectFile>
+        <OctoTemplateVersionPlaceholder>__OCTO_TEMPLATE_PACKAGE_VERSION__</OctoTemplateVersionPlaceholder>
     </PropertyGroup>
 
     <ItemGroup>
@@ -34,7 +39,33 @@
 
     <ItemGroup>
         <Compile Include="Templates\ConstructionKit.CSharp\GlobalUsings.cs" />
-        <Content Include="Templates\**\*" Exclude="Templates\**\bin\**;Templates\**\obj\**"/>
+        <!-- The scaffold csproj carries a version placeholder and is packed through the
+             OctoPackTemplateProjectVersion target below (AB#4418), never as-is. -->
+        <Content Include="Templates\**\*" Exclude="Templates\**\bin\**;Templates\**\obj\**;$(OctoTemplateProjectFile)"/>
         <Compile Remove="**\*"/>
     </ItemGroup>
+
+    <!-- Replaces the version placeholder of the scaffold csproj with the pack version and packs that
+         copy instead of the source file. Runs on every pack (GeneratePackageOnBuild included).
+         Fails when the version is empty or the placeholder is missing, so a scaffold with an
+         unresolvable version can never be published. -->
+    <Target Name="OctoPackTemplateProjectVersion" BeforeTargets="_GetPackageFiles;GenerateNuspec">
+        <PropertyGroup>
+            <_OctoTemplatePackVersion>$(PackageVersion)</_OctoTemplatePackVersion>
+            <_OctoTemplatePackVersion Condition="'$(_OctoTemplatePackVersion)'==''">$(Version)</_OctoTemplatePackVersion>
+            <_OctoTemplateSource>$(MSBuildProjectDirectory)\$(OctoTemplateProjectFile)</_OctoTemplateSource>
+            <_OctoTemplateTarget>$(IntermediateOutputPath)OctoTemplate\GeneratedConstructionKitProject.csproj</_OctoTemplateTarget>
+            <_OctoTemplateContent>$([System.IO.File]::ReadAllText($(_OctoTemplateSource)))</_OctoTemplateContent>
+        </PropertyGroup>
+        <Error Condition="'$(_OctoTemplatePackVersion)'==''"
+               Text="OCTO-TPL001: cannot pack the ConstructionKit template without a package version (PackageVersion/Version is empty)." />
+        <Error Condition="!$(_OctoTemplateContent.Contains('$(OctoTemplateVersionPlaceholder)'))"
+               Text="OCTO-TPL002: the placeholder '$(OctoTemplateVersionPlaceholder)' is missing in $(OctoTemplateProjectFile)." />
+        <WriteLinesToFile File="$(_OctoTemplateTarget)"
+                          Lines="$([MSBuild]::Escape($(_OctoTemplateContent.Replace('$(OctoTemplateVersionPlaceholder)', '$(_OctoTemplatePackVersion)'))))"
+                          Overwrite="true" WriteOnlyWhenDifferent="true" />
+        <ItemGroup>
+            <None Include="$(_OctoTemplateTarget)" Pack="true" PackagePath="content/Templates/ConstructionKit.CSharp/" Visible="false" />
+        </ItemGroup>
+    </Target>
 </Project>

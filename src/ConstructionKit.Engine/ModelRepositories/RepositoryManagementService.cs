@@ -5,8 +5,17 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.ModelRepositories;
 
-internal class RepositoryManagementService(IModelRepository modelRepository) : IRepositoryManagementService
+internal class RepositoryManagementService(IModelRepository modelRepository)
+    : IRepositoryManagementService, IRepositoryVersionLister
 {
+    /// <inheritdoc />
+    public Task<IReadOnlyList<CkModelId>> ListVersionsAsync(string ckModelName, object? sourceIdentifier = null)
+    {
+        return modelRepository is IRepositoryVersionLister lister
+            ? lister.ListVersionsAsync(ckModelName, sourceIdentifier)
+            : Task.FromResult<IReadOnlyList<CkModelId>>([]);
+    }
+
     public Task<bool> IsExistingAsync(CkModelId ckModelId, object? sourceIdentifier = null)
     {
         return modelRepository.IsExistingAsync(ckModelId, sourceIdentifier);

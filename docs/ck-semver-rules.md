@@ -577,6 +577,38 @@ Engine API: `ICatalog.UnpublishAsync` (per catalog: `LocalFileSystemCatalog`, `G
 A real GitHub catalog is only ever written by an explicit command; the tests run against the local file system catalog and an in-memory
 GitHub client.
 
+## Dependency resolution by SemVer (AB#4468, AB#6671)
+
+The rules above say when a version must change; the resolvers apply the same SemVer reading when a model is
+compiled, imported or re-validated. A dependency **range** (`System-[2.5,3.0)`) is satisfied by **any version
+inside the range that is not below the floor** — a higher minor or patch than the floor resolves and the model
+loads; a different major, or only versions below the floor, do not:
+
+| Versions available (range `[2.5,3.0)`, floor 2.5.0) | Result |
+| --- | --- |
+| `2.5.0` | resolves to 2.5.0 |
+| `2.6.1` only (higher minor/patch than the floor) | resolves to 2.6.1, the model loads |
+| `2.4.9` only (below the floor) | rejected |
+| `3.0.0` only (higher major) | rejected (a new major is a deliberate cascade, one major per range) |
+| `2.5.0`, `2.6.1`, `3.0.0` | resolves to **2.6.1**, the highest version in range |
+
+A rejection names the range and the visible versions (catalog side: unknown dependency message,
+`ModelValidationException.UnknownCkModels(…, visibleVersions)`; repository side the same message built from
+`IRepositoryVersionLister`; tenant re-validation: `Acme.Assets-[1.0,2.0) (floor 1.1.0): installed Acme.Assets-1.0.0`).
+Where several constraints meet on one model name (ranges and the exact pins of classic dependencies) the compile
+picks the **highest version that satisfies all of them** (AB#6671, `CatalogConstraintSolver`).
+
+- **Exact-pinned (classic) models** keep exact-match semantics: `System-2.5.0` is satisfied by 2.5.0 only.
+- **Decision (AB#4468, Thor 2026-10-13): no special treatment** for the System models and the models Meshmakers
+  ships. They resolve by the same rules; their SemVer discipline is guaranteed by the compile and publish gates, not by
+  a looser resolver.
+- **Blueprints:** a blueprint installs the floor of a CK dependency range and keeps a newer installed version that
+  satisfies the range (AB#4294); that rule is not changed here (see AB#6672).
+
+Pinned by the same matrix on all three resolvers: `DependencyResolutionMatrixTests` (catalog/compile, with and without
+range retention), `RepositoryResolutionMatrixTests` (import) and, in `octo-construction-kit-engine-mongodb`,
+`DependencyResolutionMatrixTests` (tenant re-validation).
+
 ## The fixed rule set (V1)
 
 The highest applicable level in the overall diff determines the minimum bump level. The rule set

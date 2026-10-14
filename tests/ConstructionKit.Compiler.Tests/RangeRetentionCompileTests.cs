@@ -48,6 +48,23 @@ public sealed class RangeRetentionCompileTests : IDisposable
         }
     }
 
+    // AB#6675: range retention is the compiler default - no property, option or environment variable is needed.
+    [Fact]
+    public async Task Default_WithoutAnyFlag_WritesRangesFloorsAndMajorQualifiedReferences()
+    {
+        Assert.True(new CkCompilerOptions().RangeRetention);
+        using var byDefault = new CkCompileFixture(s =>
+            s.Configure<CkCompilerOptions>(o => o.RangeRetention = new CkCompilerOptions().RangeRetention));
+        await byDefault.CompileAndPublishAsync(byDefault.WriteSystemModel("2.5.0", withExtraAttribute: true));
+
+        var compiled = await byDefault.CompileAsync(DependentSource(byDefault, "System-[2.5,3.0)"));
+
+        var dependency = Assert.Single(compiled.DependencyRanges!);
+        Assert.Equal("System-[2.5,3.0)", dependency.Range.FullName);
+        Assert.Equal("2.5.0", dependency.Floor);
+        Assert.Equal("System@2/Entity-1", compiled.Types!.Single().DerivedFromCkTypeId!.FullName);
+    }
+
     [Fact]
     public async Task FlagOff_OutputKeepsExactPinsAndConcreteReferences()
     {

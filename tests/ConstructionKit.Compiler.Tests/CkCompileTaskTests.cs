@@ -61,7 +61,7 @@ public sealed class CkCompileTaskTests : IDisposable
     }
 
     private (bool Success, RecordingBuildEngine Engine) Run(string folder, bool publish = true,
-        string? baseline = "Local")
+        string? baseline = "Local", string? rangeRetention = null)
     {
         var engine = new RecordingBuildEngine();
         var output = Path.Combine(_fixture.Root, "task-out", $"run{_run++}");
@@ -81,7 +81,8 @@ public sealed class CkCompileTaskTests : IDisposable
             LocalCatalogRootPath = _catalogRoot,
             IsPublicGitHubCatalogEnabled = false,
             IsPrivateGitHubCatalogEnabled = false,
-            CompatibilityBaseline = baseline
+            CompatibilityBaseline = baseline,
+            RangeRetention = rangeRetention
         };
         return (task.Execute(), engine);
     }
@@ -94,6 +95,22 @@ public sealed class CkCompileTaskTests : IDisposable
     {
         var (success, engine) = Run(WriteModel("2.4.0"));
         Assert.True(success, string.Join("; ", engine.Errors));
+    }
+
+    // AB#6675: OctoCkRangeRetention is obsolete - a build that still sets it gets OCTO-CK300 and nothing else changes.
+    [Theory]
+    [InlineData("true")]
+    [InlineData("false")]
+    public void The_obsolete_OctoCkRangeRetention_property_only_logs_the_deprecation_warning(string value)
+    {
+        var (success, engine) = Run(WriteModel("2.4.0"), publish: false, rangeRetention: value);
+
+        Assert.True(success, string.Join("; ", engine.Errors));
+        var warning = Assert.Single(engine.Messages, m => m.StartsWith("warning OCTO-CK300:"));
+        Assert.Contains("obsolete and ignored", warning);
+
+        var (_, without) = Run(WriteModel("2.4.0"), publish: false);
+        Assert.DoesNotContain(without.Messages, m => m.Contains("OCTO-CK300"));
     }
 
     [Fact]

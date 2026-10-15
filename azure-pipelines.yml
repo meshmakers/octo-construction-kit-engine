@@ -242,8 +242,18 @@ stages:
           # idempotent "already exists" no-op of the publish step.
           # Note: this validates with the latest RELEASED octo-ckc from the feed — brand-new
           # schema features introduced in this repo may need a toolVersion pin until released.
+          # AB#6725: toolVersion is pinned to the main-line compiler that carries the range-retention default
+          # (AB#6675, first flip build 0.1.2610.14025). Without the pin an r* tag build derives the newest STABLE
+          # compiler of its own line (3.5.21, pre-flip), which classifies the already published, range-retaining
+          # System.Files-1.1.0 / System.StreamData-1.18.0 as "rangeRetention true -> false" and demands a further
+          # MINOR bump (OCTO-CK100; r3.5.22, build 54764). The 3.5.22 compiler is only published by this very
+          # build, so the line cannot supply it. The models must NOT be bumped: the old compiler would publish them
+          # with exact pins, and published versions are immutable.
+          # REMOVE this pin after the first release train that ships the flip compiler on the 3.5 line
+          # (a stable 3.5.N compiler with the flip is on the feed); the derivation then picks it up.
           - template: templates/steps/validate-and-publish-ck-versions.yml@pipelineTemplates
             parameters:
+              toolVersion: '0.1.2610.14032'
               constructionKitPaths:
                 - 'src/SystemCkModel/ConstructionKit'
                 - 'src/SystemFilesCkModel/ConstructionKit'

@@ -677,6 +677,12 @@
       "number": 130,
       "level": "ERROR",
       "text": "Entry {index} of 'compatibility.acknowledge' in the ckModel.yaml of model '{modelId}' is invalid: {reason}"
+    },
+    {
+      "key": "CkMethodHandlerInvalid",
+      "number": 131,
+      "level": "ERROR",
+      "text": "Method '{methodId}' of '{ckTypeId}' declares an invalid 'execution.handler': {reason}"
     }
   ]
 }

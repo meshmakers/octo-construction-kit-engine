@@ -195,6 +195,79 @@ public sealed class CkV2CompileTests : IDisposable
             m => Assert.Equal(90, m.MessageNumber));
     }
 
+    private static Dictionary<string, string> KitchenSinkWithHandler(string execution)
+    {
+        var files = KitchenSinkFiles();
+        files["types/types.yaml"] = files["types/types.yaml"].Replace("      - methodId: Unlock-1",
+            "      - methodId: Unlock-1\n        execution:\n" + execution.TrimEnd('\n'));
+        Assert.Contains("execution:\n" + execution.TrimEnd('\n'), files["types/types.yaml"]);
+        return files;
+    }
+
+    [Fact]
+    public async Task MethodHandler_Pipeline_ReachesCompiledOutputRoundTripGraphAndDocs_AndDefaultStaysByteIdentical()
+    {
+        await PublishSystemAsync(_fixture);
+
+        // Golden: a model that does not use the key serializes without any 'handler' member.
+        var plain = await _fixture.CompileAsync(_fixture.WriteSource("plain", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], KitchenSinkFiles(), ckLanguage: 2));
+        var plainYaml = await ToYamlAsync(_fixture, plain);
+        Assert.DoesNotContain("handler", plainYaml);
+        Assert.Null(plain.Types!.Single(t => t.TypeId.Name == "Account").Methods!.Single().Execution);
+
+        var compiled = await _fixture.CompileAndPublishAsync(_fixture.WriteSource("ks", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], KitchenSinkWithHandler(
+                "          timeoutSeconds: 120\n          handler: pipeline\n"), ckLanguage: 2));
+
+        // Compiled model, serialized YAML and read-back carry the value.
+        var unlock = compiled.Types!.Single(t => t.TypeId.Name == "Account").Methods!.Single();
+        Assert.Equal(CkMethodHandlers.Pipeline, unlock.Execution!.Handler);
+        Assert.Equal(120, unlock.Execution.TimeoutSeconds);
+        var yaml = await ToYamlAsync(_fixture, compiled);
+        Assert.Contains("handler: pipeline", yaml);
+        var operationResult = new OperationResult();
+        var readBack = await _fixture.Services.GetRequiredService<ICkSerializer>()
+            .DeserializeCompiledModelRootAsync(yaml, "ks.yaml", operationResult);
+        Assert.False(operationResult.HasErrors, string.Join("; ", operationResult.Messages));
+        Assert.Equal(CkMethodHandlers.Pipeline,
+            readBack.Types!.Single(t => t.TypeId.Name == "Account").Methods!.Single().Execution!.Handler);
+
+        // The resolved graph carries it; the methods of the other types keep the default.
+        var graph = await _fixture.Services.GetRequiredService<ICatalogModelResolver>()
+            .HardResolveAsync(compiled, new OriginFileResolver("-"), new OperationResult());
+        var account = graph.Types[new CkId<CkTypeId>("KitchenSink-1.0.0/Account")];
+        Assert.Equal(CkMethodHandlers.Pipeline, account.AllMethods["Unlock-1"].Handler);
+        Assert.Null(account.AllMethods["ChangePassword-1"].Definition.Execution?.Handler);
+
+        // Docs generator: non-default handler is listed, default methods are not marked.
+        var docs = Path.Combine(_fixture.Root, "docs");
+        await _fixture.Services.GetRequiredService<Engine.Documentation.IContentGenerator>()
+            .GenerateTypesMarkdownTable(graph, docs, compiled.ModelId, "1.0.0", "/docs/");
+        var types = await File.ReadAllTextAsync(
+            Directory.GetFiles(docs, "*.md", SearchOption.AllDirectories).Single(f => f.EndsWith("Types.md")),
+            TestContext.Current.CancellationToken);
+        Assert.Contains("| Unlock-1 (handler: pipeline) |", types);
+        Assert.Contains("| ChangePassword-1 | Instance |", types);
+    }
+
+    [Theory]
+    [InlineData("          handler: pipeline\n", "timeoutSeconds")]
+    [InlineData("          timeoutSeconds: 30\n          handler: script\n", "unknown handler")]
+    public async Task MethodHandler_Invalid_FailsWith131NamingTheMethod(string execution, string expectedText)
+    {
+        await PublishSystemAsync(_fixture);
+
+        var operationResult = new OperationResult();
+        await Assert.ThrowsAnyAsync<Exception>(() => _fixture.Services.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(_fixture.WriteSource("ks", "KitchenSink-1.0.0", ["System-[2.5,3.0)"],
+                KitchenSinkWithHandler(execution), ckLanguage: 2), operationResult));
+
+        var message = Assert.Single(operationResult.Messages, m => m.MessageNumber == 131);
+        Assert.Contains("Unlock-1", message.MessageText);
+        Assert.Contains(expectedText, message.MessageText);
+    }
+
     [Fact]
     public async Task SecuritySensitive_ReachesCompiledOutputGraphAndDocs_AndRequiresCkLanguage2()
     {

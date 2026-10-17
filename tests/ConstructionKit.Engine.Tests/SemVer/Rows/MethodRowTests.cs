@@ -135,6 +135,24 @@ public class MethodRowTests
     [Theory]
     [InlineData("type")]
     [InlineData("interface")]
+    public void M15_HandlerChanged_IsMajor_AddingTheDefaultIsNoChange(string owner)
+    {
+        // service -> pipeline and back: Major both ways.
+        var toPipeline = Change(owner, m => m.Execution!.Handler = CkMethodHandlers.Pipeline);
+        Assert.Equal(CkSemVerLevel.Major, Required(toPipeline));
+        Assert.Contains(toPipeline, c => c.Change is { Property: "handler", ChangeKind: CkModelChangeKind.Modified });
+
+        var pipelineBaseline = Model();
+        Method(pipelineBaseline, owner).Execution!.Handler = CkMethodHandlers.Pipeline;
+        Assert.Equal(CkSemVerLevel.Major, Level(pipelineBaseline, Model()));
+
+        // An omitted key equals the default: declaring 'service' explicitly is no change.
+        Assert.Equal(CkSemVerLevel.None, Required(Change(owner, m => m.Execution!.Handler = CkMethodHandlers.Service)));
+    }
+
+    [Theory]
+    [InlineData("type")]
+    [InlineData("interface")]
     public void M11_TimeoutChanged_IsMinor(string owner)
     {
         Assert.Equal(CkSemVerLevel.Minor, Required(Change(owner, m => m.Execution!.TimeoutSeconds = 60)));

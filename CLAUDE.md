@@ -1062,7 +1062,7 @@ Notes:
   `ReadWrite`, visibility `Public`, derivable `Any`) through a `JsonTypeInfo` modifier in `CkCache` (`OmitCkV2Defaults`), so v1 caches stay
   byte-identical; reading tolerates the missing keys (trailing defaulted `[JsonConstructor]` parameters on
   `CkTypeGraph`, init setter on `CkTypeAttributeGraph.Access`).
-- Message codes for CK v2: 90–113 and 118–130 are in use (table below); **spare: 111, 114–117, 131**. Range
+- Message codes for CK v2: 90–113 and 118–131 are in use (table below); **spare: 111, 114–117, 132**. Range
   retention (F0.2) has no message codes of its own — its failures are `ModelValidationException`s and the
   unbound-reference diagnostic is the source-generator diagnostic OM1004.
   Warnings (e.g. 110, 124) of a successful compile are printed by `octo-ckc -c compile` (to **stderr**, also with
@@ -1111,6 +1111,7 @@ Notes:
 | 128 | `UnknownTargetCkInterfaceOfAssociation` | `ReferenceResolver` | F1.2-S4: a type association's `targetCkInterfaceId` is unknown |
 | 129 | `CkInconsistentVisibility` | `CkVisibilityValidator` (end of `ReferenceResolver`) + `InheritanceResolver.InheritInterfaceMethods` | AB#6334 / AB#6335 (F2.1 gate findings H1/H3): in a `ckLanguage: 2` model a **public** element references an **internal** element of its own model (same reference walk as 112, plus type association `targetCkAttributeIds`), a public interface declares an internal method, or a type redeclares a method of a public interface it implements as internal. One message per offending reference. Coverage of the walk is guarded by `CkVisibilityReferenceCoverageTests`; the classifier mirror is `CkVisibilityIndex.ExposeInternalElementsReachableFromPublicOnes` (defence in depth; it also treats associations of internal types that target a public type, and their roles, as public surface — N1) |
 | 130 | `InvalidCompatibilityAcknowledge` | `CkCompatibilityValidator` (from `CompilerService`) | AB#6295: an entry of `compatibility.acknowledge` in `ckModel.yaml` has an empty `change`, a wildcard (`*`, `?`), an empty `reason`, or repeats a key. The JSON schema rejects empty reasons and wildcard keys first; this is the same rule for sources that skip the schema. Using the section in a `ckLanguage` 1 model is message 90 (feature `compatibility.acknowledge`) |
+| 131 | `CkMethodHandlerInvalid` | `InheritanceResolver.ValidateMethodHandler` (M-6) | AB#6877: `execution.handler` of a method (type or interface) is not `service` or `pipeline` (exact, lower-case — the schema deliberately has no `enum` so the compiler names the method), `pipeline` without an explicit `timeoutSeconds`, or `pipeline` on an **interface** method (a pipeline binds by the well-known name equal to the qualified method id `Model/Type.Method-1` of one type; an implementing type redeclares the method with `handler: pipeline` itself — execution is not part of the invocation contract, rule 122). Relaxing the interface rule later is non-breaking, tightening it would not be |
 
 `InheritanceResolver.ResolveInterfacesAndMethods` also completes `AllImplementedInterfaces` (own ∪ every base
 type's declared interfaces), `AllMethods` (nearest declaration wins; `CkMethodGraph.DeclaringCkTypeId` is the
@@ -1195,7 +1196,7 @@ that gate is green.
 | 3 | DTO | `CkModelPropertiesDto.CkLanguage` | `CkInterfaceDto`, `CkElementsRootDto`, `CkModelRootBase` | `CkTypeDto.Implements` | `CkTypeAttributeDto.Access` | `CkTypeDto.Methods` + `CkMethodDto` family | `CkVisibilityDto` / `CkDerivableDto` on the 7 element DTOs | `CkInterfaceDto`, `CkInterfaceAssociationDto`, `CkTypeAssociationDto.TargetCkInterfaceId` |
 | 4 | Compiler hand-copies | `CompilerService` candidate, `CatalogModelResolver` | same + `interfaces/` loop | `CompilerService` type copy | by reference | `CompilerService` type copy | `CompilerService` type copy (others by reference) | by reference |
 | 5 | Graph + `[JsonConstructor]` | `CkCacheRoot.Models` (set in `ElementResolver` / `AppendModel`) | `CkInterfaceGraph`, `CkModelGraph`, `CkCacheRoot`, cache getters | `CkTypeGraph` | `CkTypeAttributeGraph` (init setter) | `CkTypeGraph` + `CkMethodGraph` | settable effective properties, set by `CkModelGraph.ApplyCkV2Modifiers` | `CkInterfaceGraph` (defaulted `[JsonConstructor]` params), `CkInterfaceAssociationGraph`, `CkInterfaceMethodGraph`, `CkTypeAssociationGraph` |
-| 6 | Resolvers + codes | 90/91, 126 | 92–94, 118–124, 127 | 95–99, 121, 124 | 90, 99, 105–108 | 100–104, 122, 125 | 90, 112, 113, 129 | 90, 118–124, 128 |
+| 6 | Resolvers + codes | 90/91, 126 | 92–94, 118–124, 127 | 95–99, 121, 124 | 90, 99, 105–108 | 100–104, 122, 125, 131 | 90, 112, 113, 129 | 90, 118–124, 128 |
 | 7 | SemVer diff + classifier rule + row test (gate: `CkSemVerClassificationGuardTests`, mandatory) | yes | yes | yes | yes | yes | yes (`CkModelDiffService.DiffModifiers`) | yes |
 | 8 | Source generator | — | yes (ids + `IRt<Name>`) | yes (explicit impls) | — | yes (ids, parameter/result records) | `sealed` (v2; no `abstract`, E-M3) | `IRt<Name>` (extends = interface inheritance) |
 | 9 | Docs generator | — | yes | yes | — | yes | yes (non-default only) | yes |
@@ -1220,6 +1221,22 @@ matched against the diff by `CkAcknowledgementResult`, they are not model struct
 `CkAcknowledgeDto` in the guard's `NotDiffedDtoTypes`; (8), (9) -; (10) conscious exclusion in `CkModelReflectionComparer.AllowList`
 (`CkCompiledModelRoot.Compatibility`: build and publish-time metadata, read from the catalog JSON by the publish gate, not
 needed in tenants); (11), (12) not needed. Rules: `docs/ck-semver-rules.md`, "Acknowledge".
+
+**`execution.handler` (AB#6877, F3.1) touch points**, same numbering (the field lives in `CkMethodExecutionDto`, next to
+`timeoutSeconds` / `idempotent`; values `service` (default) and `pipeline`, the string constants of `CkMethodHandlers`;
+`null` = omitted = `service`, so existing models serialize byte-identically): (1) method schema
+`CkMethodExecution.handler` (plain string, no `enum`: an unknown value is message 131 with the method id, not a schema
+error); (2) compiled schema via the shared `$ref`; (3) `CkMethodExecutionDto.Handler` (`string?`, `OmitNull`);
+(4) copied by reference with `Methods`; (5) `CkMethodGraph.Handler` (`[JsonIgnore]`, derived from the definition that
+the graph already serializes); (6) message 131 (unknown value, `pipeline` without explicit `timeoutSeconds`, `pipeline`
+on an interface method); (7) diff property `handler` (effective value, so adding `handler: service` is no change),
+classifier row **M15** (service ↔ pipeline = Major), guard probe, `signature` summary shows `, handler pipeline` only for
+the non-default; (8) — (parameter/result records and id constants are generated as before); (9) `Types.md` marks a
+non-default method `(handler: pipeline)`; (10) **follow-up AB#6878** (engine-mongodb `CkMethodExecution` map +
+`CkModelReflectionComparer` gate — until then a tenant document drops the value on import); (11) **follow-up AB#6878**
+(asset-repo CK meta); (12) optional, Studio. Runtime routing of `pipeline` methods: AB#6879. Tests:
+`CkV2MethodResolverTests` (`Code131_*`), `CkV2CompileTests.MethodHandler_*`, `CkV2GraphJsonRoundTripTests`,
+`MethodRowTests.M15_*`.
 
 **`securitySensitive` (AB#6269) touch points**, same numbering: (1) attribute schema `CkAttribute.securitySensitive`;
 (2) compiled schema via the shared `$ref`; (3) `CkAttributeDto.SecuritySensitive` (`bool?`, omitted when null); (4) copied

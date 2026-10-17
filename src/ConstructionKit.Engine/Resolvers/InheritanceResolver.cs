@@ -258,7 +258,7 @@ internal class InheritanceResolver : IInheritanceResolver
 
             foreach (var method in interfaceGraph.DefinedMethods)
             {
-                ValidateMethodDefinition(method, id, location, operationResult);
+                ValidateMethodDefinition(method, id, location, operationResult, isInterfaceMethod: true);
             }
         }
     }
@@ -449,7 +449,7 @@ internal class InheritanceResolver : IInheritanceResolver
                     $"it is inherited from '{declaringBase.CkTypeId}'; overriding an inherited method is not supported"));
             }
 
-            ValidateMethodDefinition(method, ckTypeId, location, operationResult);
+            ValidateMethodDefinition(method, ckTypeId, location, operationResult, isInterfaceMethod: false);
         }
     }
 
@@ -457,7 +457,7 @@ internal class InheritanceResolver : IInheritanceResolver
     ///     Method rules M-2..M-5 for one definition — of a type or (F1.2-S4) of an interface.
     /// </summary>
     private static void ValidateMethodDefinition(CkMethodDto method, object ckTypeId, string location,
-        OperationResult operationResult)
+        OperationResult operationResult, bool isInterfaceMethod)
     {
         {
             // M-2
@@ -508,6 +508,8 @@ internal class InheritanceResolver : IInheritanceResolver
                     ckTypeId, "'allowSelf: true' requires an instance method, a static method has no target entity"));
             }
 
+            ValidateMethodHandler(method, ckTypeId, location, operationResult, isInterfaceMethod);
+
             // N4 (AB#6338): role and scope names are compared as sets by the classifier and the F3.4 gateway; a name
             // with separators or spaces could be mistaken for several names or an empty one.
             foreach (var (kind, names) in new[] { ("role", method.Authorization?.Roles), ("scope", method.Authorization?.Scopes) })
@@ -523,6 +525,50 @@ internal class InheritanceResolver : IInheritanceResolver
                     }
                 }
             }
+        }
+    }
+
+    /// <summary>
+    ///     M-6 (AB#6877, message 131): <c>execution.handler</c> is <c>service</c> or <c>pipeline</c>. A pipeline method
+    ///     declares an explicit <c>timeoutSeconds</c> (the pipeline run is bounded by it, the platform default is not
+    ///     a safe choice for a long-running pipeline) and is declared on a type, never on an interface: the pipeline
+    ///     binds by the well-known name equal to one qualified method id (<c>Model/Type.Method-1</c>), which an
+    ///     interface method — implemented by many types — does not have. A type that implements the interface
+    ///     redeclares the method with <c>handler: pipeline</c> itself (execution is not part of the invocation
+    ///     contract, rule 122).
+    /// </summary>
+    private static void ValidateMethodHandler(CkMethodDto method, object ckTypeId, string location,
+        OperationResult operationResult, bool isInterfaceMethod)
+    {
+        var handler = method.Execution?.Handler;
+        if (handler == null)
+        {
+            return;
+        }
+
+        if (!CkMethodHandlers.IsKnown(handler))
+        {
+            operationResult.AddMessage(MessageCodes.CkMethodHandlerInvalid(location, method.MethodId, ckTypeId,
+                $"unknown handler '{handler}' — use '{CkMethodHandlers.Service}' or '{CkMethodHandlers.Pipeline}' (lower-case)"));
+            return;
+        }
+
+        if (handler != CkMethodHandlers.Pipeline)
+        {
+            return;
+        }
+
+        if (method.Execution?.TimeoutSeconds == null)
+        {
+            operationResult.AddMessage(MessageCodes.CkMethodHandlerInvalid(location, method.MethodId, ckTypeId,
+                "a pipeline method must declare an explicit 'timeoutSeconds' (1-300)"));
+        }
+
+        if (isInterfaceMethod)
+        {
+            operationResult.AddMessage(MessageCodes.CkMethodHandlerInvalid(location, method.MethodId, ckTypeId,
+                "'pipeline' is not allowed on an interface method — the pipeline binds by the qualified method id of " +
+                "one type; redeclare the method on the implementing type with 'handler: pipeline'"));
         }
     }
 

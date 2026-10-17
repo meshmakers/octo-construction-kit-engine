@@ -364,6 +364,9 @@ internal static class MessageCodes
     internal static OperationMessage CkInconsistentVisibility(string? location, object element, object reason) =>
         GetMessage("CkInconsistentVisibility", location, element, reason);
 
+    internal static OperationMessage CkMethodHandlerInvalid(string? location, object methodId, object ckTypeId, object reason) =>
+        GetMessage("CkMethodHandlerInvalid", location, methodId, ckTypeId, reason);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1043,6 +1046,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  129, "'{element}' {reason}. (visibility consistency, ckLanguage 2: public elements reference only public elements of their model; public interface methods stay public)",
                  new [] {"element", "reason"})
+        },
+        {
+            "CkMethodHandlerInvalid",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 131, "Method '{methodId}' of '{ckTypeId}' declares an invalid 'execution.handler': {reason}",
+                 new [] {"methodId", "ckTypeId", "reason"})
         },
     };
 }

@@ -80,6 +80,35 @@ public class CkV2GraphJsonRoundTripTests(ITestOutputHelper output) : CkV2Resolve
     }
 
     [Fact]
+    public async Task PipelineHandler_SurvivesTheCacheJson_AndDefaultMethodsCarryNoHandlerKey()
+    {
+        var model = Model();
+        Type(model, "Tag").Methods =
+        [
+            new() { MethodId = "Ping-1", Execution = new() { TimeoutSeconds = 120, Handler = CkMethodHandlers.Pipeline } }
+        ];
+        var operationResult = new OperationResult();
+        var graph = Resolve(model, operationResult);
+        Assert.Empty(operationResult.Messages);
+
+        var cache = await RoundTripAsync(graph);
+
+        var ping = cache.GetRtCkType("target", new RtCkId<CkTypeId>($"{M}/Tag")).AllMethods["Ping-1"];
+        Assert.Equal(CkMethodHandlers.Pipeline, ping.Handler);
+        Assert.Equal(120, ping.TimeoutSeconds);
+        var changePassword = cache.GetRtCkType("target", new RtCkId<CkTypeId>($"{M}/Account")).AllMethods["ChangePassword-1"];
+        Assert.Equal(CkMethodHandlers.Service, changePassword.Handler);
+
+        // A model that does not use the key writes none into the cache JSON.
+        var plainSource = new CkCacheService(NullLogger<CkCacheService>.Instance);
+        plainSource.CreateTenant("plain");
+        plainSource.LoadCkModelGraph("plain", Resolve(Model(), new OperationResult()));
+        using var stream = new MemoryStream();
+        await plainSource.SaveCacheAsync("plain", stream);
+        Assert.DoesNotContain("\"handler\"", Encoding.UTF8.GetString(stream.ToArray()), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task V1Graph_CacheJsonHasNoCkV2Keys_AndRestoresDefaults()
     {
         var operationResult = new OperationResult();

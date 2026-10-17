@@ -84,7 +84,7 @@ public class CkSemVerClassificationGuardTests
     /// </summary>
     internal static readonly IReadOnlyList<string> ExpectedRuleRows =
     [
-        .. Rows("N", 5), .. Rows("I", 12), .. Rows("M", 14), .. Rows("T", 7), .. Rows("E", 2), .. Rows("R", 2),
+        .. Rows("N", 5), .. Rows("I", 12), .. Rows("M", 15), .. Rows("T", 7), .. Rows("E", 2), .. Rows("R", 2),
         .. Rows("A", 3), .. Rows("B", 4), .. Rows("D", 8)
     ];
 
@@ -685,6 +685,7 @@ public class CkSemVerClassificationGuardTests
             ["CkMethodAuthorizationDto.AllowSelf"] = m => Method(m).Authorization!.AllowSelf = false,
             ["CkMethodAuthorizationDto.Scopes"] = m => Method(m).Authorization!.Scopes = [],
             ["CkMethodExecutionDto.TimeoutSeconds"] = m => Method(m).Execution!.TimeoutSeconds = 60,
-            ["CkMethodExecutionDto.Idempotent"] = m => Method(m).Execution!.Idempotent = false
+            ["CkMethodExecutionDto.Idempotent"] = m => Method(m).Execution!.Idempotent = false,
+            ["CkMethodExecutionDto.Handler"] = m => Method(m).Execution!.Handler = CkMethodHandlers.Pipeline
         };
 }

@@ -30,4 +30,11 @@ public sealed record CkMethodGraph(CkId<CkTypeId> DeclaringCkTypeId, CkMethodDto
     /// </summary>
     [JsonIgnore]
     public int TimeoutSeconds => Definition.Execution?.TimeoutSeconds ?? CkMethodExecutionDto.DefaultTimeoutSeconds;
+
+    /// <summary>
+    ///     The effective handler kind, see <see cref="CkMethodHandlers" /> (AB#6877). <c>pipeline</c>: the deployed
+    ///     pipeline named like <see cref="QualifiedMethodId" /> implements the method, no service handler is expected.
+    /// </summary>
+    [JsonIgnore]
+    public string Handler => CkMethodHandlers.Effective(Definition.Execution?.Handler);
 }

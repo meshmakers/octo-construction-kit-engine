@@ -79,6 +79,9 @@ public class CkV2SchemaTests
               - methodId: Unlock-1
               - methodId: CreateMany-2
                 kind: Static
+                execution:
+                  timeoutSeconds: 90
+                  handler: pipeline
         records:
           - recordId: Address
             attributes:
@@ -163,6 +166,11 @@ public class CkV2SchemaTests
         Assert.Null(minimal.Authorization);
         Assert.Null(minimal.Execution);
         Assert.Equal(CkMethodKindDto.Static, user.Methods[2].Kind);
+        // AB#6877: the handler kind is read as authored; an omitted key stays null (default 'service').
+        Assert.Equal(CkMethodHandlers.Pipeline, user.Methods[2].Execution!.Handler);
+        Assert.Equal(90, user.Methods[2].Execution!.TimeoutSeconds);
+        Assert.Null(changePassword.Execution.Handler);
+        Assert.Equal(CkMethodHandlers.Service, CkMethodHandlers.Effective(changePassword.Execution.Handler));
     }
 
     [Theory]
@@ -181,6 +189,7 @@ public class CkV2SchemaTests
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        authorization: { anyone: true }\n", "unknown authorization key")]
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        execution: { timeoutSeconds: 0 }\n", "timeout below minimum")]
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        execution: { timeoutSeconds: 301 }\n", "timeout above maximum")]
+    [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        execution: { handler: 3 }\n", "handler is a string")]
     [InlineData("interfaces:\n  - interfaceId: Named\n    attributes:\n      - id: ${System}/Name\n        name: Name\n", "interface id without version")]
     [InlineData("interfaces:\n  - interfaceId: Named-1\n    extends: []\n", "empty extends")]
     [InlineData("interfaces:\n  - interfaceId: Named-1\n    extends:\n      - Base-1\n", "extends without model part")]
@@ -638,5 +647,6 @@ internal static class CkV2Assert
         Assert.Equal(expected.Authorization?.Scopes, actual.Authorization?.Scopes);
         Assert.Equal(expected.Execution?.TimeoutSeconds, actual.Execution?.TimeoutSeconds);
         Assert.Equal(expected.Execution?.Idempotent, actual.Execution?.Idempotent);
+        Assert.Equal(expected.Execution?.Handler, actual.Execution?.Handler);
     }
 }

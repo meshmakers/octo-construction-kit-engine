@@ -137,7 +137,11 @@ public class CkModelDiffService : ICkModelDiffService
                 nameof(CkMethodAuthorizationDto.Roles), nameof(CkMethodAuthorizationDto.AllowSelf),
                 nameof(CkMethodAuthorizationDto.Scopes)
             ],
-            [typeof(CkMethodExecutionDto)] = [nameof(CkMethodExecutionDto.TimeoutSeconds), nameof(CkMethodExecutionDto.Idempotent)]
+            [typeof(CkMethodExecutionDto)] =
+            [
+                nameof(CkMethodExecutionDto.TimeoutSeconds), nameof(CkMethodExecutionDto.Idempotent),
+                nameof(CkMethodExecutionDto.Handler)
+            ]
         };
 
     /// <summary>
@@ -233,7 +237,7 @@ public class CkModelDiffService : ICkModelDiffService
         Element(CkModelElementKind.TypeInterface);
         string[] methodProperties =
         [
-            "description", "signature", "visibility", "kind", "result", "timeoutSeconds", "idempotent", "authorization",
+            "description", "signature", "visibility", "kind", "result", "timeoutSeconds", "idempotent", "handler", "authorization",
             "roles", "scopes", "allowSelf"
         ];
         Element(CkModelElementKind.TypeMethod, methodProperties);
@@ -562,6 +566,11 @@ public class CkModelDiffService : ICkModelDiffService
                     FormatTimeout(baselineMethod), FormatTimeout(currentMethod));
                 AddModified(methodChanges, kind, id, "idempotent",
                     baselineMethod.Execution?.Idempotent ?? false, currentMethod.Execution?.Idempotent ?? false);
+                // AB#6877: the effective handler kind; an omitted key equals 'service', so adding the key with the
+                // default value is no change.
+                AddModified(methodChanges, kind, id, "handler",
+                    CkMethodHandlers.Effective(baselineMethod.Execution?.Handler),
+                    CkMethodHandlers.Effective(currentMethod.Execution?.Handler));
                 // AB#6338: a block added or removed is ONE change carrying both blocks (FormatAuthorization), so the
                 // classifier can compare them under default-deny; the field lines are only emitted when both versions
                 // declare a block (no contradictory "removed — looser" + "narrowed" lines).
@@ -666,7 +675,11 @@ public class CkModelDiffService : ICkModelDiffService
         var timeout = (method.Execution?.TimeoutSeconds ?? CkMethodExecutionDto.DefaultTimeoutSeconds)
             .ToString(CultureInfo.InvariantCulture);
         return $"{method.Kind} ({parameters}) -> {result}; errors [{errors}]; authorization {authorization}; " +
-               $"timeout {timeout}s, idempotent {FormatBool(method.Execution?.Idempotent ?? false)}";
+               $"timeout {timeout}s, idempotent {FormatBool(method.Execution?.Idempotent ?? false)}" +
+               // AB#6877: only a non-default handler is rendered, so the signature of existing methods is unchanged.
+               (CkMethodHandlers.Effective(method.Execution?.Handler) is var handler && handler != CkMethodHandlers.Service
+                   ? $", handler {handler}"
+                   : "");
     }
 
     private static void DiffAttributes(List<CkModelChange> changes, List<CkAttributeDto>? baseline,

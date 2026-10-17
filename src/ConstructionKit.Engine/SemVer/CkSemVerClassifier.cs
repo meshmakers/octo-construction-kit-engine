@@ -550,6 +550,12 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 return change.NewValue == "false"
                     ? (CkSemVerLevel.Major, "method no longer idempotent — callers that retry break (row M10)")
                     : (CkSemVerLevel.Minor, "method declared idempotent — relaxation (row M10)");
+            case "handler":
+                // AB#6877 row M15: service <-> pipeline moves the implementation to another runtime; the registered
+                // service handlers (or the deployed pipeline) of the previous version stop serving the method.
+                return (CkSemVerLevel.Major,
+                    "method handler kind changed (service ↔ pipeline) — the implementation moves to another runtime, " +
+                    "publish a new method version instead (row M15)");
             case "timeoutSeconds":
                 return (CkSemVerLevel.Minor, "method timeout changed — behavioural change, no contract break (row M11)");
             case "authorization":

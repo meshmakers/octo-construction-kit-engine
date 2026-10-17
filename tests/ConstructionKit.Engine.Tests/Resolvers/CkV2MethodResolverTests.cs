@@ -198,4 +198,99 @@ public class CkV2MethodResolverTests(ITestOutputHelper output) : CkV2ResolverTes
         Assert.True(Type(Model(), "Principal").Methods![0].Authorization!.AllowSelf);
         ResolveExpectingNoMessages(Model());
     }
+
+    // ── execution.handler (AB#6877, message 131) ─────────────────────────────────────
+
+    [Fact]
+    public void Code131_PipelineMethodWithExplicitTimeout_OK_AndReachesTheGraph()
+    {
+        var model = Model();
+        Type(model, "Tag").Methods =
+        [
+            new()
+            {
+                MethodId = "Ping-1", Execution = new() { TimeoutSeconds = 120, Handler = CkMethodHandlers.Pipeline }
+            }
+        ];
+
+        var operationResult = new OperationResult();
+        var graph = Resolve(model, operationResult);
+
+        Assert.Empty(operationResult.Messages);
+        var method = graph.Types[$"{M}/Tag"].AllMethods["Ping-1"];
+        Assert.Equal(CkMethodHandlers.Pipeline, method.Handler);
+        Assert.Equal(120, method.TimeoutSeconds);
+        Assert.Equal($"{M}/Tag.Ping-1", method.QualifiedMethodId);
+    }
+
+    [Fact]
+    public void Code131_PipelineMethodWithoutTimeout()
+    {
+        var model = Model();
+        Type(model, "Tag").Methods =
+        [
+            new() { MethodId = "Ping-1", Execution = new() { Handler = CkMethodHandlers.Pipeline, Idempotent = true } }
+        ];
+
+        var message = Assert.Single(ResolveExpectingOnly(model, 131));
+        Assert.Contains("Ping-1", message.MessageText);
+        Assert.Contains("timeoutSeconds", message.MessageText);
+    }
+
+    [Theory]
+    [InlineData("Pipeline")]
+    [InlineData("PIPELINE")]
+    [InlineData("script")]
+    [InlineData("")]
+    public void Code131_UnknownHandlerValue(string handler)
+    {
+        var model = Model();
+        Type(model, "Tag").Methods =
+        [
+            new() { MethodId = "Ping-1", Execution = new() { TimeoutSeconds = 10, Handler = handler } }
+        ];
+
+        var message = Assert.Single(ResolveExpectingOnly(model, 131));
+        Assert.Contains("Ping-1", message.MessageText);
+        Assert.Contains("unknown handler", message.MessageText);
+    }
+
+    [Fact]
+    public void Code131_PipelineOnAnInterfaceMethod()
+    {
+        var model = Model();
+        (model.Interfaces ??= []).Add(new CkInterfaceDto
+        {
+            InterfaceId = "Labeled-1",
+            Methods =
+            [
+                new() { MethodId = "Relabel-1", Execution = new() { TimeoutSeconds = 10, Handler = CkMethodHandlers.Pipeline } }
+            ]
+        });
+
+        var message = Assert.Single(ResolveExpectingOnly(model, 131));
+        Assert.Contains("Relabel-1", message.MessageText);
+        Assert.Contains("interface method", message.MessageText);
+    }
+
+    [Fact]
+    public void Code131_ExplicitServiceHandler_OK_AndImplementingTypeMayRedeclareAsPipeline()
+    {
+        var model = Model();
+        (model.Interfaces ??= []).Add(new CkInterfaceDto
+        {
+            InterfaceId = "Labeled-1",
+            Methods = [new() { MethodId = "Relabel-1", Execution = new() { Handler = CkMethodHandlers.Service } }]
+        });
+        var tag = Type(model, "Tag");
+        tag.Implements = [$"{M}/Labeled-1"];
+        // Execution is not part of the invocation contract (rule 122): the implementing type may bind the method to a
+        // pipeline itself.
+        tag.Methods =
+        [
+            new() { MethodId = "Relabel-1", Execution = new() { TimeoutSeconds = 30, Handler = CkMethodHandlers.Pipeline } }
+        ];
+
+        ResolveExpectingNoMessages(model);
+    }
 }

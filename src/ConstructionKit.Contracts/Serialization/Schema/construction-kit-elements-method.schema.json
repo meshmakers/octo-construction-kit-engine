@@ -199,6 +199,10 @@
         "idempotent": {
           "type": "boolean",
           "description": "Omitted = false."
+        },
+        "handler": {
+          "type": "string",
+          "description": "Who implements the method (AB#6877): 'service' (default; a service registers a handler) or 'pipeline' (the deployed pipeline whose well-known name equals the qualified method id handles the call). 'pipeline' requires an explicit timeoutSeconds and is not allowed on interface methods. Other values are rejected by the compiler (message 131)."
         }
       },
       "additionalProperties": false

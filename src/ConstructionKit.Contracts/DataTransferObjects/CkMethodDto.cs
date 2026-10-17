@@ -25,6 +25,37 @@ public enum CkMethodKindDto
 }
 
 /// <summary>
+///     The handler kinds of a CK method (CK v2 Phase 3, AB#6877), the values of
+///     <see cref="CkMethodExecutionDto.Handler" />. The values are lower-case, exactly as authored; any other value is
+///     rejected by the compiler (message 131).
+/// </summary>
+public static class CkMethodHandlers
+{
+    /// <summary>
+    ///     A service registers a handler for the method (default; the key is usually omitted).
+    /// </summary>
+    public const string Service = "service";
+
+    /// <summary>
+    ///     The method is implemented by a pipeline: the deployed pipeline whose well-known name equals the qualified
+    ///     method id (e.g. <c>Acme.Assets/Device.UpdateFirmware-1</c>) handles the call and no service handler is
+    ///     expected. Requires an explicit <see cref="CkMethodExecutionDto.TimeoutSeconds" /> and is not allowed on
+    ///     interface methods (message 131).
+    /// </summary>
+    public const string Pipeline = "pipeline";
+
+    /// <summary>
+    ///     True for a supported handler kind (ordinal, lower-case).
+    /// </summary>
+    public static bool IsKnown(string? handler) => handler is Service or Pipeline;
+
+    /// <summary>
+    ///     The effective handler kind: <paramref name="handler" />, or <see cref="Service" /> when omitted.
+    /// </summary>
+    public static string Effective(string? handler) => handler ?? Service;
+}
+
+/// <summary>
 ///     A method declared on a CK type or interface (CK v2, AB#5669) — a definition only, there is no invocation
 ///     runtime yet. Methods are inherited by derived and implementing types; a derived type must not re-declare an
 ///     inherited method id, and a type must not redeclare an interface method with another signature.
@@ -237,4 +268,13 @@ public class CkMethodExecutionDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public bool Idempotent { get; set; }
+
+    /// <summary>
+    ///     CK v2 Phase 3 (AB#6877): who implements the method, see <see cref="CkMethodHandlers" />. <c>null</c>
+    ///     (omitted) means <see cref="CkMethodHandlers.Service" />, so models that do not use the key serialize
+    ///     byte-identically. An unknown value is reported by the compiler (message 131), not by the schema. The runtime
+    ///     that routes <see cref="CkMethodHandlers.Pipeline" /> calls is AB#6879.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
+    public string? Handler { get; set; }
 }

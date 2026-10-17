@@ -351,12 +351,21 @@ internal class ContentGenerator(
                 var parameters = string.Join(", ", (method.Definition.Parameters ?? []).Select(p =>
                     $"{p.Name}{(p.IsOptional ? "?" : "")}: {p.ValueType}"));
                 await outputFile.WriteLineAsync(
-                        $"| {method.Definition.MethodId}{(method.Visibility == CkVisibilityDto.Internal ? " (internal)" : "")} | {method.Definition.Kind} | {parameters} | " +
+                        $"| {method.Definition.MethodId}{(method.Visibility == CkVisibilityDto.Internal ? " (internal)" : "")}{HandlerMarker(method.Definition)} | {method.Definition.Kind} | {parameters} | " +
                         $"{method.Definition.Result?.ValueType.ToString() ?? "-"} | {method.DeclaringCkTypeId.ToRtCkId().SemanticVersionedFullName} |")
                     .ConfigureAwait(false);
             }
         }
     }
+
+    /// <summary>
+    ///     AB#6877: <c> (handler: pipeline)</c> for a method that is not implemented by a service; empty for the default,
+    ///     so the documentation of existing models is unchanged.
+    /// </summary>
+    private static string HandlerMarker(CkMethodDto method) =>
+        CkMethodHandlers.Effective(method.Execution?.Handler) is var handler && handler != CkMethodHandlers.Service
+            ? $" (handler: {handler})"
+            : "";
 
     /// <summary>
     ///     CK v2 (AB#5667): one table per interface of the model with its members.

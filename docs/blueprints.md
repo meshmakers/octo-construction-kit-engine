@@ -560,6 +560,14 @@ public async Task UpdateTenantAsync(string tenantId)
 }
 ```
 
+### CK upgrade guard (AB#6871)
+
+`PreviewUpdateAsync` also reports which installed CK models the blueprint's `ckModelDependencies` would break (`CkUpdateSet`, `CkUpgradeBlockers`,
+`IsCkUpgradeBlocked`) when the host registers an `IBlueprintCkUpgradeGuard`. `ApplyUpdateAsync` / `ApplyBlueprintAsync` refuse a blocked set before
+the first change when `CkUpgradeGuard = BlueprintCkUpgradeGuardMode.Enforce` (result flag `IsCkUpgradeBlocked`, tenant unchanged); `ForceBreakingUpdate`
+proceeds and returns the forced blockers; `Off` (the default) never asks the guard on apply. See the engine `CLAUDE.md` and the user documentation
+(`constructionKits/blueprints.md#ck-upgrade-guard`).
+
 Updates do not create a tenant backup — take an external snapshot (e.g. the platform's tenant dump/backup jobs) beforehand if you need a safety net.
 
 ### What a successful update records

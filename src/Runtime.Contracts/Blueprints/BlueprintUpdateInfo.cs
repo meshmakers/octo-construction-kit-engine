@@ -110,6 +110,29 @@ public class BlueprintUpdatePreview
     /// Whether the update can proceed without manual intervention
     /// </summary>
     public bool CanProceed => Conflicts.Count == 0;
+
+    /// <summary>
+    /// The CK models (full ids) the update would install or raise and the tenant upgrade guard judged as one set
+    /// (CK v2 F2.5, AB#6871); empty when the update installs no CK model or the host has no guard.
+    /// </summary>
+    public List<string> CkUpdateSet { get; set; } = [];
+
+    /// <summary>
+    /// The installed models the CK update set would break. Empty when nothing breaks. Read-only information:
+    /// <see cref="CanProceed"/> is unchanged (an update with blockers can still be forced).
+    /// </summary>
+    public List<BlueprintCkUpgradeBlocker> CkUpgradeBlockers { get; set; } = [];
+
+    /// <summary>
+    /// True when the CK update set would break at least one installed model.
+    /// </summary>
+    public bool IsCkUpgradeBlocked => CkUpgradeBlockers.Count > 0;
+
+    /// <summary>
+    /// Set when the tenant upgrade guard could not judge the CK update set (English text); the preview is
+    /// otherwise complete. An enforcing apply fails closed in this case.
+    /// </summary>
+    public string? CkUpgradeGuardError { get; set; }
 }
 
 /// <summary>
@@ -398,6 +421,15 @@ public class BlueprintUpdateOptions
     /// stays kept. Ignored when <see cref="AllowBlanking" /> is true.
     /// </summary>
     public List<BlueprintBlankingConfirmation>? ConfirmedBlankings { get; set; }
+
+    /// <summary>
+    /// AB#6871: how a CK update set that would break an installed model is treated (tenant upgrade guard, CK v2
+    /// F2.5). Default <see cref="BlueprintCkUpgradeGuardMode.Off"/>: no enforcement, existing callers behave as
+    /// before. With <see cref="BlueprintCkUpgradeGuardMode.Enforce"/> the update is refused before the first change;
+    /// <see cref="BlueprintCkUpgradeGuardMode.ForceBreakingUpdate"/> proceeds and reports the blockers. A dry run
+    /// never refuses: it reports the blockers.
+    /// </summary>
+    public BlueprintCkUpgradeGuardMode CkUpgradeGuard { get; set; } = BlueprintCkUpgradeGuardMode.Off;
 }
 
 /// <summary>
@@ -469,4 +501,28 @@ public class BlueprintUpdateResult
     /// The new blueprint info after update
     /// </summary>
     public TenantBlueprintInfo? NewBlueprintInfo { get; set; }
+
+    /// <summary>
+    /// True when the update was refused because the CK models it installs or raises break an installed model
+    /// (tenant upgrade guard, AB#6871). <see cref="Success"/> is <c>false</c>, nothing was changed. On a dry run the
+    /// flag only reports what a real update would hit and <see cref="Success"/> stays <c>true</c>.
+    /// </summary>
+    public bool IsCkUpgradeBlocked { get; set; }
+
+    /// <summary>
+    /// True when the tenant upgrade guard itself could not judge the CK update set; the update failed closed and
+    /// nothing was changed.
+    /// </summary>
+    public bool CkUpgradeGuardFailed { get; set; }
+
+    /// <summary>
+    /// The installed models the CK update set breaks: the reason of a refusal, the blockers of a dry run, or the
+    /// blockers the caller forced past (<see cref="BlueprintCkUpgradeGuardMode.ForceBreakingUpdate"/>).
+    /// </summary>
+    public List<BlueprintCkUpgradeBlocker> CkUpgradeBlockers { get; set; } = [];
+
+    /// <summary>
+    /// The CK models (full ids) judged as one set; empty when the guard did not run.
+    /// </summary>
+    public List<string> CkUpdateSet { get; set; } = [];
 }

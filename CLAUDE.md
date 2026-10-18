@@ -260,6 +260,31 @@ Blueprints initialize tenants with pre-configured CK models and runtime data. Se
 
 Key services:
 - `IBlueprintService` - Applies blueprints to tenants
+- `IBlueprintCkUpgradeGuard` (host-registered, optional) - tenant upgrade guard for the CK models a blueprint installs or raises (CK v2 F2.5, AB#6871), see below
+
+#### Tenant upgrade guard in `BlueprintService` (CK v2 F2.5, AB#6871)
+
+A blueprint installs the floor of each `ckModelDependencies` range as an exact model version, so an apply or update can replace an installed model
+exactly like `ImportFromCatalog`. `BlueprintService` therefore asks an optional host service, `IBlueprintCkUpgradeGuard`
+(`Runtime.Contracts/Blueprints/IBlueprintCkUpgradeGuard.cs`; the guard of AB#6867 lives in engine-mongodb and needs the catalogs, so the host -
+asset-repo - implements the interface), to judge the **CK update set as one set** before anything is installed:
+
+- **Update set** (`EvaluateCkUpgradeGuardAsync`): every dependency whose floor is above the installed version or that is not installed
+  (`IRuntimeRepositoryProvider.GetSchemaVersionsAsync`, same rule as `EnsureCkModelInstalledAsync`: a satisfying-or-newer installed version is
+  kept and not judged). Judged for the aggregated dependencies of the install order (first-time apply) and for the target blueprint's own
+  dependencies (update). The implementation decides what it judges (asset-repo skips `System*`).
+- **Opt-in per call**, default off, so platform-internal callers (`TenantContext` applying service-managed blueprints) are unchanged:
+  `BlueprintApplyOptions.CkUpgradeGuard` (new overload `ApplyBlueprintAsync(tenantId, id, BlueprintApplyOptions, ct)`; the `bool force` overload is
+  `Off`) and `BlueprintUpdateOptions.CkUpgradeGuard`, mode `BlueprintCkUpgradeGuardMode` `Off` | `Enforce` | `ForceBreakingUpdate`.
+- **Enforce + blocked**: apply -> `BlueprintApplicationResult.CkUpgradeBlocked(...)` (`IsSuccess` false, `IsCkUpgradeBlocked`, `CkUpdateSet`,
+  `CkUpgradeBlockers`), update -> `BlueprintUpdateResult` (`Success` false, `IsCkUpgradeBlocked`, ...) **before the first CK model is installed**:
+  no `EnsureCkModelInstalledAsync`, no migrations, no installation row, no history entry. **ForceBreakingUpdate** proceeds and returns the
+  forced blockers in `CkUpgradeBlockers` (the host logs them with the caller). A failing guard fails closed in both modes
+  (`CkUpgradeGuardFailed`, nothing changed). A host without the registration runs unguarded.
+- **Preview** (`PreviewUpdateAsync`) always reports `CkUpdateSet`, `CkUpgradeBlockers` (`IsCkUpgradeBlocked`) and `CkUpgradeGuardError` (a failing
+  guard does not fail the preview); `CanProceed` is unchanged (entity conflicts only). **DryRun** of `ApplyUpdateAsync` never refuses: `Success` stays
+  true, `IsCkUpgradeBlocked` + blockers are reported, nothing is written.
+- Tests: `tests/Runtime.Engine.Tests/Blueprints/BlueprintServiceCkUpgradeGuardTests.cs`.
 
 #### Runtime-State Preservation on Re-Import (Upsert)
 

@@ -68,6 +68,31 @@ public class BlueprintApplicationResult
     public string? SkipReason { get; private init; }
 
     /// <summary>
+    /// True when the apply was refused because the CK models it would install or raise break an installed
+    /// model (tenant upgrade guard, AB#6871). Nothing was changed. <see cref="CkUpgradeBlockers"/> names what
+    /// would break; <see cref="IsSuccess"/> is <c>false</c>.
+    /// </summary>
+    public bool IsCkUpgradeBlocked { get; private init; }
+
+    /// <summary>
+    /// True when the tenant upgrade guard itself could not judge the CK update set. The apply failed closed and
+    /// nothing was changed.
+    /// </summary>
+    public bool CkUpgradeGuardFailed { get; private init; }
+
+    /// <summary>
+    /// The installed models the CK update set breaks. With <see cref="IsCkUpgradeBlocked"/> they are the reason of
+    /// the refusal; on a successful result they are the blockers the caller forced past
+    /// (<see cref="BlueprintCkUpgradeGuardMode.ForceBreakingUpdate"/>). Empty otherwise.
+    /// </summary>
+    public IReadOnlyList<BlueprintCkUpgradeBlocker> CkUpgradeBlockers { get; private init; } = [];
+
+    /// <summary>
+    /// The CK models (full ids) that were judged as one set; empty when the guard did not run.
+    /// </summary>
+    public IReadOnlyList<string> CkUpdateSet { get; private init; } = [];
+
+    /// <summary>
     /// Creates a successful result
     /// </summary>
     /// <param name="tenantId">The tenant id</param>
@@ -76,6 +101,8 @@ public class BlueprintApplicationResult
     /// <param name="appliedSeedDataFiles">List of applied seed data files</param>
     /// <param name="entitiesCreated">Number of entities created</param>
     /// <param name="operationResult">Operation result with messages</param>
+    /// <param name="forcedCkUpgradeBlockers">The blockers the caller forced past (AB#6871); none by default</param>
+    /// <param name="ckUpdateSet">The CK models (full ids) the tenant upgrade guard judged as one set; none by default</param>
     /// <returns>A successful result</returns>
     public static BlueprintApplicationResult Success(
         string tenantId,
@@ -83,7 +110,9 @@ public class BlueprintApplicationResult
         List<CkModelIdVersionRange> loadedCkModels,
         List<string> appliedSeedDataFiles,
         int entitiesCreated,
-        OperationResult operationResult)
+        OperationResult operationResult,
+        IReadOnlyList<BlueprintCkUpgradeBlocker>? forcedCkUpgradeBlockers = null,
+        IReadOnlyList<string>? ckUpdateSet = null)
     {
         return new BlueprintApplicationResult
         {
@@ -93,6 +122,52 @@ public class BlueprintApplicationResult
             LoadedCkModels = loadedCkModels,
             AppliedSeedDataFiles = appliedSeedDataFiles,
             EntitiesCreated = entitiesCreated,
+            OperationResult = operationResult,
+            CkUpgradeBlockers = forcedCkUpgradeBlockers ?? [],
+            CkUpdateSet = ckUpdateSet ?? []
+        };
+    }
+
+    /// <summary>
+    /// Creates the result of an apply that the tenant upgrade guard refused (AB#6871): nothing was changed.
+    /// </summary>
+    /// <param name="tenantId">The tenant id</param>
+    /// <param name="blueprintId">The blueprint id</param>
+    /// <param name="ckUpdateSet">The CK models (full ids) judged as one set</param>
+    /// <param name="blockers">The installed models the set would break</param>
+    /// <param name="operationResult">Operation result with the error message</param>
+    /// <returns>A failed result with <see cref="IsCkUpgradeBlocked"/> = <c>true</c></returns>
+    public static BlueprintApplicationResult CkUpgradeBlocked(
+        string tenantId,
+        BlueprintId blueprintId,
+        IReadOnlyList<string> ckUpdateSet,
+        IReadOnlyList<BlueprintCkUpgradeBlocker> blockers,
+        OperationResult operationResult)
+    {
+        return new BlueprintApplicationResult
+        {
+            IsSuccess = false,
+            IsCkUpgradeBlocked = true,
+            TenantId = tenantId,
+            BlueprintId = blueprintId,
+            CkUpdateSet = ckUpdateSet,
+            CkUpgradeBlockers = blockers,
+            OperationResult = operationResult
+        };
+    }
+
+    /// <summary>
+    /// Creates the result of an apply that failed closed because the tenant upgrade guard could not judge
+    /// the CK update set (AB#6871): nothing was changed.
+    /// </summary>
+    /// <param name="operationResult">Operation result with the error message</param>
+    /// <returns>A failed result with <see cref="CkUpgradeGuardFailed"/> = <c>true</c></returns>
+    public static BlueprintApplicationResult CkUpgradeGuardFailure(OperationResult operationResult)
+    {
+        return new BlueprintApplicationResult
+        {
+            IsSuccess = false,
+            CkUpgradeGuardFailed = true,
             OperationResult = operationResult
         };
     }

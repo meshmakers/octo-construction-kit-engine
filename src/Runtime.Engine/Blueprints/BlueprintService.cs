@@ -38,6 +38,7 @@ internal class BlueprintService : IBlueprintService
     private readonly IBlueprintDependencyResolver _dependencyResolver;
     private readonly ITenantBlueprintInstallations _installations;
     private readonly IBlueprintVariableProvider _variableProvider;
+    private readonly IBlueprintCkUpgradeGuard? _ckUpgradeGuard;
     private readonly ILogger<BlueprintService> _logger;
 
     // System CK attribute identifiers for blueprint tracking.
@@ -71,7 +72,8 @@ internal class BlueprintService : IBlueprintService
         IBlueprintDependencyResolver dependencyResolver,
         ITenantBlueprintInstallations installations,
         IBlueprintVariableProvider variableProvider,
-        ILogger<BlueprintService> logger)
+        ILogger<BlueprintService> logger,
+        IBlueprintCkUpgradeGuard? ckUpgradeGuard = null)
     {
         _ckCacheService = ckCacheService;
         _blueprintCatalogManager = blueprintCatalogManager;
@@ -87,6 +89,7 @@ internal class BlueprintService : IBlueprintService
         _installations = installations;
         _variableProvider = variableProvider;
         _logger = logger;
+        _ckUpgradeGuard = ckUpgradeGuard;
     }
 
     /// <summary>
@@ -201,12 +204,27 @@ internal class BlueprintService : IBlueprintService
     }
 
     /// <inheritdoc />
-    public async Task<BlueprintApplicationResult> ApplyBlueprintAsync(
+    public Task<BlueprintApplicationResult> ApplyBlueprintAsync(
         string tenantId,
         BlueprintId blueprintId,
         bool force = false,
         CancellationToken cancellationToken = default)
     {
+        return ApplyBlueprintAsync(tenantId, blueprintId, new BlueprintApplyOptions { Force = force },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<BlueprintApplicationResult> ApplyBlueprintAsync(
+        string tenantId,
+        BlueprintId blueprintId,
+        BlueprintApplyOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var force = options.Force;
+        IReadOnlyList<BlueprintCkUpgradeBlocker> forcedCkBlockers = [];
+        IReadOnlyList<string> judgedCkUpdateSet = [];
         var operationResult = new OperationResult();
         var loadedCkModels = new List<CkModelIdVersionRange>();
         var appliedSeedDataFiles = new List<string>();
@@ -306,6 +324,49 @@ internal class BlueprintService : IBlueprintService
             {
                 await NotifyApplyFailedAsync(tenantId, blueprintId, operationResult, correlationId).ConfigureAwait(false);
                 return BlueprintApplicationResult.Failed(operationResult);
+            }
+
+            // 2c. AB#6871: tenant upgrade guard. The CK models this apply installs or raises are judged as ONE set
+            //     against what the tenant holds, before the first model is installed: a blocked set is refused
+            //     (installation records, CK models and runtime data stay as they were) unless the caller forces it.
+            if (options.CkUpgradeGuard != BlueprintCkUpgradeGuardMode.Off && _ckUpgradeGuard != null)
+            {
+                CkUpgradeGuardOutcome outcome;
+                try
+                {
+                    outcome = await EvaluateCkUpgradeGuardAsync(tenantId, aggregatedCkDeps, cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogError(ex,
+                        "The CK upgrade guard could not judge blueprint {BlueprintId} for tenant {TenantId}",
+                        blueprintId, tenantId);
+                    operationResult.AddMessage(new OperationMessage(
+                        MessageLevel.Error, null, 54,
+                        $"The CK upgrade guard could not judge the CK models of blueprint '{blueprintId.FullName}': " +
+                        $"{ex.Message}. Nothing was changed."));
+                    await NotifyApplyFailedAsync(tenantId, blueprintId, operationResult, correlationId).ConfigureAwait(false);
+                    return BlueprintApplicationResult.CkUpgradeGuardFailure(operationResult);
+                }
+
+                judgedCkUpdateSet = outcome.UpdateSet;
+                if (outcome.Blockers.Count > 0)
+                {
+                    if (options.CkUpgradeGuard == BlueprintCkUpgradeGuardMode.Enforce)
+                    {
+                        operationResult.AddMessage(new OperationMessage(
+                            MessageLevel.Error, null, 55, DescribeRefusal(blueprintId, outcome)));
+                        await NotifyApplyFailedAsync(tenantId, blueprintId, operationResult, correlationId).ConfigureAwait(false);
+                        return BlueprintApplicationResult.CkUpgradeBlocked(
+                            tenantId, blueprintId, outcome.UpdateSet, outcome.Blockers, operationResult);
+                    }
+
+                    forcedCkBlockers = outcome.Blockers;
+                    _logger.LogInformation(
+                        "Blueprint {BlueprintId} is applied to tenant {TenantId} although its CK models break {Count} installed model(s) (forced)",
+                        blueprintId, tenantId, outcome.Blockers.Count);
+                }
             }
 
             // 3. Install missing CK model schemas into the tenant. The blueprint contract
@@ -518,7 +579,9 @@ internal class BlueprintService : IBlueprintService
                 loadedCkModels,
                 appliedSeedDataFiles,
                 entitiesCreated,
-                operationResult);
+                operationResult,
+                forcedCkBlockers,
+                judgedCkUpdateSet);
         }
         catch (Exception ex)
         {
@@ -647,6 +710,85 @@ internal class BlueprintService : IBlueprintService
                 "downgrade an installed CK model; nothing was installed. Update the blueprint to a version that " +
                 "supports the installed model, or move the tenant back into the range explicitly."));
         }
+    }
+
+    private sealed record CkUpgradeGuardOutcome(
+        IReadOnlyList<string> UpdateSet,
+        IReadOnlyList<BlueprintCkUpgradeBlocker> Blockers);
+
+    /// <summary>
+    /// AB#6871: reduces the CK dependencies of a blueprint to the models the install step really installs or raises
+    /// (the same rule as <c>EnsureCkModelInstalledAsync</c>: not installed, or installed below the floor - a
+    /// satisfying-or-newer installed version is kept) and asks the host's <see cref="IBlueprintCkUpgradeGuard"/> to
+    /// judge that set as one. Read-only. A failure propagates (the caller fails closed).
+    /// </summary>
+    private async Task<CkUpgradeGuardOutcome> EvaluateCkUpgradeGuardAsync(string tenantId,
+        IEnumerable<CkModelIdVersionRange> ckDependencies, CancellationToken cancellationToken)
+    {
+        var guard = _ckUpgradeGuard;
+        if (guard == null)
+        {
+            return new CkUpgradeGuardOutcome([], []);
+        }
+
+        var dependencies = ckDependencies.ToList();
+        if (dependencies.Count == 0)
+        {
+            return new CkUpgradeGuardOutcome([], []);
+        }
+
+        var installed = await _runtimeRepositoryProvider.GetSchemaVersionsAsync(tenantId, cancellationToken)
+            .ConfigureAwait(false);
+
+        var updateSet = new List<CkModelId>();
+        foreach (var dependency in dependencies)
+        {
+            var floor = dependency.ModelVersionRange.MinVersion;
+            if (floor == null)
+            {
+                continue;
+            }
+
+            if (installed.TryGetValue(dependency.Name, out var installedText)
+                && TryParseVersion(installedText, out var installedVersion)
+                && installedVersion.CompareTo(floor.Value) >= 0)
+            {
+                continue;
+            }
+
+            updateSet.Add(new CkModelId(dependency.Name, floor.Value.ToString()!));
+        }
+
+        if (updateSet.Count == 0)
+        {
+            return new CkUpgradeGuardOutcome([], []);
+        }
+
+        var blockers = await guard.EvaluateAsync(tenantId, updateSet, cancellationToken).ConfigureAwait(false);
+        return new CkUpgradeGuardOutcome(updateSet.Select(m => m.FullName).ToList(), blockers);
+    }
+
+    private static bool TryParseVersion(string text, out CkVersion version)
+    {
+        try
+        {
+            version = new CkVersion(text);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            version = default;
+            return false;
+        }
+    }
+
+    private static string DescribeRefusal(BlueprintId blueprintId, CkUpgradeGuardOutcome outcome)
+    {
+        var dependents = outcome.Blockers.Select(b => b.Dependent).Distinct(StringComparer.Ordinal).ToList();
+        return $"Blueprint '{blueprintId.FullName}' would install {string.Join(", ", outcome.UpdateSet)}, which " +
+               $"would break {dependents.Count} installed model(s): " +
+               $"{string.Join("; ", outcome.Blockers.Select(b => b.Message))}. Nothing was changed. Update the " +
+               "dependent models first, or repeat the request with ForceBreakingUpdate to proceed anyway.";
     }
 
     private async Task NotifyApplyFailedAsync(
@@ -902,6 +1044,10 @@ internal class BlueprintService : IBlueprintService
                 $"Blueprint '{targetVersion.Name}' is not currently applied to tenant - this will be a fresh application");
             preview.EntitiesToAdd = 1; // Placeholder - actual count would come from seed data analysis
 
+            // AB#6871: a first-time application installs the CK floors of the blueprint like an update does.
+            await AddCkUpgradeGuardToPreviewAsync(tenantId, targetVersion, null, preview, cancellationToken)
+                .ConfigureAwait(false);
+
             if (updateMode == BlueprintUpdateMode.Migration)
             {
                 // Nothing to migrate from: a migration script is defined per source version.
@@ -948,6 +1094,11 @@ internal class BlueprintService : IBlueprintService
             }
             return preview;
         }
+
+        // 3b. AB#6871: tenant upgrade guard - which installed models would the CK models of the target break?
+        //     Read-only; reported for every mode, enforced only by ApplyUpdateAsync.
+        await AddCkUpgradeGuardToPreviewAsync(tenantId, targetVersion, targetBlueprint, preview, cancellationToken)
+            .ConfigureAwait(false);
 
         // 4. Check for migration path if using Migration mode
         if (updateMode == BlueprintUpdateMode.Migration)
@@ -1075,6 +1226,53 @@ internal class BlueprintService : IBlueprintService
         }
 
         return preview;
+    }
+
+    /// <summary>
+    /// AB#6871: fills the CK update set and the blockers of a preview. A failure of the guard does not fail the
+    /// preview (old clients keep working): it is reported in <see cref="BlueprintUpdatePreview.CkUpgradeGuardError"/>
+    /// and an enforcing apply fails closed on it.
+    /// </summary>
+    private async Task AddCkUpgradeGuardToPreviewAsync(string tenantId, BlueprintId targetVersion,
+        BlueprintMetaRootDto? targetBlueprint, BlueprintUpdatePreview preview, CancellationToken cancellationToken)
+    {
+        if (_ckUpgradeGuard == null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (targetBlueprint == null)
+            {
+                var lookup = new OperationResult();
+                targetBlueprint = await _blueprintCatalogManager.GetAsync(targetVersion, lookup).ConfigureAwait(false);
+                if (lookup.HasErrors || targetBlueprint == null)
+                {
+                    return;
+                }
+            }
+
+            var outcome = await EvaluateCkUpgradeGuardAsync(tenantId, targetBlueprint.CkModelDependencies ?? [],
+                cancellationToken).ConfigureAwait(false);
+            preview.CkUpdateSet.AddRange(outcome.UpdateSet);
+            preview.CkUpgradeBlockers.AddRange(outcome.Blockers);
+            if (outcome.Blockers.Count > 0)
+            {
+                preview.Warnings.Add(
+                    $"CK upgrade guard: the CK models of {targetVersion.FullName} would break " +
+                    $"{outcome.Blockers.Select(b => b.Dependent).Distinct(StringComparer.Ordinal).Count()} installed " +
+                    "model(s) (see CkUpgradeBlockers); the update is refused unless it is forced.");
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex,
+                "The CK upgrade guard could not judge the preview of {TargetVersion} for tenant {TenantId}",
+                targetVersion, tenantId);
+            preview.CkUpgradeGuardError = ex.Message;
+            preview.Warnings.Add($"CK upgrade guard unavailable: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -1672,6 +1870,54 @@ internal class BlueprintService : IBlueprintService
                 {
                     result.Errors.Add($"Conflict: {conflict.Description}");
                 }
+                await NotifyUpdateFailedAsync(tenantId, targetVersion, result.Errors, correlationId).ConfigureAwait(false);
+                return result;
+            }
+
+            // 3b. AB#6871: tenant upgrade guard. The preview judged the CK models of the target as ONE set. A blocked
+            //     set is refused before the first change (installation record, CK models and runtime data stay as
+            //     they were) unless the caller forces it; a dry run only reports the blockers.
+            result.CkUpdateSet.AddRange(preview.CkUpdateSet);
+            var guardEnforced = options.CkUpgradeGuard != BlueprintCkUpgradeGuardMode.Off && _ckUpgradeGuard != null;
+            if (preview.CkUpgradeBlockers.Count > 0)
+            {
+                result.CkUpgradeBlockers.AddRange(preview.CkUpgradeBlockers);
+                if (options.DryRun)
+                {
+                    result.IsCkUpgradeBlocked = true;
+                }
+                else if (guardEnforced && options.CkUpgradeGuard == BlueprintCkUpgradeGuardMode.Enforce)
+                {
+                    result.Success = false;
+                    result.IsCkUpgradeBlocked = true;
+                    result.Errors.Add(
+                        $"The CK models of '{targetVersion.FullName}' ({string.Join(", ", preview.CkUpdateSet)}) would " +
+                        $"break {preview.CkUpgradeBlockers.Select(b => b.Dependent).Distinct(StringComparer.Ordinal).Count()} " +
+                        $"installed model(s): {string.Join("; ", preview.CkUpgradeBlockers.Select(b => b.Message))}. " +
+                        "Nothing was changed. Update the dependent models first, or repeat the request with " +
+                        "ForceBreakingUpdate to proceed anyway.");
+                    await NotifyUpdateFailedAsync(tenantId, targetVersion, result.Errors, correlationId).ConfigureAwait(false);
+                    return result;
+                }
+                else if (!guardEnforced)
+                {
+                    // Guard off (platform-internal callers): the blockers are information only.
+                    result.CkUpgradeBlockers.Clear();
+                }
+                else
+                {
+                    _logger.LogInformation(
+                        "Blueprint update of tenant {TenantId} to {TargetVersion} proceeds although its CK models break {Count} installed model(s) (forced)",
+                        tenantId, targetVersion, preview.CkUpgradeBlockers.Count);
+                }
+            }
+            else if (preview.CkUpgradeGuardError != null && guardEnforced && !options.DryRun)
+            {
+                result.Success = false;
+                result.CkUpgradeGuardFailed = true;
+                result.Errors.Add(
+                    $"The CK upgrade guard could not judge the CK models of '{targetVersion.FullName}': " +
+                    $"{preview.CkUpgradeGuardError}. Nothing was changed.");
                 await NotifyUpdateFailedAsync(tenantId, targetVersion, result.Errors, correlationId).ConfigureAwait(false);
                 return result;
             }

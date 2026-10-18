@@ -28,6 +28,28 @@ public interface IBlueprintService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Applies a blueprint like <see cref="ApplyBlueprintAsync(string, BlueprintId, bool, CancellationToken)"/>, with
+    /// the tenant upgrade guard of the CK models the blueprint installs or raises (CK v2 F2.5, AB#6871).
+    /// </summary>
+    /// <remarks>
+    /// With <see cref="BlueprintApplyOptions.CkUpgradeGuard"/> = <see cref="BlueprintCkUpgradeGuardMode.Enforce"/> the
+    /// apply stops before the first change when the CK update set would break an installed model: the result is not
+    /// successful, <see cref="BlueprintApplicationResult.IsCkUpgradeBlocked"/> is <c>true</c> and
+    /// <see cref="BlueprintApplicationResult.CkUpgradeBlockers"/> names what would break. The tenant and the
+    /// installation records are unchanged. A host without an <see cref="IBlueprintCkUpgradeGuard"/> applies unguarded.
+    /// </remarks>
+    /// <param name="tenantId">Target tenant identifier</param>
+    /// <param name="blueprintId">Blueprint to apply</param>
+    /// <param name="options">Re-apply and guard options</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Result of the blueprint application</returns>
+    Task<BlueprintApplicationResult> ApplyBlueprintAsync(
+        string tenantId,
+        BlueprintId blueprintId,
+        BlueprintApplyOptions options,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Validates that a blueprint can be applied (checks CK dependencies exist, seed data is valid, etc.)
     /// </summary>
     /// <param name="blueprintId">Blueprint to validate</param>

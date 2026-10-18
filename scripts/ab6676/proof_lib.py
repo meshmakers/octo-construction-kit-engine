@@ -269,27 +269,23 @@ def make_flow(args) -> None:
         "      - id: System.Communication/PipelineDefinition-1\n        value: |-\n" + indented, encoding="utf-8")
 
 # --------------------------------------------------------------------------------------------- adapter-online
-def _json_documents(text: str):
-    """Yield every JSON document found in the text: the whole text, then each line, then any value starting at a
-    '[' or '{' (octo-cli may print log lines before the JSON; compact and pretty-printed output both work)."""
-    dec = json.JSONDecoder()
+def _json_document(text: str):
+    """Return the JSON document of the text: the whole text, or the text after a log prefix (the document then
+    starts at the beginning of a line and runs to the end). A malformed document is rejected as a whole - never
+    a fragment inside it (octo-cli may print log lines before the JSON; compact and pretty output both work)."""
     try:
-        yield json.loads(text)
-        return
+        return json.loads(text)
     except ValueError:
         pass
-    pos = 0
-    while pos < len(text):
-        m = re.search(r"[\[{]", text[pos:])
-        if not m:
-            return
-        start = pos + m.start()
-        try:
-            obj, end = dec.raw_decode(text, start)
-            yield obj
-            pos = end
-        except ValueError:
-            pos = start + 1
+    offset = 0
+    for line in text.splitlines(keepends=True):
+        if line.lstrip()[:1] in ("[", "{"):
+            try:
+                return json.loads(text[offset:])
+            except ValueError:
+                pass
+        offset += len(line)
+    return None
 
 
 def _any_adapter_online(node) -> bool:
@@ -306,7 +302,7 @@ def _any_adapter_online(node) -> bool:
 def adapter_online_text(text: str) -> bool:
     """True when the `GetAdapters -j` output lists an adapter whose CommunicationState is Online, independent of
     the JSON whitespace (AB#6973). Empty, non-JSON or Offline output is False."""
-    return any(_any_adapter_online(doc) for doc in _json_documents(text))
+    return _any_adapter_online(_json_document(text))
 
 
 def adapter_online(args) -> None:
@@ -331,6 +327,8 @@ def selftest(args) -> None:
         ("empty output", "", False),
         ("error text", "Error: connection refused", False),
         ("empty list", "[]", False),
+        ("fragment inside a malformed document", 'Error: [{"CommunicationState":"Online"} INVALID]', False),
+        ("truncated document", '[{"CommunicationState":"Online"}', False),
     ]
     bad = 0
     for name, text, expected in cases:

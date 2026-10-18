@@ -363,3 +363,25 @@ public class BlueprintServiceCkUpgradeGuardTests
         AssertNothingInstalled();
     }
 }
+
+/// <summary>
+///     AB#6871: the six-parameter <c>BlueprintApplicationResult.Success</c> that earlier packages exposed still exists
+///     (a consumer compiled against it must not fail with a missing method).
+/// </summary>
+public class BlueprintApplicationResultCompatibilityTests
+{
+    [Fact]
+    public void Success_SixParameterForm_StillExists_AndCarriesNoGuardReport()
+    {
+        var method = typeof(BlueprintApplicationResult).GetMethod("Success",
+            [typeof(string), typeof(BlueprintId), typeof(List<CkModelIdVersionRange>), typeof(List<string>), typeof(int),
+                typeof(OperationResult)]);
+        Assert.NotNull(method);
+
+        var result = BlueprintApplicationResult.Success("t", new BlueprintId("Shop-1.0.0"), [], [], 0, new OperationResult());
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.CkUpgradeBlockers);
+        Assert.Empty(result.CkUpdateSet);
+    }
+}

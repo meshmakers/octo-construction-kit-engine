@@ -93,6 +93,28 @@ public class BlueprintApplicationResult
     public IReadOnlyList<string> CkUpdateSet { get; private init; } = [];
 
     /// <summary>
+    /// Creates a successful result (six-parameter form kept for consumers compiled against earlier packages)
+    /// </summary>
+    /// <param name="tenantId">The tenant id</param>
+    /// <param name="blueprintId">The blueprint id</param>
+    /// <param name="loadedCkModels">List of loaded CK models (as version ranges)</param>
+    /// <param name="appliedSeedDataFiles">List of applied seed data files</param>
+    /// <param name="entitiesCreated">Number of entities created</param>
+    /// <param name="operationResult">Operation result with messages</param>
+    /// <returns>A successful result</returns>
+    public static BlueprintApplicationResult Success(
+        string tenantId,
+        BlueprintId blueprintId,
+        List<CkModelIdVersionRange> loadedCkModels,
+        List<string> appliedSeedDataFiles,
+        int entitiesCreated,
+        OperationResult operationResult)
+    {
+        return Success(tenantId, blueprintId, loadedCkModels, appliedSeedDataFiles, entitiesCreated,
+            operationResult, null, null);
+    }
+
+    /// <summary>
     /// Creates a successful result
     /// </summary>
     /// <param name="tenantId">The tenant id</param>
@@ -111,8 +133,8 @@ public class BlueprintApplicationResult
         List<string> appliedSeedDataFiles,
         int entitiesCreated,
         OperationResult operationResult,
-        IReadOnlyList<BlueprintCkUpgradeBlocker>? forcedCkUpgradeBlockers = null,
-        IReadOnlyList<string>? ckUpdateSet = null)
+        IReadOnlyList<BlueprintCkUpgradeBlocker>? forcedCkUpgradeBlockers,
+        IReadOnlyList<string>? ckUpdateSet)
     {
         return new BlueprintApplicationResult
         {

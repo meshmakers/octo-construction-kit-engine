@@ -169,10 +169,32 @@ public class RollupConsistencyContractTests
         Assert.True(notChecked.IsNotChecked);
         Assert.False(report.IsOk);
         Assert.True(report.HasNotChecked);
+        Assert.True(report.HasBlockingNotChecked);
         Assert.True(new RollupConsistencyReport([consistent], DateTime.UtcNow).IsOk);
         Assert.False(new RollupConsistencyReport([consistent], DateTime.UtcNow).HasNotChecked);
         // After a repair whose final validation still has an unchecked rollup, the repair is not ok.
         Assert.False(new RollupRepairReport(false, report, [], report, null).IsOk);
+    }
+
+    [Fact]
+    public void ARollupThatWasNeverActivated_IsListedAsInformation_AndDoesNotBlock()
+    {
+        var info = new RollupConsistencyEntry(Rt, [],
+            new RollupNotChecked(RollupNotCheckedCause.NeverActivated, "Never activated."));
+        var report = new RollupConsistencyReport([info], DateTime.UtcNow);
+
+        Assert.True(info.IsNotChecked);
+        Assert.False(info.NotChecked!.IsBlocking);
+        Assert.False(info.IsBlockedByNotChecked);
+        Assert.True(info.IsOk);
+        Assert.True(report.IsOk);
+        Assert.True(report.HasNotChecked);
+        Assert.False(report.HasBlockingNotChecked);
+        // A finding next to an informational gap still makes the entry not ok.
+        var withFinding = info with { Findings = [new RollupConsistencyFinding(RollupConsistencyCheck.MissingGenerationMap, "m")] };
+        Assert.False(withFinding.IsOk);
+        Assert.True(new RollupNotChecked(RollupNotCheckedCause.NoLiveTable, "x").IsBlocking);
+        Assert.True(new RollupNotChecked(RollupNotCheckedCause.SourceMissing, "x").IsBlocking);
     }
 
     [Fact]

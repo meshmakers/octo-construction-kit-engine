@@ -361,9 +361,9 @@ public interface IStreamDataRepository
     /// Checks rollups for the inconsistencies a restore (or a dump taken during a recompute) can leave: a pointer without rows, rows
     /// above the pointer, a watermark ahead of the rows, a missing generation map (<see cref="RollupConsistencyCheck"/>). Read only:
     /// counts and MAX/MIN statements, no row is exported, nothing is changed. Does not throw for an inconsistent rollup; the report
-    /// lists it. A rollup that cannot be checked (no table, never activated, a source missing) is listed with
+    /// lists it. A rollup that cannot be checked (no table, a source missing) is listed with
     /// <see cref="RollupConsistencyEntry.NotChecked"/> and makes <see cref="RollupConsistencyReport.IsOk"/> false: "nothing found"
-    /// never means "not looked at".
+    /// never means "not looked at". A rollup that was never activated is listed too, as information only (it has no data).
     /// </summary>
     /// <param name="rollupRtIds">The rollups to check; <c>null</c> checks every rollup archive of the tenant.</param>
     /// <param name="cancellationToken">Cancels the check.</param>

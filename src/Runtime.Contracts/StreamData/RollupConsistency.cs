@@ -48,7 +48,7 @@ public enum RollupNotCheckedCause
     /// <summary>The rollup has no table (status other than Created): a restore that failed to load it leaves this state.</summary>
     NoLiveTable = 0,
 
-    /// <summary>The rollup was never activated (status Created) and has no table.</summary>
+    /// <summary>The rollup was never activated (status Created) and has no table. Informational: it does not make the report not ok.</summary>
     NeverActivated = 1,
 
     /// <summary>A source archive of the rollup is missing (no entity, or an activated source without a table), so the watermark check cannot be decided.</summary>
@@ -58,7 +58,16 @@ public enum RollupNotCheckedCause
 /// <summary>What the validator could not check of a rollup, and why.</summary>
 /// <param name="Cause">The kind of gap.</param>
 /// <param name="Reason">English text for logs, reports and the CLI.</param>
-public sealed record RollupNotChecked(RollupNotCheckedCause Cause, string Reason);
+public sealed record RollupNotChecked(RollupNotCheckedCause Cause, string Reason)
+{
+    /// <summary>
+    /// True when the gap makes the entry (and the report) not ok and keeps the restore reconcile marker. False for
+    /// <see cref="RollupNotCheckedCause.NeverActivated"/>: a rollup that was never activated has no data, so nothing can be
+    /// inconsistent, and blocking the tenant's rollups for it would stop forward aggregation, recompute and reclaim for good.
+    /// Informational entries are still listed so that a reader sees that the rollup was not looked at.
+    /// </summary>
+    public bool IsBlocking => Cause != RollupNotCheckedCause.NeverActivated;
+}
 
 /// <summary>The validator's result for one rollup.</summary>
 /// <param name="RollupRtId">The rollup.</param>
@@ -67,11 +76,17 @@ public sealed record RollupNotChecked(RollupNotCheckedCause Cause, string Reason
 public sealed record RollupConsistencyEntry(
     OctoObjectId RollupRtId, IReadOnlyList<RollupConsistencyFinding> Findings, RollupNotChecked? NotChecked = null)
 {
-    /// <summary>True when a check could not run (see <see cref="NotChecked"/>).</summary>
+    /// <summary>True when a check could not run (see <see cref="NotChecked"/>), whether or not that blocks.</summary>
     public bool IsNotChecked => NotChecked is not null;
 
-    /// <summary>True when every check ran and none found anything. An entry that was not checked is never ok.</summary>
-    public bool IsOk => Findings.Count == 0 && NotChecked is null;
+    /// <summary>True when the rollup could not be checked in a way that matters (see <see cref="RollupNotChecked.IsBlocking"/>).</summary>
+    public bool IsBlockedByNotChecked => NotChecked is { IsBlocking: true };
+
+    /// <summary>
+    /// True when no check found anything and no blocking gap remains. A rollup that was not checked is not ok, except one that was
+    /// never activated (informational: it has no data).
+    /// </summary>
+    public bool IsOk => Findings.Count == 0 && !IsBlockedByNotChecked;
 }
 
 /// <summary>The validator's result for a tenant: one entry per rollup.</summary>
@@ -80,8 +95,11 @@ public sealed record RollupConsistencyReport(IReadOnlyList<RollupConsistencyEntr
     /// <summary>True when every rollup is checked and consistent (also when there is none). A rollup that was not checked makes it false.</summary>
     public bool IsOk => Rollups.All(r => r.IsOk);
 
-    /// <summary>True when at least one rollup could not be checked.</summary>
+    /// <summary>True when at least one rollup could not be checked, informational entries included.</summary>
     public bool HasNotChecked => Rollups.Any(r => r.IsNotChecked);
+
+    /// <summary>True when at least one rollup could not be checked in a way that makes the report not ok.</summary>
+    public bool HasBlockingNotChecked => Rollups.Any(r => r.IsBlockedByNotChecked);
 }
 
 /// <summary>What a repair step does.</summary>

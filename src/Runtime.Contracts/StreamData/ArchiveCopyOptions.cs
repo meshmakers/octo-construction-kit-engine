@@ -35,6 +35,21 @@ public sealed record ArchiveCopyOptions
     /// </summary>
     public int MaxMapAttempts { get; init; } = DefaultMaxMapAttempts;
 
+    /// <summary>
+    /// When <c>false</c> a dump of a rollup copies it once, does not compare the generation map before and after, and returns
+    /// normally with <c>Attempts = 1</c> even if a recompute moved the map meanwhile. Default <c>true</c> (the repeat rule).
+    /// For characterisation tests that show what the repeat rule prevents; not for production use.
+    /// </summary>
+    public bool RepeatOnMovedMap { get; init; } = true;
+
+    /// <summary>
+    /// Called by <see cref="IStreamDataRepository.DumpArchiveToStagingAsync"/> at the phases of <see cref="ArchiveCopyPhase"/> and
+    /// awaited before the dump goes on; <c>null</c> = nothing. For tests and diagnostics (e.g. to run a recompute at an exact moment
+    /// of a dump); the arguments are the phase and the number of the attempt (from 1). Exceptions it throws end the dump.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Func<ArchiveCopyPhase, int, System.Threading.CancellationToken, System.Threading.Tasks.Task>? PhaseObserver { get; init; }
+
     /// <summary>Command timeout of the segment merge.</summary>
     public TimeSpan OptimizeTimeout { get; init; } = DefaultOptimizeTimeout;
 
@@ -67,4 +82,14 @@ public sealed record ArchiveCopyOptions
             throw new ArgumentOutOfRangeException(nameof(OptimizeTimeout), "The optimize timeout must be positive.");
         }
     }
+}
+
+/// <summary>The moments of the dump of a rollup that <see cref="ArchiveCopyOptions.PhaseObserver"/> is told about.</summary>
+public enum ArchiveCopyPhase
+{
+    /// <summary>The generation map of an attempt was read; its data slices are not copied yet.</summary>
+    MapRead = 0,
+
+    /// <summary>The last data slice of an attempt was copied; the map is not read a second time yet.</summary>
+    DataCopied = 1
 }

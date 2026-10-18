@@ -253,6 +253,11 @@ cache from the database that the restore is about to replace. The answer is the 
 tenant-bound `IStreamDataRepository.CheckStagingCopyReadinessAsync` gives (both delegate to one piece of code), and
 asking changes nothing in the cluster.
 
+**Order of the archives: every source before the rollups that read it** (raw archives first, then rollups by the length of their source
+chain). A rollup can be activated only while its source is `Activated`, and the dump lists the archives in no dependency order. A source
+that was not `Activated` in the backup but has rollups stays `Activated` - with the restore reconcile marker set, which keeps forward
+aggregation and recompute away from the tenant - until those rollups are restored, and is set back to `Disabled` at the end.
+
 Per archive of the manifest that exists after the MongoDB restore and passes the schema match:
 
 1. Disable, drop the table and its generation map, activate (the platform creates both tables with
@@ -274,7 +279,9 @@ Per archive of the manifest that exists after the MongoDB restore and passes the
 8. **Reconcile the rollups of the tenant** (AB#6968), once all archives of the tenant are loaded: set the marker
    *restore reconcile pending* (`SetRestoreReconcilePendingAsync(true)`; it stays set until step 11), run the validator, repair, validate again.
    The restore result carries both reports.
-9. `ValidateRollupsAsync`: a pointer entry whose generation has no rows, rows above every covering pointer entry, a watermark ahead of the
+9. `ValidateRollupsAsync`: a pointer entry whose generation has no rows **where a source holds rows in that range** (an entry over a range the
+   source is empty in is a correct empty recompute or backfill, not a finding; a rollup source counts only the rows live under its own pointer),
+   rows above every covering pointer entry, a watermark ahead of the
    last rollup row while a source holds rows in between, a rollup without its generation map. Read only, counts and MIN/MAX. A rollup that cannot
    be looked at (no table, a source missing) is reported as *not checked* with the reason and makes the report not ok; "nothing
    found" never means "not looked at". The repair skips such a rollup and the marker stays set. A rollup that was never activated is listed
@@ -282,6 +289,10 @@ Per archive of the manifest that exists after the MongoDB restore and passes the
 10. `RepairRollupsAsync` (skipped when the validator reports ok): create the map, delete the orphans, recompute only the ranges that have
     no rows, rewind a watermark that is ahead of the rows (the forward aggregation fills the gap). A dry run lists the steps.
 11. When the second validation is ok the repair clears the marker; a failing repair names the failing step and **leaves the marker set**.
+    The marker is also kept while an archive of the backup failed to restore (the job knows the manifest, the validator does not), a repair of
+    only some rollups clears it only when the whole tenant validates ok, and deleting a tenant removes the marker, the repair queue rows and
+    the sweep records together with the archive tables (`IStreamDataRepositoryFactory.DeleteTenantStateAsync`; the shared schema keeps a
+    neighbour tenant's rows), so a tenant created again under the same id starts without a marker.
 
 While the marker is set the tenant's rollups are not aggregated further, recomputed or swept (the host skips the tenant, a direct call is
 refused with `RestoreReconcilePendingException`); everything that reads works. A tenant and a backup without the marker (everything made

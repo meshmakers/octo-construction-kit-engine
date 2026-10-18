@@ -220,6 +220,29 @@ flowchart TD
 - **Statements run as maintenance statements** (`CrateStatementClass.Maintenance`) with a command
   timeout of their own for the copy.
 
+### Placement matrix: where a recompute can hit a dump
+
+Measured with real recomputes against a real CrateDB (AB#6968; asset-repo integration tests, 34 cases, 18 s). Each cell gives the
+defects found in the restored rollup, in this order: *empty windows / windows differing from the source at map-read time / orphan
+rows above the pointer / pointers without rows*. "No flip" and "flip before the dump" are 0/0/0/0 in every column.
+
+| Placement of the flip | Grace off, repeat off | Grace off, repeat on | Grace on, repeat off | Grace on, repeat on |
+|---|---|---|---|---|
+| between map copy and data copy | 6/0/1/1 | 2 attempts, 0/0/0/0 | 0/0/1/0 | 2 attempts, 0/0/0/0 |
+| flip and sweep between map copy and data copy | 6/0/1/1 | 2 attempts, 0/0/0/0 | 0/0/1/0 | 2 attempts, 0/0/0/0 |
+| flip after the data | 0/0/0/0 | 2 attempts, 0/0/0/0 | 0/0/0/0 | 2 attempts, 0/0/0/0 |
+| flip and sweep after the data | 0/0/0/0 | 2 attempts, 0/0/0/0 | 0/0/0/0 | 2 attempts, 0/0/0/0 |
+| flip after the dump | 0/0/0/0 | 1 attempt, 0/0/0/0 | 0/0/0/0 | 1 attempt, 0/0/0/0 |
+
+The pass criterion is the column *grace on, repeat on*: all 0/0/0/0 and the validator ok. The grace period prevents the empty windows and the
+pointer without rows: the sweep does not remove the generation the copied map names, so its rows are in the data copy. The repeat rule
+catches the orphan rows of the new generation that the old map does not name, by copying the rollup again. "Flip after the data" also
+repeats, because the second read of the map sees the moved pointer even though the files were consistent; a repeat costs time, not
+correctness. Test classes `PlacementMatrixGraceOffTests` and `PlacementMatrixGraceOnTests` (`PlacementMatrixCases.cs`) in
+`octo-asset-repo-services/tests/AssetRepositoryServices.IntegrationTests/StreamData`; run them with
+`dotnet test -c DebugL --filter "FullyQualifiedName~PlacementMatrix"` (Docker needed, see the README of that test project). The
+engine seams they use are `ArchiveCopyOptions.PhaseObserver` and `RepeatOnMovedMap`.
+
 ## §7 Restore
 
 Per archive of the manifest that exists after the MongoDB restore and passes the schema match:

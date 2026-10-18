@@ -30,6 +30,26 @@ public class RollupConsistencyContractTests
         Assert.Throws<ArchiveCopyNotSupportedException>(() => { _ = repo.RepairRollupsAsync(null, true, Ct); });
         Assert.Throws<ArchiveCopyNotSupportedException>(() => { _ = repo.IsRestoreReconcilePendingAsync(Ct); });
         Assert.Throws<ArchiveCopyNotSupportedException>(() => { _ = repo.SetRestoreReconcilePendingAsync(true, Ct); });
+        Assert.Throws<ArchiveCopyNotSupportedException>(() => { _ = repo.EnqueueRollupRepairAsync(null, Ct); });
+        Assert.Throws<ArchiveCopyNotSupportedException>(() => { _ = repo.GetRollupRepairRequestAsync("x", Ct); });
+    }
+
+    [Fact]
+    public async Task RepairRequest_RoundTripsThroughJson_AndNoPendingRepairsMeansNothingRuns()
+    {
+        IStreamDataRepository repo = new StreamDataRepositoryStub();
+        Assert.Equal(0, await repo.RunPendingRollupRepairsAsync(Ct));
+
+        var empty = new RollupConsistencyReport([], new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc));
+        var request = new RollupRepairRequest("r1", RollupRepairRequestState.Failed, empty.GeneratedAtUtc, empty.GeneratedAtUtc,
+            [new RollupRepairAction(Rt, RollupRepairKind.DeleteOrphans, "d", RollupRepairStatus.Planned)],
+            new RollupRepairReport(false, empty, [], empty, "step failed"));
+
+        var back = JsonSerializer.Deserialize<RollupRepairRequest>(JsonSerializer.Serialize(request))!;
+
+        Assert.Equal(RollupRepairRequestState.Failed, back.State);
+        Assert.Equal("step failed", back.Report!.FailedStep);
+        Assert.Equal(request.PlannedActions, back.PlannedActions);
     }
 
     [Fact]

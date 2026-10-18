@@ -240,6 +240,19 @@ Per archive of the manifest that exists after the MongoDB restore and passes the
    (`OPTIMIZE … max_num_segments = 1`, can be switched off), refresh, compare the table's row count
    with the manifest.
 7. Restore the archive's backed-up status (enable only what was Activated), as today.
+8. **Reconcile the rollups of the tenant** (AB#6968), once all archives of the tenant are loaded: set the marker
+   *restore reconcile pending* (`SetRestoreReconcilePendingAsync(true)`; it stays set until step 11), run the validator, repair, validate again.
+   The restore result carries both reports.
+9. `ValidateRollupsAsync`: a pointer entry whose generation has no rows, rows above every covering pointer entry, a watermark ahead of the
+   last rollup row while a source holds rows in between, a rollup without its generation map. Read only, counts and MIN/MAX.
+10. `RepairRollupsAsync` (skipped when the validator reports ok): create the map, delete the orphans, recompute only the ranges that have
+    no rows, rewind a watermark that is ahead of the rows (the forward aggregation fills the gap). A dry run lists the steps.
+11. When the second validation is ok the repair clears the marker; a failing repair names the failing step and **leaves the marker set**.
+
+While the marker is set the tenant's rollups are not aggregated further, recomputed or swept (the host skips the tenant, a direct call is
+refused with `RestoreReconcilePendingException`); everything that reads works. A tenant and a backup without the marker (everything made
+before this feature) are not affected. A backup of format 1 carries no generation map: its rollup rows are loaded as they are and
+the reconcile step brings them in line (see the repair for what is removed as orphans).
 
 **NULL in a column that has a DEFAULT is not preserved.** `COPY TO` leaves NULL values out of the
 line and `COPY FROM` applies the column default to a missing value, so a NULL
@@ -248,7 +261,9 @@ a column with a default is not meant to hold NULL, and the platform never writes
 without a default keep their NULL.
 
 A failed archive is reported and the job continues with the next one (decision 4 of AB#4231). The
-rollup tables come back row for row, so no rollup has to be recomputed after a restore.
+rollup tables come back row for row, so no rollup has to be recomputed after a restore - unless the validator of step 8 finds the
+rollup inconsistent (a dump taken while a recompute ran, a backup of format 1, a lost map), in which case the repair recomputes exactly the
+affected ranges.
 
 Restore under another tenant id and on another environment works as today: the files hold no tenant
 id, and the target schema and table names are derived from the target tenant. The two environments

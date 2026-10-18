@@ -94,6 +94,40 @@ public sealed record RollupRepairAction(
     long? Generation = null,
     string? Error = null);
 
+/// <summary>Where a queued rollup repair stands.</summary>
+public enum RollupRepairRequestState
+{
+    /// <summary>Recorded, not started: the host's recompute tick picks it up.</summary>
+    Pending = 0,
+
+    /// <summary>A tick is running it.</summary>
+    Running = 1,
+
+    /// <summary>Finished without a failing step and the final validation is ok; the restore reconcile marker is cleared.</summary>
+    Done = 2,
+
+    /// <summary>A step failed or the tenant is still inconsistent; the report names the step, the marker stays.</summary>
+    Failed = 3
+}
+
+/// <summary>
+/// A repair that was queued with <see cref="IStreamDataRepository.EnqueueRollupRepairAsync"/>: durable (a restart does not lose it)
+/// and run by the host's recompute tick, not under the request that queued it.
+/// </summary>
+/// <param name="RequestId">Identifies the request for <see cref="IStreamDataRepository.GetRollupRepairRequestAsync"/>.</param>
+/// <param name="State">Where it stands.</param>
+/// <param name="RequestedAtUtc">When it was queued.</param>
+/// <param name="FinishedAtUtc">When it ended; <c>null</c> while pending or running.</param>
+/// <param name="PlannedActions">The steps the repair planned when it was queued (a dry run).</param>
+/// <param name="Report">The report of the run (validate, repair, validate); <c>null</c> until it ended.</param>
+public sealed record RollupRepairRequest(
+    string RequestId,
+    RollupRepairRequestState State,
+    DateTime RequestedAtUtc,
+    DateTime? FinishedAtUtc,
+    IReadOnlyList<RollupRepairAction> PlannedActions,
+    RollupRepairReport? Report);
+
 /// <summary>
 /// What <see cref="IStreamDataRepository.RepairRollupsAsync"/> did: the validation before, every step, the validation after.
 /// </summary>

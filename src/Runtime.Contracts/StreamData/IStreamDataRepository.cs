@@ -369,6 +369,31 @@ public interface IStreamDataRepository
         => throw new ArchiveCopyNotSupportedException();
 
     /// <summary>
+    /// Queues a repair (<see cref="RepairRollupsAsync"/>) instead of running it under the caller: the plan is recorded durably
+    /// (the request returns at once with the planned steps) and the host's recompute tick runs it, also after a restart
+    /// (<see cref="RunPendingRollupRepairsAsync"/>). The repair clears the restore reconcile marker when its final validation
+    /// is ok; if a step fails the request is <see cref="RollupRepairRequestState.Failed"/>, its report names the step, and the
+    /// marker stays. For the REST, CLI and MCP surfaces, where an inline repair of a large tenant would outlive the request.
+    /// </summary>
+    /// <exception cref="ArchiveCopyNotSupportedException">The repository does not support the repair.</exception>
+    Task<RollupRepairRequest> EnqueueRollupRepairAsync(
+        IReadOnlyCollection<OctoObjectId>? rollupRtIds = null,
+        CancellationToken cancellationToken = default)
+        => throw new ArchiveCopyNotSupportedException();
+
+    /// <summary>The state and, once it ended, the report of a queued repair; <c>null</c> for an unknown id.</summary>
+    /// <exception cref="ArchiveCopyNotSupportedException">The repository does not support the repair.</exception>
+    Task<RollupRepairRequest?> GetRollupRepairRequestAsync(string requestId, CancellationToken cancellationToken = default)
+        => throw new ArchiveCopyNotSupportedException();
+
+    /// <summary>
+    /// Runs the queued repairs of the tenant that are pending (or were left running by a process that died). Returns how many
+    /// were run. Called by the host's recompute tick, which does not hold a marked tenant back from this call.
+    /// </summary>
+    Task<int> RunPendingRollupRepairsAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(0);
+
+    /// <summary>
     /// True while the tenant is marked <em>restore reconcile pending</em>: a restore with archive data finished and the rollups were not
     /// yet validated ok or repaired. While it is set, reclaim, forward aggregation and recompute do not run for the tenant. Absent
     /// marker = not pending, so tenants and backups from before this feature work unchanged.

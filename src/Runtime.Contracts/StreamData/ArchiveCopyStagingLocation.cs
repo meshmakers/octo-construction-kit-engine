@@ -130,7 +130,12 @@ public sealed class ArchiveCopyStagingLocation
                 nameof(relativePath));
         }
 
-        return new ArchiveCopyStagingLocation(_uri.TrimEnd('/') + "/" + string.Join('/', segments), _options);
+        // The folder belongs to the path, so it goes in front of a query string or fragment (a signed URL keeps its signature).
+        var queryOrFragment = _uri.IndexOfAny(['?', '#']);
+        var pathEnd = queryOrFragment < 0 ? _uri.Length : queryOrFragment;
+        var path = _uri.Substring(0, pathEnd).TrimEnd('/');
+        return new ArchiveCopyStagingLocation(
+            path + "/" + string.Join('/', segments) + _uri.Substring(pathEnd), _options);
     }
 
     /// <summary>

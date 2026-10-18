@@ -153,6 +153,32 @@ public class ArchiveCopyStagingLocationTests
     }
 
     [Fact]
+    public void Scrub_RemovesTheValuesOfAQueryStringAndFragmentOfTheUri()
+    {
+        var location = new ArchiveCopyStagingLocation(
+            "az://acct.blob.core.windows.net/c/p?sv=2024&sig=QUERYSIGCANARY%2Fx&se=QUERYEXPCANARY#FRAGCANARY");
+        var echoes = new[]
+        {
+            "request failed for sig QUERYSIGCANARY/x",
+            "request failed for sig QUERYSIGCANARY%2Fx",
+            "expiry QUERYEXPCANARY is in the past",
+            "fragment FRAGCANARY was refused",
+            "url az://acct.blob.core.windows.net/c/p?sv=2024&sig=QUERYSIGCANARY%2Fx&se=QUERYEXPCANARY#FRAGCANARY"
+        };
+
+        foreach (var echo in echoes)
+        {
+            var scrubbed = location.Scrub(echo);
+            foreach (var canary in new[] { "QUERYSIGCANARY", "QUERYEXPCANARY", "FRAGCANARY" })
+            {
+                Assert.False(scrubbed.Contains(canary, StringComparison.Ordinal), $"Scrub shows '{canary}': {scrubbed}");
+            }
+        }
+
+        Assert.Contains("is in the past", location.Scrub(echoes[2]));
+    }
+
+    [Fact]
     public void Scrub_OnNullOrEmpty_ReturnsEmpty()
     {
         Assert.Equal(string.Empty, S3().Scrub(null));
@@ -168,6 +194,18 @@ public class ArchiveCopyStagingLocationTests
             sub.RevealUri());
         Assert.Equal(CanarySas, sub.RevealOptions()["sas_token"]);
         AssertNoCanary(sub.ToString(), "sub location");
+    }
+
+    [Theory]
+    [InlineData("az://acct.blob.core.windows.net/c/p?sig=ABC", "az://acct.blob.core.windows.net/c/p/x/y?sig=ABC")]
+    [InlineData("az://acct.blob.core.windows.net/c/p/?sig=ABC&se=1", "az://acct.blob.core.windows.net/c/p/x/y?sig=ABC&se=1")]
+    [InlineData("s3://host:9000/b/p#frag", "s3://host:9000/b/p/x/y#frag")]
+    [InlineData("s3://host:9000/b/p/", "s3://host:9000/b/p/x/y")]
+    public void WithSubPath_PutsTheFolderIntoThePathAndKeepsQueryAndFragment(string uri, string expected)
+    {
+        var sub = new ArchiveCopyStagingLocation(uri).WithSubPath("x/y");
+
+        Assert.Equal(expected, sub.RevealUri());
     }
 
     [Theory]

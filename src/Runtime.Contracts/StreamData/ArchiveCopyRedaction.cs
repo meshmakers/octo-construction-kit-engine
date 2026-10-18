@@ -83,9 +83,10 @@ public static class ArchiveCopyRedaction
 
     /// <summary>
     /// The values inside <paramref name="uri"/> that are secrets: the whole user info, and — for the usual
-    /// <c>key:secret</c> form — each of its two parts, each also percent-decoded and percent-encoded, so a text
-    /// that echoes only one of them or the other spelling is still caught. Parts shorter than three characters
-    /// are not searched for on their own.
+    /// <c>key:secret</c> form — each of its two parts, plus the whole query string or fragment and each of its
+    /// parameter values (a signed URL carries its signature there, and <see cref="RedactUri"/> masks it as a whole).
+    /// Each is also percent-decoded and percent-encoded, so a text that echoes only one of them or the other
+    /// spelling is still caught. Parts shorter than three characters are not searched for on their own.
     /// </summary>
     internal static IEnumerable<string> ExtractUriSecrets(string uri)
     {
@@ -96,6 +97,28 @@ public static class ArchiveCopyRedaction
         }
 
         var rest = uri.Substring(schemeEnd + SchemeSeparator.Length);
+
+        var queryStart = rest.IndexOfAny(['?', '#']);
+        if (queryStart >= 0)
+        {
+            var query = rest.Substring(queryStart + 1);
+            foreach (var spelling in Spellings(query, minLength: 1))
+            {
+                yield return spelling;
+            }
+
+            foreach (var parameter in query.Split(['&', ';', '#', '?'], StringSplitOptions.RemoveEmptyEntries))
+            {
+                var value = parameter.Substring(parameter.IndexOf('=') + 1);
+                foreach (var spelling in Spellings(value, minLength: 3))
+                {
+                    yield return spelling;
+                }
+            }
+
+            rest = rest.Substring(0, queryStart);
+        }
+
         var at = rest.LastIndexOf('@');
         if (at <= 0)
         {

@@ -190,7 +190,7 @@ flowchart TD
   B -- no --> C["format 1 or Mongo only, as today"]
   B -- yes --> D["per archive with a table: plan time slices (ExportSlicePlanner, about 2 million rows)"]
   D --> E["per slice: COPY archive_<rtId> WHERE time in slice TO DIRECTORY '<staging>/<rtId>/data/<slice>' WITH (compression='gzip')"]
-  E --> F["rollup: read genmap, copy data table, COPY genmap, read genmap again"]
+  E --> F["rollup: read genmap, COPY genmap, copy data table, read genmap again"]
   F -- "genmap changed" --> F
   F -- "unchanged" --> G["manifest.json: columns, slices, counts, CrateDB version"]
   G --> H["pack staging files + mongo.tar.gz + manifest into .octobak.zip, store, delete staging"]
@@ -416,11 +416,20 @@ stays valid.
 | `CopyToStagingAsync` | Dumps the slices of a plan one at a time into `<rtId>/data/<slice>/` (`<rtId>/genmap/all/`) and yields an `ArchiveCopySliceResult` per slice. Ends after the first failed slice, stops between slices on cancellation, refuses while the job log filter of §5 is missing. |
 | `CopyFromStagingAsync` | Loads the slices of a plan into the freshly created tables, same shape as the dump; checks columns and disk before the first slice, restores the bulk table settings when the enumeration ends, optionally merges at the end (`ArchiveCopyOptions`). Reads the files of the plan's archive id, so a restore into another archive id works. |
 | `DescribeArchiveTableAsync`, `GetStorageVersionAsync` | Columns with their data types, and the version of the data store, for the manifest. |
+| `DumpArchiveToStagingAsync` | Dumps one archive completely and applies the repeat rule of §6: for a rollup the generation map is read, copied, the data slices are copied, the map is read again, and the whole rollup is copied again when the map moved in between (up to `ArchiveCopyOptions.MaxMapAttempts` times). The result states the attempts and the times of the map read and of the last data slice. An archive without a generation map is copied once. |
+| `LoadArchiveFromStagingAsync` | Loads one archive from a plan (data slices first, the generation map last) with the checks, bulk settings and refusals of `CopyFromStagingAsync`, and states whether the tables hold exactly the counted rows (`ArchiveCopyLoadResult.RowCountVerified`). |
+| `SweepSupersededGenerationsAsync` | Runs the deferred sweeps of recomputed rollup ranges that are due (the sweep grace period of §6). A recompute records the sweep of the superseded generation durably instead of running it at once; this call executes every record whose flip time plus grace period has passed, also after a restart, and returns the number of sweeps executed or dropped as obsolete. A repository that defers nothing returns 0. |
+| `ValidateRollupsAsync` | Read only check of rollups for what a restore, or a dump taken during a recompute, can leave (`RollupConsistencyCheck`): a pointer without rows, rows above the pointer, a watermark ahead of the rows, a missing generation map. A rollup that cannot be checked is listed as `NotChecked` and makes `RollupConsistencyReport.IsOk` false; a never activated rollup is listed as information only (§7). |
+| `RepairRollupsAsync` | Validates, repairs what the validator found and validates again (`RollupRepairReport`); idempotent, with a dry run that lists the steps and changes nothing. The restore reconcile marker is cleared only when the final validation is ok. |
+| `EnqueueRollupRepairAsync`, `GetRollupRepairRequestAsync` | Queue a repair durably instead of running it under the caller (for REST, CLI and MCP), and read its state and report (`RollupRepairRequest`, `RollupRepairRequestState`). |
+| `RunPendingRollupRepairsAsync` | Runs the queued repairs of the tenant that are pending, or were left running by a process that died; called by the host's recompute tick. |
+| `IsRestoreReconcilePendingAsync`, `SetRestoreReconcilePendingAsync` | The durable *restore reconcile pending* marker (§7): while it is set, reclaim, forward aggregation and recompute do not run for the tenant. An absent marker means not pending, so tenants and backups from before this feature work unchanged. |
 
 A slice result carries the counted rows (`Slice.RowCount`), the copied rows, rejected rows, the duration
 and a **redacted** message. A refusal before any data moved is `ArchiveCopyRefusedException` with a
-reason (`JobLogNotFiltered`, `ColumnMissing`, `InsufficientDiskSpace`). Plan, slice and result records
-round-trip through System.Text.Json. Tests: `Runtime.Engine.Tests/StreamData/ArchiveCopy*Tests.cs`; the
+reason (`JobLogNotFiltered`, `ColumnMissing`, `InsufficientDiskSpace`, `GenerationMapKeptMoving`). Plan,
+slice and result records round-trip through System.Text.Json. Tests:
+`Runtime.Engine.Tests/StreamData/ArchiveCopy*Tests.cs` and `RollupConsistencyContractTests.cs`; the
 in-memory fake that drives the dump and load order is `FakeStagingCopyStreamDataRepository`.
 
 ### Setting up the artifact store per environment

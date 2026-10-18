@@ -12,7 +12,11 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 /// of the generation map went (AB#5967, concept §6).
 /// </summary>
 /// <param name="ArchiveRtId">The archive that was dumped.</param>
-/// <param name="Plan">The plan of the attempt whose files stand; the bot writes it into the manifest.</param>
+/// <param name="Plan">
+/// The plan of the attempt whose files stand; the bot writes it into the manifest. Each slice carries the rows the
+/// copy <em>reported</em> (the tenant stays online, so they can differ from the rows counted before the copy), which is
+/// what a load verifies against; a slice that was not copied keeps its counted rows.
+/// </param>
 /// <param name="Slices">Result of each slice of <paramref name="Plan"/>, in copy order.</param>
 /// <param name="Attempts">How often the rollup was copied; 1 unless its generation map moved while it was copied. 1 for any other archive.</param>
 /// <param name="MapReadAtUtc">

@@ -275,7 +275,9 @@ Per archive of the manifest that exists after the MongoDB restore and passes the
    *restore reconcile pending* (`SetRestoreReconcilePendingAsync(true)`; it stays set until step 11), run the validator, repair, validate again.
    The restore result carries both reports.
 9. `ValidateRollupsAsync`: a pointer entry whose generation has no rows, rows above every covering pointer entry, a watermark ahead of the
-   last rollup row while a source holds rows in between, a rollup without its generation map. Read only, counts and MIN/MAX.
+   last rollup row while a source holds rows in between, a rollup without its generation map. Read only, counts and MIN/MAX. A rollup that cannot
+   be looked at (no table, never activated, a source missing) is reported as *not checked* with the reason and makes the report not ok; "nothing
+   found" never means "not looked at". The repair skips such a rollup and the marker stays set.
 10. `RepairRollupsAsync` (skipped when the validator reports ok): create the map, delete the orphans, recompute only the ranges that have
     no rows, rewind a watermark that is ahead of the rows (the forward aggregation fills the gap). A dry run lists the steps.
 11. When the second validation is ok the repair clears the marker; a failing repair names the failing step and **leaves the marker set**.

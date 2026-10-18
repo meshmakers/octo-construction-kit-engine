@@ -157,6 +157,41 @@ public class RollupConsistencyContractTests
     }
 
     [Fact]
+    public void ARollupThatWasNotChecked_IsNeverOk_AndMakesTheReportNotOk()
+    {
+        var notChecked = new RollupConsistencyEntry(Rt, [],
+            new RollupNotChecked(RollupNotCheckedCause.NoLiveTable, "Rollup has no table."));
+        var consistent = new RollupConsistencyEntry(OctoObjectId.GenerateNewId(), []);
+        var report = new RollupConsistencyReport([consistent, notChecked], DateTime.UtcNow);
+
+        Assert.True(consistent.IsOk);
+        Assert.False(notChecked.IsOk);
+        Assert.True(notChecked.IsNotChecked);
+        Assert.False(report.IsOk);
+        Assert.True(report.HasNotChecked);
+        Assert.True(new RollupConsistencyReport([consistent], DateTime.UtcNow).IsOk);
+        Assert.False(new RollupConsistencyReport([consistent], DateTime.UtcNow).HasNotChecked);
+        // After a repair whose final validation still has an unchecked rollup, the repair is not ok.
+        Assert.False(new RollupRepairReport(false, report, [], report, null).IsOk);
+    }
+
+    [Fact]
+    public void NotChecked_RoundTripsThroughJson_AndAnOldDocumentWithoutItReadsAsChecked()
+    {
+        var entry = new RollupConsistencyEntry(Rt, [],
+            new RollupNotChecked(RollupNotCheckedCause.SourceMissing, "Source is missing."));
+
+        var back = JsonSerializer.Deserialize<RollupConsistencyEntry>(JsonSerializer.Serialize(entry))!;
+        var old = JsonSerializer.Deserialize<RollupConsistencyEntry>($"{{\"RollupRtId\":\"{Rt}\",\"Findings\":[]}}")!;
+
+        Assert.Equal(RollupNotCheckedCause.SourceMissing, back.NotChecked!.Cause);
+        Assert.Equal("Source is missing.", back.NotChecked.Reason);
+        Assert.False(back.IsOk);
+        Assert.Null(old.NotChecked);
+        Assert.True(old.IsOk);
+    }
+
+    [Fact]
     public void Options_AllowAtLeastOneMapAttempt()
     {
         new ArchiveCopyOptions().Validate();

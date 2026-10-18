@@ -268,6 +268,76 @@ def make_flow(args) -> None:
         "      - id: System/Enabled-1\n        value: true\n"
         "      - id: System.Communication/PipelineDefinition-1\n        value: |-\n" + indented, encoding="utf-8")
 
+# --------------------------------------------------------------------------------------------- adapter-online
+def _json_document(text: str):
+    """Return the JSON document of the text: the whole text, or the text after a log prefix (the document then
+    starts at the beginning of a line and runs to the end). A malformed document is rejected as a whole - never
+    a fragment inside it (octo-cli may print log lines before the JSON; compact and pretty output both work)."""
+    try:
+        return json.loads(text)
+    except ValueError:
+        pass
+    offset = 0
+    for line in text.splitlines(keepends=True):
+        if line.lstrip()[:1] in ("[", "{"):
+            try:
+                return json.loads(text[offset:])
+            except ValueError:
+                pass
+        offset += len(line)
+    return None
+
+
+def _any_adapter_online(node) -> bool:
+    if isinstance(node, dict):
+        state = node.get("CommunicationState", node.get("communicationState"))
+        if isinstance(state, str) and state.strip().lower() == "online":
+            return True
+        return any(_any_adapter_online(v) for v in node.values())
+    if isinstance(node, list):
+        return any(_any_adapter_online(v) for v in node)
+    return False
+
+
+def adapter_online_text(text: str) -> bool:
+    """True when the `GetAdapters -j` output lists an adapter whose CommunicationState is Online, independent of
+    the JSON whitespace (AB#6973). Empty, non-JSON or Offline output is False."""
+    return _any_adapter_online(_json_document(text))
+
+
+def adapter_online(args) -> None:
+    sys.exit(0 if adapter_online_text(sys.stdin.read()) else 1)
+
+
+# --------------------------------------------------------------------------------------------- selftest
+SELFTEST_ONLINE_COMPACT = '[{"AdapterId":"670000000000000000000002","CommunicationState":"Online"}]'
+SELFTEST_ONLINE_PRETTY = json.dumps(json.loads(SELFTEST_ONLINE_COMPACT), indent=2)  # spaced form, as a pretty-printing CLI would print it
+SELFTEST_ONLINE_LOGGED = 'info: connecting\n' + SELFTEST_ONLINE_PRETTY
+SELFTEST_OFFLINE = '[{"AdapterId":"670000000000000000000002","CommunicationState":"Offline"}]'
+
+
+def selftest(args) -> None:
+    cases = [
+        ("compact Online", SELFTEST_ONLINE_COMPACT, True),
+        ("pretty-printed Online", SELFTEST_ONLINE_PRETTY, True),
+        ("log line before pretty JSON", SELFTEST_ONLINE_LOGGED, True),
+        ("single object, compact", '{"CommunicationState":"Online"}', True),
+        ("Offline compact", SELFTEST_OFFLINE, False),
+        ("Offline pretty", json.dumps(json.loads(SELFTEST_OFFLINE), indent=2), False),
+        ("empty output", "", False),
+        ("error text", "Error: connection refused", False),
+        ("empty list", "[]", False),
+        ("fragment inside a malformed document", 'Error: [{"CommunicationState":"Online"} INVALID]', False),
+        ("truncated document", '[{"CommunicationState":"Online"}', False),
+    ]
+    bad = 0
+    for name, text, expected in cases:
+        got = adapter_online_text(text)
+        print(("ok   " if got == expected else "FAIL ") + name + f" (expected {expected}, got {got})")
+        bad += got != expected
+    print("selftest: " + ("FAILED" if bad else "all passed"))
+    sys.exit(1 if bad else 0)
+
 
 def main() -> None:
     ap = argparse.ArgumentParser()
@@ -313,6 +383,10 @@ def main() -> None:
     p.add_argument("--since", required=True)
     p.add_argument("logs", nargs="+")
     p.set_defaults(fn=scan_logs)
+    p = sub.add_parser("adapter-online", help="exit 0 when stdin (GetAdapters -j) lists an Online adapter")
+    p.set_defaults(fn=adapter_online)
+    p = sub.add_parser("selftest", help="check adapter-online against compact and pretty-printed fixtures (no stack needed)")
+    p.set_defaults(fn=selftest)
     args = ap.parse_args()
     args.fn(args)
 

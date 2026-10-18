@@ -1,0 +1,28 @@
+triggers:
+  - type: FromExecutePipelineCommand@1
+transformations:
+  - type: GetOrCreateRtEntitiesByType@1
+    ckTypeId: Basic/Tree
+    fieldFilters:
+      - attributePath: Name
+        comparisonValue: AB6676 proof tree
+    rtIdTargetPath: $.treeId
+    modOperationPath: $.treeModOp
+  - type: CreateUpdateInfo@1
+    targetPath: $.entityUpdates
+    targetValueWriteMode: Append
+    targetValueKind: Array
+    updateKindPath: $.treeModOp
+    rtIdPath: $.treeId
+    ckTypeId: Basic/Tree
+    attributeUpdates:
+      - attributeName: name
+        attributeValueType: String
+        value: AB6676 proof tree
+  - type: ApplyChanges@2
+    entityUpdatesPath: $.entityUpdates
+  - type: GetRtEntitiesByType@1
+    ckTypeId: Basic/Tree
+    targetPath: $.trees
+  - type: SetPipelineExecutionResult@1
+    path: $.trees

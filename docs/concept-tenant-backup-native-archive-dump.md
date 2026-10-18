@@ -255,11 +255,12 @@ Nothing changes in the commands and dialogs.
   result names one `.octobak.zip`; the existing download endpoint delivers it.
 - **Restore:** upload of the `.octobak.zip` and `Restore -rad` as today; the format is detected.
 - **Sizes:** the file of the large tenant is about 5.5 GB, inside the upload limit of 10 GiB
-  (`Bot:MaxUploadSizeBytes`, configurable per environment). Studio and CLI upload resumable in
-  parts (tus): Studio 50 MB per request, the CLI 100 MB per request for files above 300 MB
-  (`BotServicesClient.RestoreRepositoryWithTusAsync`), with no size limit of its own. The CLI part
-  size is exactly the request size limit of the ingress (100m); whether it passes is to be checked
-  on an environment.
+  (`Bot:MaxUploadSizeBytes`, configurable per environment). The SDK uploads `Restore` and
+  `ImportArchiveData` resumable in parts (tus) of 50 MiB by default. The part size is configurable
+  in the SDK from 1 to 90 MiB, because the request size limit of the ingress is 100m; `octo-cli` has
+  `-ps` / `--part-size-mib` for both commands, MCP uses the default through the SDK. A refused part
+  is reported with its status, part number and offset and without file content, and an interrupted
+  upload resumes from the server's offset.
 - **Which path ran** is in the job log and in the manifest (`formatVersion`).
 
 ## §9 CrateDB versions
@@ -446,7 +447,8 @@ Consequences:
 - `COPY` with `az://` against an Azure container under 5.9.10 (on staging-1).
 - Whether the injected auto-instrumentation records the driver's command text on the environments
   (not visible locally; §5 excludes `COPY` from it either way).
-- Whether a 100 MB part of the CLI upload passes the ingress (§8).
+- The 50 MiB default part size of the upload (§8) is confirmed on staging-1 at acceptance (AB#5490);
+  that needs Gerald's go for the environment.
 - The rates on a three-node cluster with replicas; the local figures come from a single node.
 
 **Decisions on the points that were open**

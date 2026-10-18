@@ -1126,6 +1126,17 @@ Notes:
 
 ### Compiler rules and message codes
 
+**Unknown type / record hints (AB#6987).** The messages `OCTO-CK018` (unknown association target type), `OCTO-CK019`
+(unknown type) and `OCTO-CK034` (unknown record), and the `ModelValidationException`s of the same situations, end in
+a `{hint}` computed by `Resolvers/UnknownCkElementHint` from the model graph. Numbers and levels are unchanged. The
+hint tells three situations apart: the id's model is **not in the graph** (dependency or alias missing: "This may
+happen because a dependency to another construction kit model is missing."), the model **is resolved but holds no
+element of that name** ("The type 'Pump' does not exist in model Industry.Basic-2.6.0. Did you mean 'Machine'?",
+up to three closest names), and an element of that name **exists in another model** ("... but a type of that name
+exists in Industry.Basic-2.6.0. Check the model prefix of the reference."). `OCTO-CK018` also fills its
+`{targetCkTypeId}` / `{roleId}` placeholders in the right order now (they were swapped at the call sites). Tests:
+`UnknownCkElementHintTests`.
+
 | Code | Key | Where | Rule |
 | ---- | --- | ----- | ---- |
 | 90 | `CkLanguageFeatureRequiresV2` | `ElementResolver` | `interfaces`, `implements`, `methods`, any `access` (type, record, association-role assignment), any `visibility` / `derivable` (type, method, record, enum, attribute, association role), or a type association `targetCkInterfaceId` without `ckLanguage: 2` |

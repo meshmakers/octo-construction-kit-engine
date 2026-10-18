@@ -29,25 +29,22 @@ public class ModelValidationException : CkModelException
             $"CkTypeId '{ckTypeId}' is used as base type but is an unknown CkTypeId. This may happen because a dependency to another construction kit model is missing.");
     }
 
-    internal static Exception UnknownCkTypeId(CkId<CkTypeId> ckTypeId)
+    internal static Exception UnknownCkTypeId(CkId<CkTypeId> ckTypeId, string hint)
     {
-        return new ModelValidationException(
-            $"CkTypeId '{ckTypeId}' is unknown. This may happen because a dependency to another construction kit model is missing.");
+        return new ModelValidationException($"CkTypeId '{ckTypeId}' is unknown. {hint}");
     }
 
-    internal static Exception UnknownCkRecordId(CkId<CkRecordId> ckRecordId)
+    internal static Exception UnknownCkRecordId(CkId<CkRecordId> ckRecordId, string hint)
     {
-        return new ModelValidationException(
-            $"CkRecordId '{ckRecordId}' is unknown. This may happen because a dependency to another construction kit model is missing.");
+        return new ModelValidationException($"CkRecordId '{ckRecordId}' is unknown. {hint}");
     }
 
 
     internal static Exception UnknownCkTypeIdForAssociationTarget(CkId<CkTypeId> originCkTypeId,
-        CkId<CkAssociationRoleId> entityAssociationRoleId, CkId<CkTypeId> typeAssociationTargetCkTypeId)
+        CkId<CkAssociationRoleId> entityAssociationRoleId, CkId<CkTypeId> typeAssociationTargetCkTypeId, string hint)
     {
         return new ModelValidationException(
-            $"CkTypeId '{originCkTypeId}' defines a unknown target construction kit type id '{typeAssociationTargetCkTypeId}' for role id '{entityAssociationRoleId}'." +
-            $" This may happen because a dependency to another construction kit model is missing.");
+            $"CkTypeId '{originCkTypeId}' defines a unknown target construction kit type id '{typeAssociationTargetCkTypeId}' for role id '{entityAssociationRoleId}'. {hint}");
     }
 
     internal static Exception DerivedFromCkTypeIdThatIsFinal(CkId<CkTypeId> currentCkTypeId, CkId<CkTypeId> lastCkTypeId)

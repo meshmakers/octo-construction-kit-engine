@@ -106,13 +106,13 @@
       "key": "CkTypeIdUnknownTargetCkTypeIdForAssociation",
       "number": 18,
       "level": "FATALERROR",
-      "text": "CkTypeId '{originCkTypeId}' defines a unknown target CkTypeId '{targetCkTypeId}' for role id '{roleId}'. This may happen because a dependency to another construction kit model is missing."
+      "text": "CkTypeId '{originCkTypeId}' defines a unknown target CkTypeId '{targetCkTypeId}' for role id '{roleId}'. {hint}"
     },
     {
       "key": "CkTypeIdUnknown",
       "number": 19,
       "level": "FATALERROR",
-      "text": "CkTypeId '{ckTypeId}' is unknown. This may happen because a dependency to another construction kit model is missing."
+      "text": "CkTypeId '{ckTypeId}' is unknown. {hint}"
     },
     {
       "key": "CkTypeIdMultipleOutgoingAssociationRepresentingSameRole",
@@ -202,7 +202,7 @@
       "key": "CkRecordIdUnknown",
       "number": 34,
       "level": "FATALERROR",
-      "text": "CkRecordId '{ckRecordId}' is unknown. This may happen because a dependency to another construction kit model is missing."
+      "text": "CkRecordId '{ckRecordId}' is unknown. {hint}"
     },
     {
       "key": "UnknownCkRecordIdForInheritance",

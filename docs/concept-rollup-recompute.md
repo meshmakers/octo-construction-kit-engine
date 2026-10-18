@@ -160,7 +160,69 @@ forced by CrateDB's lack of partial-range atomicity.
   staging rows are confirmed.
 - The read path (§6) injects `generation = CASE WHEN <range> THEN <gen> … ELSE 0 END`; until the
   pointer flips, readers see `generation = N` (previous values).
-- After the flip, a background sweep deletes the superseded `generation` rows for that range.
+- After the flip, a background sweep deletes the superseded `generation` rows for that range. The
+  sweep runs once the flip time plus the **sweep grace period** has passed (next section).
+
+### Sweep grace period (AB#6968)
+
+A native tenant dump copies a rollup's generation map and its data table one after the other. Without
+a delay, a recompute between the two copies flips a range and removes the superseded generation: the
+copied map still names the removed generation, its rows are not in the copied data, and the restored
+rollup would show nothing for that range (the "pointer without rows" the validator reports, §6 of
+`concept-tenant-backup-native-archive-dump.md`).
+
+So the sweep waits. After the flip to generation N+1 the rows of the older generations **and** the pointer
+entries the flip made redundant stay until the **first sweep after flip time + grace period**. Readers are not
+affected — the read predicate selects the newest pointer entry's generation, and the older rows are only
+extra rows in the table, so the values are the same before and after the sweep. What is kept costs
+storage and a larger table to scan for as long as the grace period lasts.
+
+- **Configuration** `StreamData:Recompute:SweepGracePeriod` (env `OCTO_STREAMDATA__RECOMPUTE__SWEEPGRACEPERIOD`),
+  a time span, **default two hours**. `0` sweeps at once as before. A negative value stops the service at start
+  with a message naming the key. Choose it above the longest dump of a rollup.
+- **Durable record.** The deferred sweep is a row in the rollup's table `archive_<rtId>__sweep`
+  (`range_start, range_end, rtid_scope, generation, flipped_at_ms`, created with the first deferred sweep), written
+  with every column explicit in the same call as the flip (no column default, AB#6647). It is a CrateDB row, not process
+  memory: a restart between flip and sweep does not lose it.
+- **Execution.** Every recompute tick of the host runs the records that are due (`SweepSupersededGenerationsAsync`,
+  one catalogue query for the tenant), and every recompute of a rollup runs its own due records first. A record whose
+  pointer entry is gone or was replaced by a newer recompute is dropped without deleting anything (the newer recompute
+  has its own record). The sweep deletes only rows **below** the entry's generation, inside its range and scope, and
+  then the pointer entries contained in the range. A failed sweep keeps its record and is repeated.
+- **Reclaim.** The once-per-process reclaim pass over all pointer entries leaves entries with a record alone; entries
+  without one (swept, or from before the grace period existed) are reclaimed as before.
+- **Dump order.** The dump copies the map first and the data after it; with the grace period the version the copied map
+  names is still in the data when its copy starts, as long as the span between the map read and the last data slice
+  (reported in the dump result) stays below the grace period.
+- **Disk while a range is recomputed repeatedly (AB#5490).** Every recompute of the same range inside the grace period
+  adds one full version of the range; a newer generation does **not** replace a pending older one, because each
+  version is only removed by its own record once that record is due. The disk therefore grows linearly: with `n`
+  recomputes of the range inside the grace period the table holds `n + 1` versions, at most `(n + 1) ×` the swept size
+  (for a recompute of the whole rollup; a partial range adds only its share). Measured on a synthetic rollup of
+  3,000,000 hourly windows (3,000 entities x 1,000 hours; Testcontainers CrateDB 5.10, grace period two hours, merged to
+  one segment per reading; 143 MiB after the sweep):
+
+  | State | Rows | Table size | vs. swept |
+  |---|---|---|---|
+  | one version, swept | 3,000,000 | 143 to 226 MiB (see note) | 1.0x |
+  | after recompute 1 | 6,000,000 | 262 MiB | 1.8x |
+  | after recompute 2 | 9,000,000 | 484 MiB | 3.4x |
+  | after recompute 3 | 12,000,000 | 607 MiB | 4.2x |
+  | right after the sweep, before CrateDB merges the deleted rows away | 3,000,000 | 1,022 MiB | 7.1x |
+  | after the sweep and a forced merge | 3,000,000 | 143 MiB | 1.0x |
+
+  The row counts are exact and linear (one version per recompute); the byte figures carry the noise of CrateDB's segment
+  merging (the swept baseline measured 147 MiB and 226 MiB in two runs, depending on how far merging had come), so read
+  them as about 150 MiB per version of this data. The production measurement of one recompute (28.8 million rows,
+  1,947 MiB before and 6,369 MiB while both versions are kept, 3.27x) is above the 1.8x here because that table was
+  not merged. Two further effects: the sweep itself briefly raises the size (deleted rows stay on disk until CrateDB
+  merges the segments), so plan the headroom for the sweep, not only for the pending versions, and the table scanned by
+  readers is `n + 1` times as large for the whole grace period.
+  **Guard: documentation only.** Free disk of at least `(n + 1) ×` the rollup size, plus the sweep headroom, is
+  the rule for the worst case; `n` is bounded by how often an operator or the repair job recomputes the same
+  range inside two hours, which is rare. A cap on pending generations per range (sweep the oldest early once a range
+  holds, say, three pending versions) is possible, but it removes the dump protection exactly for dumps that started
+  before the second-newest flip; it is only worth building if an environment is seen to recompute one range repeatedly.
 
 > **Implementation note (deviation from this doc):** the pointer was implemented in a **CrateDB
 > side-table**, not "Mongo metadata" as written above. Co-locating it with the rollup data makes the
@@ -366,8 +428,8 @@ Frameworks: xUnit v3 (`Runtime.Engine.Tests`, `StreamData.UnitTests`), integrati
 
 ## §12 Open items (post-MVP)
 
-- **Generation-pointer GC cadence** — when to delete superseded generations (immediate sweep vs.
-  retention window for rollback). Default: immediate sweep after the flip, configurable retention.
+- **Generation-pointer GC cadence** — settled by AB#6968: the sweep runs after a configurable grace
+  period (default two hours, `0` = immediate); see "Sweep grace period" in §4.
 - **Per-`rtId` generation granularity** — ~~start per-window; refine to per-`(window, rtId)`~~
   **Done.** The executor takes an optional `rtId` scope; a scoped recompute restricts staging
   aggregation, genmap pointer, and sweep to that single metering point. Remaining refinement: the

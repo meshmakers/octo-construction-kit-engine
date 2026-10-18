@@ -3,8 +3,9 @@
 > Work item: **AB#5490** (Feature **AB#5967**, Epic **AB#3364**).
 > Predecessors: **AB#4230** (archive data export/import), **AB#4231** (tenant backup with archive
 > data, `concept-tenant-backup-archive-data.md`), **AB#5489** (export reads time slices).
-> Status: **Concept complete, implementation on hold** (§12, decision 8). Decisions are in §3 and
-> §12; §12 also lists what is still to be checked.
+> Status: **Concept complete; local implementation under way** (Feature AB#5967, step 1 of §12; the
+> engine contract of slice AB#6967 is in §11). Decisions are in §3 and §12; §12 also lists what is
+> still to be checked.
 
 ## §1 Goal
 
@@ -148,10 +149,16 @@ of each store (expiry after one day, the backstop behind the cleanup of the job 
   entries. On Azure and Exoscale the store encrypts at rest; Hetzner (test-2) does not, so staging
   files lie there in plain text for the length of a run. Accepted for test-2, which holds no
   customer data.
-- A small contract in `octo-common-services` describes a staging location for CrateDB: the URI as
-  CrateDB sees it plus the `WITH` options that carry the credential. The endpoint CrateDB uses can
-  differ from the one the bot uses (local development, §10). The bot never logs the credential;
-  statement texts are logged with it removed.
+- A small type describes a staging location for CrateDB: the URI as CrateDB sees it plus the `WITH`
+  options that carry the credential. The endpoint CrateDB uses can differ from the one the bot uses
+  (local development, §10). The type, `ArchiveCopyStagingLocation`, lives in the engine
+  (`Runtime.Contracts`, next to `IStreamDataRepository`, which takes it); `octo-common-services`
+  builds it from the artifact store settings of the environment. The credential is reachable only
+  through two methods that are named for it (`RevealUri`, `RevealOptions`); `ToString()`, every
+  property and any serializer show the redacted form (`ArchiveCopyRedaction`: user info of the URI
+  dropped, every `WITH` option masked unless it is on a short list known to be harmless), and
+  `Scrub(text)` removes the credential from a text that may echo it, such as a driver error message.
+  The bot never logs the credential; statement texts are logged with it removed.
 - **`COPY` statements are kept out of `sys.jobs_log`.** CrateDB records every finished statement
   with its full text there, which for S3 includes the secret key. The cluster setting
   `stats.jobs_log_filter` is set to `stmt NOT ILIKE 'copy %'` (persistent), so `COPY` statements
@@ -183,7 +190,7 @@ flowchart TD
   B -- no --> C["format 1 or Mongo only, as today"]
   B -- yes --> D["per archive with a table: plan time slices (ExportSlicePlanner, about 2 million rows)"]
   D --> E["per slice: COPY archive_<rtId> WHERE time in slice TO DIRECTORY '<staging>/<rtId>/data/<slice>' WITH (compression='gzip')"]
-  E --> F["rollup: read genmap, copy data table, COPY genmap, read genmap again"]
+  E --> F["rollup: read genmap, COPY genmap, copy data table, read genmap again"]
   F -- "genmap changed" --> F
   F -- "unchanged" --> G["manifest.json: columns, slices, counts, CrateDB version"]
   G --> H["pack staging files + mongo.tar.gz + manifest into .octobak.zip, store, delete staging"]
@@ -198,15 +205,58 @@ flowchart TD
   not treated as a failure (expected in the open bucket of a live tenant).
 - **Rollups and their generation map.** A recompute copies new rows, flips the pointer and sweeps
   the old generation. A dump that reads data and pointer on different sides of that flip would
-  restore windows no reader can see. The job reads the generation map before and after it copies a
-  rollup table and its map, and repeats that rollup when the map moved — the pattern
-  `RollupSourceBucketAggregator` already uses. Rollup tables are small next to the raw table.
+  restore windows no reader can see. The dump (`IStreamDataRepository.DumpArchiveToStagingAsync`) reads
+  the generation map, copies it, copies the data slices, and reads the map again; when the two reads
+  differ it repeats that rollup (at most `ArchiveCopyOptions.MaxMapAttempts`, default 3, then it
+  fails and names the rollup) — the pattern `RollupSourceBucketAggregator` already uses. The map is
+  copied **first** and the data after it, and a load does the reverse (data first, map last): with
+  the deferred sweep of a recompute (grace period, default 2 hours) the version the copied map
+  names is still in the data when it is copied. The result states the number of attempts, the time
+  of the map read and the time of the last data slice, so the caller can warn when the span is not
+  well below the grace period. An archive that is not a rollup never reads or copies a map. Rollup
+  tables are small next to the raw table.
 - **Packing.** The bot streams the staging files into the container. For the large tenant that is
   about 2 GB from the storage through the bot.
 - **Statements run as maintenance statements** (`CrateStatementClass.Maintenance`) with a command
   timeout of their own for the copy.
 
+### Placement matrix: where a recompute can hit a dump
+
+Measured with real recomputes against a real CrateDB (AB#6968; asset-repo integration tests, 34 cases, 18 s). Each cell gives the
+defects found in the restored rollup, in this order: *empty windows / windows differing from the source at map-read time / orphan
+rows above the pointer / pointers without rows*. "No flip" and "flip before the dump" are 0/0/0/0 in every column.
+
+| Placement of the flip | Grace off, repeat off | Grace off, repeat on | Grace on, repeat off | Grace on, repeat on |
+|---|---|---|---|---|
+| between map copy and data copy | 6/0/1/1 | 2 attempts, 0/0/0/0 | 0/0/1/0 | 2 attempts, 0/0/0/0 |
+| flip and sweep between map copy and data copy | 6/0/1/1 | 2 attempts, 0/0/0/0 | 0/0/1/0 | 2 attempts, 0/0/0/0 |
+| flip after the data | 0/0/0/0 | 2 attempts, 0/0/0/0 | 0/0/0/0 | 2 attempts, 0/0/0/0 |
+| flip and sweep after the data | 0/0/0/0 | 2 attempts, 0/0/0/0 | 0/0/0/0 | 2 attempts, 0/0/0/0 |
+| flip after the dump | 0/0/0/0 | 1 attempt, 0/0/0/0 | 0/0/0/0 | 1 attempt, 0/0/0/0 |
+
+The pass criterion is the column *grace on, repeat on*: all 0/0/0/0 and the validator ok. The grace period prevents the empty windows and the
+pointer without rows: the sweep does not remove the generation the copied map names, so its rows are in the data copy. The repeat rule
+catches the orphan rows of the new generation that the old map does not name, by copying the rollup again. "Flip after the data" also
+repeats, because the second read of the map sees the moved pointer even though the files were consistent; a repeat costs time, not
+correctness. Test classes `PlacementMatrixGraceOffTests` and `PlacementMatrixGraceOnTests` (`PlacementMatrixCases.cs`) in
+`octo-asset-repo-services/tests/AssetRepositoryServices.IntegrationTests/StreamData`; run them with
+`dotnet test -c DebugL --filter "FullyQualifiedName~PlacementMatrix"` (Docker needed, see the README of that test project). The
+engine seams they use are `ArchiveCopyOptions.PhaseObserver` and `RepeatOnMovedMap`.
+
 ## §7 Restore
+
+**Before the MongoDB restore: check that the storage can load.** The restore job asks the cluster, not a tenant,
+whether the native copy can run (`IStreamDataRepositoryFactory.CheckStagingCopyReadinessAsync`, the cluster-level
+member of the readiness check in the contract table below) and stops with the reason when it cannot, so a missing job
+log filter leaves the tenant exactly as it was. The question must not build a tenant context: that would load the CK
+cache from the database that the restore is about to replace. The answer is the same `StagingCopyReadiness` the
+tenant-bound `IStreamDataRepository.CheckStagingCopyReadinessAsync` gives (both delegate to one piece of code), and
+asking changes nothing in the cluster.
+
+**Order of the archives: every source before the rollups that read it** (raw archives first, then rollups by the length of their source
+chain). A rollup can be activated only while its source is `Activated`, and the dump lists the archives in no dependency order. A source
+that was not `Activated` in the backup but has rollups stays `Activated` - with the restore reconcile marker set, which keeps forward
+aggregation and recompute away from the tenant - until those rollups are restored, and is set back to `Disabled` at the end.
 
 Per archive of the manifest that exists after the MongoDB restore and passes the schema match:
 
@@ -226,6 +276,28 @@ Per archive of the manifest that exists after the MongoDB restore and passes the
    (`OPTIMIZE … max_num_segments = 1`, can be switched off), refresh, compare the table's row count
    with the manifest.
 7. Restore the archive's backed-up status (enable only what was Activated), as today.
+8. **Reconcile the rollups of the tenant** (AB#6968), once all archives of the tenant are loaded: set the marker
+   *restore reconcile pending* (`SetRestoreReconcilePendingAsync(true)`; it stays set until step 11), run the validator, repair, validate again.
+   The restore result carries both reports.
+9. `ValidateRollupsAsync`: a pointer entry whose generation has no rows **where a source holds rows in that range** (an entry over a range the
+   source is empty in is a correct empty recompute or backfill, not a finding; a rollup source counts only the rows live under its own pointer),
+   rows above every covering pointer entry, a watermark ahead of the
+   last rollup row while a source holds rows in between, a rollup without its generation map. Read only, counts and MIN/MAX. A rollup that cannot
+   be looked at (no table, a source missing) is reported as *not checked* with the reason and makes the report not ok; "nothing
+   found" never means "not looked at". The repair skips such a rollup and the marker stays set. A rollup that was never activated is listed
+   too, for information only: it has no data, so it neither makes the report not ok nor keeps the marker.
+10. `RepairRollupsAsync` (skipped when the validator reports ok): create the map, delete the orphans, recompute only the ranges that have
+    no rows, rewind a watermark that is ahead of the rows (the forward aggregation fills the gap). A dry run lists the steps.
+11. When the second validation is ok the repair clears the marker; a failing repair names the failing step and **leaves the marker set**.
+    The marker is also kept while an archive of the backup failed to restore (the job knows the manifest, the validator does not), a repair of
+    only some rollups clears it only when the whole tenant validates ok, and deleting a tenant removes the marker, the repair queue rows and
+    the sweep records together with the archive tables (`IStreamDataRepositoryFactory.DeleteTenantStateAsync`; the shared schema keeps a
+    neighbour tenant's rows), so a tenant created again under the same id starts without a marker.
+
+While the marker is set the tenant's rollups are not aggregated further, recomputed or swept (the host skips the tenant, a direct call is
+refused with `RestoreReconcilePendingException`); everything that reads works. A tenant and a backup without the marker (everything made
+before this feature) are not affected. A backup of format 1 carries no generation map: its rollup rows are loaded as they are and
+the reconcile step brings them in line (see the repair for what is removed as orphans).
 
 **NULL in a column that has a DEFAULT is not preserved.** `COPY TO` leaves NULL values out of the
 line and `COPY FROM` applies the column default to a missing value, so a NULL
@@ -234,7 +306,9 @@ a column with a default is not meant to hold NULL, and the platform never writes
 without a default keep their NULL.
 
 A failed archive is reported and the job continues with the next one (decision 4 of AB#4231). The
-rollup tables come back row for row, so no rollup has to be recomputed after a restore.
+rollup tables come back row for row, so no rollup has to be recomputed after a restore - unless the validator of step 8 finds the
+rollup inconsistent (a dump taken while a recompute ran, a backup of format 1, a lost map), in which case the repair recomputes exactly the
+affected ranges.
 
 Restore under another tenant id and on another environment works as today: the files hold no tenant
 id, and the target schema and table names are derived from the target tenant. The two environments
@@ -248,11 +322,12 @@ Nothing changes in the commands and dialogs.
   result names one `.octobak.zip`; the existing download endpoint delivers it.
 - **Restore:** upload of the `.octobak.zip` and `Restore -rad` as today; the format is detected.
 - **Sizes:** the file of the large tenant is about 5.5 GB, inside the upload limit of 10 GiB
-  (`Bot:MaxUploadSizeBytes`, configurable per environment). Studio and CLI upload resumable in
-  parts (tus): Studio 50 MB per request, the CLI 100 MB per request for files above 300 MB
-  (`BotServicesClient.RestoreRepositoryWithTusAsync`), with no size limit of its own. The CLI part
-  size is exactly the request size limit of the ingress (100m); whether it passes is to be checked
-  on an environment.
+  (`Bot:MaxUploadSizeBytes`, configurable per environment). The SDK uploads `Restore` and
+  `ImportArchiveData` resumable in parts (tus) of 50 MiB by default. The part size is configurable
+  in the SDK from 1 to 90 MiB, because the request size limit of the ingress is 100m; `octo-cli` has
+  `-ps` / `--part-size-mib` for both commands, MCP uses the default through the SDK. A refused part
+  is reported with its status, part number and offset and without file content, and an interrupted
+  upload resumes from the server's offset.
 - **Which path ran** is in the job log and in the manifest (`formatVersion`).
 
 ## §9 CrateDB versions
@@ -317,15 +392,45 @@ There is no object storage, and the bot process cannot see the disk of the Crate
 
 | Repository | Change |
 |------------|--------|
-| `octo-construction-kit-engine` | Contract on `IStreamDataRepository`: copy an archive's tables to and from a staging location, with slice results. This document. |
+| `octo-construction-kit-engine` | Contract on `IStreamDataRepository` (AB#5967, slice AB#6967): copy an archive's tables to and from a staging location, with slice results. This document. See "The engine contract" below. |
 | `octo-construction-kit-engine-mongodb` | CrateDB implementation: slice planning, `COPY` statements, summary evaluation, bulk settings, generation map handling, column and disk checks. |
-| `octo-common-services` | Artifact category `copy-staging`; staging location for CrateDB per provider (SAS token, S3 key, endpoint as CrateDB sees it). |
+| `octo-common-services` | Artifact category `copy-staging`; builds the engine's `ArchiveCopyStagingLocation` per provider (SAS token, S3 key, endpoint as CrateDB sees it) from the artifact store settings. |
 | `octo-bot-services` | `DumpRepositoryJob` and `RestoreRepositoryJob`: format 2 writer and reader, format 1 kept; restore upload limit. |
 | `octo-asset-repo-services` | Integration tests against CrateDB (version matrix of §9). |
 | `octo-tools` | S3-compatible store in the local kind infrastructure. |
 | deployment (`meshmakers-infrastructure`, `octo-mesh-deployment`) | Artifact store per environment (AB#5562 to AB#5565, prepared, not applied yet); lifecycle entry for `copy-staging`; artifact store settings of the bot service. |
 
 SDK, CLI, MCP and Studio need no change.
+
+### The engine contract
+
+All types are in `Meshmakers.Octo.Runtime.Contracts.StreamData`. The members of `IStreamDataRepository`
+have default implementations, so a repository without a staging area (and every existing implementer)
+stays valid.
+
+| Member | Meaning |
+|--------|---------|
+| `CheckStagingCopyReadinessAsync` | Preflight, **read only**: `StagingCopyReadiness(Supported, JobLogFilterSet, StorageVersion, Reason)`, `IsReady` = supported and the filter of §5 is set. A missing prerequisite is the answer (with a reason that says what to set, never a credential), not an exception. Two doors, one answer: on `IStreamDataRepository` (tenant-bound) and on `IStreamDataRepositoryFactory` (engine-mongodb contracts; cluster-level, needs no tenant, no CK cache and no archive store, so a restore can ask before it touches the tenant). |
+| `SupportsStagingCopy` | `false` unless the repository implements the copy. When `false`, the caller takes the row path (format 1) and the members below throw `ArchiveCopyNotSupportedException`. |
+| `PlanArchiveCopyAsync` | Cuts an archive into counted, ascending `ArchiveCopySlice`s (the generation map of a rollup last) and describes every table. The result is the `ArchiveCopyPlan` the bot writes into the manifest. |
+| `CopyToStagingAsync` | Dumps the slices of a plan one at a time into `<rtId>/data/<slice>/` (`<rtId>/genmap/all/`) and yields an `ArchiveCopySliceResult` per slice. Ends after the first failed slice, stops between slices on cancellation, refuses while the job log filter of §5 is missing. |
+| `CopyFromStagingAsync` | Loads the slices of a plan into the freshly created tables, same shape as the dump; checks columns and disk before the first slice, restores the bulk table settings when the enumeration ends, optionally merges at the end (`ArchiveCopyOptions`). Reads the files of the plan's archive id, so a restore into another archive id works. |
+| `DescribeArchiveTableAsync`, `GetStorageVersionAsync` | Columns with their data types, and the version of the data store, for the manifest. |
+| `DumpArchiveToStagingAsync` | Dumps one archive completely and applies the repeat rule of §6: for a rollup the generation map is read, copied, the data slices are copied, the map is read again, and the whole rollup is copied again when the map moved in between (up to `ArchiveCopyOptions.MaxMapAttempts` times). The result states the attempts and the times of the map read and of the last data slice. An archive without a generation map is copied once. |
+| `LoadArchiveFromStagingAsync` | Loads one archive from a plan (data slices first, the generation map last) with the checks, bulk settings and refusals of `CopyFromStagingAsync`, and states whether the tables hold exactly the counted rows (`ArchiveCopyLoadResult.RowCountVerified`). |
+| `SweepSupersededGenerationsAsync` | Runs the deferred sweeps of recomputed rollup ranges that are due (the sweep grace period of §6). A recompute records the sweep of the superseded generation durably instead of running it at once; this call executes every record whose flip time plus grace period has passed, also after a restart, and returns the number of sweeps executed or dropped as obsolete. A repository that defers nothing returns 0. |
+| `ValidateRollupsAsync` | Read only check of rollups for what a restore, or a dump taken during a recompute, can leave (`RollupConsistencyCheck`): a pointer without rows, rows above the pointer, a watermark ahead of the rows, a missing generation map. A rollup that cannot be checked is listed as `NotChecked` and makes `RollupConsistencyReport.IsOk` false; a never activated rollup is listed as information only (§7). |
+| `RepairRollupsAsync` | Validates, repairs what the validator found and validates again (`RollupRepairReport`); idempotent, with a dry run that lists the steps and changes nothing. The restore reconcile marker is cleared only when the final validation is ok. |
+| `EnqueueRollupRepairAsync`, `GetRollupRepairRequestAsync` | Queue a repair durably instead of running it under the caller (for REST, CLI and MCP), and read its state and report (`RollupRepairRequest`, `RollupRepairRequestState`). |
+| `RunPendingRollupRepairsAsync` | Runs the queued repairs of the tenant that are pending, or were left running by a process that died; called by the host's recompute tick. |
+| `IsRestoreReconcilePendingAsync`, `SetRestoreReconcilePendingAsync` | The durable *restore reconcile pending* marker (§7): while it is set, reclaim, forward aggregation and recompute do not run for the tenant. An absent marker means not pending, so tenants and backups from before this feature work unchanged. |
+
+A slice result carries the counted rows (`Slice.RowCount`), the copied rows, rejected rows, the duration
+and a **redacted** message. A refusal before any data moved is `ArchiveCopyRefusedException` with a
+reason (`JobLogNotFiltered`, `ColumnMissing`, `InsufficientDiskSpace`, `GenerationMapKeptMoving`). Plan,
+slice and result records round-trip through System.Text.Json. Tests:
+`Runtime.Engine.Tests/StreamData/ArchiveCopy*Tests.cs` and `RollupConsistencyContractTests.cs`; the
+in-memory fake that drives the dump and load order is `FakeStagingCopyStreamDataRepository`.
 
 ### Setting up the artifact store per environment
 
@@ -419,7 +524,8 @@ Consequences:
 - `COPY` with `az://` against an Azure container under 5.9.10 (on staging-1).
 - Whether the injected auto-instrumentation records the driver's command text on the environments
   (not visible locally; §5 excludes `COPY` from it either way).
-- Whether a 100 MB part of the CLI upload passes the ingress (§8).
+- The 50 MiB default part size of the upload (§8) is confirmed on staging-1 at acceptance (AB#5490);
+  that needs Gerald's go for the environment.
 - The rates on a three-node cluster with replicas; the local figures come from a single node.
 
 **Decisions on the points that were open**

@@ -193,6 +193,106 @@ public interface IStreamDataRepository
         ArchiveImportMode mode,
         CancellationToken ct);
 
+    // --- Native copy to and from a staging location (AB#5967) ----------------------------------
+    // Concept: docs/concept-tenant-backup-native-archive-dump.md. The members have default
+    // implementations so that a repository without a staging area (and every existing implementer)
+    // stays valid: SupportsStagingCopy is false and the members throw ArchiveCopyNotSupportedException.
+
+    /// <summary>
+    /// True when this repository can copy an archive's tables to and from a staging location with the
+    /// data store's own bulk statements (CrateDB <c>COPY TO</c> / <c>COPY FROM</c>). When false the
+    /// caller takes the row path (<see cref="ExportRowsAsync"/> / <see cref="ImportRowsAsync"/>, dump
+    /// format 1). The other members of this section throw <see cref="ArchiveCopyNotSupportedException"/>.
+    /// </summary>
+    bool SupportsStagingCopy => false;
+
+    /// <summary>
+    /// Cuts the archive into the slices a dump copies: time slices of about
+    /// <see cref="ArchiveCopyOptions.TargetSliceRows"/> rows, each counted, in ascending time order, and
+    /// for a rollup its generation map as the last slice, together with the description of every table.
+    /// An archive without a backing table yields a plan without slices. Reads only.
+    /// </summary>
+    /// <exception cref="ArchiveCopyNotSupportedException">The repository has no staging copy.</exception>
+    Task<ArchiveCopyPlan> PlanArchiveCopyAsync(
+        OctoObjectId archiveRtId,
+        ArchiveCopyOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => throw new ArchiveCopyNotSupportedException(archiveRtId);
+
+    /// <summary>
+    /// Dumps the slices of <paramref name="plan"/> to <paramref name="location"/>, one slice at a time in plan
+    /// order, into the folder <see cref="ArchiveCopySlice.GetStagingPath"/> of each slice. Yields the result
+    /// of each slice as soon as it is done. The copy ends after the first failed slice (its result says
+    /// <see cref="ArchiveCopySliceStatus.Failed"/> with a redacted message; earlier slices stay valid) and
+    /// stops between two slices when <paramref name="cancellationToken"/> is cancelled
+    /// (<see cref="OperationCanceledException"/>). Refuses to start with
+    /// <see cref="ArchiveCopyRefusedException"/> while the data store would record the credential in its job
+    /// log.
+    /// </summary>
+    /// <remarks>
+    /// The tenant stays online, the dump is not a snapshot: a slice whose copied rows differ from the counted
+    /// ones is reported with a warning in <see cref="ArchiveCopySliceResult.Message"/>, not as a failure.
+    /// <paramref name="plan"/> must have been made for <paramref name="archiveRtId"/>. No text that leaves
+    /// this method — result message, exception, log, trace — contains the credential of
+    /// <paramref name="location"/>.
+    /// </remarks>
+    /// <exception cref="ArchiveCopyNotSupportedException">The repository has no staging copy.</exception>
+    IAsyncEnumerable<ArchiveCopySliceResult> CopyToStagingAsync(
+        OctoObjectId archiveRtId,
+        ArchiveCopyPlan plan,
+        ArchiveCopyStagingLocation location,
+        ArchiveCopyOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => throw new ArchiveCopyNotSupportedException(archiveRtId);
+
+    /// <summary>
+    /// Loads the slices of <paramref name="plan"/> from <paramref name="location"/> into the table of
+    /// <paramref name="archiveRtId"/>, which the caller created fresh with the platform's DDL. The files are
+    /// read from <see cref="ArchiveCopySlice.GetStagingPath"/> of the <b>plan's</b> archive id, so a restore
+    /// into another archive id reads the source's files. Yields the result of each slice as soon as it is
+    /// done; a slice counts as loaded when the loaded rows equal <see cref="ArchiveCopySlice.RowCount"/> and
+    /// no row was rejected. The copy ends after the first failed slice and stops between two slices on
+    /// cancellation.
+    /// </summary>
+    /// <remarks>
+    /// Before the first slice it refuses with <see cref="ArchiveCopyRefusedException"/> when a dumped column
+    /// is missing in the target table (message names the column) or a node lacks the free disk space the load
+    /// needs (message names expected and available size), and when the data store would record the credential
+    /// in its job log. The bulk table settings it sets for the load (no replicas, no refresh) are restored
+    /// when the enumeration ends — also after a failed slice, an exception or cancellation. After the last
+    /// slice it merges the segments when <see cref="ArchiveCopyOptions.OptimizeAfterLoad"/> is set. A
+    /// different storage version on source and target is logged, not refused.
+    /// A NULL in a column that has a DEFAULT is not preserved (the default applies); see the concept §7.
+    /// </remarks>
+    /// <exception cref="ArchiveCopyNotSupportedException">The repository has no staging copy.</exception>
+    IAsyncEnumerable<ArchiveCopySliceResult> CopyFromStagingAsync(
+        OctoObjectId archiveRtId,
+        ArchiveCopyPlan plan,
+        ArchiveCopyStagingLocation location,
+        ArchiveCopyOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => throw new ArchiveCopyNotSupportedException(archiveRtId);
+
+    /// <summary>
+    /// Describes one physical table of the archive: every column with its backend data type, as the dump
+    /// manifest records it. A table that does not exist (archive not activated, no generation map) yields an
+    /// empty column list; every other storage failure propagates.
+    /// </summary>
+    /// <exception cref="ArchiveCopyNotSupportedException">The repository has no staging copy.</exception>
+    Task<ArchiveTableDescription> DescribeArchiveTableAsync(
+        OctoObjectId archiveRtId,
+        ArchiveCopyTable table,
+        CancellationToken cancellationToken = default)
+        => throw new ArchiveCopyNotSupportedException(archiveRtId);
+
+    /// <summary>
+    /// The version of the data store (CrateDB: <c>sys.nodes</c> version) the dump manifest records and a
+    /// restore logs next to the target's.
+    /// </summary>
+    /// <exception cref="ArchiveCopyNotSupportedException">The repository has no staging copy.</exception>
+    Task<string> GetStorageVersionAsync(CancellationToken cancellationToken = default)
+        => throw new ArchiveCopyNotSupportedException();
+
     // --- Rollup data plane --------------------------------------------------------------------
 
     /// <summary>

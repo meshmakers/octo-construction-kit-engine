@@ -3,8 +3,9 @@
 > Work item: **AB#5490** (Feature **AB#5967**, Epic **AB#3364**).
 > Predecessors: **AB#4230** (archive data export/import), **AB#4231** (tenant backup with archive
 > data, `concept-tenant-backup-archive-data.md`), **AB#5489** (export reads time slices).
-> Status: **Concept complete, implementation on hold** (§12, decision 8). Decisions are in §3 and
-> §12; §12 also lists what is still to be checked.
+> Status: **Concept complete; local implementation under way** (Feature AB#5967, step 1 of §12; the
+> engine contract of slice AB#6967 is in §11). Decisions are in §3 and §12; §12 also lists what is
+> still to be checked.
 
 ## §1 Goal
 
@@ -148,10 +149,16 @@ of each store (expiry after one day, the backstop behind the cleanup of the job 
   entries. On Azure and Exoscale the store encrypts at rest; Hetzner (test-2) does not, so staging
   files lie there in plain text for the length of a run. Accepted for test-2, which holds no
   customer data.
-- A small contract in `octo-common-services` describes a staging location for CrateDB: the URI as
-  CrateDB sees it plus the `WITH` options that carry the credential. The endpoint CrateDB uses can
-  differ from the one the bot uses (local development, §10). The bot never logs the credential;
-  statement texts are logged with it removed.
+- A small type describes a staging location for CrateDB: the URI as CrateDB sees it plus the `WITH`
+  options that carry the credential. The endpoint CrateDB uses can differ from the one the bot uses
+  (local development, §10). The type, `ArchiveCopyStagingLocation`, lives in the engine
+  (`Runtime.Contracts`, next to `IStreamDataRepository`, which takes it); `octo-common-services`
+  builds it from the artifact store settings of the environment. The credential is reachable only
+  through two methods that are named for it (`RevealUri`, `RevealOptions`); `ToString()`, every
+  property and any serializer show the redacted form (`ArchiveCopyRedaction`: user info of the URI
+  dropped, every `WITH` option masked unless it is on a short list known to be harmless), and
+  `Scrub(text)` removes the credential from a text that may echo it, such as a driver error message.
+  The bot never logs the credential; statement texts are logged with it removed.
 - **`COPY` statements are kept out of `sys.jobs_log`.** CrateDB records every finished statement
   with its full text there, which for S3 includes the secret key. The cluster setting
   `stats.jobs_log_filter` is set to `stmt NOT ILIKE 'copy %'` (persistent), so `COPY` statements
@@ -317,15 +324,35 @@ There is no object storage, and the bot process cannot see the disk of the Crate
 
 | Repository | Change |
 |------------|--------|
-| `octo-construction-kit-engine` | Contract on `IStreamDataRepository`: copy an archive's tables to and from a staging location, with slice results. This document. |
+| `octo-construction-kit-engine` | Contract on `IStreamDataRepository` (AB#5967, slice AB#6967): copy an archive's tables to and from a staging location, with slice results. This document. See "The engine contract" below. |
 | `octo-construction-kit-engine-mongodb` | CrateDB implementation: slice planning, `COPY` statements, summary evaluation, bulk settings, generation map handling, column and disk checks. |
-| `octo-common-services` | Artifact category `copy-staging`; staging location for CrateDB per provider (SAS token, S3 key, endpoint as CrateDB sees it). |
+| `octo-common-services` | Artifact category `copy-staging`; builds the engine's `ArchiveCopyStagingLocation` per provider (SAS token, S3 key, endpoint as CrateDB sees it) from the artifact store settings. |
 | `octo-bot-services` | `DumpRepositoryJob` and `RestoreRepositoryJob`: format 2 writer and reader, format 1 kept; restore upload limit. |
 | `octo-asset-repo-services` | Integration tests against CrateDB (version matrix of §9). |
 | `octo-tools` | S3-compatible store in the local kind infrastructure. |
 | deployment (`meshmakers-infrastructure`, `octo-mesh-deployment`) | Artifact store per environment (AB#5562 to AB#5565, prepared, not applied yet); lifecycle entry for `copy-staging`; artifact store settings of the bot service. |
 
 SDK, CLI, MCP and Studio need no change.
+
+### The engine contract
+
+All types are in `Meshmakers.Octo.Runtime.Contracts.StreamData`. The members of `IStreamDataRepository`
+have default implementations, so a repository without a staging area (and every existing implementer)
+stays valid.
+
+| Member | Meaning |
+|--------|---------|
+| `SupportsStagingCopy` | `false` unless the repository implements the copy. When `false`, the caller takes the row path (format 1) and the members below throw `ArchiveCopyNotSupportedException`. |
+| `PlanArchiveCopyAsync` | Cuts an archive into counted, ascending `ArchiveCopySlice`s (the generation map of a rollup last) and describes every table. The result is the `ArchiveCopyPlan` the bot writes into the manifest. |
+| `CopyToStagingAsync` | Dumps the slices of a plan one at a time into `<rtId>/data/<slice>/` (`<rtId>/genmap/all/`) and yields an `ArchiveCopySliceResult` per slice. Ends after the first failed slice, stops between slices on cancellation, refuses while the job log filter of §5 is missing. |
+| `CopyFromStagingAsync` | Loads the slices of a plan into the freshly created tables, same shape as the dump; checks columns and disk before the first slice, restores the bulk table settings when the enumeration ends, optionally merges at the end (`ArchiveCopyOptions`). Reads the files of the plan's archive id, so a restore into another archive id works. |
+| `DescribeArchiveTableAsync`, `GetStorageVersionAsync` | Columns with their data types, and the version of the data store, for the manifest. |
+
+A slice result carries the counted rows (`Slice.RowCount`), the copied rows, rejected rows, the duration
+and a **redacted** message. A refusal before any data moved is `ArchiveCopyRefusedException` with a
+reason (`JobLogNotFiltered`, `ColumnMissing`, `InsufficientDiskSpace`). Plan, slice and result records
+round-trip through System.Text.Json. Tests: `Runtime.Engine.Tests/StreamData/ArchiveCopy*Tests.cs`; the
+in-memory fake that drives the dump and load order is `FakeStagingCopyStreamDataRepository`.
 
 ### Setting up the artifact store per environment
 

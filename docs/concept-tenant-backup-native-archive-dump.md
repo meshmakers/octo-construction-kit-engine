@@ -205,9 +205,16 @@ flowchart TD
   not treated as a failure (expected in the open bucket of a live tenant).
 - **Rollups and their generation map.** A recompute copies new rows, flips the pointer and sweeps
   the old generation. A dump that reads data and pointer on different sides of that flip would
-  restore windows no reader can see. The job reads the generation map before and after it copies a
-  rollup table and its map, and repeats that rollup when the map moved — the pattern
-  `RollupSourceBucketAggregator` already uses. Rollup tables are small next to the raw table.
+  restore windows no reader can see. The dump (`IStreamDataRepository.DumpArchiveToStagingAsync`) reads
+  the generation map, copies it, copies the data slices, and reads the map again; when the two reads
+  differ it repeats that rollup (at most `ArchiveCopyOptions.MaxMapAttempts`, default 3, then it
+  fails and names the rollup) — the pattern `RollupSourceBucketAggregator` already uses. The map is
+  copied **first** and the data after it, and a load does the reverse (data first, map last): with
+  the deferred sweep of a recompute (grace period, default 2 hours) the version the copied map
+  names is still in the data when it is copied. The result states the number of attempts, the time
+  of the map read and the time of the last data slice, so the caller can warn when the span is not
+  well below the grace period. An archive that is not a rollup never reads or copies a map. Rollup
+  tables are small next to the raw table.
 - **Packing.** The bot streams the staging files into the container. For the large tenant that is
   about 2 GB from the storage through the bot.
 - **Statements run as maintenance statements** (`CrateStatementClass.Maintenance`) with a command

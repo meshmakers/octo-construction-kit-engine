@@ -331,6 +331,17 @@ public interface IStreamDataRepository
         => throw new ArchiveCopyNotSupportedException(archiveRtId);
 
     /// <summary>
+    /// Runs the deferred sweeps of recomputed rollup ranges that are due. A recompute flips a range to a new generation and, with
+    /// a sweep grace period above zero, records the sweep of the superseded generation durably instead of running it at once (a
+    /// native dump that read the generation map before the flip still finds the rows its copy names); this call executes every
+    /// record whose flip time plus grace period has passed, so it also works after a restart. Returns the number of recorded
+    /// sweeps that were executed or dropped as obsolete. A repository that defers nothing returns 0.
+    /// </summary>
+    /// <remarks>Called by the host's recompute tick for every tenant, not while the tenant is marked <em>restore reconcile pending</em>.</remarks>
+    Task<int> SweepSupersededGenerationsAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(0);
+
+    /// <summary>
     /// Checks rollups for the inconsistencies a restore (or a dump taken during a recompute) can leave: a pointer without rows, rows
     /// above the pointer, a watermark ahead of the rows, a missing generation map (<see cref="RollupConsistencyCheck"/>). Read only:
     /// counts and MAX/MIN statements, no row is exported, nothing is changed. Does not throw for an inconsistent rollup; the report

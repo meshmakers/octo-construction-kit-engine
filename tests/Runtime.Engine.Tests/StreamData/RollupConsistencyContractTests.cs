@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Tasks;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.StreamData;
 
@@ -29,6 +30,14 @@ public class RollupConsistencyContractTests
         Assert.Throws<ArchiveCopyNotSupportedException>(() => { _ = repo.RepairRollupsAsync(null, true, Ct); });
         Assert.Throws<ArchiveCopyNotSupportedException>(() => { _ = repo.IsRestoreReconcilePendingAsync(Ct); });
         Assert.Throws<ArchiveCopyNotSupportedException>(() => { _ = repo.SetRestoreReconcilePendingAsync(true, Ct); });
+    }
+
+    [Fact]
+    public async Task RepositoryThatDefersNoSweeps_ReportsNothingToDo()
+    {
+        IStreamDataRepository repo = new StreamDataRepositoryStub();
+
+        Assert.Equal(0, await repo.SweepSupersededGenerationsAsync(Ct));
     }
 
     [Fact]

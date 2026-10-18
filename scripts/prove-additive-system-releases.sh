@@ -46,7 +46,7 @@ GUARD_TEST=0
 FORCED_FILE_IMPORT=0
 STACK_CATALOG=""
 
-usage() { sed -n '2,24p' "$0"; echo; echo "Options: --monorepo DIR --work DIR --ckc PATH --classic-ckc PATH --octo-cli PATH --admin-context CTX --tenant ID --phase P --release N --restart-cmd CMD --skill-dir DIR --system-base X.Y.Z --keep-tenant --guard-test [--stack-catalog DIR] --forced-file-import"; }
+usage() { sed -n '2,24p' "$0"; echo; echo "Options: --monorepo DIR --work DIR --ckc PATH --classic-ckc PATH --octo-cli PATH --admin-context CTX --tenant ID --phase P --release N --restart-cmd CMD --skill-dir DIR --system-base X.Y.Z --keep-tenant --guard-test [--stack-catalog DIR] --forced-file-import --selftest"; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --monorepo) MONO="$2"; shift 2;;
@@ -65,6 +65,7 @@ while [ $# -gt 0 ]; do
     --guard-test) GUARD_TEST=1; shift;;
     --stack-catalog) STACK_CATALOG="$2"; shift 2;;
     --forced-file-import) FORCED_FILE_IMPORT=1; shift;;
+    --selftest) python3 "$LIB" selftest; exit $?;;
     -h|--help) usage; exit 0;;
     *) echo "unknown option $1"; usage; exit 64;;
   esac
@@ -82,6 +83,8 @@ FAILS=0
 say() { echo "$*" | tee -a "$REPORT"; }
 row() { printf '%s\n' "$*" | tee -a "$REPORT"; }
 finding() { FAILS=$((FAILS + 1)); say "FINDING: $*"; }
+# true when `GetAdapters -j` lists an Online adapter; parses the JSON, so compact and pretty-printed output both work (AB#6973)
+adapter_online() { octo -c GetAdapters -j --context "$(tctx)" 2>&1 | python3 "$LIB" adapter-online; }
 json_get() { python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print(d.get(sys.argv[2],""))' "$1" "$2"; }
 # octo-ckc with a throw-away HOME: no GitHub catalog, no token, no network
 ckc() { local bin="$1"; shift; HOME="$WORK/home" "$bin" "$@"; }
@@ -387,10 +390,10 @@ phase_tenant_pipeline() {
   tenant_login
   local i
   for i in $(seq 1 100); do
-    octo -c GetAdapters -j --context "$(tctx)" 2>&1 | grep -q '"CommunicationState": "Online"' && break
+    adapter_online && break
     sleep 3
   done
-  octo -c GetAdapters -j --context "$(tctx)" 2>&1 | grep -q '"CommunicationState": "Online"' || finding "the mesh adapter is not Online for $TENANT (start the stack with --meshAdapterTenantId $TENANT after the tenant exists)"
+  adapter_online || finding "the mesh adapter is not Online for $TENANT (start the stack with --meshAdapterTenantId $TENANT after the tenant exists)"
   octo -c DeployPipeline -aid 670000000000000000000002 -pid aaa000000000000000006762 -f "$PIPELINE_YAML" --context "$(tctx)" 2>&1 | tail -1 | tee -a "$REPORT"
   octo -c GetPipelineStatus -id aaa000000000000000006762 -j --context "$(tctx)" 2>&1 | tail -1 | cut -c1-200 | tee -a "$REPORT"
 }
@@ -411,7 +414,7 @@ requests() { # one request per service
   if printf '%s' "$auth" | grep -q "Access token is valid" && ! printf '%s' "$auth" | grep -qi "failed"; then row "[$label] login (client credentials token for tenant $TENANT): ok"; else finding "[$label] login failed: $(printf '%s' "$auth" | tail -1 | cut -c1-200)"; fi
   # GraphQL runtime query + create (the pipeline creates or updates a Basic/Tree entity) and the adapter pipeline run
   local i ex ok=0 attempt
-  for i in $(seq 1 30); do octo -c GetAdapters -j --context "$(tctx)" 2>&1 | grep -q '"CommunicationState": "Online"' && break; sleep 3; done
+  for i in $(seq 1 30); do adapter_online && break; sleep 3; done
   for attempt in 1 2 3; do
     ex="$(octo -c ExecutePipeline -id aaa000000000000000006762 --context "$(tctx)" 2>&1 | tail -1)"
     for i in 1 2 3 4 5 6 7 8 9 10; do

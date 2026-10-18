@@ -268,6 +268,78 @@ def make_flow(args) -> None:
         "      - id: System/Enabled-1\n        value: true\n"
         "      - id: System.Communication/PipelineDefinition-1\n        value: |-\n" + indented, encoding="utf-8")
 
+# --------------------------------------------------------------------------------------------- adapter-online
+def _json_documents(text: str):
+    """Yield every JSON document found in the text: the whole text, then each line, then any value starting at a
+    '[' or '{' (octo-cli may print log lines before the JSON; compact and pretty-printed output both work)."""
+    dec = json.JSONDecoder()
+    try:
+        yield json.loads(text)
+        return
+    except ValueError:
+        pass
+    pos = 0
+    while pos < len(text):
+        m = re.search(r"[\[{]", text[pos:])
+        if not m:
+            return
+        start = pos + m.start()
+        try:
+            obj, end = dec.raw_decode(text, start)
+            yield obj
+            pos = end
+        except ValueError:
+            pos = start + 1
+
+
+def _any_adapter_online(node) -> bool:
+    if isinstance(node, dict):
+        state = node.get("CommunicationState", node.get("communicationState"))
+        if isinstance(state, str) and state.strip().lower() == "online":
+            return True
+        return any(_any_adapter_online(v) for v in node.values())
+    if isinstance(node, list):
+        return any(_any_adapter_online(v) for v in node)
+    return False
+
+
+def adapter_online_text(text: str) -> bool:
+    """True when the `GetAdapters -j` output lists an adapter whose CommunicationState is Online, independent of
+    the JSON whitespace (AB#6973). Empty, non-JSON or Offline output is False."""
+    return any(_any_adapter_online(doc) for doc in _json_documents(text))
+
+
+def adapter_online(args) -> None:
+    sys.exit(0 if adapter_online_text(sys.stdin.read()) else 1)
+
+
+# --------------------------------------------------------------------------------------------- selftest
+SELFTEST_ONLINE_COMPACT = '[{"AdapterId":"670000000000000000000002","CommunicationState":"Online"}]'
+SELFTEST_ONLINE_PRETTY = json.dumps(json.loads(SELFTEST_ONLINE_COMPACT), indent=2)  # spaced form, as a pretty-printing CLI would print it
+SELFTEST_ONLINE_LOGGED = 'info: connecting\n' + SELFTEST_ONLINE_PRETTY
+SELFTEST_OFFLINE = '[{"AdapterId":"670000000000000000000002","CommunicationState":"Offline"}]'
+
+
+def selftest(args) -> None:
+    cases = [
+        ("compact Online", SELFTEST_ONLINE_COMPACT, True),
+        ("pretty-printed Online", SELFTEST_ONLINE_PRETTY, True),
+        ("log line before pretty JSON", SELFTEST_ONLINE_LOGGED, True),
+        ("single object, compact", '{"CommunicationState":"Online"}', True),
+        ("Offline compact", SELFTEST_OFFLINE, False),
+        ("Offline pretty", json.dumps(json.loads(SELFTEST_OFFLINE), indent=2), False),
+        ("empty output", "", False),
+        ("error text", "Error: connection refused", False),
+        ("empty list", "[]", False),
+    ]
+    bad = 0
+    for name, text, expected in cases:
+        got = adapter_online_text(text)
+        print(("ok   " if got == expected else "FAIL ") + name + f" (expected {expected}, got {got})")
+        bad += got != expected
+    print("selftest: " + ("FAILED" if bad else "all passed"))
+    sys.exit(1 if bad else 0)
+
 
 def main() -> None:
     ap = argparse.ArgumentParser()
@@ -313,6 +385,10 @@ def main() -> None:
     p.add_argument("--since", required=True)
     p.add_argument("logs", nargs="+")
     p.set_defaults(fn=scan_logs)
+    p = sub.add_parser("adapter-online", help="exit 0 when stdin (GetAdapters -j) lists an Online adapter")
+    p.set_defaults(fn=adapter_online)
+    p = sub.add_parser("selftest", help="check adapter-online against compact and pretty-printed fixtures (no stack needed)")
+    p.set_defaults(fn=selftest)
     args = ap.parse_args()
     args.fn(args)
 

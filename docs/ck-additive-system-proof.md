@@ -16,6 +16,10 @@ tenants (`octo-cli -c LogIn -i --context local_OctoSystem`; machine client crede
 `OCTO_CLI_CLIENT_ID/SECRET` for admin calls yourself: octo-cli would replace the stored user token by a client-credentials token (the script unsets them
 for admin calls, see `octoa`).
 
+The "mesh adapter is Online" wait (phases `tenant-pipeline`, `tenant-final`) parses the JSON of `GetAdapters -j` (`proof_lib.py adapter-online`), so compact and
+pretty-printed output both work (AB#6973; before, a grep for the spaced form never matched and a green run ended with a false FINDING after about 5 minutes).
+`scripts/prove-additive-system-releases.sh --selftest` checks that helper against both spacings, Offline and empty output without a stack.
+
 ```bash
 M=~/RiderProjects/meshmakers/main                       # monorepo root of the lane
 # pre-flip compiler for the "v1 baseline" row: engine commit a9e5532d (parent of PR #279), built in a separate worktree

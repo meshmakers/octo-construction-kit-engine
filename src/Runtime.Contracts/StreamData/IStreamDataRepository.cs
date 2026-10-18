@@ -303,6 +303,12 @@ public interface IStreamDataRepository
     /// it touches the archives of the tenant. It does not test the staging location (that needs the credential and a real file); a
     /// location that fails shows at the first slice. Never throws for a missing prerequisite - the answer says what is missing.
     /// </summary>
+    /// <remarks>
+    /// The question is about the storage cluster, not the tenant. A caller that must ask before it can build a tenant context (a
+    /// restore, which replaces the tenant's database first) uses the cluster-level counterpart on the factory,
+    /// <c>IStreamDataRepositoryFactory.CheckStagingCopyReadinessAsync</c> (engine-mongodb contracts); both give the same answer
+    /// (AB#6969).
+    /// </remarks>
     Task<StagingCopyReadiness> CheckStagingCopyReadinessAsync(CancellationToken cancellationToken = default)
         => Task.FromResult(new StagingCopyReadiness(false, false, null,
             "This stream data repository does not support the native copy to a staging location."));

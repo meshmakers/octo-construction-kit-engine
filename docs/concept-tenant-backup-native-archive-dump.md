@@ -245,6 +245,14 @@ engine seams they use are `ArchiveCopyOptions.PhaseObserver` and `RepeatOnMovedM
 
 ## §7 Restore
 
+**Before the MongoDB restore: check that the storage can load.** The restore job asks the cluster, not a tenant,
+whether the native copy can run (`IStreamDataRepositoryFactory.CheckStagingCopyReadinessAsync`, the cluster-level
+member of the readiness check in the contract table below) and stops with the reason when it cannot, so a missing job
+log filter leaves the tenant exactly as it was. The question must not build a tenant context: that would load the CK
+cache from the database that the restore is about to replace. The answer is the same `StagingCopyReadiness` the
+tenant-bound `IStreamDataRepository.CheckStagingCopyReadinessAsync` gives (both delegate to one piece of code), and
+asking changes nothing in the cluster.
+
 Per archive of the manifest that exists after the MongoDB restore and passes the schema match:
 
 1. Disable, drop the table and its generation map, activate (the platform creates both tables with
@@ -388,6 +396,7 @@ stays valid.
 
 | Member | Meaning |
 |--------|---------|
+| `CheckStagingCopyReadinessAsync` | Preflight, **read only**: `StagingCopyReadiness(Supported, JobLogFilterSet, StorageVersion, Reason)`, `IsReady` = supported and the filter of §5 is set. A missing prerequisite is the answer (with a reason that says what to set, never a credential), not an exception. Two doors, one answer: on `IStreamDataRepository` (tenant-bound) and on `IStreamDataRepositoryFactory` (engine-mongodb contracts; cluster-level, needs no tenant, no CK cache and no archive store, so a restore can ask before it touches the tenant). |
 | `SupportsStagingCopy` | `false` unless the repository implements the copy. When `false`, the caller takes the row path (format 1) and the members below throw `ArchiveCopyNotSupportedException`. |
 | `PlanArchiveCopyAsync` | Cuts an archive into counted, ascending `ArchiveCopySlice`s (the generation map of a rollup last) and describes every table. The result is the `ArchiveCopyPlan` the bot writes into the manifest. |
 | `CopyToStagingAsync` | Dumps the slices of a plan one at a time into `<rtId>/data/<slice>/` (`<rtId>/genmap/all/`) and yields an `ArchiveCopySliceResult` per slice. Ends after the first failed slice, stops between slices on cancellation, refuses while the job log filter of §5 is missing. |

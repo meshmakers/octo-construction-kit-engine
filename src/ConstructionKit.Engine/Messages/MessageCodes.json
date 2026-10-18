@@ -683,6 +683,12 @@
       "number": 131,
       "level": "ERROR",
       "text": "Method '{methodId}' of '{ckTypeId}' declares an invalid 'execution.handler': {reason}"
+    },
+    {
+      "key": "CkMethodPipelineSensitiveParameter",
+      "number": 132,
+      "level": "ERROR",
+      "text": "Method '{methodId}' of '{ckTypeId}' declares 'execution.handler: pipeline' but has sensitive parameter(s) {parameters}: a pipeline execution stores its input, so a method with a sensitive parameter must use 'execution.handler: service'"
     }
   ]
 }

@@ -367,6 +367,9 @@ internal static class MessageCodes
     internal static OperationMessage CkMethodHandlerInvalid(string? location, object methodId, object ckTypeId, object reason) =>
         GetMessage("CkMethodHandlerInvalid", location, methodId, ckTypeId, reason);
 
+    internal static OperationMessage CkMethodPipelineSensitiveParameter(string? location, object methodId, object ckTypeId, object parameters) =>
+        GetMessage("CkMethodPipelineSensitiveParameter", location, methodId, ckTypeId, parameters);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1052,6 +1055,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  131, "Method '{methodId}' of '{ckTypeId}' declares an invalid 'execution.handler': {reason}",
                  new [] {"methodId", "ckTypeId", "reason"})
+        },
+        {
+            "CkMethodPipelineSensitiveParameter",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 132, "Method '{methodId}' of '{ckTypeId}' declares 'execution.handler: pipeline' but has sensitive parameter(s) {parameters}: a pipeline execution stores its input, so a method with a sensitive parameter must use 'execution.handler: service'",
+                 new [] {"methodId", "ckTypeId", "parameters"})
         },
     };
 }

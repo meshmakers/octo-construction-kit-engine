@@ -61,6 +61,20 @@ public class RollupConsistencyContractTests
     }
 
     [Fact]
+    public async Task ReadinessOfARepositoryWithoutTheCopy_SaysWhy_AndIsNotReady()
+    {
+        IStreamDataRepository repo = new StreamDataRepositoryStub();
+
+        var readiness = await repo.CheckStagingCopyReadinessAsync(Ct);
+
+        Assert.False(readiness.IsReady);
+        Assert.False(readiness.Supported);
+        Assert.Contains("does not support", readiness.Reason, StringComparison.Ordinal);
+        Assert.True(new StagingCopyReadiness(true, true, "5.10.10", null).IsReady);
+        Assert.False(new StagingCopyReadiness(true, false, "5.10.10", "filter").IsReady);
+    }
+
+    [Fact]
     public void DumpResult_RoundTripsThroughJson_AndKnowsWhetherItSucceeded()
     {
         var slice = ArchiveCopySlice.ForTimeRange(

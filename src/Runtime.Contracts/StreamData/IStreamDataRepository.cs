@@ -298,6 +298,16 @@ public interface IStreamDataRepository
     // ArchiveCopyNotSupportedException.
 
     /// <summary>
+    /// Asks, without changing anything and without touching an archive, whether the native copy can run: the repository supports it and
+    /// the job log filter is in place (the check a load otherwise makes only after the table was recreated). A restore calls it before
+    /// it touches the archives of the tenant. It does not test the staging location (that needs the credential and a real file); a
+    /// location that fails shows at the first slice. Never throws for a missing prerequisite - the answer says what is missing.
+    /// </summary>
+    Task<StagingCopyReadiness> CheckStagingCopyReadinessAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(new StagingCopyReadiness(false, false, null,
+            "This stream data repository does not support the native copy to a staging location."));
+
+    /// <summary>
     /// Dumps one archive completely: plans it, copies its data slices and — for a rollup — its generation map, and applies the
     /// repeat rule. For a rollup the map is read first, copied, then the data slices are copied, then the map is read again; when it
     /// moved in between (a recompute flipped a pointer) the whole rollup is copied again, up to

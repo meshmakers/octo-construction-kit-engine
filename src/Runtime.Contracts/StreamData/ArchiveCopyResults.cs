@@ -37,6 +37,22 @@ public sealed record ArchiveCopyDumpResult(
 }
 
 /// <summary>
+/// Whether the repository can run the native copy now (<see cref="IStreamDataRepository.CheckStagingCopyReadinessAsync"/>): a
+/// side-effect-free answer to ask before anything of a restore is dropped or created.
+/// </summary>
+/// <param name="Supported">The repository has the native copy at all (<see cref="IStreamDataRepository.SupportsStagingCopy"/>).</param>
+/// <param name="JobLogFilterSet">
+/// The cluster setting that keeps <c>COPY</c> statements (and with them the storage credential) out of the server's job log is in place.
+/// </param>
+/// <param name="StorageVersion">The version of the storage nodes; <c>null</c> when it could not be read.</param>
+/// <param name="Reason">What is missing, in English and without any secret; <c>null</c> when ready.</param>
+public sealed record StagingCopyReadiness(bool Supported, bool JobLogFilterSet, string? StorageVersion, string? Reason)
+{
+    /// <summary>True when a dump or a load can start.</summary>
+    public bool IsReady => Supported && JobLogFilterSet;
+}
+
+/// <summary>
 /// The outcome of loading one archive with <see cref="IStreamDataRepository.LoadArchiveFromStagingAsync"/>.
 /// </summary>
 /// <param name="ArchiveRtId">The archive that was loaded.</param>

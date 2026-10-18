@@ -10,6 +10,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 public sealed record ArchiveCopyOptions
 {
     public const long DefaultTargetSliceRows = 2_000_000;
+    public const int DefaultMaxMapAttempts = 3;
     public static readonly TimeSpan DefaultCommandTimeout = TimeSpan.FromMinutes(10);
     public static readonly TimeSpan DefaultOptimizeTimeout = TimeSpan.FromHours(2);
 
@@ -27,6 +28,12 @@ public sealed record ArchiveCopyOptions
     /// restore, 7 min 40 s for the 115 million row tenant on one node). Switch off to leave the merge to CrateDB.
     /// </summary>
     public bool OptimizeAfterLoad { get; init; } = true;
+
+    /// <summary>
+    /// How often a rollup may be copied again because its generation map moved while it was copied
+    /// (<see cref="IStreamDataRepository.DumpArchiveToStagingAsync"/>). The dump fails when the map moves in every attempt.
+    /// </summary>
+    public int MaxMapAttempts { get; init; } = DefaultMaxMapAttempts;
 
     /// <summary>Command timeout of the segment merge.</summary>
     public TimeSpan OptimizeTimeout { get; init; } = DefaultOptimizeTimeout;
@@ -48,6 +55,11 @@ public sealed record ArchiveCopyOptions
         if (CommandTimeout <= TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(nameof(CommandTimeout), "The command timeout must be positive.");
+        }
+
+        if (MaxMapAttempts < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(MaxMapAttempts), "At least one attempt is needed.");
         }
 
         if (OptimizeTimeout <= TimeSpan.Zero)

@@ -293,6 +293,84 @@ public interface IStreamDataRepository
     Task<string> GetStorageVersionAsync(CancellationToken cancellationToken = default)
         => throw new ArchiveCopyNotSupportedException();
 
+    // --- Archive-level dump and load, rollup consistency (AB#5967 slice 2) ---------------------------
+    // Default implementations as above: a repository without the native copy throws
+    // ArchiveCopyNotSupportedException.
+
+    /// <summary>
+    /// Dumps one archive completely: plans it, copies its data slices and — for a rollup — its generation map, and applies the
+    /// repeat rule. For a rollup the map is read first, copied, then the data slices are copied, then the map is read again; when it
+    /// moved in between (a recompute flipped a pointer) the whole rollup is copied again, up to
+    /// <see cref="ArchiveCopyOptions.MaxMapAttempts"/> times. The result states the attempts and the times of the map read and of
+    /// the last data slice. An archive without a generation map is copied once and its map is never read.
+    /// </summary>
+    /// <exception cref="ArchiveCopyRefusedException">
+    /// <see cref="ArchiveCopyRefusalReason.GenerationMapKeptMoving"/>: the map moved in every attempt (the message names the rollup),
+    /// or any reason of <see cref="CopyToStagingAsync"/>.
+    /// </exception>
+    /// <exception cref="ArchiveCopyNotSupportedException">The repository has no staging copy.</exception>
+    Task<ArchiveCopyDumpResult> DumpArchiveToStagingAsync(
+        OctoObjectId archiveRtId,
+        ArchiveCopyStagingLocation location,
+        ArchiveCopyOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => throw new ArchiveCopyNotSupportedException(archiveRtId);
+
+    /// <summary>
+    /// Loads one archive from <paramref name="plan"/> (data slices first, the generation map last, the previous version of the rollup
+    /// is not involved) and states whether the tables hold exactly the counted rows (<see cref="ArchiveCopyLoadResult.RowCountVerified"/>).
+    /// Same checks, bulk settings and refusals as <see cref="CopyFromStagingAsync"/>.
+    /// </summary>
+    /// <exception cref="ArchiveCopyNotSupportedException">The repository has no staging copy.</exception>
+    Task<ArchiveCopyLoadResult> LoadArchiveFromStagingAsync(
+        OctoObjectId archiveRtId,
+        ArchiveCopyPlan plan,
+        ArchiveCopyStagingLocation location,
+        ArchiveCopyOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => throw new ArchiveCopyNotSupportedException(archiveRtId);
+
+    /// <summary>
+    /// Checks rollups for the inconsistencies a restore (or a dump taken during a recompute) can leave: a pointer without rows, rows
+    /// above the pointer, a watermark ahead of the rows, a missing generation map (<see cref="RollupConsistencyCheck"/>). Read only:
+    /// counts and MAX/MIN statements, no row is exported, nothing is changed. Does not throw for an inconsistent rollup; the report
+    /// lists it.
+    /// </summary>
+    /// <param name="rollupRtIds">The rollups to check; <c>null</c> checks every rollup archive of the tenant.</param>
+    /// <param name="cancellationToken">Cancels the check.</param>
+    /// <exception cref="ArchiveCopyNotSupportedException">The repository does not support the check.</exception>
+    Task<RollupConsistencyReport> ValidateRollupsAsync(
+        IReadOnlyCollection<OctoObjectId>? rollupRtIds = null,
+        CancellationToken cancellationToken = default)
+        => throw new ArchiveCopyNotSupportedException();
+
+    /// <summary>
+    /// Validates, repairs what the validator found, and validates again (<see cref="RollupRepairReport"/>). Idempotent: a second run on
+    /// a repaired tenant finds nothing to do. With <paramref name="dryRun"/> it lists the planned steps and changes nothing. A failing
+    /// step stops the repair of its rollup and is named in the report; the restore-reconcile marker is cleared only when the repair
+    /// ended with a tenant that validates ok (<see cref="IsRestoreReconcilePendingAsync"/>).
+    /// </summary>
+    /// <exception cref="ArchiveCopyNotSupportedException">The repository does not support the repair.</exception>
+    Task<RollupRepairReport> RepairRollupsAsync(
+        IReadOnlyCollection<OctoObjectId>? rollupRtIds = null,
+        bool dryRun = false,
+        CancellationToken cancellationToken = default)
+        => throw new ArchiveCopyNotSupportedException();
+
+    /// <summary>
+    /// True while the tenant is marked <em>restore reconcile pending</em>: a restore with archive data finished and the rollups were not
+    /// yet validated ok or repaired. While it is set, reclaim, forward aggregation and recompute do not run for the tenant. Absent
+    /// marker = not pending, so tenants and backups from before this feature work unchanged.
+    /// </summary>
+    /// <exception cref="ArchiveCopyNotSupportedException">The repository does not support the marker.</exception>
+    Task<bool> IsRestoreReconcilePendingAsync(CancellationToken cancellationToken = default)
+        => throw new ArchiveCopyNotSupportedException();
+
+    /// <summary>Sets or clears the <em>restore reconcile pending</em> marker (stored durably next to the rollup data).</summary>
+    /// <exception cref="ArchiveCopyNotSupportedException">The repository does not support the marker.</exception>
+    Task SetRestoreReconcilePendingAsync(bool pending, CancellationToken cancellationToken = default)
+        => throw new ArchiveCopyNotSupportedException();
+
     // --- Rollup data plane --------------------------------------------------------------------
 
     /// <summary>

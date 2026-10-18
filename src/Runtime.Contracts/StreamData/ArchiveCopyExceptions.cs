@@ -30,7 +30,10 @@ public enum ArchiveCopyRefusalReason
     ColumnMissing = 1,
 
     /// <summary>A node does not have the free disk space the load needs.</summary>
-    InsufficientDiskSpace = 2
+    InsufficientDiskSpace = 2,
+
+    /// <summary>The generation map of a rollup moved in every attempt of the dump.</summary>
+    GenerationMapKeptMoving = 3
 }
 
 /// <summary>

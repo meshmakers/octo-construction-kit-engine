@@ -553,6 +553,16 @@ public class CkModelDiffService : ICkModelDiffService
     private static void DiffMethods(List<CkModelChange> changes, CkModelElementKind kind, string ownerId,
         List<CkMethodDto>? baseline, List<CkMethodDto>? current, string modelName)
     {
+        // AB#7024 (decision of 2026-10-19): a method that is NEW on an owner of the previous version and sets
+        // 'replacesGenericCreate' removes the generic create for existing callers exactly like false -> true on an
+        // existing method, so it also reports that change (row M16, Major). DiffMethods only runs for owners present in
+        // both versions: a method on a NEW type is covered by the type's own Added change (Minor).
+        var baselineIds = new HashSet<string>((baseline ?? []).Select(m => m.MethodId));
+        foreach (var added in (current ?? []).Where(m => m.ReplacesGenericCreate && !baselineIds.Contains(m.MethodId)))
+        {
+            AddModified(changes, kind, $"{ownerId}/{added.MethodId}", "replacesGenericCreate", false, true);
+        }
+
         DiffElements(changes, kind, baseline, current, m => $"{ownerId}/{m.MethodId}",
             (methodChanges, id, baselineMethod, currentMethod) =>
             {

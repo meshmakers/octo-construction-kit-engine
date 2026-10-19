@@ -1310,7 +1310,7 @@ before that); (2) compiled schema via the shared `$ref`; (3) `CkMethodDto.Replac
 reference with `Methods`; (5) `CkMethodGraph.ReplacesGenericCreate` (`[JsonIgnore]`, derived from the serialized definition);
 (6) message 133 (`InheritanceResolver` rule M-7: static only, no interface method, no abstract type, at most one per
 concrete type incl. inherited ones) and message 90 in a v1 model (`ElementResolver.CheckCkLanguage`); (7) diff property
-`replacesGenericCreate`, classifier row **M16** (`false` → `true` Major, `true` → `false` Minor, a new method is row M1),
+`replacesGenericCreate`, classifier row **M16** (`false` → `true` Major, `true` → `false` Minor, a new flagged method on a type of the previous version is Major too — the diff emits the `false` → `true` change for it —, on a new type Minor),
 guard probe, `signature` summary shows `, replaces generic create` only when set; (8) — (no generated code depends on it);
 (9) `Types.md` marks the method `(replaces generic create)`; (10) engine-mongodb `CkMethod.ReplacesGenericCreate`
 (reflection gate); (11) asset-repo CK meta + refusal: AB#7025; (12) optional, Studio. **minEngineVersion:**

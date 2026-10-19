@@ -351,14 +351,43 @@ public class MethodRowTests
     }
 
     [Fact]
-    public void M16_NewMethodWithTheFlag_IsMinorLikeAnyNewMethod()
+    public void M16_NewMethodWithTheFlagOnAnExistingType_IsMajor()
     {
+        // The type existed in the previous version: its callers create entities generically today.
         var current = Model();
         Methods(current, "type").Add(new CkMethodDto
         {
             MethodId = "Provision-1", Kind = CkMethodKindDto.Static, ReplacesGenericCreate = true
         });
 
+        var classified = Classify(Model(), current);
+        Assert.Equal(CkSemVerLevel.Major, Required(classified));
+        Assert.Contains(classified, c => c.Change is { ElementKind: CkModelElementKind.TypeMethod, ChangeKind: CkModelChangeKind.Added });
+        Assert.Contains(classified, c => c is { Level: CkSemVerLevel.Major, Change: { Property: "replacesGenericCreate", NewValue: "true" } });
+    }
+
+    [Fact]
+    public void M16_NewMethodWithoutTheFlagOnAnExistingType_StaysMinor()
+    {
+        var current = Model();
+        Methods(current, "type").Add(new CkMethodDto { MethodId = "Provision-1", Kind = CkMethodKindDto.Static });
+
         Assert.Equal(CkSemVerLevel.Minor, Level(Model(), current));
+    }
+
+    [Fact]
+    public void M16_NewMethodWithTheFlagOnANewType_IsMinor()
+    {
+        // A type that did not exist in the previous version has no callers that create it generically.
+        var current = Model();
+        current.Types!.Add(new CkCompiledTypeDto
+        {
+            TypeId = "Fresh", DerivedFromCkTypeId = "Base/Entity",
+            Methods = [new() { MethodId = "Provision-1", Kind = CkMethodKindDto.Static, ReplacesGenericCreate = true }]
+        });
+
+        var classified = Classify(Model(), current);
+        Assert.Equal(CkSemVerLevel.Minor, Required(classified));
+        Assert.DoesNotContain(classified, c => c.Change.Property == "replacesGenericCreate");
     }
 }

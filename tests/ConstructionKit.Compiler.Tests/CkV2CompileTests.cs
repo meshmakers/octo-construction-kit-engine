@@ -302,6 +302,107 @@ public sealed class CkV2CompileTests : IDisposable
         Assert.Contains("execution.handler: service", message.MessageText);
     }
 
+    /// <summary>The kitchen sink with a method added to the (concrete) type Account.</summary>
+    private static Dictionary<string, string> KitchenSinkWithAccountMethod(string method)
+    {
+        var files = KitchenSinkFiles();
+        files["types/types.yaml"] = files["types/types.yaml"].Replace("      - methodId: Unlock-1",
+            method.TrimEnd('\n') + "\n      - methodId: Unlock-1");
+        Assert.Contains(method.TrimEnd('\n'), files["types/types.yaml"]);
+        return files;
+    }
+
+    [Fact]
+    public async Task ReplacesGenericCreate_ReachesCompiledOutputRoundTripGraphDocsAndMinEngineVersion_AndDefaultStaysByteIdentical()
+    {
+        await PublishSystemAsync(_fixture);
+
+        // Golden: a model that does not use the key has no 'replacesGenericCreate' member and keeps the CK v2 floor.
+        var plain = await _fixture.CompileAsync(_fixture.WriteSource("plain", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], KitchenSinkFiles(), ckLanguage: 2));
+        Assert.DoesNotContain("replacesGenericCreate", await ToYamlAsync(_fixture, plain));
+        Assert.Equal(CkEngineVersion.CkV2MinEngineVersion, plain.MinEngineVersion);
+
+        var compiled = await _fixture.CompileAndPublishAsync(_fixture.WriteSource("ks", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], KitchenSinkWithAccountMethod(
+                "      - methodId: Provision-1\n        kind: Static\n        replacesGenericCreate: true\n"),
+            ckLanguage: 2));
+
+        // Compiled model, serialized YAML and read-back carry the value.
+        var provision = compiled.Types!.Single(t => t.TypeId.Name == "Account").Methods!
+            .Single(m => m.MethodId == "Provision-1");
+        Assert.True(provision.ReplacesGenericCreate);
+        var yaml = await ToYamlAsync(_fixture, compiled);
+        Assert.Contains("replacesGenericCreate: true", yaml);
+        var operationResult = new OperationResult();
+        var readBack = await _fixture.Services.GetRequiredService<ICkSerializer>()
+            .DeserializeCompiledModelRootAsync(yaml, "ks.yaml", operationResult);
+        Assert.False(operationResult.HasErrors, string.Join("; ", operationResult.Messages));
+        Assert.True(readBack.Types!.Single(t => t.TypeId.Name == "Account").Methods!
+            .Single(m => m.MethodId == "Provision-1").ReplacesGenericCreate);
+
+        // minEngineVersion is raised, so an engine that predates the flag refuses the model (message 126).
+        Assert.Equal(CkEngineVersion.ReplacesGenericCreateMinEngineVersion, compiled.MinEngineVersion);
+        Assert.Contains($"minEngineVersion: {CkEngineVersion.ReplacesGenericCreateMinEngineVersion}", yaml);
+        var refusal = new OperationResult();
+        Assert.False(CkEngineVersion.CheckModel(compiled, "ks", refusal, new Version(3, 5, 31)));
+        Assert.Equal(126, Assert.Single(refusal.Messages).MessageNumber);
+
+        // The resolved graph carries it; the other methods keep the default.
+        var graph = await _fixture.Services.GetRequiredService<ICatalogModelResolver>()
+            .HardResolveAsync(compiled, new OriginFileResolver("-"), new OperationResult());
+        var account = graph.Types[new CkId<CkTypeId>("KitchenSink-1.0.0/Account")];
+        Assert.True(account.AllMethods["Provision-1"].ReplacesGenericCreate);
+        Assert.False(account.AllMethods["Unlock-1"].ReplacesGenericCreate);
+        Assert.False(account.AllMethods["ChangePassword-1"].ReplacesGenericCreate);
+
+        // Docs generator: the flagged method is marked, the others are not.
+        var docs = Path.Combine(_fixture.Root, "docs");
+        await _fixture.Services.GetRequiredService<Engine.Documentation.IContentGenerator>()
+            .GenerateTypesMarkdownTable(graph, docs, compiled.ModelId, "1.0.0", "/docs/");
+        var types = await File.ReadAllTextAsync(
+            Directory.GetFiles(docs, "*.md", SearchOption.AllDirectories).Single(f => f.EndsWith("Types.md")),
+            TestContext.Current.CancellationToken);
+        Assert.Contains("| Provision-1 (replaces generic create) | Static |", types);
+        Assert.Contains("| Unlock-1 | Instance |", types);
+    }
+
+    [Theory]
+    [InlineData("      - methodId: Provision-1\n        replacesGenericCreate: true\n", "Static")]
+    [InlineData("      - methodId: Provision-1\n        kind: Static\n        replacesGenericCreate: true\n" +
+                "      - methodId: Build-1\n        kind: Static\n        replacesGenericCreate: true\n", "at most one")]
+    public async Task ReplacesGenericCreate_Invalid_FailsWith133NamingTheMethod(string method, string expectedText)
+    {
+        await PublishSystemAsync(_fixture);
+
+        var operationResult = new OperationResult();
+        await Assert.ThrowsAnyAsync<Exception>(() => _fixture.Services.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(_fixture.WriteSource("ks", "KitchenSink-1.0.0", ["System-[2.5,3.0)"],
+                KitchenSinkWithAccountMethod(method), ckLanguage: 2), operationResult));
+
+        var message = Assert.Single(operationResult.Messages.Where(m => m.MessageNumber == 133).Take(1));
+        Assert.Contains("Provision-1", message.MessageText);
+        Assert.Contains(expectedText, message.MessageText);
+    }
+
+    [Fact]
+    public async Task ReplacesGenericCreate_InACkLanguage1Model_FailsWith90()
+    {
+        await PublishSystemAsync(_fixture);
+
+        var operationResult = new OperationResult();
+        await Assert.ThrowsAnyAsync<Exception>(() => _fixture.Services.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(_fixture.WriteSource("v1", "V1Model-1.0.0", ["System-[2.5,3.0)"],
+                new Dictionary<string, string>
+                {
+                    ["types/t.yaml"] = "types:\n  - typeId: Gadget\n    derivedFromCkTypeId: ${System}/Entity\n" +
+                                       "    methods:\n      - methodId: Make-1\n        kind: Static\n        replacesGenericCreate: true\n"
+                }), operationResult));
+
+        Assert.Contains(operationResult.Messages,
+            m => m.MessageNumber == 90 && m.MessageText.Contains("replacesGenericCreate"));
+    }
+
     [Fact]
     public async Task SecuritySensitive_ReachesCompiledOutputGraphAndDocs_AndRequiresCkLanguage2()
     {

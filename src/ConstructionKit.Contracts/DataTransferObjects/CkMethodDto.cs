@@ -120,6 +120,21 @@ public class CkMethodDto
     [YamlMember(Alias = "visibility", DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public CkVisibilityDto? Visibility { get; set; }
+
+    /// <summary>
+    ///     CK v2 Phase 3 (AB#7024): <c>true</c> declares that this static method replaces the generic create of its
+    ///     type — entities of the type (and of every derived type) are created only through the method. Allowed only
+    ///     on a <see cref="CkMethodKindDto.Static" /> method of a non-abstract type (never on an interface method), at
+    ///     most one per concrete type including inherited ones, and only in a <c>ckLanguage: 2</c> model (message 133;
+    ///     message 90 for ckLanguage 1). The compiler only records the flag; the refusal of the generic create is
+    ///     enforced by the asset repository. <c>false</c> (default, key omitted) is not serialized, so models that do
+    ///     not use the key serialize byte-identically. A model that uses it carries a raised <c>minEngineVersion</c>
+    ///     (<c>CkEngineVersion.ReplacesGenericCreateMinEngineVersion</c>), so older engines refuse it with message 126
+    ///     instead of silently dropping the flag.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool ReplacesGenericCreate { get; set; }
 }
 
 /// <summary>

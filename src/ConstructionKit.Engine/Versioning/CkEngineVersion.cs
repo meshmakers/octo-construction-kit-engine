@@ -21,6 +21,17 @@ public static class CkEngineVersion
     /// </summary>
     public const string CkV2MinEngineVersion = "3.5.1";
 
+    /// <summary>
+    ///     The lowest engine version that reads a method's <c>replacesGenericCreate</c> flag (AB#7024): the first libs
+    ///     release that contains the field. An older engine of the 3.5 line would drop the unknown key silently and
+    ///     then serve the generic create of a type that must only be created through its method, so a model that sets
+    ///     the flag on any method carries this value as <c>minEngineVersion</c> and older engines refuse it with
+    ///     message 126. Models that do not use the flag keep <see cref="CkV2MinEngineVersion" />. <b>Must equal the
+    ///     number of the release that first ships the field</b> (the next patch after the last <c>r3.5.x</c> tag at
+    ///     merge time); raise it before merging when a release was cut in between.
+    /// </summary>
+    public const string ReplacesGenericCreateMinEngineVersion = "3.5.32";
+
     private static readonly Version? RunningVersion = ReadRunningVersion(typeof(CkEngineVersion).Assembly);
 
     // Test seam (AB#6274): never set outside tests, so production always reads RunningVersion.
@@ -49,10 +60,17 @@ public static class CkEngineVersion
 
     /// <summary>
     ///     The <c>minEngineVersion</c> the compiler writes for a model: <see cref="CkV2MinEngineVersion" /> for a
-    ///     <c>ckLanguage: 2</c> or range-retaining model, otherwise <c>null</c> (v1 output unchanged).
+    ///     <c>ckLanguage: 2</c> or range-retaining model, <see cref="ReplacesGenericCreateMinEngineVersion" /> when a
+    ///     method sets <c>replacesGenericCreate</c>, otherwise <c>null</c> (v1 output unchanged).
     /// </summary>
-    public static string? GetRequiredMinEngineVersion(CkCompiledModelRoot model) =>
-        model.EffectiveCkLanguage >= 2 || model.IsRangeRetaining ? CkV2MinEngineVersion : null;
+    public static string? GetRequiredMinEngineVersion(CkCompiledModelRoot model)
+    {
+        var baseline = model.EffectiveCkLanguage >= 2 || model.IsRangeRetaining ? CkV2MinEngineVersion : null;
+        // AB#7024: a model that uses 'replacesGenericCreate' needs an engine that knows the flag.
+        return model.Types?.Any(t => t.Methods?.Any(m => m.ReplacesGenericCreate) == true) == true
+            ? Max([baseline, ReplacesGenericCreateMinEngineVersion])
+            : baseline;
+    }
 
     /// <summary>
     ///     The highest of several <c>minEngineVersion</c> values (<c>null</c> entries ignored; <c>null</c> when none).

@@ -37,4 +37,11 @@ public sealed record CkMethodGraph(CkId<CkTypeId> DeclaringCkTypeId, CkMethodDto
     /// </summary>
     [JsonIgnore]
     public string Handler => CkMethodHandlers.Effective(Definition.Execution?.Handler);
+
+    /// <summary>
+    ///     AB#7024: true when this static method replaces the generic create of <see cref="DeclaringCkTypeId" /> and
+    ///     of every type derived from it (the refusal itself is enforced by the asset repository).
+    /// </summary>
+    [JsonIgnore]
+    public bool ReplacesGenericCreate => Definition.ReplacesGenericCreate;
 }

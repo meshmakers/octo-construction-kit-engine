@@ -328,4 +328,66 @@ public class MethodRowTests
         Assert.Equal(CkSemVerLevel.Patch, Required(Change(owner, m => m.Parameters![0].Description = "Reworded")));
         Assert.Equal(CkSemVerLevel.Patch, Required(Change(owner, m => m.Errors![0].Description = "Reworded")));
     }
+
+    [Theory]
+    [InlineData("type")]
+    [InlineData("interface")]
+    public void M16_ReplacesGenericCreate_FalseToTrueIsMajor_TrueToFalseIsMinor(string owner)
+    {
+        // absent / false -> true: callers that create entities generically break.
+        var toTrue = Change(owner, m => m.ReplacesGenericCreate = true);
+        Assert.Equal(CkSemVerLevel.Major, Required(toTrue));
+        Assert.Contains(toTrue, c => c.Change is { Property: "replacesGenericCreate", ChangeKind: CkModelChangeKind.Modified, NewValue: "true" });
+
+        // true -> false: the generic create is available again.
+        var trueBaseline = Model();
+        Method(trueBaseline, owner).ReplacesGenericCreate = true;
+        Assert.Equal(CkSemVerLevel.Minor, Level(trueBaseline, Model()));
+
+        // An unchanged flag is no change.
+        var both = Model();
+        Method(both, owner).ReplacesGenericCreate = true;
+        Assert.Equal(CkSemVerLevel.None, Level(trueBaseline, both));
+    }
+
+    [Fact]
+    public void M16_NewMethodWithTheFlagOnAnExistingType_IsMajor()
+    {
+        // The type existed in the previous version: its callers create entities generically today.
+        var current = Model();
+        Methods(current, "type").Add(new CkMethodDto
+        {
+            MethodId = "Provision-1", Kind = CkMethodKindDto.Static, ReplacesGenericCreate = true
+        });
+
+        var classified = Classify(Model(), current);
+        Assert.Equal(CkSemVerLevel.Major, Required(classified));
+        Assert.Contains(classified, c => c.Change is { ElementKind: CkModelElementKind.TypeMethod, ChangeKind: CkModelChangeKind.Added });
+        Assert.Contains(classified, c => c is { Level: CkSemVerLevel.Major, Change: { Property: "replacesGenericCreate", NewValue: "true" } });
+    }
+
+    [Fact]
+    public void M16_NewMethodWithoutTheFlagOnAnExistingType_StaysMinor()
+    {
+        var current = Model();
+        Methods(current, "type").Add(new CkMethodDto { MethodId = "Provision-1", Kind = CkMethodKindDto.Static });
+
+        Assert.Equal(CkSemVerLevel.Minor, Level(Model(), current));
+    }
+
+    [Fact]
+    public void M16_NewMethodWithTheFlagOnANewType_IsMinor()
+    {
+        // A type that did not exist in the previous version has no callers that create it generically.
+        var current = Model();
+        current.Types!.Add(new CkCompiledTypeDto
+        {
+            TypeId = "Fresh", DerivedFromCkTypeId = "Base/Entity",
+            Methods = [new() { MethodId = "Provision-1", Kind = CkMethodKindDto.Static, ReplacesGenericCreate = true }]
+        });
+
+        var classified = Classify(Model(), current);
+        Assert.Equal(CkSemVerLevel.Minor, Required(classified));
+        Assert.DoesNotContain(classified, c => c.Change.Property == "replacesGenericCreate");
+    }
 }

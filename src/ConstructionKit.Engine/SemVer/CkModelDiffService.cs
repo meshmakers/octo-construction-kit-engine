@@ -117,7 +117,8 @@ public class CkModelDiffService : ICkModelDiffService
             [
                 nameof(CkMethodDto.MethodId), nameof(CkMethodDto.Kind), nameof(CkMethodDto.Description),
                 nameof(CkMethodDto.Parameters), nameof(CkMethodDto.Result), nameof(CkMethodDto.Errors),
-                nameof(CkMethodDto.Authorization), nameof(CkMethodDto.Execution), nameof(CkMethodDto.Visibility)
+                nameof(CkMethodDto.Authorization), nameof(CkMethodDto.Execution), nameof(CkMethodDto.Visibility),
+                nameof(CkMethodDto.ReplacesGenericCreate)
             ],
             [typeof(CkMethodParameterDto)] =
             [
@@ -237,7 +238,7 @@ public class CkModelDiffService : ICkModelDiffService
         Element(CkModelElementKind.TypeInterface);
         string[] methodProperties =
         [
-            "description", "signature", "visibility", "kind", "result", "timeoutSeconds", "idempotent", "handler", "authorization",
+            "description", "signature", "visibility", "kind", "replacesGenericCreate", "result", "timeoutSeconds", "idempotent", "handler", "authorization",
             "roles", "scopes", "allowSelf"
         ];
         Element(CkModelElementKind.TypeMethod, methodProperties);
@@ -552,6 +553,16 @@ public class CkModelDiffService : ICkModelDiffService
     private static void DiffMethods(List<CkModelChange> changes, CkModelElementKind kind, string ownerId,
         List<CkMethodDto>? baseline, List<CkMethodDto>? current, string modelName)
     {
+        // AB#7024 (decision of 2026-10-19): a method that is NEW on an owner of the previous version and sets
+        // 'replacesGenericCreate' removes the generic create for existing callers exactly like false -> true on an
+        // existing method, so it also reports that change (row M16, Major). DiffMethods only runs for owners present in
+        // both versions: a method on a NEW type is covered by the type's own Added change (Minor).
+        var baselineIds = new HashSet<string>((baseline ?? []).Select(m => m.MethodId));
+        foreach (var added in (current ?? []).Where(m => m.ReplacesGenericCreate && !baselineIds.Contains(m.MethodId)))
+        {
+            AddModified(changes, kind, $"{ownerId}/{added.MethodId}", "replacesGenericCreate", false, true);
+        }
+
         DiffElements(changes, kind, baseline, current, m => $"{ownerId}/{m.MethodId}",
             (methodChanges, id, baselineMethod, currentMethod) =>
             {
@@ -560,6 +571,9 @@ public class CkModelDiffService : ICkModelDiffService
                 AddModified(methodChanges, kind, id, "signature",
                     FormatMethod(baselineMethod, modelName), FormatMethod(currentMethod, modelName));
                 AddModified(methodChanges, kind, id, "kind", baselineMethod.Kind.ToString(), currentMethod.Kind.ToString());
+                // AB#7024: absent equals false.
+                AddModified(methodChanges, kind, id, "replacesGenericCreate",
+                    baselineMethod.ReplacesGenericCreate, currentMethod.ReplacesGenericCreate);
                 AddModified(methodChanges, kind, id, "result",
                     FormatMethodResult(baselineMethod, modelName), FormatMethodResult(currentMethod, modelName));
                 AddModified(methodChanges, kind, id, "timeoutSeconds",
@@ -679,7 +693,9 @@ public class CkModelDiffService : ICkModelDiffService
                // AB#6877: only a non-default handler is rendered, so the signature of existing methods is unchanged.
                (CkMethodHandlers.Effective(method.Execution?.Handler) is var handler && handler != CkMethodHandlers.Service
                    ? $", handler {handler}"
-                   : "");
+                   : "") +
+               // AB#7024: only a set flag is rendered, so the signature of existing methods is unchanged.
+               (method.ReplacesGenericCreate ? ", replaces generic create" : "");
     }
 
     private static void DiffAttributes(List<CkModelChange> changes, List<CkAttributeDto>? baseline,

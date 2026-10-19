@@ -109,6 +109,31 @@ public class CkV2GraphJsonRoundTripTests(ITestOutputHelper output) : CkV2Resolve
     }
 
     [Fact]
+    public async Task ReplacesGenericCreate_SurvivesTheCacheJson_AndDefaultMethodsCarryNoKey()
+    {
+        var model = Model();
+        Type(model, "Account").Methods!.Single(m => m.MethodId == "Lock-1").ReplacesGenericCreate = true;
+        var operationResult = new OperationResult();
+        var graph = Resolve(model, operationResult);
+        Assert.Empty(operationResult.Messages);
+
+        var cache = await RoundTripAsync(graph);
+
+        var account = cache.GetRtCkType("target", new RtCkId<CkTypeId>($"{M}/Account"));
+        Assert.True(account.AllMethods["Lock-1"].ReplacesGenericCreate);
+        Assert.False(account.AllMethods["Unlock-1"].ReplacesGenericCreate);
+
+        // A model that does not use the key writes none into the cache JSON.
+        var plainSource = new CkCacheService(NullLogger<CkCacheService>.Instance);
+        plainSource.CreateTenant("plain");
+        plainSource.LoadCkModelGraph("plain", Resolve(Model(), new OperationResult()));
+        using var stream = new MemoryStream();
+        await plainSource.SaveCacheAsync("plain", stream);
+        Assert.DoesNotContain("replacesGenericCreate", Encoding.UTF8.GetString(stream.ToArray()),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task V1Graph_CacheJsonHasNoCkV2Keys_AndRestoresDefaults()
     {
         var operationResult = new OperationResult();

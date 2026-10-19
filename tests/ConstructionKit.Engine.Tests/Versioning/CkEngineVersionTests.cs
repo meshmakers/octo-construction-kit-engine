@@ -221,4 +221,36 @@ public class CkEngineVersionTests(ITestOutputHelper output) : CkV2ResolverTestBa
 
         return builder;
     }
+
+    // ── replacesGenericCreate (AB#7024) ─────────────────────────────────────────────
+
+    [Fact]
+    public void RequiredMinEngineVersion_RaisedOnlyWhenAMethodSetsReplacesGenericCreate()
+    {
+        var plain = Model();
+        Assert.Equal(CkEngineVersion.CkV2MinEngineVersion, CkEngineVersion.GetRequiredMinEngineVersion(plain));
+
+        var flagged = Model();
+        Type(flagged, "Account").Methods!.Single(m => m.MethodId == "Lock-1").ReplacesGenericCreate = true;
+        Assert.Equal(CkEngineVersion.ReplacesGenericCreateMinEngineVersion,
+            CkEngineVersion.GetRequiredMinEngineVersion(flagged));
+        Assert.True(Version.Parse(CkEngineVersion.ReplacesGenericCreateMinEngineVersion) >
+                    Version.Parse(CkEngineVersion.CkV2MinEngineVersion));
+    }
+
+    [Fact]
+    public void Code126_ModelWithReplacesGenericCreate_IsRefusedByAnEngineThatPredatesTheFlag()
+    {
+        // 3.5.31 is the last release without the field: it would drop the key silently, so it must refuse the model.
+        var model = Model();
+        Type(model, "Account").Methods!.Single(m => m.MethodId == "Lock-1").ReplacesGenericCreate = true;
+        model.MinEngineVersion = CkEngineVersion.GetRequiredMinEngineVersion(model);
+        var operationResult = new OperationResult();
+
+        Assert.False(CkEngineVersion.CheckModel(model, "loc", operationResult, new Version(3, 5, 31)));
+        Assert.Equal(126, Assert.Single(operationResult.Messages).MessageNumber);
+
+        Assert.True(CkEngineVersion.CheckModel(model, "loc", new OperationResult(),
+            Version.Parse(CkEngineVersion.ReplacesGenericCreateMinEngineVersion)));
+    }
 }

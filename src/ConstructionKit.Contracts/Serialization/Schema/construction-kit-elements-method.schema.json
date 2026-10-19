@@ -51,6 +51,10 @@
             "Internal"
           ],
           "description": "CK v2 (F1.1-S4): Internal = may only be referenced inside the declaring model. Omitted = Public. Requires ckLanguage: 2."
+        },
+        "replacesGenericCreate": {
+          "type": "boolean",
+          "description": "AB#7024: true = this static method replaces the generic create of its type; entities of the type (and of every derived type) are created only through the method. Omitted = false. Allowed only on a static method of a non-abstract type (not on an interface method), at most one per concrete type including inherited ones; requires ckLanguage: 2. Other uses are rejected by the compiler (message 133). The asset repository refuses the generic create of such a type. The model's minEngineVersion is raised so older engines refuse it (message 126)."
         }
       },
       "additionalProperties": false,

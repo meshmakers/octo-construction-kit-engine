@@ -84,7 +84,7 @@ public class CkSemVerClassificationGuardTests
     /// </summary>
     internal static readonly IReadOnlyList<string> ExpectedRuleRows =
     [
-        .. Rows("N", 5), .. Rows("I", 12), .. Rows("M", 16), .. Rows("T", 7), .. Rows("E", 2), .. Rows("R", 2),
+        .. Rows("N", 5), .. Rows("I", 12), .. Rows("M", 17), .. Rows("T", 7), .. Rows("E", 2), .. Rows("R", 2),
         .. Rows("A", 3), .. Rows("B", 4), .. Rows("D", 8)
     ];
 
@@ -680,6 +680,7 @@ public class CkSemVerClassificationGuardTests
             ["CkMethodResultDto.ValueType"] = m => Method(m).Result!.ValueType = AttributeValueTypesDto.String,
             ["CkMethodResultDto.ValueCkRecordId"] = m => Method(m).Result!.ValueCkRecordId = "Base/Record",
             ["CkMethodResultDto.ValueCkEnumId"] = m => Method(m).Result!.ValueCkEnumId = $"{M}/State",
+            ["CkMethodResultDto.Sensitive"] = m => Method(m).Result!.Sensitive = true,
             ["CkMethodErrorDto.Code"] = m => Method(m).Errors!.First().Code = "OTHER_CODE",
             ["CkMethodErrorDto.Description"] = m => Method(m).Errors!.First().Description = "changed",
             ["CkMethodAuthorizationDto.Roles"] = m => Method(m).Authorization!.Roles = ["Other"],

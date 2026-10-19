@@ -102,6 +102,24 @@ public class CkV2GeneratedContractsTests(ITestOutputHelper output) : CkV2Resolve
     }
 
     [Fact]
+    public void MethodResultRecord_PrintsThreeStarsOnlyForASensitiveResult()
+    {
+        var (model, _) = Prepare(m =>
+            Type(m, "Principal").Methods!.Single(x => x.MethodId == "ChangePassword-1").Result!.Sensitive = true);
+
+        var code = CkMethodCodeGenerator.Generate(Ns, model.Types!.Single(t => t.TypeId.Name == "Principal"));
+
+        Assert.Contains("public sealed partial record PrincipalChangePasswordResult", code);
+        Assert.Contains("public override string ToString() => \"PrincipalChangePasswordResult { Value = *** }\";", code);
+
+        // Unchanged for a result that is not sensitive: no ToString override, the default record rendering applies.
+        var (plainModel, _) = Prepare();
+        var plain = CkMethodCodeGenerator.Generate(Ns, plainModel.Types!.Single(t => t.TypeId.Name == "Principal"));
+        Assert.DoesNotContain("PrincipalChangePasswordResult { Value", plain);
+        Assert.DoesNotContain("Renders the result", plain);
+    }
+
+    [Fact]
     public void GeneratedV2Code_Compiles_AndToStringRedacts()
     {
         var (model, cache) = Prepare();

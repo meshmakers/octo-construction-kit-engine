@@ -253,4 +253,58 @@ public class CkEngineVersionTests(ITestOutputHelper output) : CkV2ResolverTestBa
         Assert.True(CkEngineVersion.CheckModel(model, "loc", new OperationResult(),
             Version.Parse(CkEngineVersion.ReplacesGenericCreateMinEngineVersion)));
     }
+
+    // ── sensitive method result (AB#7006) ───────────────────────────────────────────
+
+    [Fact]
+    public void RequiredMinEngineVersion_RaisedOnlyWhenAMethodResultIsSensitive()
+    {
+        var plain = Model();
+        Assert.Equal(CkEngineVersion.CkV2MinEngineVersion, CkEngineVersion.GetRequiredMinEngineVersion(plain));
+
+        var marked = Model();
+        Type(marked, "Principal").Methods!.Single(m => m.MethodId == "ChangePassword-1").Result!.Sensitive = true;
+        Assert.Equal(CkEngineVersion.SensitiveResultMinEngineVersion, CkEngineVersion.GetRequiredMinEngineVersion(marked));
+        Assert.True(Version.Parse(CkEngineVersion.SensitiveResultMinEngineVersion) >
+                    Version.Parse(CkEngineVersion.CkV2MinEngineVersion));
+    }
+
+    [Fact]
+    public void RequiredMinEngineVersion_AnInterfaceMethodWithASensitiveResultRaisesIt_TheHigherOfTwoMarkersWins()
+    {
+        var model = Model();
+        (model.Interfaces ??= []).Add(new CkInterfaceDto
+        {
+            InterfaceId = "Tokens-1",
+            Methods = [new() { MethodId = "IssueToken-1", Result = new() { ValueType = AttributeValueTypesDto.String, Sensitive = true } }]
+        });
+        Assert.Equal(CkEngineVersion.SensitiveResultMinEngineVersion, CkEngineVersion.GetRequiredMinEngineVersion(model));
+
+        // With replacesGenericCreate as well, the higher of the two constants is written.
+        Type(model, "Account").Methods!.Single(m => m.MethodId == "Lock-1").ReplacesGenericCreate = true;
+        var expected = new[] { CkEngineVersion.ReplacesGenericCreateMinEngineVersion, CkEngineVersion.SensitiveResultMinEngineVersion }
+            .Select(Version.Parse).Max()!.ToString();
+        Assert.Equal(expected, CkEngineVersion.GetRequiredMinEngineVersion(model));
+    }
+
+    [Fact]
+    public void Code126_ModelWithASensitiveResult_IsRefusedByAnEngineThatPredatesTheMarker_ButAModelWithoutItStillReads()
+    {
+        // 3.5.34 is the last release without the field: it would drop the key silently (and redact nothing).
+        var model = Model();
+        Type(model, "Principal").Methods!.Single(m => m.MethodId == "ChangePassword-1").Result!.Sensitive = true;
+        model.MinEngineVersion = CkEngineVersion.GetRequiredMinEngineVersion(model);
+        var operationResult = new OperationResult();
+
+        Assert.False(CkEngineVersion.CheckModel(model, "loc", operationResult, new Version(3, 5, 34)));
+        Assert.Equal(126, Assert.Single(operationResult.Messages).MessageNumber);
+        Assert.True(CkEngineVersion.CheckModel(model, "loc", new OperationResult(),
+            Version.Parse(CkEngineVersion.SensitiveResultMinEngineVersion)));
+
+        // A model that does not use the marker keeps the CK v2 floor and still reads at 3.5.1.
+        var plain = Model();
+        plain.MinEngineVersion = CkEngineVersion.GetRequiredMinEngineVersion(plain);
+        Assert.Equal(CkEngineVersion.CkV2MinEngineVersion, plain.MinEngineVersion);
+        Assert.True(CkEngineVersion.CheckModel(plain, "loc", new OperationResult(), new Version(3, 5, 1)));
+    }
 }

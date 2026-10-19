@@ -130,7 +130,7 @@ public class CkModelDiffService : ICkModelDiffService
             [typeof(CkMethodResultDto)] =
             [
                 nameof(CkMethodResultDto.ValueType), nameof(CkMethodResultDto.ValueCkRecordId),
-                nameof(CkMethodResultDto.ValueCkEnumId)
+                nameof(CkMethodResultDto.ValueCkEnumId), nameof(CkMethodResultDto.Sensitive)
             ],
             [typeof(CkMethodErrorDto)] = [nameof(CkMethodErrorDto.Code), nameof(CkMethodErrorDto.Description)],
             [typeof(CkMethodAuthorizationDto)] =
@@ -238,7 +238,7 @@ public class CkModelDiffService : ICkModelDiffService
         Element(CkModelElementKind.TypeInterface);
         string[] methodProperties =
         [
-            "description", "signature", "visibility", "kind", "replacesGenericCreate", "result", "timeoutSeconds", "idempotent", "handler", "authorization",
+            "description", "signature", "visibility", "kind", "replacesGenericCreate", "result", "resultSensitive", "timeoutSeconds", "idempotent", "handler", "authorization",
             "roles", "scopes", "allowSelf"
         ];
         Element(CkModelElementKind.TypeMethod, methodProperties);
@@ -576,6 +576,13 @@ public class CkModelDiffService : ICkModelDiffService
                     baselineMethod.ReplacesGenericCreate, currentMethod.ReplacesGenericCreate);
                 AddModified(methodChanges, kind, id, "result",
                     FormatMethodResult(baselineMethod, modelName), FormatMethodResult(currentMethod, modelName));
+                // AB#7006: the sensitive marker of the result is its own change (row M17), only when both versions have
+                // a result; a result added or removed is already a "result" change (row M6).
+                if (baselineMethod.Result != null && currentMethod.Result != null)
+                {
+                    AddModified(methodChanges, kind, id, "resultSensitive",
+                        baselineMethod.Result.Sensitive, currentMethod.Result.Sensitive);
+                }
                 AddModified(methodChanges, kind, id, "timeoutSeconds",
                     FormatTimeout(baselineMethod), FormatTimeout(currentMethod));
                 AddModified(methodChanges, kind, id, "idempotent",
@@ -680,7 +687,8 @@ public class CkModelDiffService : ICkModelDiffService
             (p.Sensitive ? " sensitive" : "")));
         var result = method.Result == null
             ? "none"
-            : Value(method.Result.ValueType, method.Result.ValueCkRecordId, method.Result.ValueCkEnumId);
+            : Value(method.Result.ValueType, method.Result.ValueCkRecordId, method.Result.ValueCkEnumId) +
+              (method.Result.Sensitive ? " sensitive" : "");
         var errors = string.Join(", ", (method.Errors ?? []).Select(e => e.Code));
         var authorization = method.Authorization == null
             ? "none"

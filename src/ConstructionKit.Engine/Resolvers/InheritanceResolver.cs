@@ -585,6 +585,13 @@ internal class InheritanceResolver : IInheritanceResolver
             operationResult.AddMessage(MessageCodes.CkMethodPipelineSensitiveParameter(location, method.MethodId,
                 ckTypeId, string.Join(", ", sensitiveParameters)));
         }
+
+        // AB#7006 (message 134): a pipeline execution stores its output, so a sensitive result cannot be hidden from
+        // it. Reported next to 132 when both apply (the remedies differ: a parameter can be dropped, a result not).
+        if (method.Result?.Sensitive == true)
+        {
+            operationResult.AddMessage(MessageCodes.CkMethodPipelineSensitiveResult(location, method.MethodId, ckTypeId));
+        }
     }
 
     /// <summary>

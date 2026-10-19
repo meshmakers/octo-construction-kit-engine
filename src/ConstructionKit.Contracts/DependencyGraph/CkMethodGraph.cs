@@ -44,4 +44,11 @@ public sealed record CkMethodGraph(CkId<CkTypeId> DeclaringCkTypeId, CkMethodDto
     /// </summary>
     [JsonIgnore]
     public bool ReplacesGenericCreate => Definition.ReplacesGenericCreate;
+
+    /// <summary>
+    ///     AB#7006: true when the result of this method is marked sensitive (never logged, audited or traced). False
+    ///     for a method without a result.
+    /// </summary>
+    [JsonIgnore]
+    public bool HasSensitiveResult => Definition.Result?.Sensitive == true;
 }

@@ -213,6 +213,20 @@ public class CkMethodResultDto
     [JsonConverter(typeof(CkIdEnumIdConverter))]
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public CkId<CkEnumId>? ValueCkEnumId { get; set; }
+
+    /// <summary>
+    ///     CK v2 Phase 3 (AB#7006): <c>true</c> declares the whole result value (scalar, enum or record) as sensitive —
+    ///     it must never be logged, audited or traced (the redaction itself is enforced at runtime, not by the
+    ///     compiler). The counterpart of <see cref="CkMethodParameterDto.Sensitive" /> for the result. A method with
+    ///     <c>execution.handler: pipeline</c> must not have a sensitive result, because a pipeline execution stores its
+    ///     output (message 134). <c>false</c> (default, key omitted) is not serialized, so models that do not use the
+    ///     key serialize byte-identically. A model that uses it carries a raised <c>minEngineVersion</c>
+    ///     (<c>CkEngineVersion.SensitiveResultMinEngineVersion</c>), so older engines refuse it with message 126
+    ///     instead of silently dropping the marker. A <c>Secret</c> value type is not sensitive implicitly.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Sensitive { get; set; }
 }
 
 /// <summary>

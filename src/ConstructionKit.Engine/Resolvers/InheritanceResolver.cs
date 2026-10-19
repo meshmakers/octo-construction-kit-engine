@@ -904,11 +904,13 @@ internal class InheritanceResolver : IInheritanceResolver
 
     /// <summary>
     ///     Index paths on entity system fields (<c>RtWellKnownName</c>, <c>RtBlueprintSource</c>, <c>CkTypeId</c>, ...)
-    ///     are not attributes.
+    ///     are not attributes. <c>_id</c> is the database primary key (the stored form of <c>RtId</c>); the
+    ///     <c>System/Entity</c> index <c>(CkTypeId, _id)</c> uses it, so a <c>ckLanguage: 2</c> System must be allowed to keep it.
     /// </summary>
     private static bool IsSystemIndexPath(string path) =>
         path.StartsWith("Rt", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("CkTypeId", StringComparison.OrdinalIgnoreCase);
+        path.StartsWith("CkTypeId", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(path, "_id", StringComparison.Ordinal);
 
     /// <summary>
     ///     Walks an attribute path (record segments allowed) and returns the first segment whose access is

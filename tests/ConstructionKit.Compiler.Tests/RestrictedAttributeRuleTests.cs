@@ -110,6 +110,7 @@ public sealed class RestrictedAttributeRuleTests : IDisposable
     [Theory]
     [InlineData("code")] // case-insensitive, like the database
     [InlineData("RtWellKnownName")] // entity system field
+    [InlineData("_id")] // database primary key (System/Entity index CkTypeId + _id)
     public async Task KnownOrSystemIndexPath_Compiles(string path)
     {
         Assert.Null(await CompileAsync(Index("Ascending", path)));

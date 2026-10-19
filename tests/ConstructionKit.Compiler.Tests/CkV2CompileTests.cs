@@ -269,6 +269,40 @@ public sealed class CkV2CompileTests : IDisposable
     }
 
     [Fact]
+    public async Task MethodHandler_SensitiveParameterWithPipeline_FailsWith132_AndServiceStaysAllowed()
+    {
+        // AB#7004 (OD-9): the kitchen sink's ChangePassword-1 has the sensitive parameter 'newPassword'.
+        await PublishSystemAsync(_fixture);
+
+        // Service handler (explicit) compiles.
+        var service = KitchenSinkFiles();
+        service["types/types.yaml"] = System.Text.RegularExpressions.Regex.Replace(service["types/types.yaml"],
+            @"^(\s+)timeoutSeconds: 15$", "$1timeoutSeconds: 15\n$1handler: service",
+            System.Text.RegularExpressions.RegexOptions.Multiline);
+        Assert.Contains("handler: service", service["types/types.yaml"]);
+        await _fixture.CompileAndPublishAsync(_fixture.WriteSource("ks-service", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], service, ckLanguage: 2));
+
+        // Pipeline handler is refused.
+        var pipeline = KitchenSinkFiles();
+        pipeline["types/types.yaml"] = System.Text.RegularExpressions.Regex.Replace(pipeline["types/types.yaml"],
+            @"^(\s+)timeoutSeconds: 15$", "$1timeoutSeconds: 15\n$1handler: pipeline",
+            System.Text.RegularExpressions.RegexOptions.Multiline);
+        Assert.Contains("handler: pipeline", pipeline["types/types.yaml"]);
+
+        var operationResult = new OperationResult();
+        await Assert.ThrowsAnyAsync<Exception>(() => _fixture.Services.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(_fixture.WriteSource("ks-pipeline", "KitchenSink-1.0.0", ["System-[2.5,3.0)"],
+                pipeline, ckLanguage: 2), operationResult));
+
+        var message = Assert.Single(operationResult.Messages, m => m.MessageNumber == 132);
+        Assert.Contains("ChangePassword-1", message.MessageText);
+        Assert.Contains("KitchenSink-1.0.0/Principal", message.MessageText);
+        Assert.Contains("'newPassword'", message.MessageText);
+        Assert.Contains("execution.handler: service", message.MessageText);
+    }
+
+    [Fact]
     public async Task SecuritySensitive_ReachesCompiledOutputGraphAndDocs_AndRequiresCkLanguage2()
     {
         // AB#6269

@@ -536,6 +536,9 @@ internal class InheritanceResolver : IInheritanceResolver
     ///     interface method — implemented by many types — does not have. A type that implements the interface
     ///     redeclares the method with <c>handler: pipeline</c> itself (execution is not part of the invocation
     ///     contract, rule 122).
+    ///     AB#7004 (message 132, OD-9 Option A): a pipeline method has no <c>sensitive</c> parameter. A pipeline
+    ///     execution stores its input, so the compiler refuses the combination; the pipeline handler runtime refuses
+    ///     such a method as well (defence in depth). A sensitive RESULT is not covered (no result-sensitivity flag).
     /// </summary>
     private static void ValidateMethodHandler(CkMethodDto method, object ckTypeId, string location,
         OperationResult operationResult, bool isInterfaceMethod)
@@ -569,6 +572,13 @@ internal class InheritanceResolver : IInheritanceResolver
             operationResult.AddMessage(MessageCodes.CkMethodHandlerInvalid(location, method.MethodId, ckTypeId,
                 "'pipeline' is not allowed on an interface method — the pipeline binds by the qualified method id of " +
                 "one type; redeclare the method on the implementing type with 'handler: pipeline'"));
+        }
+
+        var sensitiveParameters = (method.Parameters ?? []).Where(p => p.Sensitive).Select(p => $"'{p.Name}'").ToList();
+        if (sensitiveParameters.Count > 0)
+        {
+            operationResult.AddMessage(MessageCodes.CkMethodPipelineSensitiveParameter(location, method.MethodId,
+                ckTypeId, string.Join(", ", sensitiveParameters)));
         }
     }
 

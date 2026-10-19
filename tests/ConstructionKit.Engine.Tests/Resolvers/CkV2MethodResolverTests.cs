@@ -293,4 +293,149 @@ public class CkV2MethodResolverTests(ITestOutputHelper output) : CkV2ResolverTes
 
         ResolveExpectingNoMessages(model);
     }
+
+    // ── sensitive parameter + pipeline handler (AB#7004, OD-9 Option A, message 132) ──
+
+    private static CkMethodDto SensitiveMethod(string? handler, int? timeoutSeconds = 30) => new()
+    {
+        MethodId = "SetSecret-1",
+        Parameters =
+        [
+            new() { Name = "name", ValueType = AttributeValueTypesDto.String },
+            new() { Name = "secret", ValueType = AttributeValueTypesDto.String, Sensitive = true }
+        ],
+        Execution = handler == null && timeoutSeconds == null
+            ? null
+            : new() { Handler = handler, TimeoutSeconds = timeoutSeconds }
+    };
+
+    [Fact]
+    public void Code132_SensitiveParameterWithPipelineHandler_NamesMethodTypeAndParameter()
+    {
+        var model = Model();
+        Type(model, "Tag").Methods = [SensitiveMethod(CkMethodHandlers.Pipeline)];
+
+        var message = Assert.Single(ResolveExpectingOnly(model, 132));
+        Assert.Contains("SetSecret-1", message.MessageText);
+        Assert.Contains("/Tag", message.MessageText);
+        Assert.Contains("'secret'", message.MessageText);
+        Assert.DoesNotContain("'name'", message.MessageText);
+        Assert.Contains("execution.handler: service", message.MessageText);
+    }
+
+    [Fact]
+    public void Code132_SeveralSensitiveParameters_AreAllNamed()
+    {
+        var model = Model();
+        var method = SensitiveMethod(CkMethodHandlers.Pipeline);
+        method.Parameters!.Add(new() { Name = "token", ValueType = AttributeValueTypesDto.String, Sensitive = true });
+        Type(model, "Tag").Methods = [method];
+
+        var message = Assert.Single(ResolveExpectingOnly(model, 132));
+        Assert.Contains("'secret', 'token'", message.MessageText);
+    }
+
+    [Fact]
+    public void Code132_AndCode131_AreBothReportedForAPipelineWithoutTimeout()
+    {
+        var model = Model();
+        Type(model, "Tag").Methods = [SensitiveMethod(CkMethodHandlers.Pipeline, timeoutSeconds: null)];
+
+        var operationResult = new OperationResult();
+        Resolve(model, operationResult);
+
+        Assert.Equal([131, 132], operationResult.Messages.Select(m => m.MessageNumber).OrderBy(n => n));
+    }
+
+    [Theory]
+    [InlineData(CkMethodHandlers.Service)]
+    [InlineData(null)]
+    public void Code132_SensitiveParameterWithServiceOrOmittedHandler_OK(string? handler)
+    {
+        var model = Model();
+        Type(model, "Tag").Methods = [SensitiveMethod(handler, timeoutSeconds: handler == null ? null : 30)];
+
+        ResolveExpectingNoMessages(model);
+    }
+
+    [Fact]
+    public void Code132_PipelineWithoutSensitiveParameter_OK()
+    {
+        var model = Model();
+        var method = SensitiveMethod(CkMethodHandlers.Pipeline);
+        method.Parameters!.Single(p => p.Sensitive).Sensitive = false;
+        Type(model, "Tag").Methods = [method];
+
+        ResolveExpectingNoMessages(model);
+    }
+
+    [Fact]
+    public void Code132_PipelineWithSensitiveLookingResult_NotCovered_OK()
+    {
+        // Residual limit (OD-9): the meta-model has no result-sensitivity flag, a pipeline may return a secret.
+        var model = Model();
+        Type(model, "Tag").Methods =
+        [
+            new()
+            {
+                MethodId = "IssueToken-1",
+                Parameters = [new() { Name = "scope", ValueType = AttributeValueTypesDto.String }],
+                Result = new() { ValueType = AttributeValueTypesDto.String },
+                Execution = new() { Handler = CkMethodHandlers.Pipeline, TimeoutSeconds = 30 }
+            }
+        ];
+
+        ResolveExpectingNoMessages(model);
+    }
+
+    [Fact]
+    public void Code132_InterfaceMethod_SensitivePipelineIsRefusedByBoth131And132()
+    {
+        var model = Model();
+        (model.Interfaces ??= []).Add(new CkInterfaceDto
+        {
+            InterfaceId = "Secured-1",
+            Methods = [SensitiveMethod(CkMethodHandlers.Pipeline)]
+        });
+
+        var operationResult = new OperationResult();
+        Resolve(model, operationResult);
+
+        Assert.Equal([131, 132], operationResult.Messages.Select(m => m.MessageNumber).OrderBy(n => n));
+    }
+
+    [Fact]
+    public void Code132_InterfaceMethodWithSensitiveParameter_OK_AndImplementingTypeMustUseService()
+    {
+        var model = Model();
+        (model.Interfaces ??= []).Add(new CkInterfaceDto
+        {
+            InterfaceId = "Secured-1",
+            Methods = [SensitiveMethod(CkMethodHandlers.Service)]
+        });
+        var tag = Type(model, "Tag");
+        tag.Implements = [$"{M}/Secured-1"];
+        tag.Methods = [SensitiveMethod(CkMethodHandlers.Service)];
+        ResolveExpectingNoMessages(model);
+
+        // The implementing type redeclares the method as a pipeline: refused at the type.
+        tag.Methods = [SensitiveMethod(CkMethodHandlers.Pipeline)];
+        var message = Assert.Single(ResolveExpectingOnly(model, 132));
+        Assert.Contains("/Tag", message.MessageText);
+    }
+
+    [Fact]
+    public void Code132_InheritedSensitiveServiceMethod_OK_AndRefusedOnlyAtTheDeclaringType()
+    {
+        var model = Model();
+        // Account derives from Principal (kitchen sink). The sensitive method is declared once on the base type.
+        Type(model, "Principal").Methods!.Add(SensitiveMethod(CkMethodHandlers.Service));
+        ResolveExpectingNoMessages(model);
+
+        Type(model, "Principal").Methods!.Single(m => m.MethodId == "SetSecret-1").Execution!.Handler =
+            CkMethodHandlers.Pipeline;
+        var messages = ResolveExpectingOnly(model, 132);
+        Assert.Single(messages);
+        Assert.Contains("/Principal", messages[0].MessageText);
+    }
 }

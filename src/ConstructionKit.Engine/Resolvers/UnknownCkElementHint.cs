@@ -23,17 +23,17 @@ internal static class UnknownCkElementHint
     internal static string ForType(CkModelGraph graph, CkId<CkTypeId> ckTypeId)
     {
         return Build(graph, "type", ckTypeId.ModelId, ckTypeId.ElementId.Name,
-            graph.Types.Keys.Select(k => (k.ModelId, k.ElementId.Name)));
+            ckTypeId.ElementId.Version, graph.Types.Keys.Select(k => (k.ModelId, k.ElementId.Name, k.ElementId.Version)));
     }
 
     internal static string ForRecord(CkModelGraph graph, CkId<CkRecordId> ckRecordId)
     {
         return Build(graph, "record", ckRecordId.ModelId, ckRecordId.ElementId.Name,
-            graph.Records.Keys.Select(k => (k.ModelId, k.ElementId.Name)));
+            ckRecordId.ElementId.Version, graph.Records.Keys.Select(k => (k.ModelId, k.ElementId.Name, k.ElementId.Version)));
     }
 
     private static string Build(CkModelGraph graph, string kind, CkModelId modelId, string name,
-        IEnumerable<(CkModelId ModelId, string Name)> elements)
+        uint version, IEnumerable<(CkModelId ModelId, string Name, uint Version)> elements)
     {
         var all = elements.ToList();
         var modelResolved = graph.Models.ContainsKey(modelId) || all.Any(e => e.ModelId.Equals(modelId));
@@ -43,6 +43,18 @@ internal static class UnknownCkElementHint
         }
 
         var modelFullName = modelId.FullName;
+        var otherVersions = all
+            .Where(e => e.ModelId.Equals(modelId) && string.Equals(e.Name, name, StringComparison.Ordinal) &&
+                        e.Version != version)
+            .Select(e => $"{e.Name}-{e.Version}")
+            .OrderBy(v => v, StringComparer.Ordinal)
+            .ToList();
+        if (otherVersions.Count > 0)
+        {
+            return $"The {kind} '{name}-{version}' does not exist in model {modelFullName}, but the model contains " +
+                   $"{string.Join(", ", otherVersions.Select(v => $"'{v}'"))}. Check the version of the reference.";
+        }
+
         var inOtherModels = all
             .Where(e => !e.ModelId.Equals(modelId) && string.Equals(e.Name, name, StringComparison.Ordinal))
             .Select(e => e.ModelId.FullName)

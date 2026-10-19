@@ -134,4 +134,19 @@ public class UnknownCkElementHintTests
         Assert.Contains("The record 'Recrd1' does not exist in model sample1-1.0.0", hint);
         Assert.Contains("Did you mean 'Record1'?", hint);
     }
+
+    [Fact]
+    public void Hint_UnknownTypeVersion_NamesTheExistingVersionInsteadOfSuggestingTheSameName()
+    {
+        CkModelGraph graph = new();
+        graph.AppendModel(Builder.Build());
+
+        var hint = UnknownCkElementHint.ForType(graph, new CkId<CkTypeId>("System-1.0.0/Entity-2"));
+
+        Assert.Contains("'Entity-2' does not exist in model System-1.0.0", hint);
+        Assert.Contains("contains 'Entity-1'", hint);
+        Assert.Contains("Check the version of the reference", hint);
+        Assert.DoesNotContain("Did you mean", hint);
+        Assert.DoesNotContain("model prefix", hint);
+    }
 }

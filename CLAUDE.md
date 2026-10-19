@@ -695,6 +695,35 @@ content, the first publish from here is the idempotent "already exists" skip. Th
 publishing it together with the removal of its model project (AB#6480). A search of all `azure-pipelines.yml`
 files for `SystemFilesCkModel` must therefore find only this repository.
 
+## System on ckLanguage 2 (AB#6928, Epic AB#5584 F4.1)
+
+`src/SystemCkModel` is **System-2.6.0**, `ckLanguage: 2` (2.5.0 was ckLanguage 1). The release is a **Minor** and must stay one:
+
+- **Every type and record declares `derivable: Any`.** Raising the language flips the default from `Any` to `Model`; without the explicit
+  keys every model deriving from `System/Entity` would fail with message 113 and the SemVer verdict would be Major (row T6, `OCTO-CK200`).
+  `visibility` (omitted = `Public`) and attribute `access` (omitted = `ReadWrite`) do not flip, nothing else is declared. A **new** System type
+  without `derivable` is `Model` like in any v2 model; give it `derivable: Any` when other models should derive from it.
+  `Entity` and `Configuration` are stable bases by declaration (public, not final, `derivable: Any`): row B4 (unique index = Major +
+  acknowledge) is judged through `CkSemVerClassifier.IsStableBase`. The v1 name branch of `IsStableBase` stays for System versions up to 2.5.x
+  (their sources and published files are ckLanguage 1 and are still compared) and goes with the last ckLanguage 1 System.
+- **minEngineVersion 3.5.1, `ck-models/v3/` only.** The compiler derives it from `ckLanguage: 2`. An engine below 3.5.1 does not see System 2.6
+  (message 126 / catalog path); the embedded-import downgrade guard keeps a newer installed System when an older service starts
+  (`EmbeddedCkModelImportGuard.Decide`: embedded `System-2.5.0` against installed `System-2.6.0` = `SkipNewerInstalled`, covered by
+  `CkModelImportGuardDecisionTests` in engine-mongodb).
+- **Message 109 and `_id`.** The `System/Entity` index `(CkTypeId, _id)` names the database key; rule 109 (unknown index path in a v2 model)
+  exempts `_id` next to `Rt*` / `CkTypeId` (`InheritanceResolver.IsSystemIndexPath`, test `RestrictedAttributeRuleTests`).
+- **Generated C#.** For a v2 model the Rt class of an `isFinal` type is `sealed`: `RtAutoIncrement`, `RtBlueprintBackup`, `RtBlueprintHistory`,
+  `RtBlueprintInstallation`, `RtMigrationHistory`, `RtTenant`, `RtTenantConfiguration`, `RtTenantModeConfiguration` (no subclass or mock of them in the monorepo, checked 2026-10-19).
+- **Not published by this change.** A service that embeds System 2.6 brings it to every tenant, and a model that is still exact-pinned to 2.5.0
+  would go `ResolveFailed`; publishing waits for the exact-pin scan (F2.6, AB#6708) and the release train, together with the interfaces story
+  (AB#6929). Never publish a ckLanguage 2 System into a shared catalog or environment before every service there runs the CK v2 engine.
+- **Proof.** `scripts/prove-system-ckl2.sh --monorepo <root>` (private catalogs, throw-away `HOME`, nothing shared is read or written): compiles
+  System 2.5.0 (git ref `origin/main`) and the 21 dependent models (committed HEAD of each repository) into a "before" catalog, runs
+  `ValidateVersion` (Minor), `ValidateCascade` (0 Breaks, 0 NeedsRepin), shows the SHA-256 list of System before/after, proves the compiled
+  surface identical apart from the explicit modifiers, publishes 2.6.0 into a copy of the catalog (`ck-models/v3` only) and recompiles every dependent
+  without editing its `ckModel.yaml` (0 output changes; only the resolved closure line moves, row D8). Tests: `SystemCkLanguage2Tests`
+  (Compiler.Tests; includes the negative control that the same switch without the explicit modifiers is `OCTO-CK200`).
+
 ## CK Model Publishing Lanes (CI)
 
 This repo publishes its CK models (`System`, `System.Files`, `System.StreamData`) from **inside the build**, not from a dedicated publish
@@ -1155,7 +1184,7 @@ exists in Industry.Basic-2.6.0. Check the model prefix of the reference."). `OCT
 | 106 | `HiddenAttributeIndexed` | `InheritanceResolver.ValidateRestrictedAttributeUse` | F1.2-S2 (review N5): a non-text index (`Unique`, `UniqueNotDeleted`, `Ascending`, ...) reaches a Hidden attribute (a unique index reveals values through duplicate-key errors). Text indexes keep reporting 105. Review G3 E-M1: every index path is checked against the type, its derived types **and every other type of the same collection** (defining collection root + all its derived types, i.e. siblings, also from other models) — they share `attributes.<name>`, so a sibling's Hidden assignment would be indexed too |
 | 107 | `HiddenAttributeAutoCompleteValues` | `ElementResolver.CheckHiddenAssignments` | F1.2-S2 (N5): a Hidden type/record assignment declares `autoCompleteValues` (published in the model; Secret equivalent: 71) |
 | 108 | `HiddenAttributeOnAssociationRole` | `ElementResolver.CheckHiddenAssignments` | F1.2-S2 (N5): association-role attributes cannot be Hidden (no access guard on association attributes). `ReadOnly` / `MethodOnly` stay allowed |
-| 109 | `UnknownIndexAttributePath` | `InheritanceResolver.ValidateRestrictedAttributeUse` | F1.2-S2 (review N6): in a `ckLanguage: 2` model every index path segment must name an attribute (matched case-insensitively, like Mongo). Paths starting with `Rt`/`CkTypeId` (entity system fields) are exempt; a path merged into a collection root from a derived type is checked at that type. v1 models: unchanged |
+| 109 | `UnknownIndexAttributePath` | `InheritanceResolver.ValidateRestrictedAttributeUse` | F1.2-S2 (review N6): in a `ckLanguage: 2` model every index path segment must name an attribute (matched case-insensitively, like Mongo). Paths starting with `Rt`/`CkTypeId` (entity system fields) and the database key `_id` (the `System/Entity` index `CkTypeId` + `_id`, AB#6928) are exempt; a path merged into a collection root from a derived type is checked at that type. v1 models: unchanged |
 | 110 | `CkElementsInWrongFolder` | `CompilerService` (per element file) | **warning**: an element file declares a root key that is only read from another folder (e.g. `interfaces:` in `types/x.yaml`); those elements are ignored. Applies to every element kind (each folder reads only its own key) |
 | 112 | `CkReferenceToInternalElement` | `CkVisibilityValidator` (end of `ReferenceResolver`) | F1.2-S3: a reference from another model to a `visibility: Internal` element — base type/record, attribute assignment (type, record, role, interface member), attribute `valueCkRecordId`/`valueCkEnumId`, `implements`, interface `extends`, type/interface association role and targets, method parameter/result records and enums. Models compared by name |
 | 113 | `CkElementNotDerivable` | `CkVisibilityValidator` | F1.2-S3: a type or record derives from a type/record of another model whose effective `derivable` is `Model` (a v2 base without `derivable: Any`) |

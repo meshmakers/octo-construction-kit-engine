@@ -81,11 +81,11 @@ internal static class MessageCodes
     internal static OperationMessage CkTypeIdOutAssociationNotUniqueByInheritance(string? location, object ckTypeId, object ckAssociationId, object targetCkTypeId) =>
         GetMessage("CkTypeIdOutAssociationNotUniqueByInheritance", location, ckTypeId, ckAssociationId, targetCkTypeId);
 
-    internal static OperationMessage CkTypeIdUnknownTargetCkTypeIdForAssociation(string? location, object originCkTypeId, object targetCkTypeId, object roleId) =>
-        GetMessage("CkTypeIdUnknownTargetCkTypeIdForAssociation", location, originCkTypeId, targetCkTypeId, roleId);
+    internal static OperationMessage CkTypeIdUnknownTargetCkTypeIdForAssociation(string? location, object originCkTypeId, object targetCkTypeId, object roleId, object hint) =>
+        GetMessage("CkTypeIdUnknownTargetCkTypeIdForAssociation", location, originCkTypeId, targetCkTypeId, roleId, hint);
 
-    internal static OperationMessage CkTypeIdUnknown(string? location, object ckTypeId) =>
-        GetMessage("CkTypeIdUnknown", location, ckTypeId);
+    internal static OperationMessage CkTypeIdUnknown(string? location, object ckTypeId, object hint) =>
+        GetMessage("CkTypeIdUnknown", location, ckTypeId, hint);
 
     internal static OperationMessage CkTypeIdMultipleOutgoingAssociationRepresentingSameRole(string? location, object ckTypeId, object ckAssociationId, object targetCkTypeId, object otherCkTypeId, object otherTargetCkTypeId) =>
         GetMessage("CkTypeIdMultipleOutgoingAssociationRepresentingSameRole", location, ckTypeId, ckAssociationId, targetCkTypeId, otherCkTypeId, otherTargetCkTypeId);
@@ -126,8 +126,8 @@ internal static class MessageCodes
     internal static OperationMessage RecordIdNotUnique(string? location, object ckRecordId) =>
         GetMessage("RecordIdNotUnique", location, ckRecordId);
 
-    internal static OperationMessage CkRecordIdUnknown(string? location, object ckRecordId) =>
-        GetMessage("CkRecordIdUnknown", location, ckRecordId);
+    internal static OperationMessage CkRecordIdUnknown(string? location, object ckRecordId, object hint) =>
+        GetMessage("CkRecordIdUnknown", location, ckRecordId, hint);
 
     internal static OperationMessage UnknownCkRecordIdForInheritance(string? location, object ckRecordId) =>
         GetMessage("UnknownCkRecordIdForInheritance", location, ckRecordId);
@@ -477,14 +477,14 @@ internal static class MessageCodes
         {
             "CkTypeIdUnknownTargetCkTypeIdForAssociation",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 18, "CkTypeId '{originCkTypeId}' defines a unknown target CkTypeId '{targetCkTypeId}' for role id '{roleId}'. This may happen because a dependency to another construction kit model is missing.",
-                 new [] {"originCkTypeId", "targetCkTypeId", "roleId"})
+                 18, "CkTypeId '{originCkTypeId}' defines a unknown target CkTypeId '{targetCkTypeId}' for role id '{roleId}'. {hint}",
+                 new [] {"originCkTypeId", "targetCkTypeId", "roleId", "hint"})
         },
         {
             "CkTypeIdUnknown",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 19, "CkTypeId '{ckTypeId}' is unknown. This may happen because a dependency to another construction kit model is missing.",
-                 new [] {"ckTypeId"})
+                 19, "CkTypeId '{ckTypeId}' is unknown. {hint}",
+                 new [] {"ckTypeId", "hint"})
         },
         {
             "CkTypeIdMultipleOutgoingAssociationRepresentingSameRole",
@@ -573,8 +573,8 @@ internal static class MessageCodes
         {
             "CkRecordIdUnknown",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 34, "CkRecordId '{ckRecordId}' is unknown. This may happen because a dependency to another construction kit model is missing.",
-                 new [] {"ckRecordId"})
+                 34, "CkRecordId '{ckRecordId}' is unknown. {hint}",
+                 new [] {"ckRecordId", "hint"})
         },
         {
             "UnknownCkRecordIdForInheritance",

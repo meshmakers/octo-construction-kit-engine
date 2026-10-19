@@ -88,7 +88,7 @@ public class CatalogServicePublishTests
     [Fact]
     public async Task PublishAsync_WhenResolveCollectsAFatalErrorWithoutThrowing_ThrowsAndDoesNotPublish()
     {
-        ResolveCollects(MessageCodes.CkTypeIdUnknown("types/meter.yaml", "Industry.Basic/Asset"));
+        ResolveCollects(MessageCodes.CkTypeIdUnknown("types/meter.yaml", "Industry.Basic/Asset", "hint"));
 
         var exception = await Assert.ThrowsAsync<CompilerException>(() =>
             _sut.PublishAsync(CatalogName, _model, _originFileResolver, true));
@@ -128,7 +128,7 @@ public class CatalogServicePublishTests
     public async Task PublishAsync_WithPreExistingErrorFromAnEarlierStep_StillPublishes()
     {
         var callerOperationResult = new OperationResult();
-        callerOperationResult.AddMessage(MessageCodes.CkTypeIdUnknown("types/other.yaml", "Other/Type"));
+        callerOperationResult.AddMessage(MessageCodes.CkTypeIdUnknown("types/other.yaml", "Other/Type", "hint"));
         ResolveCollects();
 
         await _sut.PublishAsync(CatalogName, _model, _originFileResolver, true, callerOperationResult);

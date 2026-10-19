@@ -640,7 +640,8 @@ internal class InheritanceResolver : IInheritanceResolver
 
         if (!modelGraph.Types.TryGetValue(ckTypeId, out var typeGraph))
         {
-            operationResult.AddMessage(MessageCodes.CkTypeIdUnknown(originFileResolver.Resolve(ckTypeId), ckTypeId));
+            operationResult.AddMessage(MessageCodes.CkTypeIdUnknown(originFileResolver.Resolve(ckTypeId), ckTypeId,
+                UnknownCkElementHint.ForType(modelGraph, ckTypeId)));
             failedModelIds.Add(ckTypeId.ModelId);
             failedTypeIds.Add(ckTypeId);
             return null;
@@ -1130,7 +1131,7 @@ internal class InheritanceResolver : IInheritanceResolver
         if (!modelGraph.Records.TryGetValue(ckRecordId, out var recordGraph))
         {
             operationResult.AddMessage(MessageCodes.CkRecordIdUnknown(originFileResolver.Resolve(ckRecordId),
-                ckRecordId));
+                ckRecordId, UnknownCkElementHint.ForRecord(modelGraph, ckRecordId)));
             failedModelIds.Add(ckRecordId.ModelId);
             return null;
         }
@@ -1361,7 +1362,8 @@ internal class InheritanceResolver : IInheritanceResolver
         {
             operationResult.AddMessage(MessageCodes.CkTypeIdUnknownTargetCkTypeIdForAssociation(
                 originFileResolver.Resolve(typeGraph.CkTypeId),
-                typeGraph.CkTypeId, typeAssociation.CkRoleId, typeAssociation.TargetCkTypeId));
+                typeGraph.CkTypeId, typeAssociation.TargetCkTypeId, typeAssociation.CkRoleId,
+                UnknownCkElementHint.ForType(ckModelGraph, typeAssociation.TargetCkTypeId)));
             failedModelIds.Add(typeGraph.CkTypeId.ModelId);
             failedTypeIds.Add(typeGraph.CkTypeId);
             return null;
@@ -1377,8 +1379,9 @@ internal class InheritanceResolver : IInheritanceResolver
     {
         if (!modelGraph.Types.TryGetValue(ckTypeId, out var typeGraph))
         {
-            operationResult.AddMessage(MessageCodes.CkTypeIdUnknown(originFileResolver.Resolve(ckTypeId), ckTypeId));
-            throw ModelValidationException.UnknownCkTypeId(ckTypeId);
+            operationResult.AddMessage(MessageCodes.CkTypeIdUnknown(originFileResolver.Resolve(ckTypeId), ckTypeId,
+                UnknownCkElementHint.ForType(modelGraph, ckTypeId)));
+            throw ModelValidationException.UnknownCkTypeId(ckTypeId, UnknownCkElementHint.ForType(modelGraph, ckTypeId));
         }
 
 
@@ -1423,8 +1426,8 @@ internal class InheritanceResolver : IInheritanceResolver
         if (!modelGraph.Records.TryGetValue(ckRecordId, out var recordGraph))
         {
             operationResult.AddMessage(MessageCodes.CkRecordIdUnknown(originFileResolver.Resolve(ckRecordId),
-                ckRecordId));
-            throw ModelValidationException.UnknownCkRecordId(ckRecordId);
+                ckRecordId, UnknownCkElementHint.ForRecord(modelGraph, ckRecordId)));
+            throw ModelValidationException.UnknownCkRecordId(ckRecordId, UnknownCkElementHint.ForRecord(modelGraph, ckRecordId));
         }
 
         if (!handledRecordHashSet.Contains(ckRecordId))
@@ -1627,9 +1630,11 @@ internal class InheritanceResolver : IInheritanceResolver
         {
             operationResult.AddMessage(MessageCodes.CkTypeIdUnknownTargetCkTypeIdForAssociation(
                 originFileResolver.Resolve(typeGraph.CkTypeId),
-                typeGraph.CkTypeId, typeAssociation.CkRoleId, typeAssociation.TargetCkTypeId));
+                typeGraph.CkTypeId, typeAssociation.TargetCkTypeId, typeAssociation.CkRoleId,
+                UnknownCkElementHint.ForType(ckModelGraph, typeAssociation.TargetCkTypeId)));
             throw ModelValidationException.UnknownCkTypeIdForAssociationTarget(typeGraph.CkTypeId,
-                typeAssociation.CkRoleId, typeAssociation.TargetCkTypeId);
+                typeAssociation.CkRoleId, typeAssociation.TargetCkTypeId,
+                UnknownCkElementHint.ForType(ckModelGraph, typeAssociation.TargetCkTypeId));
         }
 
         var targetCkTypeGraph = GetAndUpdateTypeGraph(handledTypesHashSet, ckModelGraph, typeAssociation.TargetCkTypeId,

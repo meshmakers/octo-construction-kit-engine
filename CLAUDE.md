@@ -1314,6 +1314,20 @@ kitchen sink `sampleData/ckv2KitchenSink/Builder.cs`), `CkV2GraphJsonRoundTripTe
 `CkIdsCodeGeneratorCkV2Tests`, and in `ConstructionKit.Compiler.Tests` `CkV2CompileTests` (YAML kitchen sink end to
 end incl. `interfaces/` folder, gate, docs and range retention of `implements`) and `CkV1CompileOutputUnchangedTests`.
 
+## Delete is Archive by default; importing an archived entity again (AB#7018)
+
+`DeleteStrategies.Archive` is the default of `DeleteOptions`, `BulkOperationOptions` and the GraphQL delete: the
+runtime entity and its associations only get `RtState = Archived`, the document keeps its `_id` (= rtId). Only
+`DeleteStrategies.Erase` removes it. Consequences for imports (`ImportStrategy` / `BulkInsertStrategies`):
+
+- `Insert` (`octo-cli ImportRt` default) replaces an ARCHIVED document with the same rtId (active again); an ACTIVE one
+  still fails, with a message naming index and state. `Upsert` (`-w`) replaces in any case.
+- Business keys: declare them `UniqueNotDeleted`; a plain `Unique` CK index also blocks the value of an archived
+  entity (unchanged CK behaviour).
+- The implementation is `MongoDbDataSourceCollection.BulkImportAsync` in `octo-construction-kit-engine-mongodb`
+  (details and tests there, section "Re-importing an archived entity"). `LocalDataSourceCollection` (dev-only local
+  directory repository) still treats every existing id as taken.
+
 ## Important Notes
 
 - The solution uses Azure Pipelines for CI/CD (`azure-pipelines.yml` in the repo root)

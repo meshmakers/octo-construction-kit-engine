@@ -6,7 +6,8 @@ namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
 public enum BulkInsertStrategies
 {
     /// <summary>
-    /// Insert new entities only, do not replace existing ones.
+    /// Insert new entities only, do not replace existing ones. An entity that exists only as an ARCHIVED document
+    /// with the same identifier is not an existing one: it is replaced and active again (AB#7018).
     /// </summary>
     InsertOnly,
 

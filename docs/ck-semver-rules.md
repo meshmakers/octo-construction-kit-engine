@@ -845,12 +845,12 @@ keyed by their role, so a changed target is one change (`target`), not remove + 
 | I9 | `deprecated` set or withdrawn | Minor |
 | I10 | Interface added / removed | Minor / Major |
 | I11 | Method added to an interface | Major (an optional interface method does not exist yet); an `internal` method on a public interface is a compile error (129), so it cannot be added as a capped Minor |
-| I12 | Invocation contract of an interface method changed (`kind`; parameter added or removed; parameter `valueType`, record, enum, `isOptional` in either direction, `sensitive`; `result`; error code added or removed) | Major — a type in another model that redeclares the method with the previous contract breaks with error 122; this lifts M2, M5 (required → optional) and M13 on interface methods. Metadata (descriptions, authorization, execution) keeps its M-row level. Type methods are unchanged (M1–M16) |
+| I12 | Invocation contract of an interface method changed (`kind`; parameter added or removed; parameter `valueType`, record, enum, `isOptional` in either direction, `sensitive`; `result`; result `sensitive`, row M17; error code added or removed) | Major — a type in another model that redeclares the method with the previous contract breaks with error 122; this lifts M2, M5 (required → optional) and M13 on interface methods. Metadata (descriptions, authorization, execution) keeps its M-row level. Type methods are unchanged (M1–M17) |
 
 **Invocation contract (AB#6336, gate finding H2).** A type may redeclare a method of an interface it implements; error
 **122** fires only when the redeclaration has another **invocation contract**: `kind`, the parameters as a set keyed
-by name (`valueType`, `valueCkRecordId`, `valueCkEnumId`, `isOptional`, `sensitive`), `result` (present or absent and
-its type) and the set of error codes. Descriptions, `authorization`, `execution` and the order of parameters and
+by name (`valueType`, `valueCkRecordId`, `valueCkEnumId`, `isOptional`, `sensitive`), `result` (present or absent, its
+type and its `sensitive` marker) and the set of error codes. Descriptions, `authorization`, `execution` and the order of parameters and
 errors may differ; the redeclaring type's own authorization and execution apply. The definition lives in one place,
 `CkMethodContract`, used by error 122 and by row I12.
 

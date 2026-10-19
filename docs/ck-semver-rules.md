@@ -719,10 +719,10 @@ surface in the dependency diff.
 | CK v2: `implements` entry removed from a type | Consumers querying the type through the interface break |
 | CK v2: interface `extends` entry added or removed | The inherited members change the contract — publish a new interface version instead |
 | CK v2: interface association member removed, required one added, `target` or `multiplicity` changed, made required | The contract changed — publish a new interface version instead (rows I3–I7) |
-| CK v2: interface method added or removed | The contract changed — publish a new interface version instead (rows I11, M1); field changes follow rows M2–M15 |
+| CK v2: interface method added or removed | The contract changed — publish a new interface version instead (rows I11, M1); field changes follow rows M2–M16 |
 | CK v2: type association `targetCkInterfaceId` set or changed | The allowed targets narrow — existing associations may become invalid |
 | CK v2: method **removed** | Callers of the method break |
-| CK v2: breaking method field change (rows M3–M10, M12) | Callers break — publish a new method version (`ChangePassword-2`) instead |
+| CK v2: breaking method field change (rows M3–M10, M12, M15, M16) | Callers break — publish a new method version (`ChangePassword-2`) instead |
 | CK v2: `access` tightened on an attribute that **became** `securitySensitive` within the same major line (row T7, AB#6585) | The security exception does not apply and cannot be acknowledged: the marker set in one Minor must not turn the next Minor's tightening into a Minor |
 | CK v2: `ckLanguage` lowered (`2 → 1`) | CK v2 elements may disappear (defensive) |
 | CK v2: attribute-assignment `access` tightened (`ReadWrite < ReadOnly < MethodOnly < Hidden`; row T7) | Generic GraphQL clients and dependents lose write/read access |
@@ -843,7 +843,7 @@ keyed by their role, so a changed target is one change (`target`), not remove + 
 | I9 | `deprecated` set or withdrawn | Minor |
 | I10 | Interface added / removed | Minor / Major |
 | I11 | Method added to an interface | Major (an optional interface method does not exist yet); an `internal` method on a public interface is a compile error (129), so it cannot be added as a capped Minor |
-| I12 | Invocation contract of an interface method changed (`kind`; parameter added or removed; parameter `valueType`, record, enum, `isOptional` in either direction, `sensitive`; `result`; error code added or removed) | Major — a type in another model that redeclares the method with the previous contract breaks with error 122; this lifts M2, M5 (required → optional) and M13 on interface methods. Metadata (descriptions, authorization, execution) keeps its M-row level. Type methods are unchanged (M1–M15) |
+| I12 | Invocation contract of an interface method changed (`kind`; parameter added or removed; parameter `valueType`, record, enum, `isOptional` in either direction, `sensitive`; `result`; error code added or removed) | Major — a type in another model that redeclares the method with the previous contract breaks with error 122; this lifts M2, M5 (required → optional) and M13 on interface methods. Metadata (descriptions, authorization, execution) keeps its M-row level. Type methods are unchanged (M1–M16) |
 
 **Invocation contract (AB#6336, gate finding H2).** A type may redeclare a method of an interface it implements; error
 **122** fires only when the redeclaration has another **invocation contract**: `kind`, the parameters as a set keyed
@@ -875,6 +875,7 @@ are members of their own. The rendered `signature` is still reported as a readab
 | M13 | Parameter `sensitive` changed | Minor (interface method: Major, row I12) |
 | M14 | Description of the method, a parameter or an error | Patch |
 | M15 | `execution.handler` changed (`service` ↔ `pipeline`, AB#6877). An omitted key equals `service`, so adding `handler: service` to a method without the key is no change | Major — the implementation moves to another runtime and the handlers of the previous version stop serving the method; publish a new method version (`UpdateFirmware-2`). Not part of the invocation contract (rule 122), so a type may redeclare an interface method with another handler. Interface methods themselves cannot declare `pipeline` (message 131). A `pipeline` method cannot have a `sensitive` parameter (message 132, AB#7004): this is a compile rule, not a SemVer class — it refuses only new combinations, and switching a method to `pipeline` or marking a parameter `sensitive` on a pipeline method does not compile, so there is no classifier row for it |
+| M16 | `replacesGenericCreate` changed (AB#7024). An omitted key equals `false` | `false` → `true`: **Major** — callers that create entities of the type (and of every derived type) through the generic create break, they must call the method; publish a new type or method version. `true` → `false`: **Minor** — the generic create is available again. A **new** method that sets the flag is classified by row M1 (Minor). The flag is a compile rule too (message 133, not a SemVer class): only a `static` method of a non-abstract type, never an interface method, at most one per concrete type including inherited ones, `ckLanguage: 2`. A model that sets the flag on any method carries `minEngineVersion` `CkEngineVersion.ReplacesGenericCreateMinEngineVersion`, so an older engine refuses it with message 126 instead of dropping the flag |
 
 **Public types, stable bases, enums, records, attribute definitions (AB#6269).** A *stable base* is a type other
 models may derive from: in a `ckLanguage: 2` model a public, non-final type with effective `derivable: Any`; in a v1

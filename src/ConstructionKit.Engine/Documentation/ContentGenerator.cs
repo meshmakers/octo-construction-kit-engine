@@ -351,12 +351,19 @@ internal class ContentGenerator(
                 var parameters = string.Join(", ", (method.Definition.Parameters ?? []).Select(p =>
                     $"{p.Name}{(p.IsOptional ? "?" : "")}: {p.ValueType}"));
                 await outputFile.WriteLineAsync(
-                        $"| {method.Definition.MethodId}{(method.Visibility == CkVisibilityDto.Internal ? " (internal)" : "")}{HandlerMarker(method.Definition)} | {method.Definition.Kind} | {parameters} | " +
+                        $"| {method.Definition.MethodId}{(method.Visibility == CkVisibilityDto.Internal ? " (internal)" : "")}{HandlerMarker(method.Definition)}{ReplacesGenericCreateMarker(method.Definition)} | {method.Definition.Kind} | {parameters} | " +
                         $"{method.Definition.Result?.ValueType.ToString() ?? "-"} | {method.DeclaringCkTypeId.ToRtCkId().SemanticVersionedFullName} |")
                     .ConfigureAwait(false);
             }
         }
     }
+
+    /// <summary>
+    ///     AB#7024: <c> (replaces generic create)</c> for a static method that replaces the generic create of its type;
+    ///     empty otherwise, so the documentation of existing models is unchanged.
+    /// </summary>
+    private static string ReplacesGenericCreateMarker(CkMethodDto method) =>
+        method.ReplacesGenericCreate ? " (replaces generic create)" : "";
 
     /// <summary>
     ///     AB#6877: <c> (handler: pipeline)</c> for a method that is not implemented by a service; empty for the default,

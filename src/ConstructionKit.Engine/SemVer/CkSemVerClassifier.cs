@@ -550,6 +550,15 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 return change.NewValue == "false"
                     ? (CkSemVerLevel.Major, "method no longer idempotent — callers that retry break (row M10)")
                     : (CkSemVerLevel.Minor, "method declared idempotent — relaxation (row M10)");
+            case "replacesGenericCreate":
+                // AB#7024 row M16: false -> true removes the generic create of the type for callers that create its
+                // entities today (they must call the method); true -> false only re-opens it.
+                return change.NewValue == "true"
+                    ? (CkSemVerLevel.Major,
+                        "method now replaces the generic create of its type — callers that create entities generically " +
+                        "break; publish a new type or method version instead (row M16)")
+                    : (CkSemVerLevel.Minor,
+                        "method no longer replaces the generic create — the generic create is available again (row M16)");
             case "handler":
                 // AB#6877 row M15: service <-> pipeline moves the implementation to another runtime; the registered
                 // service handlers (or the deployed pipeline) of the previous version stop serving the method.

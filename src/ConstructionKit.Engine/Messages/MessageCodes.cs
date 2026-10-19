@@ -370,6 +370,9 @@ internal static class MessageCodes
     internal static OperationMessage CkMethodPipelineSensitiveParameter(string? location, object methodId, object ckTypeId, object parameters) =>
         GetMessage("CkMethodPipelineSensitiveParameter", location, methodId, ckTypeId, parameters);
 
+    internal static OperationMessage CkMethodReplacesGenericCreateInvalid(string? location, object methodId, object ckTypeId, object reason) =>
+        GetMessage("CkMethodReplacesGenericCreateInvalid", location, methodId, ckTypeId, reason);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1061,6 +1064,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  132, "Method '{methodId}' of '{ckTypeId}' declares 'execution.handler: pipeline' but has sensitive parameter(s) {parameters}: a pipeline execution stores its input, so a method with a sensitive parameter must use 'execution.handler: service'",
                  new [] {"methodId", "ckTypeId", "parameters"})
+        },
+        {
+            "CkMethodReplacesGenericCreateInvalid",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 133, "Method '{methodId}' of '{ckTypeId}' declares an invalid 'replacesGenericCreate': {reason}",
+                 new [] {"methodId", "ckTypeId", "reason"})
         },
     };
 }

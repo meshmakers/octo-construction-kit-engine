@@ -1112,7 +1112,7 @@ Notes:
   `ReadWrite`, visibility `Public`, derivable `Any`) through a `JsonTypeInfo` modifier in `CkCache` (`OmitCkV2Defaults`), so v1 caches stay
   byte-identical; reading tolerates the missing keys (trailing defaulted `[JsonConstructor]` parameters on
   `CkTypeGraph`, init setter on `CkTypeAttributeGraph.Access`).
-- Message codes for CK v2: 90–113 and 118–132 are in use (table below); **spare: 111, 114–117, 133**. Range
+- Message codes for CK v2: 90–113 and 118–133 are in use (table below); **spare: 111, 114–117, 134**. Range
   retention (F0.2) has no message codes of its own — its failures are `ModelValidationException`s and the
   unbound-reference diagnostic is the source-generator diagnostic OM1004.
   Warnings (e.g. 110, 124) of a successful compile are printed by `octo-ckc -c compile` (to **stderr**, also with
@@ -1174,6 +1174,7 @@ exists in Industry.Basic-2.6.0. Check the model prefix of the reference."). `OCT
 | 130 | `InvalidCompatibilityAcknowledge` | `CkCompatibilityValidator` (from `CompilerService`) | AB#6295: an entry of `compatibility.acknowledge` in `ckModel.yaml` has an empty `change`, a wildcard (`*`, `?`), an empty `reason`, or repeats a key. The JSON schema rejects empty reasons and wildcard keys first; this is the same rule for sources that skip the schema. Using the section in a `ckLanguage` 1 model is message 90 (feature `compatibility.acknowledge`) |
 | 131 | `CkMethodHandlerInvalid` | `InheritanceResolver.ValidateMethodHandler` (M-6) | AB#6877: `execution.handler` of a method (type or interface) is not `service` or `pipeline` (exact, lower-case — the schema deliberately has no `enum` so the compiler names the method), `pipeline` without an explicit `timeoutSeconds`, or `pipeline` on an **interface** method (a pipeline binds by the well-known name equal to the qualified method id `Model/Type.Method-1` of one type; an implementing type redeclares the method with `handler: pipeline` itself — execution is not part of the invocation contract, rule 122). Relaxing the interface rule later is non-breaking, tightening it would not be |
 | 132 | `CkMethodPipelineSensitiveParameter` | `InheritanceResolver.ValidateMethodHandler` (M-6) | AB#7004 (decision OD-9, option *forbid*): a method with `execution.handler: pipeline` has at least one parameter with `sensitive: true` (the message names the method, the type and the sensitive parameters). A pipeline execution stores its input; a method with a sensitive parameter must use `handler: service`. Reported in addition to 131 when 131 applies too. Only a sensitive **result** is not covered (the meta-model has no result-sensitivity flag). The runtime refusal in the pipeline handler (AB#6879) stays as a second gate |
+| 133 | `CkMethodReplacesGenericCreateInvalid` | `InheritanceResolver.ValidateMethodReplacesGenericCreate` / `ValidateAtMostOneReplacesGenericCreate` (M-7) | AB#7024: `replacesGenericCreate: true` on a method that is not `kind: Static`, on an **interface** method, on a method of an **abstract** type, or a second flagged method on a concrete type (own or inherited; reported on the type that declares one of them, naming all flagged methods). One message per offending method with a `{reason}`. The flag in a `ckLanguage` 1 model is message 90 (feature `replacesGenericCreate`), an older engine refuses a model that uses it with message 126 (raised `minEngineVersion`). Code taken as the next free number after 132; AB#7006 plans the following one |
 
 `InheritanceResolver.ResolveInterfacesAndMethods` also completes `AllImplementedInterfaces` (own ∪ every base
 type's declared interfaces), `AllMethods` (nearest declaration wins; `CkMethodGraph.DeclaringCkTypeId` is the
@@ -1224,7 +1225,7 @@ Public→Internal and `derivable` Any→Model Major, the reverse Minor, type ass
 changed Major and cleared Minor) plus the F2.1 rule rows with one test each (`tests/ConstructionKit.Engine.Tests/SemVer/Rows/`):
 N1–N5 internal elements (AB#6266, `CkVisibilityIndex` caps changes of internal elements and of members of internal
 owners at Minor), I1–I12 interfaces (AB#6267, optional members Minor — an optional attribute member only with a new or previously internal definition of this model, AB#6337, association members keyed by role with a `target`
-property), M1–M14 methods (AB#6268, one change per method field, element kinds `MethodParameter` / `MethodError`, the
+property), M1–M16 methods (AB#6268, one change per method field, element kinds `MethodParameter` / `MethodError`, the
 rendered `signature` stays as a level-None summary; AB#6338: M12 under default-deny — roles any-of and case-insensitive (P3-3), scopes all-of, an omitted block or empty roles admit administrators only, block add/remove is one change, looser changes are behavioural "security: method access widened"; AB#6336: I12 lifts every invocation-contract change of an interface method to Major), D1–D8 range retention (AB#6271; AB#5435 D8: a resolved dependency moving up inside its major on a range-retaining model is level None, exact-pinned models keep the Minor rule until F2.6 / AB#5688, the verdict line names the move; AB#6340: a range/floor excluding the previously resolved version, or a resolved version going down, is Major; element kind `DependencyRange`,
 model property `rangeRetention`), T1–T7 / E1–E2 / R1–R2 / A1–A3 public types, stable bases, enums, records, attribute
 definitions and access (AB#6269; access tightening Major, security exception Minor + `RequiresAcknowledge` for
@@ -1258,7 +1259,7 @@ that gate is green.
 | 3 | DTO | `CkModelPropertiesDto.CkLanguage` | `CkInterfaceDto`, `CkElementsRootDto`, `CkModelRootBase` | `CkTypeDto.Implements` | `CkTypeAttributeDto.Access` | `CkTypeDto.Methods` + `CkMethodDto` family | `CkVisibilityDto` / `CkDerivableDto` on the 7 element DTOs | `CkInterfaceDto`, `CkInterfaceAssociationDto`, `CkTypeAssociationDto.TargetCkInterfaceId` |
 | 4 | Compiler hand-copies | `CompilerService` candidate, `CatalogModelResolver` | same + `interfaces/` loop | `CompilerService` type copy | by reference | `CompilerService` type copy | `CompilerService` type copy (others by reference) | by reference |
 | 5 | Graph + `[JsonConstructor]` | `CkCacheRoot.Models` (set in `ElementResolver` / `AppendModel`) | `CkInterfaceGraph`, `CkModelGraph`, `CkCacheRoot`, cache getters | `CkTypeGraph` | `CkTypeAttributeGraph` (init setter) | `CkTypeGraph` + `CkMethodGraph` | settable effective properties, set by `CkModelGraph.ApplyCkV2Modifiers` | `CkInterfaceGraph` (defaulted `[JsonConstructor]` params), `CkInterfaceAssociationGraph`, `CkInterfaceMethodGraph`, `CkTypeAssociationGraph` |
-| 6 | Resolvers + codes | 90/91, 126 | 92–94, 118–124, 127 | 95–99, 121, 124 | 90, 99, 105–108 | 100–104, 122, 125, 131, 132 | 90, 112, 113, 129 | 90, 118–124, 128 |
+| 6 | Resolvers + codes | 90/91, 126 | 92–94, 118–124, 127 | 95–99, 121, 124 | 90, 99, 105–108 | 100–104, 122, 125, 131–133 | 90, 112, 113, 129 | 90, 118–124, 128 |
 | 7 | SemVer diff + classifier rule + row test (gate: `CkSemVerClassificationGuardTests`, mandatory) | yes | yes | yes | yes | yes | yes (`CkModelDiffService.DiffModifiers`) | yes |
 | 8 | Source generator | — | yes (ids + `IRt<Name>`) | yes (explicit impls) | — | yes (ids, parameter/result records) | `sealed` (v2; no `abstract`, E-M3) | `IRt<Name>` (extends = interface inheritance) |
 | 9 | Docs generator | — | yes | yes | — | yes | yes (non-default only) | yes |
@@ -1299,6 +1300,26 @@ non-default method `(handler: pipeline)`; (10) **follow-up AB#6878** (engine-mon
 (asset-repo CK meta); (12) optional, Studio. Runtime routing of `pipeline` methods: AB#6879. Tests:
 `CkV2MethodResolverTests` (`Code131_*`, `Code132_*`), `CkV2CompileTests.MethodHandler_*`, `CkV2GraphJsonRoundTripTests`,
 `MethodRowTests.M15_*`.
+
+**`replacesGenericCreate` (AB#7024, F3.7) touch points**, same numbering (the field lives on `CkMethodDto` itself, next to
+`kind` / `visibility`; `bool`, omitted = `false`; a static method that is the only way to create entities of its type, the
+refusal of the generic create is enforced by the asset repository, AB#7025): (1) method schema `CkMethod.replacesGenericCreate`
+(boolean; the model-language key needs a **schema release** at schemas.meshmakers.cloud, a catalog model must not use it
+before that); (2) compiled schema via the shared `$ref`; (3) `CkMethodDto.ReplacesGenericCreate` (`OmitDefaults` in YAML,
+`JsonIgnore(WhenWritingDefault)` in JSON, so models that do not use the key serialize byte-identically); (4) copied by
+reference with `Methods`; (5) `CkMethodGraph.ReplacesGenericCreate` (`[JsonIgnore]`, derived from the serialized definition);
+(6) message 133 (`InheritanceResolver` rule M-7: static only, no interface method, no abstract type, at most one per
+concrete type incl. inherited ones) and message 90 in a v1 model (`ElementResolver.CheckCkLanguage`); (7) diff property
+`replacesGenericCreate`, classifier row **M16** (`false` → `true` Major, `true` → `false` Minor, a new method is row M1),
+guard probe, `signature` summary shows `, replaces generic create` only when set; (8) — (no generated code depends on it);
+(9) `Types.md` marks the method `(replaces generic create)`; (10) engine-mongodb `CkMethod.ReplacesGenericCreate`
+(reflection gate); (11) asset-repo CK meta + refusal: AB#7025; (12) optional, Studio. **minEngineVersion:**
+`CkEngineVersion.GetRequiredMinEngineVersion` raises the value to `ReplacesGenericCreateMinEngineVersion` for a model with
+a flagged method (models without it keep `CkV2MinEngineVersion`; dependents inherit it through their dependencies), so an
+engine that predates the field refuses the model with message 126 instead of silently dropping the flag and serving the
+generic create. The constant must equal the number of the release that first ships the field. Tests:
+`CkV2MethodResolverTests` (`Code133_*`, `Code90_*`), `CkV2CompileTests.ReplacesGenericCreate_*`,
+`CkV2GraphJsonRoundTripTests.ReplacesGenericCreate_*`, `CkEngineVersionTests`, `MethodRowTests.M16_*`.
 
 **`securitySensitive` (AB#6269) touch points**, same numbering: (1) attribute schema `CkAttribute.securitySensitive`;
 (2) compiled schema via the shared `$ref`; (3) `CkAttributeDto.SecuritySensitive` (`bool?`, omitted when null); (4) copied

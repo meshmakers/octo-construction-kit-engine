@@ -258,7 +258,7 @@ internal class InheritanceResolver : IInheritanceResolver
 
             foreach (var method in interfaceGraph.DefinedMethods)
             {
-                ValidateMethodDefinition(method, id, location, operationResult, isInterfaceMethod: true);
+                ValidateMethodDefinition(method, id, location, operationResult, isInterfaceMethod: true, isAbstractType: false);
             }
         }
     }
@@ -449,15 +449,18 @@ internal class InheritanceResolver : IInheritanceResolver
                     $"it is inherited from '{declaringBase.CkTypeId}'; overriding an inherited method is not supported"));
             }
 
-            ValidateMethodDefinition(method, ckTypeId, location, operationResult, isInterfaceMethod: false);
+            ValidateMethodDefinition(method, ckTypeId, location, operationResult, isInterfaceMethod: false,
+                isAbstractType: typeGraph.IsAbstract);
         }
+
+        ValidateAtMostOneReplacesGenericCreate(typeGraph, ckTypeId, location, operationResult);
     }
 
     /// <summary>
     ///     Method rules M-2..M-5 for one definition — of a type or (F1.2-S4) of an interface.
     /// </summary>
     private static void ValidateMethodDefinition(CkMethodDto method, object ckTypeId, string location,
-        OperationResult operationResult, bool isInterfaceMethod)
+        OperationResult operationResult, bool isInterfaceMethod, bool isAbstractType)
     {
         {
             // M-2
@@ -509,6 +512,8 @@ internal class InheritanceResolver : IInheritanceResolver
             }
 
             ValidateMethodHandler(method, ckTypeId, location, operationResult, isInterfaceMethod);
+            ValidateMethodReplacesGenericCreate(method, ckTypeId, location, operationResult, isInterfaceMethod,
+                isAbstractType);
 
             // N4 (AB#6338): role and scope names are compared as sets by the classifier and the F3.4 gateway; a name
             // with separators or spaces could be mistaken for several names or an empty one.
@@ -579,6 +584,72 @@ internal class InheritanceResolver : IInheritanceResolver
         {
             operationResult.AddMessage(MessageCodes.CkMethodPipelineSensitiveParameter(location, method.MethodId,
                 ckTypeId, string.Join(", ", sensitiveParameters)));
+        }
+    }
+
+    /// <summary>
+    ///     M-7 (AB#7024, message 133): <c>replacesGenericCreate</c> makes a method the only way to create entities of
+    ///     its type, so it needs a method that can run without a target entity — a <c>static</c> one — on a type that
+    ///     can be created at all: not on an interface method (an interface has no entities of its own; the implementing
+    ///     type declares the method) and not on an abstract type (it is never instantiated; derived concrete types
+    ///     inherit nothing to replace). The ckLanguage 2 requirement is message 90 (<c>ElementResolver</c>).
+    /// </summary>
+    private static void ValidateMethodReplacesGenericCreate(CkMethodDto method, object ckTypeId, string location,
+        OperationResult operationResult, bool isInterfaceMethod, bool isAbstractType)
+    {
+        if (!method.ReplacesGenericCreate)
+        {
+            return;
+        }
+
+        string? reason = null;
+        if (isInterfaceMethod)
+        {
+            reason = "not allowed on an interface method — an interface has no entities of its own; declare the " +
+                     "static method with the flag on the concrete type";
+        }
+        else if (method.Kind != CkMethodKindDto.Static)
+        {
+            reason = "only a 'kind: Static' method can replace the generic create — an instance method needs an " +
+                     "existing entity";
+        }
+        else if (isAbstractType)
+        {
+            reason = "not allowed on an abstract type — it is never instantiated; declare the method on a concrete type";
+        }
+
+        if (reason != null)
+        {
+            operationResult.AddMessage(MessageCodes.CkMethodReplacesGenericCreateInvalid(location, method.MethodId,
+                ckTypeId, reason));
+        }
+    }
+
+    /// <summary>
+    ///     M-7 (AB#7024, message 133): at most one method per concrete type — including the ones inherited from base
+    ///     types — replaces the generic create, otherwise the creating method of the type would be ambiguous. Reported
+    ///     on the type that declares one of the flagged methods, so a derived type is not reported again.
+    /// </summary>
+    private static void ValidateAtMostOneReplacesGenericCreate(CkTypeGraph typeGraph, CkId<CkTypeId> ckTypeId,
+        string location, OperationResult operationResult)
+    {
+        if (typeGraph.IsAbstract || !typeGraph.DefinedMethods.Any(m => m.ReplacesGenericCreate))
+        {
+            return;
+        }
+
+        var flagged = typeGraph.AllMethods.Values.Where(m => m.ReplacesGenericCreate)
+            .Select(m => m.QualifiedMethodId).OrderBy(id => id, StringComparer.Ordinal).ToList();
+        if (flagged.Count <= 1)
+        {
+            return;
+        }
+
+        foreach (var method in typeGraph.DefinedMethods.Where(m => m.ReplacesGenericCreate))
+        {
+            operationResult.AddMessage(MessageCodes.CkMethodReplacesGenericCreateInvalid(location, method.MethodId,
+                ckTypeId, "at most one method per concrete type — including inherited ones — may replace the generic " +
+                          $"create, but the type has {flagged.Count}: {string.Join(", ", flagged)}"));
         }
     }
 

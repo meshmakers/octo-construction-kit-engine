@@ -84,7 +84,7 @@ public class CkSemVerClassificationGuardTests
     /// </summary>
     internal static readonly IReadOnlyList<string> ExpectedRuleRows =
     [
-        .. Rows("N", 5), .. Rows("I", 12), .. Rows("M", 15), .. Rows("T", 7), .. Rows("E", 2), .. Rows("R", 2),
+        .. Rows("N", 5), .. Rows("I", 12), .. Rows("M", 16), .. Rows("T", 7), .. Rows("E", 2), .. Rows("R", 2),
         .. Rows("A", 3), .. Rows("B", 4), .. Rows("D", 8)
     ];
 
@@ -669,6 +669,7 @@ public class CkSemVerClassificationGuardTests
             ["CkMethodDto.Authorization"] = m => Method(m).Authorization = null,
             ["CkMethodDto.Execution"] = m => Method(m).Execution = null,
             ["CkMethodDto.Visibility"] = m => Method(m).Visibility = CkVisibilityDto.Internal,
+            ["CkMethodDto.ReplacesGenericCreate"] = m => Method(m).ReplacesGenericCreate = true,
             ["CkMethodParameterDto.Name"] = m => Parameter(m).Name = "oldPassword",
             ["CkMethodParameterDto.ValueType"] = m => Parameter(m).ValueType = AttributeValueTypesDto.Int,
             ["CkMethodParameterDto.ValueCkRecordId"] = m => Parameter(m).ValueCkRecordId = $"{M}/Address",

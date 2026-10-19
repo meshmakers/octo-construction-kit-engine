@@ -438,4 +438,125 @@ public class CkV2MethodResolverTests(ITestOutputHelper output) : CkV2ResolverTes
         Assert.Single(messages);
         Assert.Contains("/Principal", messages[0].MessageText);
     }
+
+    // ── replacesGenericCreate (AB#7024, message 133) ─────────────────────────────────
+
+    [Fact]
+    public void Code133_StaticMethodOnAConcreteType_OK_AndReachesTheGraph()
+    {
+        var model = Model();
+        Type(model, "Account").Methods!.Single(m => m.MethodId == "Lock-1").ReplacesGenericCreate = true;
+
+        var operationResult = new OperationResult();
+        var graph = Resolve(model, operationResult);
+
+        Assert.Empty(operationResult.Messages);
+        Assert.True(graph.Types[$"{M}/Account"].AllMethods["Lock-1"].ReplacesGenericCreate);
+        // Methods that do not set the flag keep the default.
+        Assert.False(graph.Types[$"{M}/Account"].AllMethods["Unlock-1"].ReplacesGenericCreate);
+    }
+
+    [Fact]
+    public void Code133_InstanceMethod()
+    {
+        var model = Model();
+        Type(model, "Tag").Methods = [new() { MethodId = "Ping-1", ReplacesGenericCreate = true }];
+
+        var message = Assert.Single(ResolveExpectingOnly(model, 133));
+        Assert.Contains("Ping-1", message.MessageText);
+        Assert.Contains("Static", message.MessageText);
+    }
+
+    [Fact]
+    public void Code133_InterfaceMethod()
+    {
+        var model = Model();
+        (model.Interfaces ??= []).Add(new CkInterfaceDto
+        {
+            InterfaceId = "Creatable-1",
+            Methods = [new() { MethodId = "Make-1", Kind = CkMethodKindDto.Static, ReplacesGenericCreate = true }]
+        });
+
+        var message = Assert.Single(ResolveExpectingOnly(model, 133));
+        Assert.Contains("Make-1", message.MessageText);
+        Assert.Contains("interface method", message.MessageText);
+    }
+
+    [Fact]
+    public void Code133_AbstractType()
+    {
+        var model = Model();
+        Type(model, "Principal").Methods!.Add(new CkMethodDto
+        {
+            MethodId = "Provision-1", Kind = CkMethodKindDto.Static, ReplacesGenericCreate = true
+        });
+
+        var message = Assert.Single(ResolveExpectingOnly(model, 133));
+        Assert.Contains("Provision-1", message.MessageText);
+        Assert.Contains("abstract", message.MessageText);
+    }
+
+    [Fact]
+    public void Code133_SecondMethodOnTheSameType_NamesBothMethods()
+    {
+        var model = Model();
+        Type(model, "Tag").Methods =
+        [
+            new() { MethodId = "Make-1", Kind = CkMethodKindDto.Static, ReplacesGenericCreate = true },
+            new() { MethodId = "Build-1", Kind = CkMethodKindDto.Static, ReplacesGenericCreate = true }
+        ];
+
+        var messages = ResolveExpectingOnly(model, 133);
+        Assert.Equal(2, messages.Count);
+        Assert.All(messages, m => Assert.Contains("at most one", m.MessageText));
+        Assert.All(messages, m => Assert.Contains($"{M}/Tag.Build-1", m.MessageText));
+        Assert.All(messages, m => Assert.Contains($"{M}/Tag.Make-1", m.MessageText));
+    }
+
+    [Fact]
+    public void Code133_SecondMethodInheritedFromABaseType_IsReportedOnTheDerivedTypeOnly()
+    {
+        var model = Model();
+        Type(model, "Account").Methods!.Single(m => m.MethodId == "Lock-1").ReplacesGenericCreate = true;
+        model.Types!.Add(new CkCompiledTypeDto
+        {
+            TypeId = "Savings",
+            DerivedFromCkTypeId = $"{M}/Account",
+            Methods = [new() { MethodId = "Open-1", Kind = CkMethodKindDto.Static, ReplacesGenericCreate = true }]
+        });
+
+        var message = Assert.Single(ResolveExpectingOnly(model, 133));
+        Assert.Contains("Open-1", message.MessageText);
+        Assert.Contains($"{M}/Savings", message.MessageText);
+        Assert.Contains($"{M}/Account.Lock-1", message.MessageText);
+    }
+
+    [Fact]
+    public void Code133_DerivedTypeInheritingTheFlaggedMethod_OK_AndSeesTheFlag()
+    {
+        var model = Model();
+        Type(model, "Account").Methods!.Single(m => m.MethodId == "Lock-1").ReplacesGenericCreate = true;
+        model.Types!.Add(new CkCompiledTypeDto { TypeId = "Savings", DerivedFromCkTypeId = $"{M}/Account" });
+
+        var operationResult = new OperationResult();
+        var graph = Resolve(model, operationResult);
+
+        Assert.Empty(operationResult.Messages);
+        var inherited = graph.Types[$"{M}/Savings"].AllMethods["Lock-1"];
+        Assert.True(inherited.ReplacesGenericCreate);
+        Assert.Equal($"{M}/Account.Lock-1", inherited.QualifiedMethodId);
+    }
+
+    [Fact]
+    public void Code90_FlagInACkLanguage1Model()
+    {
+        var model = Model();
+        model.CkLanguage = 1;
+        Type(model, "Tag").Methods = [new() { MethodId = "Make-1", Kind = CkMethodKindDto.Static, ReplacesGenericCreate = true }];
+
+        var operationResult = new OperationResult();
+        Resolve(model, operationResult);
+
+        Assert.Contains(operationResult.Messages, m => m.MessageNumber == 90 && m.MessageText.Contains("replacesGenericCreate"));
+    }
 }

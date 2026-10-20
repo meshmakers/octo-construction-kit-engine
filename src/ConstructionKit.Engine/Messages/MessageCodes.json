@@ -695,6 +695,12 @@
       "number": 133,
       "level": "ERROR",
       "text": "Method '{methodId}' of '{ckTypeId}' declares an invalid 'replacesGenericCreate': {reason}"
+    },
+    {
+      "key": "CkMethodPipelineSensitiveResult",
+      "number": 134,
+      "level": "ERROR",
+      "text": "Method '{methodId}' of '{ckTypeId}' declares 'execution.handler: pipeline' but its result is sensitive: a pipeline execution stores its output, so a method with a sensitive result must use 'execution.handler: service'"
     }
   ]
 }

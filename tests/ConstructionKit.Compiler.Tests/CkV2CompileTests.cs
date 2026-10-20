@@ -404,6 +404,117 @@ public sealed class CkV2CompileTests : IDisposable
     }
 
     [Fact]
+    public async Task SensitiveResult_ReachesCompiledOutputRoundTripGraphDocsAndMinEngineVersion_AndDefaultStaysByteIdentical()
+    {
+        await PublishSystemAsync(_fixture);
+
+        // Golden: a model that does not use the marker has no sensitive result and keeps the CK v2 floor.
+        var plain = await _fixture.CompileAsync(_fixture.WriteSource("plain", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], KitchenSinkFiles(), ckLanguage: 2));
+        var plainYaml = await ToYamlAsync(_fixture, plain);
+        Assert.All(plain.Types!.SelectMany(t => t.Methods ?? []), m => Assert.False(m.Result?.Sensitive ?? false));
+        Assert.Equal(CkEngineVersion.CkV2MinEngineVersion, plain.MinEngineVersion);
+
+        var compiled = await _fixture.CompileAndPublishAsync(_fixture.WriteSource("ks", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], KitchenSinkWithAccountMethod(
+                "      - methodId: IssueToken-1\n        result:\n          valueType: String\n          sensitive: true\n"),
+            ckLanguage: 2));
+
+        // Compiled model, serialized YAML and read-back carry the marker.
+        var issue = compiled.Types!.Single(t => t.TypeId.Name == "Account").Methods!.Single(m => m.MethodId == "IssueToken-1");
+        Assert.True(issue.Result!.Sensitive);
+        var yaml = await ToYamlAsync(_fixture, compiled);
+        Assert.Equal(CountOf(plainYaml, "sensitive: true") + 1, CountOf(yaml, "sensitive: true"));
+        var operationResult = new OperationResult();
+        var readBack = await _fixture.Services.GetRequiredService<ICkSerializer>()
+            .DeserializeCompiledModelRootAsync(yaml, "ks.yaml", operationResult);
+        Assert.False(operationResult.HasErrors, string.Join("; ", operationResult.Messages));
+        Assert.True(readBack.Types!.Single(t => t.TypeId.Name == "Account").Methods!
+            .Single(m => m.MethodId == "IssueToken-1").Result!.Sensitive);
+
+        // minEngineVersion is raised, so an engine that predates the marker refuses the model (message 126).
+        Assert.Equal(CkEngineVersion.SensitiveResultMinEngineVersion, compiled.MinEngineVersion);
+        Assert.Contains($"minEngineVersion: {CkEngineVersion.SensitiveResultMinEngineVersion}", yaml);
+        var refusal = new OperationResult();
+        Assert.False(CkEngineVersion.CheckModel(compiled, "ks", refusal, new Version(3, 5, 34)));
+        Assert.Equal(126, Assert.Single(refusal.Messages).MessageNumber);
+
+        // The resolved graph carries it; the other methods keep the default.
+        var graph = await _fixture.Services.GetRequiredService<ICatalogModelResolver>()
+            .HardResolveAsync(compiled, new OriginFileResolver("-"), new OperationResult());
+        var account = graph.Types[new CkId<CkTypeId>("KitchenSink-1.0.0/Account")];
+        Assert.True(account.AllMethods["IssueToken-1"].HasSensitiveResult);
+        Assert.False(account.AllMethods["Unlock-1"].HasSensitiveResult);
+        Assert.False(account.AllMethods["ChangePassword-1"].HasSensitiveResult);
+
+        // Docs generator: the sensitive result is marked, the others are not.
+        var docs = Path.Combine(_fixture.Root, "docs");
+        await _fixture.Services.GetRequiredService<Engine.Documentation.IContentGenerator>()
+            .GenerateTypesMarkdownTable(graph, docs, compiled.ModelId, "1.0.0", "/docs/");
+        var types = await File.ReadAllTextAsync(
+            Directory.GetFiles(docs, "*.md", SearchOption.AllDirectories).Single(f => f.EndsWith("Types.md")),
+            TestContext.Current.CancellationToken);
+        Assert.Contains("| IssueToken-1 | Instance |  | String (sensitive) |", types);
+        Assert.Contains("| ChangePassword-1 |", types);
+        Assert.DoesNotContain("Record (sensitive)", types);
+    }
+
+    private static int CountOf(string text, string value) =>
+        (text.Length - text.Replace(value, "", StringComparison.Ordinal).Length) / value.Length;
+
+    [Theory]
+    [InlineData("          valueType: Record\n          valueCkRecordId: ${this}/Address\n")]
+    [InlineData("          valueType: Enum\n          valueCkEnumId: ${this}/Mode\n")]
+    [InlineData("          valueType: Int\n")]
+    public async Task SensitiveResult_EveryResultKindCompiles_ServiceHandlerIncluded(string result)
+    {
+        await PublishSystemAsync(_fixture);
+
+        var compiled = await _fixture.CompileAsync(_fixture.WriteSource("ks", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], KitchenSinkWithAccountMethod(
+                "      - methodId: IssueToken-1\n        result:\n" + result + "          sensitive: true\n" +
+                "        execution:\n          timeoutSeconds: 30\n          handler: service\n"),
+            ckLanguage: 2));
+
+        Assert.True(compiled.Types!.Single(t => t.TypeId.Name == "Account").Methods!
+            .Single(m => m.MethodId == "IssueToken-1").Result!.Sensitive);
+    }
+
+    [Fact]
+    public async Task SensitiveResult_WithPipelineHandler_FailsWith134NamingMethodAndType_AndWith132WhenAParameterIsSensitiveToo()
+    {
+        await PublishSystemAsync(_fixture);
+        const string pipeline = "        execution:\n          timeoutSeconds: 30\n          handler: pipeline\n";
+
+        // A pipeline method with a non-sensitive result compiles (unchanged).
+        await _fixture.CompileAsync(_fixture.WriteSource("ok", "KitchenSink-1.0.0", ["System-[2.5,3.0)"],
+            KitchenSinkWithAccountMethod("      - methodId: IssueToken-1\n        result:\n          valueType: String\n" + pipeline),
+            ckLanguage: 2));
+
+        var operationResult = new OperationResult();
+        await Assert.ThrowsAnyAsync<Exception>(() => _fixture.Services.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(_fixture.WriteSource("ks-pipeline", "KitchenSink-1.0.0", ["System-[2.5,3.0)"],
+                KitchenSinkWithAccountMethod("      - methodId: IssueToken-1\n        result:\n          valueType: String\n" +
+                                             "          sensitive: true\n" + pipeline), ckLanguage: 2), operationResult));
+
+        var message = Assert.Single(operationResult.Messages, m => m.MessageNumber == 134);
+        Assert.Contains("IssueToken-1", message.MessageText);
+        Assert.Contains("KitchenSink-1.0.0/Account", message.MessageText);
+        Assert.Contains("execution.handler: service", message.MessageText);
+
+        // Both messages are reported when a parameter and the result are sensitive.
+        var both = new OperationResult();
+        await Assert.ThrowsAnyAsync<Exception>(() => _fixture.Services.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(_fixture.WriteSource("ks-both", "KitchenSink-1.0.0", ["System-[2.5,3.0)"],
+                KitchenSinkWithAccountMethod("      - methodId: IssueToken-1\n        parameters:\n          - name: seed\n" +
+                                             "            valueType: String\n            sensitive: true\n" +
+                                             "        result:\n          valueType: String\n          sensitive: true\n" + pipeline),
+                ckLanguage: 2), both));
+        Assert.Contains(both.Messages, m => m.MessageNumber == 132);
+        Assert.Contains(both.Messages, m => m.MessageNumber == 134);
+    }
+
+    [Fact]
     public async Task SecuritySensitive_ReachesCompiledOutputGraphAndDocs_AndRequiresCkLanguage2()
     {
         // AB#6269

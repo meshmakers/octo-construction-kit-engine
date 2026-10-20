@@ -5,7 +5,7 @@ using static Meshmakers.Octo.ConstructionKit.Engine.Tests.SemVer.Rows.RowTestSup
 namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.SemVer.Rows;
 
 /// <summary>
-///     AB#6268 rows M1–M14: per-field verdict for method changes, for a type method and an interface method alike.
+///     AB#6268 rows M1–M17: per-field verdict for method changes, for a type method and an interface method alike.
 /// </summary>
 public class MethodRowTests
 {
@@ -389,5 +389,91 @@ public class MethodRowTests
         var classified = Classify(Model(), current);
         Assert.Equal(CkSemVerLevel.Minor, Required(classified));
         Assert.DoesNotContain(classified, c => c.Change.Property == "replacesGenericCreate");
+    }
+
+    [Fact]
+    public void M17_ResultSensitive_FalseToTrue_IsMinorWithoutAcknowledge()
+    {
+        var classified = Change("type", m => m.Result!.Sensitive = true);
+
+        Assert.Equal(CkSemVerLevel.Minor, Required(classified));
+        var change = Assert.Single(classified, c => c.Change.Property == "resultSensitive");
+        Assert.Equal(CkSemVerLevel.Minor, change.Level);
+        Assert.Equal("true", change.Change.NewValue);
+        Assert.False(change.RequiresAcknowledge);
+        Assert.False(change.IsBehavioural);
+        // The result itself did not change (that would be row M6, Major).
+        Assert.DoesNotContain(classified, c => c.Change.Property == "result");
+    }
+
+    [Fact]
+    public void M17_ResultSensitive_TrueToFalse_IsMinorAndRequiresAnAcknowledgement()
+    {
+        var baseline = Model();
+        Method(baseline, "type").Result!.Sensitive = true;
+
+        var change = Assert.Single(Classify(baseline, Model()), c => c.Change.Property == "resultSensitive");
+
+        Assert.Equal(CkSemVerLevel.Minor, change.Level);
+        Assert.True(change.RequiresAcknowledge);
+        Assert.True(change.IsBehavioural);
+        Assert.Contains("result redaction removed", change.Reason);
+        // The change key an author acknowledges.
+        Assert.EndsWith("/ChangePassword-1", change.Change.ElementId, StringComparison.Ordinal);
+        Assert.Equal("resultSensitive", change.Change.Property);
+    }
+
+    [Fact]
+    public void M17_ResultSensitive_Unchanged_IsNoChange()
+    {
+        var baseline = Model();
+        Method(baseline, "type").Result!.Sensitive = true;
+        var current = Model();
+        Method(current, "type").Result!.Sensitive = true;
+
+        Assert.Equal(CkSemVerLevel.None, Level(baseline, current));
+    }
+
+    [Fact]
+    public void M17_InterfaceMethod_EitherDirection_IsMajorViaI12_AndNotAcknowledgeable()
+    {
+        var toTrue = Change("interface", m => m.Result!.Sensitive = true);
+        Assert.Equal(CkSemVerLevel.Major, Required(toTrue));
+
+        var baseline = Model();
+        Method(baseline, "interface").Result!.Sensitive = true;
+        var toFalse = Classify(baseline, Model());
+        Assert.Equal(CkSemVerLevel.Major, Required(toFalse));
+        Assert.All(toFalse, c => Assert.False(c.RequiresAcknowledge));
+        Assert.Contains(toFalse, c => c.Change.Property == "resultSensitive" && c.Reason.Contains("row I12"));
+    }
+
+    private static CkCompiledModelRoot Change2(Action<CkMethodDto> change)
+    {
+        var current = Model();
+        change(Method(current, "type"));
+        return current;
+    }
+
+    [Fact]
+    public void M17_NewMethodWithASensitiveResult_IsMinor_AndRemovingTheResultIsOnlyARowM6Change()
+    {
+        var current = Model();
+        Methods(current, "type").Add(new CkMethodDto
+        {
+            MethodId = "IssueToken-1",
+            Result = new CkMethodResultDto { ValueType = AttributeValueTypesDto.String, Sensitive = true }
+        });
+        var added = Classify(Model(), current);
+        Assert.Equal(CkSemVerLevel.Minor, Required(added));
+        Assert.DoesNotContain(added, c => c.Change.Property == "resultSensitive");
+
+        // A result removed from a method that had a sensitive one is one "result" change (Major, row M6), not a
+        // second sensitive change.
+        var baseline = Model();
+        Method(baseline, "type").Result!.Sensitive = true;
+        var removed = Classify(baseline, Change2(m => m.Result = null));
+        Assert.Equal(CkSemVerLevel.Major, Required(removed));
+        Assert.DoesNotContain(removed, c => c.Change.Property == "resultSensitive");
     }
 }

@@ -32,6 +32,16 @@ public static class CkEngineVersion
     /// </summary>
     public const string ReplacesGenericCreateMinEngineVersion = "3.5.32";
 
+    /// <summary>
+    ///     The lowest engine version that reads a method result's <c>sensitive</c> marker (AB#7006): the first libs
+    ///     release that contains the field. An older engine would drop the unknown key silently and then log, audit and
+    ///     trace a secret result, so a model that marks any method result sensitive carries this value as
+    ///     <c>minEngineVersion</c> and older engines refuse it with message 126. Models that do not use the marker keep
+    ///     their other minimum. <b>Must equal the number of the release that first ships the field</b> (the next patch
+    ///     after the last <c>r3.5.x</c> tag at merge time); raise it before merging when a release was cut in between.
+    /// </summary>
+    public const string SensitiveResultMinEngineVersion = "3.5.35";
+
     private static readonly Version? RunningVersion = ReadRunningVersion(typeof(CkEngineVersion).Assembly);
 
     // Test seam (AB#6274): never set outside tests, so production always reads RunningVersion.
@@ -67,9 +77,14 @@ public static class CkEngineVersion
     {
         var baseline = model.EffectiveCkLanguage >= 2 || model.IsRangeRetaining ? CkV2MinEngineVersion : null;
         // AB#7024: a model that uses 'replacesGenericCreate' needs an engine that knows the flag.
-        return model.Types?.Any(t => t.Methods?.Any(m => m.ReplacesGenericCreate) == true) == true
+        var required = model.Types?.Any(t => t.Methods?.Any(m => m.ReplacesGenericCreate) == true) == true
             ? Max([baseline, ReplacesGenericCreateMinEngineVersion])
             : baseline;
+        // AB#7006: a model that marks a method result (type or interface method) sensitive needs an engine that knows it.
+        var usesSensitiveResult =
+            model.Types?.Any(t => t.Methods?.Any(m => m.Result?.Sensitive == true) == true) == true ||
+            model.Interfaces?.Any(i => i.Methods?.Any(m => m.Result?.Sensitive == true) == true) == true;
+        return usesSensitiveResult ? Max([required, SensitiveResultMinEngineVersion]) : required;
     }
 
     /// <summary>

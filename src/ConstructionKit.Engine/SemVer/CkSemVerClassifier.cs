@@ -546,6 +546,13 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 return (CkSemVerLevel.Major,
                     "method result changed — callers read another value; widen a result record by an optional attribute " +
                     "instead (row M6)");
+            case "resultSensitive":
+                // AB#7006 row M17: marking the result sensitive only adds protection; withdrawing the marker removes
+                // a redaction callers may rely on (Mark() adds the behavioural note and the acknowledge).
+                return change.NewValue == "true"
+                    ? (CkSemVerLevel.Minor, "method result marked sensitive — more protection, callers are unaffected (row M17)")
+                    : (CkSemVerLevel.Minor,
+                        "method result no longer sensitive — security: result redaction removed (row M17)");
             case "idempotent":
                 return change.NewValue == "false"
                     ? (CkSemVerLevel.Major, "method no longer idempotent — callers that retry break (row M10)")
@@ -1110,6 +1117,21 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 IsBehavioural = true,
                 RequiresAcknowledge = true,
                 Reason = classified.Reason + "; requires acknowledge with a security reason (row M12)"
+            };
+        }
+
+        // AB#7006 (row M17): withdrawing the sensitive marker of a result removes a redaction (audit, logs, traces);
+        // it stays Minor but must be acknowledged with a security reason. Marking a result sensitive needs nothing.
+        // On an interface method the change is already Major (row I12) and not acknowledgeable.
+        if (change is { ElementKind: CkModelElementKind.TypeMethod or CkModelElementKind.InterfaceMethod,
+                Property: "resultSensitive", NewValue: "false" } &&
+            classified.Level == CkSemVerLevel.Minor)
+        {
+            return classified with
+            {
+                IsBehavioural = true,
+                RequiresAcknowledge = true,
+                Reason = classified.Reason + "; requires acknowledge with a security reason (row M17)"
             };
         }
 

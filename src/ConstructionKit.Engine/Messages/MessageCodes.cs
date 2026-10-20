@@ -373,6 +373,9 @@ internal static class MessageCodes
     internal static OperationMessage CkMethodReplacesGenericCreateInvalid(string? location, object methodId, object ckTypeId, object reason) =>
         GetMessage("CkMethodReplacesGenericCreateInvalid", location, methodId, ckTypeId, reason);
 
+    internal static OperationMessage CkMethodPipelineSensitiveResult(string? location, object methodId, object ckTypeId) =>
+        GetMessage("CkMethodPipelineSensitiveResult", location, methodId, ckTypeId);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1070,6 +1073,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  133, "Method '{methodId}' of '{ckTypeId}' declares an invalid 'replacesGenericCreate': {reason}",
                  new [] {"methodId", "ckTypeId", "reason"})
+        },
+        {
+            "CkMethodPipelineSensitiveResult",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 134, "Method '{methodId}' of '{ckTypeId}' declares 'execution.handler: pipeline' but its result is sensitive: a pipeline execution stores its output, so a method with a sensitive result must use 'execution.handler: service'",
+                 new [] {"methodId", "ckTypeId"})
         },
     };
 }

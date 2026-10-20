@@ -69,6 +69,14 @@ public static class CkMethodCodeGenerator
                 sb.AppendLine("{");
                 sb.AppendLine(
                     $"  public {ClrType(method.Result.ValueType, method.Result.ValueCkRecordId, method.Result.ValueCkEnumId)}? Value {{ get; init; }}");
+                if (method.Result.Sensitive)
+                {
+                    // AB#7006: like a sensitive parameter, a sensitive result is never rendered.
+                    sb.AppendLine();
+                    sb.AppendLine("  /// <summary>Renders the result; the sensitive value is redacted.</summary>");
+                    sb.AppendLine($"  public override string ToString() => \"{name}Result {{ Value = *** }}\";");
+                }
+
                 sb.AppendLine("}");
             }
         }

@@ -1363,6 +1363,43 @@ kitchen sink `sampleData/ckv2KitchenSink/Builder.cs`), `CkV2GraphJsonRoundTripTe
 `CkIdsCodeGeneratorCkV2Tests`, and in `ConstructionKit.Compiler.Tests` `CkV2CompileTests` (YAML kitchen sink end to
 end incl. `interfaces/` folder, gate, docs and range retention of `implements`) and `CkV1CompileOutputUnchangedTests`.
 
+## Data permissions: one rule set, one public check (AB#4969 / AB#7035)
+
+Data permissions (policies of `System.Identity`, resolved per tenant by `IDataPermissionResolver`) are enforced on
+the repository session by the caller's `RtSecurityContext` (subject, roles, `IsSystem`); a session without one is the
+System context and bypasses everything. The rules live in exactly one place:
+
+| Piece | Where | Role |
+|-------|-------|------|
+| `RtDataAccessEvaluator.Classify` | `Runtime.Contracts/DataPermissions` | pure classification Open / Allowed / OwnedOnly / Denied per type (+ base types) and action; AuditOnly view |
+| `DataSecurityFilterFactory` | `Runtime.Engine/Security` | read filter: classifies with the evaluator, the query renders the ownership predicate; denied reads behave as not found |
+| `DataPermissionRules` | `Runtime.Engine/Security` (internal) | shared by guard and evaluator: type classification, ownership predicate (`RtCreatedBy` or `CkType.ownerAttributePath`, fail closed), audit events |
+| `DataPermissionWriteGuard` | `Runtime.Engine/Security` (internal) | the write/delete funnel in `RuntimeRepositoryBase`: batch checks per change set, atomic rejection, blueprint lock |
+| `IRtDataPermissionEvaluator` | `Runtime.Contracts/DataPermissions` (impl. `RtDataPermissionEvaluator`, registered singleton) | **the public question** "may this caller read / write / delete this entity (or type)?" |
+
+`IRtDataPermissionEvaluator` is the only public way to ask (a gateway or any caller-bound surface must not copy
+the classification):
+
+- `EvaluateAsync(repository, caller, RtEntityId target, RtDataAction action, publishAudit = false, ct)` and
+  `EvaluateTypeAsync(repository, caller, ckTypeId, action, publishAudit = false, ct)`.
+- Result `RtDataPermissionVerdict { Decision, Reason, AuditOnlyViolation }`, no entity data:
+  `Decision` = `Allowed` | `NotVisible` | `NotPermitted`. **`NotVisible` must be answered like a missing entity**
+  (not found); `NotPermitted` is a refusal. `Reason` is a language-neutral code (`Open`, `Granted`,
+  `GrantedAsOwner`, `AuditOnly`, `NoGrant`, `NotOwner`, `EntityNotFound`, `BlueprintLocked`).
+- Entity level: visibility is decided first with the Read classification (what the read filter hides is
+  `NotVisible` for every action, also when the entity does not exist and the verdict depends on it); then the
+  action's own grant, ownership for owned-only grants and, for Write/Delete, the blueprint lock of opted-in
+  types. The stored entity is read (raw, system session) only when the verdict depends on it.
+- Type level (no entity, e.g. a static method): Read without any grant is `NotVisible`; Write/Delete without a
+  grant is `NotPermitted`; an owned-only grant is allowed like the generic insert.
+- System callers and tenants without policies are `Allowed` / `Open`. AuditOnly policies never refuse; the
+  verdict carries `AuditOnlyViolation` and `publishAudit: true` publishes the same audit event the repository
+  would (`DataPermissions.ReadViolation` / `WriteViolation` / `BlueprintLockViolation`). The default call has
+  no side effect.
+- Tests: `RtDataPermissionEvaluatorTests` (matrix, agreement with the guard) in `Runtime.Engine.Tests`; the
+  differential test against the real repository is `DataPermissionEvaluatorDifferentialTests` in
+  engine-mongodb.
+
 ## Delete is Archive by default; importing an archived entity again (AB#7018)
 
 `DeleteStrategies.Archive` is the default of `DeleteOptions`, `BulkOperationOptions` and the GraphQL delete: the

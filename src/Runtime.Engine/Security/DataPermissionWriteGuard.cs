@@ -31,7 +31,7 @@ internal static class DataPermissionWriteGuard
 
         foreach (var typeGroup in entityUpdateInfoList.GroupBy(i => i.CkTypeId))
         {
-            var access = ClassifyType(ckCacheService, tenantId, typeGroup.Key, policyTable, securityContext);
+            var access = DataPermissionRules.ClassifyType(ckCacheService, tenantId, typeGroup.Key, policyTable, securityContext);
             var ownershipCheckIds = new List<OctoObjectId>();
 
             foreach (var item in typeGroup)
@@ -54,7 +54,7 @@ internal static class DataPermissionWriteGuard
                 if (enforced is RtDataAccessLevel.Open or RtDataAccessLevel.Allowed &&
                     audit is RtDataAccessLevel.Denied or RtDataAccessLevel.OwnedOnly)
                 {
-                    await PublishAuditAsync(auditEventSink, tenantId, securityContext, typeGroup.Key, action)
+                    await DataPermissionRules.PublishWriteAuditAsync(auditEventSink, tenantId, securityContext, typeGroup.Key, action)
                         .ConfigureAwait(false);
                 }
             }
@@ -75,7 +75,7 @@ internal static class DataPermissionWriteGuard
 
         foreach (var associationGroup in associationUpdateInfoList.GroupBy(a => a.Origin.CkTypeId))
         {
-            var access = ClassifyType(ckCacheService, tenantId, associationGroup.Key, policyTable, securityContext);
+            var access = DataPermissionRules.ClassifyType(ckCacheService, tenantId, associationGroup.Key, policyTable, securityContext);
             switch (access.EnforcedWrite)
             {
                 case RtDataAccessLevel.Denied:
@@ -93,23 +93,11 @@ internal static class DataPermissionWriteGuard
                     break;
                 case RtDataAccessLevel.Open or RtDataAccessLevel.Allowed when
                     access.AuditWrite is RtDataAccessLevel.Denied or RtDataAccessLevel.OwnedOnly:
-                    await PublishAuditAsync(auditEventSink, tenantId, securityContext, associationGroup.Key,
+                    await DataPermissionRules.PublishWriteAuditAsync(auditEventSink, tenantId, securityContext, associationGroup.Key,
                         RtDataAction.Write).ConfigureAwait(false);
                     break;
             }
         }
-    }
-
-    private static TypeAccess ClassifyType(ICkCacheService ckCacheService, string tenantId,
-        RtCkId<CkTypeId> ckTypeId, RtDataPolicyTable policyTable, RtSecurityContext securityContext)
-    {
-        var selfAndBase = RtDataPermissionCkTypeHelper.GetSelfAndBaseFullNames(ckCacheService, tenantId, ckTypeId);
-        return new TypeAccess(
-            RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Write, securityContext, false),
-            RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Delete, securityContext, false),
-            RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Write, securityContext, true),
-            RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Delete, securityContext, true),
-            RtDataAccessEvaluator.ClassifyBlueprintLockProtection(policyTable, selfAndBase, securityContext));
     }
 
     /// <summary>
@@ -295,11 +283,8 @@ internal static class DataPermissionWriteGuard
             }
 
             // Rows without an owner value are not writable under an owned-only grant (fail closed).
-            var owner = ownerAttributePath == null
-                ? entity.RtCreatedBy
-                : entity.GetAttributeValueByAccessPath(ckCacheService, runtimeRepository.TenantId,
-                    ownerAttributePath) as string;
-            if (owner == null || owner != securityContext.SubjectId)
+            if (!DataPermissionRules.IsOwnedBy(entity, ckCacheService, runtimeRepository.TenantId,
+                    ownerAttributePath, securityContext))
             {
                 AddForbidden(operationResult, ckTypeId, entity.RtId, RtDataAction.Write);
             }
@@ -313,21 +298,4 @@ internal static class DataPermissionWriteGuard
             ForbiddenMessageNumber,
             $"Access denied: missing data permission '{action}' on '{ckTypeId.SemanticVersionedFullName}'."));
     }
-
-    private static Task PublishAuditAsync(IAuditEventSink? auditEventSink, string tenantId,
-        RtSecurityContext securityContext, RtCkId<CkTypeId> ckTypeId, RtDataAction action)
-    {
-        return auditEventSink?.PublishAsync(new AuditEvent(tenantId, AuditEventLevel.Warning,
-                   "DataPermissions.WriteViolation",
-                   $"Subject '{securityContext.SubjectId}' performed '{action}' on protected type " +
-                   $"'{ckTypeId.SemanticVersionedFullName}' without a grant (AuditOnly policy — not blocked)."))
-               ?? Task.CompletedTask;
-    }
-
-    private sealed record TypeAccess(
-        RtDataAccessLevel EnforcedWrite,
-        RtDataAccessLevel EnforcedDelete,
-        RtDataAccessLevel AuditWrite,
-        RtDataAccessLevel AuditDelete,
-        RtBlueprintLockProtection BlueprintLock);
 }

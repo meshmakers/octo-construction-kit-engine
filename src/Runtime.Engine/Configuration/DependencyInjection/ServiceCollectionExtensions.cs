@@ -58,6 +58,7 @@ public static class ServiceCollectionExtensions
         // and the caller-specific read-filter factory
         services.TryAddSingleton<IDataPermissionResolver, DataPermissionResolver>();
         services.TryAddSingleton<IDataSecurityFilterFactory, DataSecurityFilterFactory>();
+        services.TryAddSingleton<IRtDataPermissionEvaluator, RtDataPermissionEvaluator>();
 
         // Secret attribute key ring (AB#5528, concept §3.5): bound from SecretEncryption in the
         // host configuration, so every engine host gets it. Without keys the host still starts;

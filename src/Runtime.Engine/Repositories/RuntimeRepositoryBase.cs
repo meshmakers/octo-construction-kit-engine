@@ -520,10 +520,18 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             if (policyTable.HasRules)
             {
                 var guardResult = new OperationResult();
+                var notVisible = new List<DataPermissionWriteGuard.NotVisibleChange>();
                 await DataPermissionWriteGuard.CheckAsync(this, cacheService, _auditEventSink, session,
                         securityContext, policyTable, entityUpdateInfoList, associationUpdateInfoList,
-                        guardResult)
+                        guardResult, notVisible)
                     .ConfigureAwait(false);
+                if (notVisible.Count > 0)
+                {
+                    // AB#7126: a change of an entity the caller may not see is answered like a missing entity.
+                    throw CreateEntityNotFoundException(notVisible[0].CkTypeId, notVisible[0].RtId,
+                        notVisible[0].Action, options.DeleteStrategy);
+                }
+
                 RuntimeRepositoryException.ThrowIfOperationResultError(guardResult);
             }
         }
@@ -531,6 +539,22 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entityUpdateInfoList,
                 associationUpdateInfoList, options)
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     The exception a write path raises for an update, replace or delete of an entity that does not exist
+    ///     (AB#7126). The write guard throws exactly this for an entity the caller may not see, so the two cases
+    ///     are indistinguishable. A persistence implementation overrides it with the exception its own write
+    ///     path raises for a missing entity (same type and message shape).
+    /// </summary>
+    /// <param name="ckTypeId">The type of the entity</param>
+    /// <param name="rtId">The runtime id of the entity</param>
+    /// <param name="action">Write for an update or replace, Delete for a delete</param>
+    /// <param name="deleteStrategy">The delete strategy of the change set (an archive is an update)</param>
+    protected virtual Exception CreateEntityNotFoundException(RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId,
+        RtDataAction action, DeleteStrategies deleteStrategy)
+    {
+        return RuntimeRepositoryException.EntityNotFound(ckTypeId, rtId);
     }
 
     /// <inheritdoc />

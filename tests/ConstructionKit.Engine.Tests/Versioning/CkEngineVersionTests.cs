@@ -241,13 +241,13 @@ public class CkEngineVersionTests(ITestOutputHelper output) : CkV2ResolverTestBa
     [Fact]
     public void Code126_ModelWithReplacesGenericCreate_IsRefusedByAnEngineThatPredatesTheFlag()
     {
-        // 3.5.31 is the last release without the field: it would drop the key silently, so it must refuse the model.
+        // 3.5.33 is the last version without the field: it would drop the key silently, so it must refuse the model.
         var model = Model();
         Type(model, "Account").Methods!.Single(m => m.MethodId == "Lock-1").ReplacesGenericCreate = true;
         model.MinEngineVersion = CkEngineVersion.GetRequiredMinEngineVersion(model);
         var operationResult = new OperationResult();
 
-        Assert.False(CkEngineVersion.CheckModel(model, "loc", operationResult, new Version(3, 5, 31)));
+        Assert.False(CkEngineVersion.CheckModel(model, "loc", operationResult, new Version(3, 5, 33)));
         Assert.Equal(126, Assert.Single(operationResult.Messages).MessageNumber);
 
         Assert.True(CkEngineVersion.CheckModel(model, "loc", new OperationResult(),
@@ -290,13 +290,13 @@ public class CkEngineVersionTests(ITestOutputHelper output) : CkV2ResolverTestBa
     [Fact]
     public void Code126_ModelWithASensitiveResult_IsRefusedByAnEngineThatPredatesTheMarker_ButAModelWithoutItStillReads()
     {
-        // 3.5.34 is the last release without the field: it would drop the key silently (and redact nothing).
+        // 3.5.35 is the last version without the field: it would drop the key silently (and redact nothing).
         var model = Model();
         Type(model, "Principal").Methods!.Single(m => m.MethodId == "ChangePassword-1").Result!.Sensitive = true;
         model.MinEngineVersion = CkEngineVersion.GetRequiredMinEngineVersion(model);
         var operationResult = new OperationResult();
 
-        Assert.False(CkEngineVersion.CheckModel(model, "loc", operationResult, new Version(3, 5, 34)));
+        Assert.False(CkEngineVersion.CheckModel(model, "loc", operationResult, new Version(3, 5, 35)));
         Assert.Equal(126, Assert.Single(operationResult.Messages).MessageNumber);
         Assert.True(CkEngineVersion.CheckModel(model, "loc", new OperationResult(),
             Version.Parse(CkEngineVersion.SensitiveResultMinEngineVersion)));

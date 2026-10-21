@@ -1407,7 +1407,7 @@ the classification):
   **as if it did not exist** (`RuntimeRepositoryBase.CreateEntityNotFoundException`, a virtual hook: the persistence
   layer overrides it with the exception its own write path raises for a missing entity, so a hidden and a missing
   entity are indistinguishable; the whole change set is rejected). The check comes before the write decision, so a
-  hidden entity never answers "access denied". Inserts have no visibility question and stay allowed. Like the
+  hidden entity never answers "access denied". Inserts have no visibility question and stay allowed, and neither do the associations whose origin is inserted by the same change set (the parent link of a new file or folder: no stored entity exists yet; without this exemption every create-with-association by an owned-only or write-only role was refused as not found, AB#7213). Like the
   evaluator, an id without a stored entity is answered the same way as an invisible one when the caller's read access
   is restricted (so existence is never revealed, and an upsert/replace by a role without full read is refused for
   existing and new ids alike); with unrestricted read it is left to the normal write path. The stored entity is read

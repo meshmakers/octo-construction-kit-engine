@@ -20,7 +20,7 @@ namespace Meshmakers.Octo.Runtime.Engine.Security;
 ///     existing entity (and an association change at its origin) is first tested against the caller's read
 ///     visibility, with the same rules as <see cref="RtDataPermissionEvaluator" />; an entity the caller
 ///     cannot see is refused as if it did not exist (see <see cref="CheckVisibilityAsync" />). Inserts have no
-///     visibility question.
+///     visibility question, nor do the associations whose origin is inserted by the same change set.
 /// </summary>
 internal static class DataPermissionWriteGuard
 {
@@ -188,8 +188,16 @@ internal static class DataPermissionWriteGuard
             }
         }
 
-        targets.AddRange(associationUpdateInfoList.Select(a =>
-            new NotVisibleChange(a.Origin.CkTypeId, a.Origin.RtId, RtDataAction.Write)));
+        // An association whose origin is inserted by the same change set (the parent link of a new file or
+        // folder) has no stored entity yet, so it can be neither visible nor hidden: the insert is the write
+        // that is decided by the write policy, the association is its part and needs no visibility question.
+        var insertedInThisChange = entityUpdateInfoList
+            .Where(i => i.ModOption == EntityModOptions.Insert && i.RtId != null)
+            .Select(i => new RtEntityId(i.CkTypeId, i.RtId!.Value))
+            .ToHashSet();
+        targets.AddRange(associationUpdateInfoList
+            .Where(a => !insertedInThisChange.Contains(a.Origin))
+            .Select(a => new NotVisibleChange(a.Origin.CkTypeId, a.Origin.RtId, RtDataAction.Write)));
 
         var refused = false;
         foreach (var typeGroup in targets.Distinct().GroupBy(t => t.CkTypeId))

@@ -341,6 +341,26 @@ public class DataPermissionWriteGuardVisibilityTests
         Assert.Equal(0, h.EntityReads);
     }
 
+    [Theory]
+    [InlineData("WriterOwnedRead")]
+    [InlineData("WriteOnly")]
+    public async Task Association_OfAnEntityInsertedWithExplicitType_NeedsNoVisibility(string role)
+    {
+        // The file system shape (AB#7213): CreateInsert(ckTypeId, entity) leaves the update info's RtId empty,
+        // the id lives on the entity. The same-change-set exemption must still recognise the origin.
+        var h = new Harness();
+        var parent = h.Add(DocType, "someone-else");
+        var inserted = new RtEntity(Rt(DocType), OctoObjectId.GenerateNewId());
+        var association = AssociationUpdateInfo.CreateInsert(new RtEntityId(Rt(DocType), inserted.RtId),
+            new RtEntityId(parent.CkTypeId!, parent.RtId), new RtCkId<CkAssociationRoleId>("Test/Relates"));
+
+        var result = await h.RunAsync(RtSecurityContext.ForUser("user-x", [role]), Table(),
+            [EntityUpdateInfo<RtEntity>.CreateInsert(Rt(DocType), inserted)], [association]);
+
+        Assert.Empty(result.Messages);
+        Assert.Equal(0, h.EntityReads);
+    }
+
     [Fact]
     public async Task Association_OfAHiddenStoredEntity_IsStillRefusedNextToAnInsert()
     {

@@ -30,7 +30,7 @@ public static class CkEngineVersion
     ///     number of the release that first ships the field</b> (the next patch after the last <c>r3.5.x</c> tag at
     ///     merge time); raise it before merging when a release was cut in between.
     /// </summary>
-    public const string ReplacesGenericCreateMinEngineVersion = "3.5.32";
+    public const string ReplacesGenericCreateMinEngineVersion = "3.5.34";
 
     /// <summary>
     ///     The lowest engine version that reads a method result's <c>sensitive</c> marker (AB#7006): the first libs
@@ -40,7 +40,7 @@ public static class CkEngineVersion
     ///     their other minimum. <b>Must equal the number of the release that first ships the field</b> (the next patch
     ///     after the last <c>r3.5.x</c> tag at merge time); raise it before merging when a release was cut in between.
     /// </summary>
-    public const string SensitiveResultMinEngineVersion = "3.5.35";
+    public const string SensitiveResultMinEngineVersion = "3.5.36";
 
     private static readonly Version? RunningVersion = ReadRunningVersion(typeof(CkEngineVersion).Assembly);
 

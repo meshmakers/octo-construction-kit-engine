@@ -321,6 +321,42 @@ public class DataPermissionWriteGuardVisibilityTests
         Assert.Empty(result.Messages);
     }
 
+    [Theory]
+    [InlineData("WriterOwnedRead")]
+    [InlineData("WriteOnly")]
+    public async Task Association_OfAnEntityInsertedByTheSameChange_NeedsNoVisibility(string role)
+    {
+        // The parent link of a new file/folder: origin = the entity inserted in the same change set. It has no
+        // stored state yet, so it must neither be treated as hidden (owned-only / no read grant) nor read.
+        var h = new Harness();
+        var parent = h.Add(DocType, "someone-else");
+        var inserted = new RtEntity(Rt(DocType), OctoObjectId.GenerateNewId());
+        var association = AssociationUpdateInfo.CreateInsert(new RtEntityId(inserted.CkTypeId!, inserted.RtId),
+            new RtEntityId(parent.CkTypeId!, parent.RtId), new RtCkId<CkAssociationRoleId>("Test/Relates"));
+
+        var result = await h.RunAsync(RtSecurityContext.ForUser("user-x", [role]), Table(),
+            [EntityUpdateInfo<RtEntity>.CreateInsert(inserted)], [association]);
+
+        Assert.Empty(result.Messages);
+        Assert.Equal(0, h.EntityReads);
+    }
+
+    [Fact]
+    public async Task Association_OfAHiddenStoredEntity_IsStillRefusedNextToAnInsert()
+    {
+        var h = new Harness();
+        var foreignOrigin = h.Add(DocType, "someone-else");
+        var target = h.Add(DocType, "user-w");
+        var inserted = new RtEntity(Rt(DocType), OctoObjectId.GenerateNewId());
+        var association = AssociationUpdateInfo.CreateInsert(new RtEntityId(foreignOrigin.CkTypeId!, foreignOrigin.RtId),
+            new RtEntityId(target.CkTypeId!, target.RtId), new RtCkId<CkAssociationRoleId>("Test/Relates"));
+
+        var result = await h.RunAsync(WriterOwnedRead, Table(), [EntityUpdateInfo<RtEntity>.CreateInsert(inserted)],
+            [association]);
+
+        AssertRefusedAsNotFound(result, foreignOrigin);
+    }
+
     [Fact]
     public async Task SystemCaller_EmptyTable_AndUnprotectedType_AreUnchanged()
     {

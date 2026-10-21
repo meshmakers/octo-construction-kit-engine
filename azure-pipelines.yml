@@ -242,18 +242,17 @@ stages:
           # idempotent "already exists" no-op of the publish step.
           # Note: this validates with the latest RELEASED octo-ckc from the feed — brand-new
           # schema features introduced in this repo may need a toolVersion pin until released.
-          # AB#6725: toolVersion is pinned to the main-line compiler that carries the range-retention default
-          # (AB#6675, first flip build 0.1.2610.14025). Without the pin an r* tag build derives the newest STABLE
-          # compiler of its own line (3.5.21, pre-flip), which classifies the already published, range-retaining
-          # System.Files-1.1.0 / System.StreamData-1.18.0 as "rangeRetention true -> false" and demands a further
-          # MINOR bump (OCTO-CK100; r3.5.22, build 54764). The 3.5.22 compiler is only published by this very
-          # build, so the line cannot supply it. The models must NOT be bumped: the old compiler would publish them
-          # with exact pins, and published versions are immutable.
-          # REMOVE this pin after the first release train that ships the flip compiler on the 3.5 line
-          # (a stable 3.5.N compiler with the flip is on the feed); the derivation then picks it up.
+          # AB#6725: no toolVersion pin. The template derives the newest STABLE compiler of the build's own version
+          # line from the private feed (main and PR builds: 0.1.*, r* tags: 3.5.*). The flip compiler (range-retention
+          # default, AB#6675) is on both lines (0.1.2610.14025 and later; 3.5.23/3.5.27 and later), so the already
+          # published, range-retaining System.Files-1.1.0 / System.StreamData-1.18.0 validate without a further bump.
+          # The former pin to the exact main-line build 0.1.2610.14032 broke every build on 2026-10-21 (builds
+          # 58123, 58142: "Version 0.1.2610.14032 ... is not found in NuGet feeds"): the private feed purges old
+          # main-line builds, and an exact pin on a main-line build cannot survive that. Do not pin an exact main-line
+          # build here again; pin only for a brand-new schema feature that no released compiler knows yet, and
+          # remove the pin in the same release train.
           - template: templates/steps/validate-and-publish-ck-versions.yml@pipelineTemplates
             parameters:
-              toolVersion: '0.1.2610.14032'
               constructionKitPaths:
                 - 'src/SystemCkModel/ConstructionKit'
                 - 'src/SystemFilesCkModel/ConstructionKit'

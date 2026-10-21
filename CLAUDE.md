@@ -675,14 +675,16 @@ before these versions are imported. Published versions stay immutable. **Why `ma
 previous main build; the flip commit itself was validated with the pre-flip compiler (`Range retention: False`, "no bump required"), a later PR
 or main build derives the flip compiler and fails.
 
-**AB#6725 - release tags need the flip compiler pinned.** The same derivation breaks the first release tag after the flip: an `r*` tag
-build takes only STABLE compilers of its own line, i.e. the pre-flip 3.5.21, and the compiler of the release being built is published only
-by that very build (r3.5.22, build 54764: `OCTO-CK100`, "rangeRetention true -> false" = MINOR bump for the already published, range-retaining
-System.Files-1.1.0 / System.StreamData-1.18.0). The `Validate CK model versions` call in `azure-pipelines.yml` therefore passes
-`toolVersion: '0.1.2610.14032'` (main-line compiler with the flip; one tool serves ValidateVersion, Compile, the cascade check and Publish).
-Never bump the models to get past it: the old compiler would publish them with exact pins, immutable. **Remove the pin after the first release
-train that ships the flip compiler on the 3.5 line** (the stable 3.5.N compiler with the flip is on the private feed). The release train
-for the engine must run on a commit that contains the pin (r3.5.22 tags are never moved; retry with the next patch).
+**AB#6725 - release tags needed the flip compiler pinned (pin removed 2026-10-21).** The same derivation broke the first release tag after the
+flip: an `r*` tag build takes only STABLE compilers of its own line, i.e. the pre-flip 3.5.21, and the compiler of the release being built is
+published only by that very build (r3.5.22, build 54764: `OCTO-CK100`, "rangeRetention true -> false" = MINOR bump for the already published,
+range-retaining System.Files-1.1.0 / System.StreamData-1.18.0). The `Validate CK model versions` call therefore passed
+`toolVersion: '0.1.2610.14032'` (exact main-line build with the flip). Never bump the models to get past such a gate: the old compiler would
+publish them with exact pins, immutable. **The pin is removed**: the flip compiler is on the 3.5 line since r3.5.23/r3.5.27 (stable 3.5.36 is on the feed), and
+the exact main-line build had been purged from the private feed, which failed every build with "Version 0.1.2610.14032 ... is not found in NuGet
+feeds" (PR 298 builds 58123 and 58142). The template derives the compiler of the build's own line again (main/PR: newest 0.1.*, r* tags: newest
+stable 3.5.*). Do not pin an exact main-line build again (the feed purges them); a pin is only for a schema feature no released compiler knows yet, and it
+is removed in the same release train.
 
 **Single publisher (AB#6481).** This repository's CI is the only publisher of `System.Files` to the private and
 public CK catalogs and the only source of its generated model documentation: the `Validate CK model versions`/

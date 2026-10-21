@@ -218,14 +218,8 @@ public class RtDataPermissionEvaluatorTests
         var verdict = await h.EvalAsync(Caller(caller), entity, action);
         var guardAllows = await h.GuardAllowsAsync(Caller(caller), table, entity, action);
 
-        // Guard permits <=> evaluator Allowed, except entities the caller cannot see: the guard has no
-        // notion of visibility (it never runs for a caller that could not name the entity), the evaluator
-        // answers NotVisible for them.
-        if (verdict.Decision == RtDataPermissionDecision.NotVisible)
-        {
-            return;
-        }
-
+        // Guard permits <=> evaluator Allowed, for every cell including the entities the caller cannot see:
+        // the guard applies the same read visibility first (AB#7126), so NotVisible is refused there too.
         Assert.Equal(guardAllows, verdict.IsAllowed);
     }
 

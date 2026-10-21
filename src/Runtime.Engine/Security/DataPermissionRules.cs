@@ -32,7 +32,9 @@ internal static class DataPermissionRules
             RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Delete, securityContext, false),
             RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Write, securityContext, true),
             RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Delete, securityContext, true),
-            RtDataAccessEvaluator.ClassifyBlueprintLockProtection(policyTable, selfAndBase, securityContext));
+            RtDataAccessEvaluator.ClassifyBlueprintLockProtection(policyTable, selfAndBase, securityContext),
+            RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Read, securityContext, false),
+            RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Read, securityContext, true));
     }
 
     /// <summary>
@@ -59,6 +61,21 @@ internal static class DataPermissionRules
                ?? Task.CompletedTask;
     }
 
+    /// <summary>
+    ///     AuditOnly counterpart of the visibility rule of the write funnel (AB#7126): the caller changed an
+    ///     existing entity that an AuditOnly read policy would hide from it. Same event type as the other
+    ///     write violations.
+    /// </summary>
+    internal static Task PublishWriteVisibilityAuditAsync(IAuditEventSink? auditEventSink, string tenantId,
+        RtSecurityContext securityContext, RtCkId<CkTypeId> ckTypeId, RtDataAction action)
+    {
+        return auditEventSink?.PublishAsync(new AuditEvent(tenantId, AuditEventLevel.Warning,
+                   "DataPermissions.WriteViolation",
+                   $"Subject '{securityContext.SubjectId}' performed '{action}' on an entity of protected type " +
+                   $"'{ckTypeId.SemanticVersionedFullName}' that it cannot see (AuditOnly policy — not blocked)."))
+               ?? Task.CompletedTask;
+    }
+
     internal static Task PublishReadAuditAsync(IAuditEventSink? auditEventSink, string tenantId,
         RtSecurityContext securityContext, RtCkId<CkTypeId> ckTypeId)
     {
@@ -74,5 +91,7 @@ internal static class DataPermissionRules
         RtDataAccessLevel EnforcedDelete,
         RtDataAccessLevel AuditWrite,
         RtDataAccessLevel AuditDelete,
-        RtBlueprintLockProtection BlueprintLock);
+        RtBlueprintLockProtection BlueprintLock,
+        RtDataAccessLevel EnforcedRead,
+        RtDataAccessLevel AuditRead);
 }

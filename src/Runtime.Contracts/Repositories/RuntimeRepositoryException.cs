@@ -70,6 +70,12 @@ public class RuntimeRepositoryException : PersistenceException
             $"Document with key '{key}' of type '{documentType.FullName}' does not exist in tenant '{tenantId}'.");
     }
 
+    internal static Exception EntityNotFound(RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId)
+    {
+        return new RuntimeRepositoryException(
+            $"Operation failed because ID '{rtId}' is not existing for type '{ckTypeId.SemanticVersionedFullName}'.");
+    }
+
     internal static Exception FieldFilterDidNotReturnResult(Type type, FieldFilterCriteria fieldFilterCriteria)
     {
         return new RuntimeRepositoryException(

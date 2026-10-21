@@ -1365,7 +1365,7 @@ kitchen sink `sampleData/ckv2KitchenSink/Builder.cs`), `CkV2GraphJsonRoundTripTe
 `CkIdsCodeGeneratorCkV2Tests`, and in `ConstructionKit.Compiler.Tests` `CkV2CompileTests` (YAML kitchen sink end to
 end incl. `interfaces/` folder, gate, docs and range retention of `implements`) and `CkV1CompileOutputUnchangedTests`.
 
-## Data permissions: one rule set, one public check (AB#4969 / AB#7035)
+## Data permissions: one rule set, one public check (AB#4969 / AB#7035 / AB#7126)
 
 Data permissions (policies of `System.Identity`, resolved per tenant by `IDataPermissionResolver`) are enforced on
 the repository session by the caller's `RtSecurityContext` (subject, roles, `IsSystem`); a session without one is the
@@ -1376,7 +1376,7 @@ System context and bypasses everything. The rules live in exactly one place:
 | `RtDataAccessEvaluator.Classify` | `Runtime.Contracts/DataPermissions` | pure classification Open / Allowed / OwnedOnly / Denied per type (+ base types) and action; AuditOnly view |
 | `DataSecurityFilterFactory` | `Runtime.Engine/Security` | read filter: classifies with the evaluator, the query renders the ownership predicate; denied reads behave as not found |
 | `DataPermissionRules` | `Runtime.Engine/Security` (internal) | shared by guard and evaluator: type classification, ownership predicate (`RtCreatedBy` or `CkType.ownerAttributePath`, fail closed), audit events |
-| `DataPermissionWriteGuard` | `Runtime.Engine/Security` (internal) | the write/delete funnel in `RuntimeRepositoryBase`: batch checks per change set, atomic rejection, blueprint lock |
+| `DataPermissionWriteGuard` | `Runtime.Engine/Security` (internal) | the write/delete funnel in `RuntimeRepositoryBase`: read visibility first (AB#7126), then batch write/delete checks per change set, atomic rejection, blueprint lock |
 | `IRtDataPermissionEvaluator` | `Runtime.Contracts/DataPermissions` (impl. `RtDataPermissionEvaluator`, registered singleton) | **the public question** "may this caller read / write / delete this entity (or type)?" |
 
 `IRtDataPermissionEvaluator` is the only public way to ask (a gateway or any caller-bound surface must not copy
@@ -1397,7 +1397,27 @@ the classification):
 - System callers and tenants without policies are `Allowed` / `Open`. AuditOnly policies never refuse; the
   verdict carries `AuditOnlyViolation` and `publishAudit: true` publishes the same audit event the repository
   would (`DataPermissions.ReadViolation` / `WriteViolation` / `BlueprintLockViolation`). The default call has
-  no side effect.
+  no side effect. (The evaluator does not publish the guard's AuditOnly visibility event of a write; its
+  `AuditOnlyViolation` flag keeps the meaning of the write/read grant audit.)
+- **Write requires visibility (AB#7126).** The write guard applies the evaluator's first step before any write/delete
+  decision: for an update, replace or delete of an existing entity, and for an association change at its origin, the
+  Read classification decides first (`DataPermissionWriteGuard.CheckVisibilityAsync`, same `DataPermissionRules`
+  classification and ownership predicate as the evaluator and the read filter). No read grant on the (protected) type,
+  or an owned-only read grant and the caller is not the owner, means the entity is invisible and the change is refused
+  **as if it did not exist** (`RuntimeRepositoryBase.CreateEntityNotFoundException`, a virtual hook: the persistence
+  layer overrides it with the exception its own write path raises for a missing entity, so a hidden and a missing
+  entity are indistinguishable; the whole change set is rejected). The check comes before the write decision, so a
+  hidden entity never answers "access denied". Inserts have no visibility question and stay allowed, and neither do the associations whose origin is inserted by the same change set (the parent link of a new file or folder: no stored entity exists yet; without this exemption every create-with-association by an owned-only or write-only role was refused as not found, AB#7213). Like the
+  evaluator, an id without a stored entity is answered the same way as an invisible one when the caller's read access
+  is restricted (so existence is never revealed, and an upsert/replace by a role without full read is refused for
+  existing and new ids alike); with unrestricted read it is left to the normal write path. The stored entity is read
+  (raw, once per entity) only for an owned-only read grant (or an AuditOnly read policy). AuditOnly policies never refuse: an AuditOnly read policy that would hide an entity publishes
+  one `DataPermissions.WriteViolation` event per type (none additionally when the type's write audit already
+  published); system callers and tenants without policies are untouched. **Compatibility:** a role that holds Write
+  or Delete on a type but no Read (e.g. a custom role with only `files.manage`) can still insert but no longer
+  update, replace or delete existing records of that type; grant the matching Read policy (the shipped
+  `FileManagement` role has it). Tests: `DataPermissionWriteGuardVisibilityTests`; the matrix test
+  `Entity_AgreesWithWriteGuard` now covers every cell, `NotVisible` included.
 - Tests: `RtDataPermissionEvaluatorTests` (matrix, agreement with the guard) in `Runtime.Engine.Tests`; the
   differential test against the real repository is `DataPermissionEvaluatorDifferentialTests` in
   engine-mongodb.

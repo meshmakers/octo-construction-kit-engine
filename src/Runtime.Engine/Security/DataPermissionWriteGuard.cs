@@ -192,7 +192,10 @@ internal static class DataPermissionWriteGuard
         // folder) has no stored entity yet, so it can be neither visible nor hidden: the insert is the write
         // that is decided by the write policy, the association is its part and needs no visibility question.
         var insertedInThisChange = entityUpdateInfoList
-            .Where(i => i.ModOption == EntityModOptions.Insert && i.RtId != null)
+            .Where(i => i.ModOption == EntityModOptions.Insert)
+            // The CreateInsert(ckTypeId, entity) overload leaves RtId empty; the id is the entity's own.
+            .Select(i => (RtId: i.RtId ?? i.RtEntity?.RtId, i.CkTypeId))
+            .Where(i => i.RtId != null)
             .Select(i => new RtEntityId(i.CkTypeId, i.RtId!.Value))
             .ToHashSet();
         targets.AddRange(associationUpdateInfoList

@@ -675,14 +675,16 @@ before these versions are imported. Published versions stay immutable. **Why `ma
 previous main build; the flip commit itself was validated with the pre-flip compiler (`Range retention: False`, "no bump required"), a later PR
 or main build derives the flip compiler and fails.
 
-**AB#6725 - release tags need the flip compiler pinned.** The same derivation breaks the first release tag after the flip: an `r*` tag
-build takes only STABLE compilers of its own line, i.e. the pre-flip 3.5.21, and the compiler of the release being built is published only
-by that very build (r3.5.22, build 54764: `OCTO-CK100`, "rangeRetention true -> false" = MINOR bump for the already published, range-retaining
-System.Files-1.1.0 / System.StreamData-1.18.0). The `Validate CK model versions` call in `azure-pipelines.yml` therefore passes
-`toolVersion: '0.1.2610.14032'` (main-line compiler with the flip; one tool serves ValidateVersion, Compile, the cascade check and Publish).
-Never bump the models to get past it: the old compiler would publish them with exact pins, immutable. **Remove the pin after the first release
-train that ships the flip compiler on the 3.5 line** (the stable 3.5.N compiler with the flip is on the private feed). The release train
-for the engine must run on a commit that contains the pin (r3.5.22 tags are never moved; retry with the next patch).
+**AB#6725 - release tags needed the flip compiler pinned (pin removed 2026-10-21).** The same derivation broke the first release tag after the
+flip: an `r*` tag build takes only STABLE compilers of its own line, i.e. the pre-flip 3.5.21, and the compiler of the release being built is
+published only by that very build (r3.5.22, build 54764: `OCTO-CK100`, "rangeRetention true -> false" = MINOR bump for the already published,
+range-retaining System.Files-1.1.0 / System.StreamData-1.18.0). The `Validate CK model versions` call therefore passed
+`toolVersion: '0.1.2610.14032'` (exact main-line build with the flip). Never bump the models to get past such a gate: the old compiler would
+publish them with exact pins, immutable. **The pin is removed**: the flip compiler is on the 3.5 line since r3.5.23/r3.5.27 (stable 3.5.36 is on the feed), and
+the exact main-line build had been purged from the private feed, which failed every build with "Version 0.1.2610.14032 ... is not found in NuGet
+feeds" (PR 298 builds 58123 and 58142). The template derives the compiler of the build's own line again (main/PR: newest 0.1.*, r* tags: newest
+stable 3.5.*). Do not pin an exact main-line build again (the feed purges them); a pin is only for a schema feature no released compiler knows yet, and it
+is removed in the same release train.
 
 **Single publisher (AB#6481).** This repository's CI is the only publisher of `System.Files` to the private and
 public CK catalogs and the only source of its generated model documentation: the `Validate CK model versions`/
@@ -1141,7 +1143,7 @@ Notes:
   `ReadWrite`, visibility `Public`, derivable `Any`) through a `JsonTypeInfo` modifier in `CkCache` (`OmitCkV2Defaults`), so v1 caches stay
   byte-identical; reading tolerates the missing keys (trailing defaulted `[JsonConstructor]` parameters on
   `CkTypeGraph`, init setter on `CkTypeAttributeGraph.Access`).
-- Message codes for CK v2: 90–113 and 118–133 are in use (table below); **spare: 111, 114–117, 134**. Range
+- Message codes for CK v2: 90–113 and 118–134 are in use (table below); **spare: 111, 114–117, 135**. Range
   retention (F0.2) has no message codes of its own — its failures are `ModelValidationException`s and the
   unbound-reference diagnostic is the source-generator diagnostic OM1004.
   Warnings (e.g. 110, 124) of a successful compile are printed by `octo-ckc -c compile` (to **stderr**, also with
@@ -1184,7 +1186,7 @@ exists in Industry.Basic-2.6.0. Check the model prefix of the reference."). `OCT
 | 106 | `HiddenAttributeIndexed` | `InheritanceResolver.ValidateRestrictedAttributeUse` | F1.2-S2 (review N5): a non-text index (`Unique`, `UniqueNotDeleted`, `Ascending`, ...) reaches a Hidden attribute (a unique index reveals values through duplicate-key errors). Text indexes keep reporting 105. Review G3 E-M1: every index path is checked against the type, its derived types **and every other type of the same collection** (defining collection root + all its derived types, i.e. siblings, also from other models) — they share `attributes.<name>`, so a sibling's Hidden assignment would be indexed too |
 | 107 | `HiddenAttributeAutoCompleteValues` | `ElementResolver.CheckHiddenAssignments` | F1.2-S2 (N5): a Hidden type/record assignment declares `autoCompleteValues` (published in the model; Secret equivalent: 71) |
 | 108 | `HiddenAttributeOnAssociationRole` | `ElementResolver.CheckHiddenAssignments` | F1.2-S2 (N5): association-role attributes cannot be Hidden (no access guard on association attributes). `ReadOnly` / `MethodOnly` stay allowed |
-| 109 | `UnknownIndexAttributePath` | `InheritanceResolver.ValidateRestrictedAttributeUse` | F1.2-S2 (review N6): in a `ckLanguage: 2` model every index path segment must name an attribute (matched case-insensitively, like Mongo). Paths starting with `Rt`/`CkTypeId` (entity system fields) and the database key `_id` (the `System/Entity` index `CkTypeId` + `_id`, AB#6928) are exempt; a path merged into a collection root from a derived type is checked at that type. v1 models: unchanged |
+| 109 | `UnknownIndexAttributePath` | `InheritanceResolver.ValidateRestrictedAttributeUse` | F1.2-S2 (review N6): in a `ckLanguage: 2` model every index path segment must name an attribute (matched case-insensitively, like Mongo). Paths starting with `Rt`/`CkTypeId` (entity system fields) and the database key `_id` (the `System/Entity` index `CkTypeId` + `_id`) are exempt; a path merged into a collection root from a derived type is checked at that type. v1 models: unchanged |
 | 110 | `CkElementsInWrongFolder` | `CompilerService` (per element file) | **warning**: an element file declares a root key that is only read from another folder (e.g. `interfaces:` in `types/x.yaml`); those elements are ignored. Applies to every element kind (each folder reads only its own key) |
 | 112 | `CkReferenceToInternalElement` | `CkVisibilityValidator` (end of `ReferenceResolver`) | F1.2-S3: a reference from another model to a `visibility: Internal` element — base type/record, attribute assignment (type, record, role, interface member), attribute `valueCkRecordId`/`valueCkEnumId`, `implements`, interface `extends`, type/interface association role and targets, method parameter/result records and enums. Models compared by name |
 | 113 | `CkElementNotDerivable` | `CkVisibilityValidator` | F1.2-S3: a type or record derives from a type/record of another model whose effective `derivable` is `Model` (a v2 base without `derivable: Any`) |
@@ -1192,7 +1194,7 @@ exists in Industry.Basic-2.6.0. Check the model prefix of the reference."). `OCT
 | 119 | `CkInterfaceMemberConflict` | `InheritanceResolver.ValidateInterfaces` | F1.2-S4: across an interface and its parents one name stands for two attributes, or one attribute appears under two names. Repeating an inherited member identically is allowed |
 | 120 | `CkInterfaceAssociationInvalid` | `ReferenceResolver` | F1.2-S4: association member with an unknown role, unknown target, or not exactly one of `targetCkTypeId` / `targetCkInterfaceId` |
 | 121 | `CkInterfaceAssociationMissing` | `InheritanceResolver.ValidateAssociationMembers` | F1.2-S4: a type implementing the interface (incl. parents' members) lacks an outbound association (own or inherited) with the role, a compatible target (the type or a subtype; for an interface target an implementor, or an association narrowed to that interface or one extending it) and a multiplicity at least as strict as the member's (One < ZeroOrOne < N). Optional members are skipped |
-| 122 | `CkInterfaceMethodConflict` | `InheritanceResolver.InheritInterfaceMethods` | F1.2-S4: a type redeclares an interface method id with another **invocation contract** (AB#6336: `CkMethodContract.FirstDifference` — kind, parameters as a set incl. `isOptional`/`sensitive`, result, error-code set; descriptions, authorization, execution and order may differ; the message names the first difference). Row I12 classifies every contract change of an interface method as Major. Interface methods are inherited into `CkTypeGraph.AllMethods` (declaring type = highest type of the chain that implements the interface); interface methods follow 100 (duplicate id) and 101-104 |
+| 122 | `CkInterfaceMethodConflict` | `InheritanceResolver.InheritInterfaceMethods` | F1.2-S4: a type redeclares an interface method id with another **invocation contract** (AB#6336: `CkMethodContract.FirstDifference` — kind, parameters as a set incl. `isOptional`/`sensitive`, result incl. its `sensitive` marker (AB#7006), error-code set; descriptions, authorization, execution and order may differ; the message names the first difference). Row I12 classifies every contract change of an interface method as Major. Interface methods are inherited into `CkTypeGraph.AllMethods` (declaring type = highest type of the chain that implements the interface); interface methods follow 100 (duplicate id) and 101-104 |
 | 123 | `CkInterfaceHasNoMembers` | `ReferenceResolver` | F1.2-S4: no attribute, association or method member and no `extends` (replaces the former schema `minItems`) |
 | 124 | `CkInterfaceDeprecated` | `ReferenceResolver` | F1.2-S4: **warning** for `implements`, `extends`, interface association targets and type association `targetCkInterfaceId` that reference a `deprecated: true` interface |
 | 125 | `CkMethodGeneratedNameCollision` | `ElementResolver.CheckGeneratedMethodNames` | F1.4-S2 (review L15): two type methods of a model produce the same generated name `{Type}{Method}` (constant / parameter record) |
@@ -1202,8 +1204,9 @@ exists in Industry.Basic-2.6.0. Check the model prefix of the reference."). `OCT
 | 129 | `CkInconsistentVisibility` | `CkVisibilityValidator` (end of `ReferenceResolver`) + `InheritanceResolver.InheritInterfaceMethods` | AB#6334 / AB#6335 (F2.1 gate findings H1/H3): in a `ckLanguage: 2` model a **public** element references an **internal** element of its own model (same reference walk as 112, plus type association `targetCkAttributeIds`), a public interface declares an internal method, or a type redeclares a method of a public interface it implements as internal. One message per offending reference. Coverage of the walk is guarded by `CkVisibilityReferenceCoverageTests`; the classifier mirror is `CkVisibilityIndex.ExposeInternalElementsReachableFromPublicOnes` (defence in depth; it also treats associations of internal types that target a public type, and their roles, as public surface — N1) |
 | 130 | `InvalidCompatibilityAcknowledge` | `CkCompatibilityValidator` (from `CompilerService`) | AB#6295: an entry of `compatibility.acknowledge` in `ckModel.yaml` has an empty `change`, a wildcard (`*`, `?`), an empty `reason`, or repeats a key. The JSON schema rejects empty reasons and wildcard keys first; this is the same rule for sources that skip the schema. Using the section in a `ckLanguage` 1 model is message 90 (feature `compatibility.acknowledge`) |
 | 131 | `CkMethodHandlerInvalid` | `InheritanceResolver.ValidateMethodHandler` (M-6) | AB#6877: `execution.handler` of a method (type or interface) is not `service` or `pipeline` (exact, lower-case — the schema deliberately has no `enum` so the compiler names the method), `pipeline` without an explicit `timeoutSeconds`, or `pipeline` on an **interface** method (a pipeline binds by the well-known name equal to the qualified method id `Model/Type.Method-1` of one type; an implementing type redeclares the method with `handler: pipeline` itself — execution is not part of the invocation contract, rule 122). Relaxing the interface rule later is non-breaking, tightening it would not be |
-| 132 | `CkMethodPipelineSensitiveParameter` | `InheritanceResolver.ValidateMethodHandler` (M-6) | AB#7004 (decision OD-9, option *forbid*): a method with `execution.handler: pipeline` has at least one parameter with `sensitive: true` (the message names the method, the type and the sensitive parameters). A pipeline execution stores its input; a method with a sensitive parameter must use `handler: service`. Reported in addition to 131 when 131 applies too. Only a sensitive **result** is not covered (the meta-model has no result-sensitivity flag). The runtime refusal in the pipeline handler (AB#6879) stays as a second gate |
-| 133 | `CkMethodReplacesGenericCreateInvalid` | `InheritanceResolver.ValidateMethodReplacesGenericCreate` / `ValidateAtMostOneReplacesGenericCreate` (M-7) | AB#7024: `replacesGenericCreate: true` on a method that is not `kind: Static`, on an **interface** method, on a method of an **abstract** type, or a second flagged method on a concrete type (own or inherited; reported on the type that declares one of them, naming all flagged methods). One message per offending method with a `{reason}`. The flag in a `ckLanguage` 1 model is message 90 (feature `replacesGenericCreate`), an older engine refuses a model that uses it with message 126 (raised `minEngineVersion`). Code taken as the next free number after 132; AB#7006 plans the following one |
+| 132 | `CkMethodPipelineSensitiveParameter` | `InheritanceResolver.ValidateMethodHandler` (M-6) | AB#7004 (decision OD-9, option *forbid*): a method with `execution.handler: pipeline` has at least one parameter with `sensitive: true` (the message names the method, the type and the sensitive parameters). A pipeline execution stores its input; a method with a sensitive parameter must use `handler: service`. Reported in addition to 131 when 131 applies too. A sensitive **result** is message 134. The runtime refusal in the pipeline handler (AB#6879) stays as a second gate |
+| 133 | `CkMethodReplacesGenericCreateInvalid` | `InheritanceResolver.ValidateMethodReplacesGenericCreate` / `ValidateAtMostOneReplacesGenericCreate` (M-7) | AB#7024: `replacesGenericCreate: true` on a method that is not `kind: Static`, on an **interface** method, on a method of an **abstract** type, or a second flagged method on a concrete type (own or inherited; reported on the type that declares one of them, naming all flagged methods). One message per offending method with a `{reason}`. The flag in a `ckLanguage` 1 model is message 90 (feature `replacesGenericCreate`), an older engine refuses a model that uses it with message 126 (raised `minEngineVersion`). Code taken as the next free number after 132 |
+| 134 | `CkMethodPipelineSensitiveResult` | `InheritanceResolver.ValidateMethodHandler` (M-6) | AB#7006 (decision OD-9 follow-up): a method with `execution.handler: pipeline` whose `result.sensitive` is `true` (the message names the method and the type). A pipeline execution stores its output, so a method with a sensitive result must use `handler: service`. Own code next to 132 because the remedy differs (a parameter can be dropped, a result cannot be hidden from the pipeline); both are reported when both apply, and 131 as well when it applies. Interface methods refuse `pipeline` already (131); a sensitive result on a `service` method (type or interface) is fine. The marker in a `ckLanguage` 1 model cannot occur (methods are v2 only, message 90); an older engine refuses a model that uses it with message 126 (raised `minEngineVersion`) |
 
 `InheritanceResolver.ResolveInterfacesAndMethods` also completes `AllImplementedInterfaces` (own ∪ every base
 type's declared interfaces), `AllMethods` (nearest declaration wins; `CkMethodGraph.DeclaringCkTypeId` is the
@@ -1254,7 +1257,7 @@ Public→Internal and `derivable` Any→Model Major, the reverse Minor, type ass
 changed Major and cleared Minor) plus the F2.1 rule rows with one test each (`tests/ConstructionKit.Engine.Tests/SemVer/Rows/`):
 N1–N5 internal elements (AB#6266, `CkVisibilityIndex` caps changes of internal elements and of members of internal
 owners at Minor), I1–I12 interfaces (AB#6267, optional members Minor — an optional attribute member only with a new or previously internal definition of this model, AB#6337, association members keyed by role with a `target`
-property), M1–M16 methods (AB#6268, one change per method field, element kinds `MethodParameter` / `MethodError`, the
+property), M1–M17 methods (AB#6268, one change per method field, element kinds `MethodParameter` / `MethodError`, the
 rendered `signature` stays as a level-None summary; AB#6338: M12 under default-deny — roles any-of and case-insensitive (P3-3), scopes all-of, an omitted block or empty roles admit administrators only, block add/remove is one change, looser changes are behavioural "security: method access widened"; AB#6336: I12 lifts every invocation-contract change of an interface method to Major), D1–D8 range retention (AB#6271; AB#5435 D8: a resolved dependency moving up inside its major on a range-retaining model is level None, exact-pinned models keep the Minor rule until F2.6 / AB#5688, the verdict line names the move; AB#6340: a range/floor excluding the previously resolved version, or a resolved version going down, is Major; element kind `DependencyRange`,
 model property `rangeRetention`), T1–T7 / E1–E2 / R1–R2 / A1–A3 public types, stable bases, enums, records, attribute
 definitions and access (AB#6269; access tightening Major, security exception Minor + `RequiresAcknowledge` for
@@ -1288,7 +1291,7 @@ that gate is green.
 | 3 | DTO | `CkModelPropertiesDto.CkLanguage` | `CkInterfaceDto`, `CkElementsRootDto`, `CkModelRootBase` | `CkTypeDto.Implements` | `CkTypeAttributeDto.Access` | `CkTypeDto.Methods` + `CkMethodDto` family | `CkVisibilityDto` / `CkDerivableDto` on the 7 element DTOs | `CkInterfaceDto`, `CkInterfaceAssociationDto`, `CkTypeAssociationDto.TargetCkInterfaceId` |
 | 4 | Compiler hand-copies | `CompilerService` candidate, `CatalogModelResolver` | same + `interfaces/` loop | `CompilerService` type copy | by reference | `CompilerService` type copy | `CompilerService` type copy (others by reference) | by reference |
 | 5 | Graph + `[JsonConstructor]` | `CkCacheRoot.Models` (set in `ElementResolver` / `AppendModel`) | `CkInterfaceGraph`, `CkModelGraph`, `CkCacheRoot`, cache getters | `CkTypeGraph` | `CkTypeAttributeGraph` (init setter) | `CkTypeGraph` + `CkMethodGraph` | settable effective properties, set by `CkModelGraph.ApplyCkV2Modifiers` | `CkInterfaceGraph` (defaulted `[JsonConstructor]` params), `CkInterfaceAssociationGraph`, `CkInterfaceMethodGraph`, `CkTypeAssociationGraph` |
-| 6 | Resolvers + codes | 90/91, 126 | 92–94, 118–124, 127 | 95–99, 121, 124 | 90, 99, 105–108 | 100–104, 122, 125, 131–133 | 90, 112, 113, 129 | 90, 118–124, 128 |
+| 6 | Resolvers + codes | 90/91, 126 | 92–94, 118–124, 127 | 95–99, 121, 124 | 90, 99, 105–108 | 100–104, 122, 125, 131–134 | 90, 112, 113, 129 | 90, 118–124, 128 |
 | 7 | SemVer diff + classifier rule + row test (gate: `CkSemVerClassificationGuardTests`, mandatory) | yes | yes | yes | yes | yes | yes (`CkModelDiffService.DiffModifiers`) | yes |
 | 8 | Source generator | — | yes (ids + `IRt<Name>`) | yes (explicit impls) | — | yes (ids, parameter/result records) | `sealed` (v2; no `abstract`, E-M3) | `IRt<Name>` (extends = interface inheritance) |
 | 9 | Docs generator | — | yes | yes | — | yes | yes (non-default only) | yes |
@@ -1350,6 +1353,33 @@ generic create. The constant must equal the number of the release that first shi
 `CkV2MethodResolverTests` (`Code133_*`, `Code90_*`), `CkV2CompileTests.ReplacesGenericCreate_*`,
 `CkV2GraphJsonRoundTripTests.ReplacesGenericCreate_*`, `CkEngineVersionTests`, `MethodRowTests.M16_*`.
 
+**Method result `sensitive` (AB#7006, F3.4) touch points**, same numbering (the field lives on `CkMethodResultDto`, next to
+`valueType`; `bool`, omitted = `false`; it marks the **whole** result value — scalar, enum or record — as never to be logged,
+audited or traced; per-attribute marking inside a record result is out of scope; a `Secret` value type is **not** sensitive
+implicitly, the marker is explicit; the redaction itself is enforced at runtime, AB#7007, the GraphQL exposure is AB#7008):
+(1) method schema `CkMethodResult.sensitive` (boolean; the model-language key needs a **schema release** at
+schemas.meshmakers.cloud, a catalog model must not use it before that; an older compiler refuses the key loudly because the
+definition has `additionalProperties: false`); (2) compiled schema via the shared `$ref`; (3) `CkMethodResultDto.Sensitive`
+(`OmitDefaults` in YAML, `JsonIgnore(WhenWritingDefault)` in JSON, so models that do not use the key serialize
+byte-identically); (4) copied by reference with `Methods`; (5) `CkMethodGraph.HasSensitiveResult` (`[JsonIgnore]`, derived from
+the serialized definition; false for a method without a result); (6) message 134 (`InheritanceResolver.ValidateMethodHandler`,
+see the table) and rule 122: `CkMethodContract` compares the marker, a type that redeclares an interface method must keep it
+(reason `result sensitive`); (7) diff property `resultSensitive` (emitted only when both versions have a result; a result added
+or removed is one `result` change, row M6), classifier row **M17** (`false` → `true` Minor; `true` → `false` Minor +
+`requiresAcknowledge` + behavioural "security: result redaction removed", change key
+`TypeMethod:<Type>/<Method>#Modified:resultSensitive`; interface method either way Major via I12, because `resultSensitive` is
+a contract property), guard probe `CkMethodResultDto.Sensitive`, the method `signature` summary appends ` sensitive` to the
+result; (8) source generator: the generated `{Type}{Method}Result` gets a `ToString()` override printing `Value = ***` for a
+sensitive result (unchanged record rendering otherwise); (9) `Types.md` marks the result column `(sensitive)`; (10) engine-mongodb
+`CkMethodResult.Sensitive` (reflection gate, legacy document); (11) asset-repo CK meta: AB#7008; (12) optional, Studio.
+**minEngineVersion:** `CkEngineVersion.GetRequiredMinEngineVersion` raises the value to `SensitiveResultMinEngineVersion` for a
+model in which any type **or interface** method has a sensitive result (the maximum with the other markers; models without it
+keep their minimum), so an engine that predates the field refuses the model with message 126 instead of silently dropping the
+marker (fail-open: nothing would be redacted). The constant must equal the number of the release that first ships the field
+(the next patch after the last `r3.5.x` tag at merge time). Tests: `CkV2MethodResolverTests` (`Code134_*`, `Code122_*`),
+`CkV2CompileTests.SensitiveResult_*`, `CkV2GraphJsonRoundTripTests.SensitiveResult_*`, `CkV2GeneratedContractsTests`,
+`CkEngineVersionTests`, `MethodRowTests.M17_*`, `CkV2SchemaTests`.
+
 **`securitySensitive` (AB#6269) touch points**, same numbering: (1) attribute schema `CkAttribute.securitySensitive`;
 (2) compiled schema via the shared `$ref`; (3) `CkAttributeDto.SecuritySensitive` (`bool?`, omitted when null); (4) copied
 by reference; (5) `CkAttributeGraph.SecuritySensitive`, omitted from the cache JSON while false (`OmitCkV2Defaults`);
@@ -1363,6 +1393,63 @@ Tests: `CkV2SchemaTests`, `CkV2ContractTests`, `CkV2SemVerTests` (`tests/Constru
 kitchen sink `sampleData/ckv2KitchenSink/Builder.cs`), `CkV2GraphJsonRoundTripTests` (graph → cache JSON → graph),
 `CkIdsCodeGeneratorCkV2Tests`, and in `ConstructionKit.Compiler.Tests` `CkV2CompileTests` (YAML kitchen sink end to
 end incl. `interfaces/` folder, gate, docs and range retention of `implements`) and `CkV1CompileOutputUnchangedTests`.
+
+## Data permissions: one rule set, one public check (AB#4969 / AB#7035 / AB#7126)
+
+Data permissions (policies of `System.Identity`, resolved per tenant by `IDataPermissionResolver`) are enforced on
+the repository session by the caller's `RtSecurityContext` (subject, roles, `IsSystem`); a session without one is the
+System context and bypasses everything. The rules live in exactly one place:
+
+| Piece | Where | Role |
+|-------|-------|------|
+| `RtDataAccessEvaluator.Classify` | `Runtime.Contracts/DataPermissions` | pure classification Open / Allowed / OwnedOnly / Denied per type (+ base types) and action; AuditOnly view |
+| `DataSecurityFilterFactory` | `Runtime.Engine/Security` | read filter: classifies with the evaluator, the query renders the ownership predicate; denied reads behave as not found |
+| `DataPermissionRules` | `Runtime.Engine/Security` (internal) | shared by guard and evaluator: type classification, ownership predicate (`RtCreatedBy` or `CkType.ownerAttributePath`, fail closed), audit events |
+| `DataPermissionWriteGuard` | `Runtime.Engine/Security` (internal) | the write/delete funnel in `RuntimeRepositoryBase`: read visibility first (AB#7126), then batch write/delete checks per change set, atomic rejection, blueprint lock |
+| `IRtDataPermissionEvaluator` | `Runtime.Contracts/DataPermissions` (impl. `RtDataPermissionEvaluator`, registered singleton) | **the public question** "may this caller read / write / delete this entity (or type)?" |
+
+`IRtDataPermissionEvaluator` is the only public way to ask (a gateway or any caller-bound surface must not copy
+the classification):
+
+- `EvaluateAsync(repository, caller, RtEntityId target, RtDataAction action, publishAudit = false, ct)` and
+  `EvaluateTypeAsync(repository, caller, ckTypeId, action, publishAudit = false, ct)`.
+- Result `RtDataPermissionVerdict { Decision, Reason, AuditOnlyViolation }`, no entity data:
+  `Decision` = `Allowed` | `NotVisible` | `NotPermitted`. **`NotVisible` must be answered like a missing entity**
+  (not found); `NotPermitted` is a refusal. `Reason` is a language-neutral code (`Open`, `Granted`,
+  `GrantedAsOwner`, `AuditOnly`, `NoGrant`, `NotOwner`, `EntityNotFound`, `BlueprintLocked`).
+- Entity level: visibility is decided first with the Read classification (what the read filter hides is
+  `NotVisible` for every action, also when the entity does not exist and the verdict depends on it); then the
+  action's own grant, ownership for owned-only grants and, for Write/Delete, the blueprint lock of opted-in
+  types. The stored entity is read (raw, system session) only when the verdict depends on it.
+- Type level (no entity, e.g. a static method): Read without any grant is `NotVisible`; Write/Delete without a
+  grant is `NotPermitted`; an owned-only grant is allowed like the generic insert.
+- System callers and tenants without policies are `Allowed` / `Open`. AuditOnly policies never refuse; the
+  verdict carries `AuditOnlyViolation` and `publishAudit: true` publishes the same audit event the repository
+  would (`DataPermissions.ReadViolation` / `WriteViolation` / `BlueprintLockViolation`). The default call has
+  no side effect. (The evaluator does not publish the guard's AuditOnly visibility event of a write; its
+  `AuditOnlyViolation` flag keeps the meaning of the write/read grant audit.)
+- **Write requires visibility (AB#7126).** The write guard applies the evaluator's first step before any write/delete
+  decision: for an update, replace or delete of an existing entity, and for an association change at its origin, the
+  Read classification decides first (`DataPermissionWriteGuard.CheckVisibilityAsync`, same `DataPermissionRules`
+  classification and ownership predicate as the evaluator and the read filter). No read grant on the (protected) type,
+  or an owned-only read grant and the caller is not the owner, means the entity is invisible and the change is refused
+  **as if it did not exist** (`RuntimeRepositoryBase.CreateEntityNotFoundException`, a virtual hook: the persistence
+  layer overrides it with the exception its own write path raises for a missing entity, so a hidden and a missing
+  entity are indistinguishable; the whole change set is rejected). The check comes before the write decision, so a
+  hidden entity never answers "access denied". Inserts have no visibility question and stay allowed, and neither do the associations whose origin is inserted by the same change set (the parent link of a new file or folder: no stored entity exists yet; without this exemption every create-with-association by an owned-only or write-only role was refused as not found, AB#7213). Like the
+  evaluator, an id without a stored entity is answered the same way as an invisible one when the caller's read access
+  is restricted (so existence is never revealed, and an upsert/replace by a role without full read is refused for
+  existing and new ids alike); with unrestricted read it is left to the normal write path. The stored entity is read
+  (raw, once per entity) only for an owned-only read grant (or an AuditOnly read policy). AuditOnly policies never refuse: an AuditOnly read policy that would hide an entity publishes
+  one `DataPermissions.WriteViolation` event per type (none additionally when the type's write audit already
+  published); system callers and tenants without policies are untouched. **Compatibility:** a role that holds Write
+  or Delete on a type but no Read (e.g. a custom role with only `files.manage`) can still insert but no longer
+  update, replace or delete existing records of that type; grant the matching Read policy (the shipped
+  `FileManagement` role has it). Tests: `DataPermissionWriteGuardVisibilityTests`; the matrix test
+  `Entity_AgreesWithWriteGuard` now covers every cell, `NotVisible` included.
+- Tests: `RtDataPermissionEvaluatorTests` (matrix, agreement with the guard) in `Runtime.Engine.Tests`; the
+  differential test against the real repository is `DataPermissionEvaluatorDifferentialTests` in
+  engine-mongodb.
 
 ## Delete is Archive by default; importing an archived entity again (AB#7018)
 

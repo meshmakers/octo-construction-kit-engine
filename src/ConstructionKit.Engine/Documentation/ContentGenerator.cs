@@ -352,11 +352,18 @@ internal class ContentGenerator(
                     $"{p.Name}{(p.IsOptional ? "?" : "")}: {p.ValueType}"));
                 await outputFile.WriteLineAsync(
                         $"| {method.Definition.MethodId}{(method.Visibility == CkVisibilityDto.Internal ? " (internal)" : "")}{HandlerMarker(method.Definition)}{ReplacesGenericCreateMarker(method.Definition)} | {method.Definition.Kind} | {parameters} | " +
-                        $"{method.Definition.Result?.ValueType.ToString() ?? "-"} | {method.DeclaringCkTypeId.ToRtCkId().SemanticVersionedFullName} |")
+                        $"{ResultText(method.Definition)} | {method.DeclaringCkTypeId.ToRtCkId().SemanticVersionedFullName} |")
                     .ConfigureAwait(false);
             }
         }
     }
+
+    /// <summary>
+    ///     AB#7006: the result column of the method table — the value type, <c> (sensitive)</c> appended for a sensitive
+    ///     result (unchanged for others), <c>-</c> without a result.
+    /// </summary>
+    private static string ResultText(CkMethodDto method) =>
+        method.Result == null ? "-" : method.Result.ValueType + (method.Result.Sensitive ? " (sensitive)" : "");
 
     /// <summary>
     ///     AB#7024: <c> (replaces generic create)</c> for a static method that replaces the generic create of its type;
@@ -467,7 +474,7 @@ internal class ContentGenerator(
                         $"{p.Name}{(p.IsOptional ? "?" : "")}: {p.ValueType}"));
                     await outputFile.WriteLineAsync(
                             $"| {method.Definition.MethodId}{(method.Visibility == CkVisibilityDto.Internal ? " (internal)" : "")} | " +
-                            $"{method.Definition.Kind} | {parameters} | {method.Definition.Result?.ValueType.ToString() ?? "-"} | " +
+                            $"{method.Definition.Kind} | {parameters} | {ResultText(method.Definition)} | " +
                             $"{method.DeclaringCkInterfaceId.ToRtCkId().FullName} |")
                         .ConfigureAwait(false);
                 }

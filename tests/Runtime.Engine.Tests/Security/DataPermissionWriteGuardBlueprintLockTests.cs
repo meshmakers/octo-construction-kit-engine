@@ -240,9 +240,9 @@ public class DataPermissionWriteGuardBlueprintLockTests
         var locked = h.AddStored(RuleType, true);
         var table = new RtDataPolicyTable(
         [
-            new RtDataPolicyRule("a", new HashSet<string> { RuleType }, [RtDataAction.Write], false, true,
+            new RtDataPolicyRule("a", new HashSet<string> { RuleType }, [RtDataAction.Read, RtDataAction.Write], false, true,
                 new HashSet<string> { "Accountant" }, true),
-            new RtDataPolicyRule("b", new HashSet<string> { RuleType }, [RtDataAction.Write], false, false,
+            new RtDataPolicyRule("b", new HashSet<string> { RuleType }, [RtDataAction.Read, RtDataAction.Write], false, false,
                 new HashSet<string> { "Accountant" }, true)
         ]);
 

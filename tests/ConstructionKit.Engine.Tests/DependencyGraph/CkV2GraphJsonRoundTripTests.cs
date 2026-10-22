@@ -134,6 +134,31 @@ public class CkV2GraphJsonRoundTripTests(ITestOutputHelper output) : CkV2Resolve
     }
 
     [Fact]
+    public async Task SensitiveResult_SurvivesTheCacheJson_AndDefaultMethodsCarryNoKey()
+    {
+        var model = Model();
+        // ChangePassword-1 of the kitchen sink returns a record; the marker covers the whole result.
+        Type(model, "Principal").Methods!.Single(m => m.MethodId == "ChangePassword-1").Result!.Sensitive = true;
+        var operationResult = new OperationResult();
+        var graph = Resolve(model, operationResult);
+        Assert.Empty(operationResult.Messages);
+
+        var cache = await RoundTripAsync(graph);
+
+        var account = cache.GetRtCkType("target", new RtCkId<CkTypeId>($"{M}/Account"));
+        Assert.True(account.AllMethods["ChangePassword-1"].Definition.Result!.Sensitive);
+        Assert.True(account.AllMethods["ChangePassword-1"].HasSensitiveResult);
+        Assert.False(account.AllMethods["Unlock-1"].HasSensitiveResult);
+
+        // A result that is not sensitive writes no 'sensitive' member (cache JSON and compiled JSON stay as before).
+        var plainResult = new CkMethodResultDto { ValueType = AttributeValueTypesDto.String };
+        Assert.DoesNotContain("sensitive", System.Text.Json.JsonSerializer.Serialize(plainResult),
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("\"Sensitive\":true", System.Text.Json.JsonSerializer.Serialize(
+            new CkMethodResultDto { ValueType = AttributeValueTypesDto.String, Sensitive = true }));
+    }
+
+    [Fact]
     public async Task V1Graph_CacheJsonHasNoCkV2Keys_AndRestoresDefaults()
     {
         var operationResult = new OperationResult();

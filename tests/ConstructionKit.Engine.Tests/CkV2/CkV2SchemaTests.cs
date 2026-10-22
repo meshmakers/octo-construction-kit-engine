@@ -65,6 +65,7 @@ public class CkV2SchemaTests
                 result:
                   valueType: Record
                   valueCkRecordId: ${this}/Address
+                  sensitive: true
                 errors:
                   - code: PASSWORD_POLICY_VIOLATION
                     description: The password violates the policy
@@ -152,6 +153,9 @@ public class CkV2SchemaTests
         Assert.NotNull(changePassword.Parameters[2].ValueCkEnumId);
         Assert.NotNull(changePassword.Parameters[3].ValueCkRecordId);
         Assert.Equal(AttributeValueTypesDto.Record, changePassword.Result!.ValueType);
+        // AB#7006: the marker is read as authored; an omitted key is false.
+        Assert.True(changePassword.Result.Sensitive);
+        Assert.False(new CkMethodResultDto().Sensitive);
         Assert.Equal(["PASSWORD_POLICY_VIOLATION", "USER_LOCKED_OUT"], changePassword.Errors!.Select(e => e.Code));
         Assert.Equal(["UserManagement"], changePassword.Authorization!.Roles!);
         Assert.True(changePassword.Authorization.AllowSelf);
@@ -196,6 +200,9 @@ public class CkV2SchemaTests
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        execution: { timeoutSeconds: 301 }\n", "timeout above maximum")]
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        execution: { handler: 3 }\n", "handler is a string")]
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        replacesGenericCreate: yes please\n", "replacesGenericCreate is a boolean")]
+    [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        result: { valueType: String, sensitive: yes please }\n", "result sensitive is a boolean")]
+    [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        result: { sensitive: true }\n", "sensitive result without a value type")]
+    [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        sensitive: true\n", "sensitive on a method without result")]
     [InlineData("interfaces:\n  - interfaceId: Named\n    attributes:\n      - id: ${System}/Name\n        name: Name\n", "interface id without version")]
     [InlineData("interfaces:\n  - interfaceId: Named-1\n    extends: []\n", "empty extends")]
     [InlineData("interfaces:\n  - interfaceId: Named-1\n    extends:\n      - Base-1\n", "extends without model part")]
@@ -646,6 +653,7 @@ internal static class CkV2Assert
         Assert.Equal(expected.Result?.ValueType, actual.Result?.ValueType);
         Assert.Equal(expected.Result?.ValueCkRecordId, actual.Result?.ValueCkRecordId);
         Assert.Equal(expected.Result?.ValueCkEnumId, actual.Result?.ValueCkEnumId);
+        Assert.Equal(expected.Result?.Sensitive, actual.Result?.Sensitive);
         Assert.Equal(expected.Errors?.Select(e => (e.Code, e.Description)),
             actual.Errors?.Select(e => (e.Code, e.Description)));
         Assert.Equal(expected.Authorization?.Roles, actual.Authorization?.Roles);

@@ -141,6 +141,10 @@
         "valueCkEnumId": {
           "type": "string",
           "pattern": "^(?:[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*|[a-zA-Z][a-zA-Z0-9._@-]*|\\$\\{[a-zA-Z0-9_.]+\\})/[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$"
+        },
+        "sensitive": {
+          "type": "boolean",
+          "description": "AB#7006: true = the whole result value (scalar, enum or record) is sensitive and is never logged, audited or traced. Omitted = false. A method with execution.handler pipeline must not have a sensitive result (rejected by the compiler); requires ckLanguage: 2. A Secret value type is not sensitive implicitly."
         }
       },
       "additionalProperties": false,

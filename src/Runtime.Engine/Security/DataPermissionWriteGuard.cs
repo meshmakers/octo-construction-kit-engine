@@ -16,7 +16,11 @@ namespace Meshmakers.Octo.Runtime.Engine.Security;
 ///     (batch pre-read of the stored creators) and publishes audit events for AuditOnly violations.
 ///     Denied changes land as errors in the operation result — the whole change set is rejected
 ///     atomically by the caller. Opt-in blueprint-lock restriction (AB#6384): see
-///     <see cref="CheckBlueprintLockAsync" />.
+///     <see cref="CheckBlueprintLockAsync" />. Visibility (AB#7126): an update, replace or delete of an
+///     existing entity (and an association change at its origin) is first tested against the caller's read
+///     visibility, with the same rules as <see cref="RtDataPermissionEvaluator" />; an entity the caller
+///     cannot see is refused as if it did not exist (see <see cref="CheckVisibilityAsync" />). Inserts have no
+///     visibility question, nor do the associations whose origin is inserted by the same change set.
 /// </summary>
 internal static class DataPermissionWriteGuard
 {
@@ -25,13 +29,40 @@ internal static class DataPermissionWriteGuard
     internal static async Task CheckAsync(IRuntimeRepository runtimeRepository, ICkCacheService ckCacheService,
         IAuditEventSink? auditEventSink, IOctoSession session, RtSecurityContext securityContext,
         RtDataPolicyTable policyTable, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
-        IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, OperationResult operationResult)
+        IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, OperationResult operationResult,
+        List<NotVisibleChange>? notVisible = null)
     {
         var tenantId = runtimeRepository.TenantId;
+        var accessByType = new Dictionary<RtCkId<CkTypeId>, DataPermissionRules.TypeAccess>();
+        var storedEntities = new StoredEntityCache(runtimeRepository, session);
+
+        DataPermissionRules.TypeAccess AccessOf(RtCkId<CkTypeId> ckTypeId)
+        {
+            if (!accessByType.TryGetValue(ckTypeId, out var cached))
+            {
+                cached = DataPermissionRules.ClassifyType(ckCacheService, tenantId, ckTypeId, policyTable,
+                    securityContext);
+                accessByType[ckTypeId] = cached;
+            }
+
+            return cached;
+        }
+
+        // AB#7126: visibility comes first. What the read filter hides does not exist for the caller, so it
+        // is answered before (and instead of) any write/delete decision, which would hint that it exists.
+        var visibilityAuditTypes = new HashSet<RtCkId<CkTypeId>>();
+        if (await CheckVisibilityAsync(ckCacheService, securityContext, tenantId, AccessOf, entityUpdateInfoList,
+                associationUpdateInfoList, storedEntities, operationResult, notVisible, visibilityAuditTypes)
+            .ConfigureAwait(false))
+        {
+            return;
+        }
+
+        var writeAuditTypes = new HashSet<RtCkId<CkTypeId>>();
 
         foreach (var typeGroup in entityUpdateInfoList.GroupBy(i => i.CkTypeId))
         {
-            var access = ClassifyType(ckCacheService, tenantId, typeGroup.Key, policyTable, securityContext);
+            var access = AccessOf(typeGroup.Key);
             var ownershipCheckIds = new List<OctoObjectId>();
 
             foreach (var item in typeGroup)
@@ -54,15 +85,16 @@ internal static class DataPermissionWriteGuard
                 if (enforced is RtDataAccessLevel.Open or RtDataAccessLevel.Allowed &&
                     audit is RtDataAccessLevel.Denied or RtDataAccessLevel.OwnedOnly)
                 {
-                    await PublishAuditAsync(auditEventSink, tenantId, securityContext, typeGroup.Key, action)
+                    writeAuditTypes.Add(typeGroup.Key);
+                    await DataPermissionRules.PublishWriteAuditAsync(auditEventSink, tenantId, securityContext, typeGroup.Key, action)
                         .ConfigureAwait(false);
                 }
             }
 
             if (ownershipCheckIds.Count > 0)
             {
-                await CheckOwnershipAsync(runtimeRepository, ckCacheService, session, securityContext, typeGroup.Key,
-                    ownershipCheckIds, operationResult).ConfigureAwait(false);
+                await CheckOwnershipAsync(runtimeRepository, ckCacheService, storedEntities, securityContext,
+                    typeGroup.Key, ownershipCheckIds, operationResult).ConfigureAwait(false);
             }
 
             if (access.BlueprintLock != RtBlueprintLockProtection.None)
@@ -75,7 +107,7 @@ internal static class DataPermissionWriteGuard
 
         foreach (var associationGroup in associationUpdateInfoList.GroupBy(a => a.Origin.CkTypeId))
         {
-            var access = ClassifyType(ckCacheService, tenantId, associationGroup.Key, policyTable, securityContext);
+            var access = AccessOf(associationGroup.Key);
             switch (access.EnforcedWrite)
             {
                 case RtDataAccessLevel.Denied:
@@ -87,29 +119,170 @@ internal static class DataPermissionWriteGuard
 
                     break;
                 case RtDataAccessLevel.OwnedOnly:
-                    await CheckOwnershipAsync(runtimeRepository, ckCacheService, session, securityContext,
+                    await CheckOwnershipAsync(runtimeRepository, ckCacheService, storedEntities, securityContext,
                         associationGroup.Key, associationGroup.Select(a => a.Origin.RtId).Distinct().ToList(),
                         operationResult).ConfigureAwait(false);
                     break;
                 case RtDataAccessLevel.Open or RtDataAccessLevel.Allowed when
                     access.AuditWrite is RtDataAccessLevel.Denied or RtDataAccessLevel.OwnedOnly:
-                    await PublishAuditAsync(auditEventSink, tenantId, securityContext, associationGroup.Key,
+                    writeAuditTypes.Add(associationGroup.Key);
+                    await DataPermissionRules.PublishWriteAuditAsync(auditEventSink, tenantId, securityContext, associationGroup.Key,
                         RtDataAction.Write).ConfigureAwait(false);
                     break;
             }
         }
+
+        // AuditOnly read policy that would hide an existing entity from this write: one audit event per
+        // type, never a refusal — and none when the write audit of the same type already reported.
+        if (!operationResult.HasErrors && !operationResult.HasFatalErrors)
+        {
+            foreach (var ckTypeId in visibilityAuditTypes.Where(t => !writeAuditTypes.Contains(t)))
+            {
+                await DataPermissionRules.PublishWriteVisibilityAuditAsync(auditEventSink, tenantId, securityContext,
+                    ckTypeId, RtDataAction.Write).ConfigureAwait(false);
+            }
+        }
     }
 
-    private static TypeAccess ClassifyType(ICkCacheService ckCacheService, string tenantId,
-        RtCkId<CkTypeId> ckTypeId, RtDataPolicyTable policyTable, RtSecurityContext securityContext)
+    /// <summary>
+    ///     One change of an existing entity (or an association at its origin) that the caller may not see
+    ///     (AB#7126). The repository turns the first one into its own "entity not found" exception, so a
+    ///     hidden entity and a missing entity are indistinguishable for the caller.
+    /// </summary>
+    internal sealed record NotVisibleChange(RtCkId<CkTypeId> CkTypeId, OctoObjectId RtId, RtDataAction Action);
+
+    /// <summary>
+    ///     Message number of the placeholder error the guard adds for a <see cref="NotVisibleChange" />. The
+    ///     text carries no hint that the entity exists.
+    /// </summary>
+    internal const int NotVisibleMessageNumber = 7126;
+
+    /// <summary>
+    ///     Visibility rule of the write funnel (AB#7126), identical to the first step of
+    ///     <see cref="RtDataPermissionEvaluator" />: for an update, replace or delete of an existing entity,
+    ///     and for an association change at its origin, the Read classification of the entity decides first.
+    ///     No read grant on the (protected) type, or an owned-only read grant and the caller is not the owner,
+    ///     means the entity is invisible and the change is refused as not found; an id without a stored entity
+    ///     is refused the same way as an invisible one when the caller's read access is restricted (the
+    ///     evaluator's <c>EntityNotFound</c>), so existence is never revealed; with unrestricted read it is
+    ///     left to the normal write path, which answers not found. Inserts are not checked. The stored
+    ///     entity is read (raw, once per entity) only for an owned-only read grant, or for an AuditOnly read
+    ///     policy that would hide the entity (<paramref name="auditTypes" /> collects those types; AuditOnly
+    ///     never refuses). Returns true when at least one change is refused.
+    /// </summary>
+    private static async Task<bool> CheckVisibilityAsync(ICkCacheService ckCacheService,
+        RtSecurityContext securityContext, string tenantId,
+        Func<RtCkId<CkTypeId>, DataPermissionRules.TypeAccess> accessOf,
+        IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
+        IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, StoredEntityCache storedEntities,
+        OperationResult operationResult, List<NotVisibleChange>? notVisible,
+        HashSet<RtCkId<CkTypeId>> auditTypes)
     {
-        var selfAndBase = RtDataPermissionCkTypeHelper.GetSelfAndBaseFullNames(ckCacheService, tenantId, ckTypeId);
-        return new TypeAccess(
-            RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Write, securityContext, false),
-            RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Delete, securityContext, false),
-            RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Write, securityContext, true),
-            RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Delete, securityContext, true),
-            RtDataAccessEvaluator.ClassifyBlueprintLockProtection(policyTable, selfAndBase, securityContext));
+        var targets = new List<NotVisibleChange>();
+        foreach (var item in entityUpdateInfoList)
+        {
+            if (item.ModOption != EntityModOptions.Insert && item.RtId != null)
+            {
+                targets.Add(new NotVisibleChange(item.CkTypeId,item.RtId.Value,
+                    item.ModOption == EntityModOptions.Delete ? RtDataAction.Delete : RtDataAction.Write));
+            }
+        }
+
+        // An association whose origin is inserted by the same change set (the parent link of a new file or
+        // folder) has no stored entity yet, so it can be neither visible nor hidden: the insert is the write
+        // that is decided by the write policy, the association is its part and needs no visibility question.
+        var insertedInThisChange = entityUpdateInfoList
+            .Where(i => i.ModOption == EntityModOptions.Insert)
+            // The CreateInsert(ckTypeId, entity) overload leaves RtId empty; the id is the entity's own.
+            .Select(i => (RtId: i.RtId ?? i.RtEntity?.RtId, i.CkTypeId))
+            .Where(i => i.RtId != null)
+            .Select(i => new RtEntityId(i.CkTypeId, i.RtId!.Value))
+            .ToHashSet();
+        targets.AddRange(associationUpdateInfoList
+            .Where(a => !insertedInThisChange.Contains(a.Origin))
+            .Select(a => new NotVisibleChange(a.Origin.CkTypeId, a.Origin.RtId, RtDataAction.Write)));
+
+        var refused = false;
+        foreach (var typeGroup in targets.Distinct().GroupBy(t => t.CkTypeId))
+        {
+            var access = accessOf(typeGroup.Key);
+            var auditHides = access.EnforcedRead is RtDataAccessLevel.Open or RtDataAccessLevel.Allowed &&
+                             access.AuditRead is RtDataAccessLevel.Denied or RtDataAccessLevel.OwnedOnly;
+            if (access.EnforcedRead is RtDataAccessLevel.Open or RtDataAccessLevel.Allowed && !auditHides)
+            {
+                continue;
+            }
+
+            var ownerAttributePath = access.EnforcedRead == RtDataAccessLevel.Denied
+                ? null
+                : RtDataPermissionCkTypeHelper.GetEffectiveOwnerAttributePath(ckCacheService, tenantId,
+                    typeGroup.Key);
+
+            foreach (var change in typeGroup)
+            {
+                bool hidden;
+                if (access.EnforcedRead == RtDataAccessLevel.Denied)
+                {
+                    // No read grant: the entity is invisible whether or not it exists, nothing to read.
+                    hidden = true;
+                }
+                else
+                {
+                    var entity = await storedEntities.GetAsync(typeGroup.Key, change.RtId).ConfigureAwait(false);
+                    if (access.EnforcedRead == RtDataAccessLevel.OwnedOnly)
+                    {
+                        // Like the evaluator: a foreign entity and a missing one are the same "not found".
+                        hidden = entity == null || !DataPermissionRules.IsOwnedBy(entity, ckCacheService, tenantId,
+                            ownerAttributePath, securityContext);
+                    }
+                    else
+                    {
+                        hidden = false;
+                        if (entity != null && (access.AuditRead == RtDataAccessLevel.Denied ||
+                                               !DataPermissionRules.IsOwnedBy(entity, ckCacheService, tenantId,
+                                                   ownerAttributePath, securityContext)))
+                        {
+                            // AuditOnly read policy that would hide the entity: audited, never refused.
+                            auditTypes.Add(typeGroup.Key);
+                        }
+                    }
+                }
+
+                if (!hidden)
+                {
+                    continue;
+                }
+
+                refused = true;
+                notVisible?.Add(change);
+                operationResult.AddMessage(new OperationMessage(MessageLevel.Error,
+                    $"{change.CkTypeId}@{change.RtId}", NotVisibleMessageNumber,
+                    $"Entity '{change.CkTypeId.SemanticVersionedFullName}@{change.RtId}' not found."));
+            }
+        }
+
+        return refused;
+    }
+
+    /// <summary>
+    ///     Raw stored entities of one guard run, read at most once each on the caller's session (deliberately
+    ///     not the query path: the caller's read filter hides the entities the checks need to see).
+    /// </summary>
+    private sealed class StoredEntityCache(IRuntimeRepository runtimeRepository, IOctoSession session)
+    {
+        private readonly Dictionary<RtEntityId, RtEntity?> _entities = new();
+
+        public async Task<RtEntity?> GetAsync(RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId)
+        {
+            var key = new RtEntityId(ckTypeId, rtId);
+            if (!_entities.TryGetValue(key, out var entity))
+            {
+                entity = await runtimeRepository.GetRtEntityByRtIdAsync(session, key).ConfigureAwait(false);
+                _entities[key] = entity;
+            }
+
+            return entity;
+        }
     }
 
     /// <summary>
@@ -274,7 +447,7 @@ internal static class DataPermissionWriteGuard
     }
 
     private static async Task CheckOwnershipAsync(IRuntimeRepository runtimeRepository,
-        ICkCacheService ckCacheService, IOctoSession session, RtSecurityContext securityContext,
+        ICkCacheService ckCacheService, StoredEntityCache storedEntities, RtSecurityContext securityContext,
         RtCkId<CkTypeId> ckTypeId, IReadOnlyList<OctoObjectId> rtIds, OperationResult operationResult)
     {
         // AB#4978: a CK-model-declared owner attribute replaces the stamped creator as the owner.
@@ -285,9 +458,7 @@ internal static class DataPermissionWriteGuard
         {
             // Deliberately the raw document read (not the query path): the caller's read filter hides
             // foreign owned-only entities, but the ownership check must see the stored owner.
-            var entity = await runtimeRepository
-                .GetRtEntityByRtIdAsync(session, new RtEntityId(ckTypeId, rtId))
-                .ConfigureAwait(false);
+            var entity = await storedEntities.GetAsync(ckTypeId, rtId).ConfigureAwait(false);
             if (entity == null)
             {
                 // Ids without a stored entity are left to the normal write path (no-op semantics).
@@ -295,11 +466,8 @@ internal static class DataPermissionWriteGuard
             }
 
             // Rows without an owner value are not writable under an owned-only grant (fail closed).
-            var owner = ownerAttributePath == null
-                ? entity.RtCreatedBy
-                : entity.GetAttributeValueByAccessPath(ckCacheService, runtimeRepository.TenantId,
-                    ownerAttributePath) as string;
-            if (owner == null || owner != securityContext.SubjectId)
+            if (!DataPermissionRules.IsOwnedBy(entity, ckCacheService, runtimeRepository.TenantId,
+                    ownerAttributePath, securityContext))
             {
                 AddForbidden(operationResult, ckTypeId, entity.RtId, RtDataAction.Write);
             }
@@ -313,21 +481,4 @@ internal static class DataPermissionWriteGuard
             ForbiddenMessageNumber,
             $"Access denied: missing data permission '{action}' on '{ckTypeId.SemanticVersionedFullName}'."));
     }
-
-    private static Task PublishAuditAsync(IAuditEventSink? auditEventSink, string tenantId,
-        RtSecurityContext securityContext, RtCkId<CkTypeId> ckTypeId, RtDataAction action)
-    {
-        return auditEventSink?.PublishAsync(new AuditEvent(tenantId, AuditEventLevel.Warning,
-                   "DataPermissions.WriteViolation",
-                   $"Subject '{securityContext.SubjectId}' performed '{action}' on protected type " +
-                   $"'{ckTypeId.SemanticVersionedFullName}' without a grant (AuditOnly policy — not blocked)."))
-               ?? Task.CompletedTask;
-    }
-
-    private sealed record TypeAccess(
-        RtDataAccessLevel EnforcedWrite,
-        RtDataAccessLevel EnforcedDelete,
-        RtDataAccessLevel AuditWrite,
-        RtDataAccessLevel AuditDelete,
-        RtBlueprintLockProtection BlueprintLock);
 }

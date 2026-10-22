@@ -370,9 +370,9 @@ public class CkV2MethodResolverTests(ITestOutputHelper output) : CkV2ResolverTes
     }
 
     [Fact]
-    public void Code132_PipelineWithSensitiveLookingResult_NotCovered_OK()
+    public void Code132_PipelineWithANonSensitiveResult_OK()
     {
-        // Residual limit (OD-9): the meta-model has no result-sensitivity flag, a pipeline may return a secret.
+        // A pipeline method whose result is not marked sensitive is unchanged (a sensitive result is message 134).
         var model = Model();
         Type(model, "Tag").Methods =
         [
@@ -437,6 +437,170 @@ public class CkV2MethodResolverTests(ITestOutputHelper output) : CkV2ResolverTes
         var messages = ResolveExpectingOnly(model, 132);
         Assert.Single(messages);
         Assert.Contains("/Principal", messages[0].MessageText);
+    }
+
+    // ── sensitive result + pipeline handler (AB#7006, message 134) ───────────────────
+
+    private static CkMethodDto TokenMethod(string? handler, AttributeValueTypesDto valueType, bool sensitive,
+        int? timeoutSeconds = 30) => new()
+    {
+        MethodId = "IssueToken-1",
+        Parameters = [new() { Name = "scope", ValueType = AttributeValueTypesDto.String }],
+        Result = new()
+        {
+            ValueType = valueType,
+            ValueCkRecordId = valueType == AttributeValueTypesDto.Record ? new CkId<CkRecordId>($"{M}/Address") : null,
+            ValueCkEnumId = valueType == AttributeValueTypesDto.Enum ? new CkId<CkEnumId>($"{M}/Mode") : null,
+            Sensitive = sensitive
+        },
+        Execution = handler == null && timeoutSeconds == null
+            ? null
+            : new() { Handler = handler, TimeoutSeconds = timeoutSeconds }
+    };
+
+    [Theory]
+    [InlineData(AttributeValueTypesDto.String)]
+    [InlineData(AttributeValueTypesDto.Enum)]
+    [InlineData(AttributeValueTypesDto.Record)]
+    public void Code134_SensitiveResultWithPipelineHandler_NamesMethodAndType_ForEveryResultKind(
+        AttributeValueTypesDto valueType)
+    {
+        var model = Model();
+        Type(model, "Tag").Methods = [TokenMethod(CkMethodHandlers.Pipeline, valueType, sensitive: true)];
+
+        var message = Assert.Single(ResolveExpectingOnly(model, 134));
+        Assert.Contains("IssueToken-1", message.MessageText);
+        Assert.Contains("/Tag", message.MessageText);
+        Assert.Contains("result is sensitive", message.MessageText);
+        Assert.Contains("execution.handler: service", message.MessageText);
+    }
+
+    [Theory]
+    [InlineData(CkMethodHandlers.Service)]
+    [InlineData(null)]
+    public void Code134_SensitiveResultWithServiceOrOmittedHandler_OK_AndReachesTheGraph(string? handler)
+    {
+        var model = Model();
+        Type(model, "Tag").Methods =
+            [TokenMethod(handler, AttributeValueTypesDto.String, sensitive: true, handler == null ? null : 30)];
+
+        var operationResult = new OperationResult();
+        var graph = Resolve(model, operationResult);
+
+        Assert.Empty(operationResult.Messages);
+        Assert.True(graph.Types[$"{M}/Tag"].AllMethods["IssueToken-1"].HasSensitiveResult);
+        Assert.True(graph.Types[$"{M}/Tag"].AllMethods["IssueToken-1"].Definition.Result!.Sensitive);
+        // Methods without the marker, or without a result, keep the default.
+        Assert.False(graph.Types[$"{M}/Account"].AllMethods["Unlock-1"].HasSensitiveResult);
+        Assert.False(graph.Types[$"{M}/Principal"].AllMethods["ChangePassword-1"].HasSensitiveResult);
+    }
+
+    [Fact]
+    public void Code134_PipelineWithANonSensitiveResult_OK()
+    {
+        var model = Model();
+        Type(model, "Tag").Methods = [TokenMethod(CkMethodHandlers.Pipeline, AttributeValueTypesDto.String, sensitive: false)];
+
+        ResolveExpectingNoMessages(model);
+    }
+
+    [Fact]
+    public void Code134_AndCode132_AreBothReportedWhenParameterAndResultAreSensitive()
+    {
+        var model = Model();
+        var method = SensitiveMethod(CkMethodHandlers.Pipeline);
+        method.Result = new() { ValueType = AttributeValueTypesDto.String, Sensitive = true };
+        Type(model, "Tag").Methods = [method];
+
+        var operationResult = new OperationResult();
+        Resolve(model, operationResult);
+
+        Assert.Equal([132, 134], operationResult.Messages.Select(m => m.MessageNumber).OrderBy(n => n));
+    }
+
+    [Fact]
+    public void Code134_AndCode131_AreBothReportedForAPipelineWithoutTimeout()
+    {
+        var model = Model();
+        Type(model, "Tag").Methods = [TokenMethod(CkMethodHandlers.Pipeline, AttributeValueTypesDto.String, true, null)];
+
+        var operationResult = new OperationResult();
+        Resolve(model, operationResult);
+
+        Assert.Equal([131, 134], operationResult.Messages.Select(m => m.MessageNumber).OrderBy(n => n));
+    }
+
+    [Fact]
+    public void Code134_InterfaceMethod_SensitiveResultIsAllowed_PipelineIsRefusedByBoth131And134()
+    {
+        var model = Model();
+        (model.Interfaces ??= []).Add(new CkInterfaceDto
+        {
+            InterfaceId = "Tokens-1",
+            Methods = [TokenMethod(CkMethodHandlers.Service, AttributeValueTypesDto.String, sensitive: true)]
+        });
+        ResolveExpectingNoMessages(model);
+
+        model.Interfaces!.Single(i => i.InterfaceId.FullName == "Tokens-1").Methods![0] =
+            TokenMethod(CkMethodHandlers.Pipeline, AttributeValueTypesDto.String, sensitive: true);
+        var operationResult = new OperationResult();
+        Resolve(model, operationResult);
+        Assert.Equal([131, 134], operationResult.Messages.Select(m => m.MessageNumber).OrderBy(n => n));
+    }
+
+    [Fact]
+    public void Code134_InterfaceSensitiveResult_ImplementingTypeMustUseService_AndKeepTheMarker()
+    {
+        var model = Model();
+        (model.Interfaces ??= []).Add(new CkInterfaceDto
+        {
+            InterfaceId = "Tokens-1",
+            Methods = [TokenMethod(CkMethodHandlers.Service, AttributeValueTypesDto.String, sensitive: true)]
+        });
+        var tag = Type(model, "Tag");
+        tag.Implements = [$"{M}/Tokens-1"];
+        tag.Methods = [TokenMethod(CkMethodHandlers.Service, AttributeValueTypesDto.String, sensitive: true)];
+        ResolveExpectingNoMessages(model);
+
+        // The implementing type redeclares the method as a pipeline: refused at the type (the contract is equal).
+        tag.Methods = [TokenMethod(CkMethodHandlers.Pipeline, AttributeValueTypesDto.String, sensitive: true)];
+        var message = Assert.Single(ResolveExpectingOnly(model, 134));
+        Assert.Contains("/Tag", message.MessageText);
+    }
+
+    [Fact]
+    public void Code122_RedeclaringAnInterfaceMethodWithoutTheSensitiveResultMarker_IsRefused()
+    {
+        var model = Model();
+        (model.Interfaces ??= []).Add(new CkInterfaceDto
+        {
+            InterfaceId = "Tokens-1",
+            Methods = [TokenMethod(CkMethodHandlers.Service, AttributeValueTypesDto.String, sensitive: true)]
+        });
+        var tag = Type(model, "Tag");
+        tag.Implements = [$"{M}/Tokens-1"];
+        tag.Methods = [TokenMethod(CkMethodHandlers.Service, AttributeValueTypesDto.String, sensitive: false)];
+
+        var message = Assert.Single(ResolveExpectingOnly(model, 122));
+        Assert.Contains("result sensitive", message.MessageText);
+    }
+
+    [Fact]
+    public void Code134_InheritedSensitiveServiceMethod_OK_AndRefusedOnlyAtTheDeclaringType()
+    {
+        var model = Model();
+        // Account derives from Principal (kitchen sink). The sensitive-result method is declared once on the base type.
+        Type(model, "Principal").Methods!.Add(
+            TokenMethod(CkMethodHandlers.Service, AttributeValueTypesDto.String, sensitive: true));
+        var operationResult = new OperationResult();
+        var graph = Resolve(model, operationResult);
+        Assert.Empty(operationResult.Messages);
+        Assert.True(graph.Types[$"{M}/Account"].AllMethods["IssueToken-1"].HasSensitiveResult);
+
+        Type(model, "Principal").Methods!.Single(m => m.MethodId == "IssueToken-1").Execution!.Handler =
+            CkMethodHandlers.Pipeline;
+        var message = Assert.Single(ResolveExpectingOnly(model, 134));
+        Assert.Contains("/Principal", message.MessageText);
     }
 
     // ── replacesGenericCreate (AB#7024, message 133) ─────────────────────────────────

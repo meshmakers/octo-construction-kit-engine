@@ -592,6 +592,14 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 return change.NewValue == "false"
                     ? (CkSemVerLevel.Major, "method no longer callable on the caller's own entity — stricter (row M12)")
                     : (CkSemVerLevel.Minor, "method callable on the caller's own entity — looser; security: method access widened (row M12)");
+            case "dataAccess":
+                // AB#7036 row M18: the declared data permission on the target. Write -> Read lets a caller with only a
+                // read grant call the method (looser); Read -> Write demands a write grant of existing callers (stricter).
+                return change.NewValue == "Read"
+                    ? (CkSemVerLevel.Minor,
+                        "method data access Write → Read — a read grant on the target suffices now; security: method access widened (row M18)")
+                    : (CkSemVerLevel.Major,
+                        "method data access Read → Write — callers with only a read grant on the target lose access; publish a new method version (row M18)");
             default:
                 return (CkSemVerLevel.Major, DefensiveDefaultReasonPrefix + "method change — defensively classified as major");
         }
@@ -1075,7 +1083,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             // AB#6338: every looser authorization change is listed under "Behavioural changes" (security: method
             // access widened), so reviewers see it; the level is unchanged.
             { ElementKind: CkModelElementKind.TypeMethod or CkModelElementKind.InterfaceMethod,
-                Property: "roles" or "scopes" or "allowSelf" or "authorization" } => classified.Level == CkSemVerLevel.Minor,
+                Property: "roles" or "scopes" or "allowSelf" or "authorization" or "dataAccess" } => classified.Level == CkSemVerLevel.Minor,
             // AB#6340: a narrowed range that still admits the previous resolution excludes newer installed versions.
             { ElementKind: CkModelElementKind.DependencyRange, Property: "range" } =>
                 classified.Level == CkSemVerLevel.Minor && classified.Reason.Contains("cannot import"),
@@ -1109,14 +1117,15 @@ public class CkSemVerClassifier : ICkSemVerClassifier
         // admitted, a looser block) changes who may invoke the method; it stays Minor but must be acknowledged with a
         // reason, like the security-sensitive access tightening. Level None (a block that grants nothing) is no change.
         if (change is { ElementKind: CkModelElementKind.TypeMethod or CkModelElementKind.InterfaceMethod,
-                Property: "roles" or "scopes" or "allowSelf" or "authorization" } &&
+                Property: "roles" or "scopes" or "allowSelf" or "authorization" or "dataAccess" } &&
             classified.Level == CkSemVerLevel.Minor)
         {
             return classified with
             {
                 IsBehavioural = true,
                 RequiresAcknowledge = true,
-                Reason = classified.Reason + "; requires acknowledge with a security reason (row M12)"
+                Reason = classified.Reason + "; requires acknowledge with a security reason (row " +
+                         (change.Property == "dataAccess" ? "M18" : "M12") + ")"
             };
         }
 

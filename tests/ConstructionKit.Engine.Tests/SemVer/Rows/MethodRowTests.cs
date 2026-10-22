@@ -423,6 +423,89 @@ public class MethodRowTests
         Assert.Equal("resultSensitive", change.Change.Property);
     }
 
+    [Theory]
+    [InlineData("type")]
+    [InlineData("interface")]
+    public void M18_DataAccess_WriteToRead_IsMinorAndRequiresAnAcknowledgement(string owner)
+    {
+        // Omitted = Write; declaring Read lets a caller with only a read grant call the method (AB#7036).
+        var classified = Change(owner, m => m.Authorization!.DataAccess = CkMethodDataAccessDto.Read);
+
+        var change = Assert.Single(classified, c => c.Change.Property == "dataAccess");
+        Assert.Equal(CkSemVerLevel.Minor, change.Level);
+        Assert.Equal("Write", change.Change.OldValue);
+        Assert.Equal("Read", change.Change.NewValue);
+        Assert.True(change.RequiresAcknowledge);
+        Assert.True(change.IsBehavioural);
+        Assert.Contains("method access widened", change.Reason);
+        Assert.Contains("row M18", change.Reason);
+        Assert.Equal(CkSemVerLevel.Minor, Required(classified));
+        // The change key an author acknowledges.
+        Assert.EndsWith("/ChangePassword-1", change.Change.ElementId, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("type")]
+    [InlineData("interface")]
+    public void M18_DataAccess_ReadToWrite_IsMajorAndNotAcknowledgeable(string owner)
+    {
+        var baseline = Model();
+        Method(baseline, owner).Authorization!.DataAccess = CkMethodDataAccessDto.Read;
+
+        var change = Assert.Single(Classify(baseline, Model()), c => c.Change.Property == "dataAccess");
+
+        Assert.Equal(CkSemVerLevel.Major, change.Level);
+        Assert.False(change.RequiresAcknowledge);
+        Assert.Equal("Read", change.Change.OldValue);
+        Assert.Equal("Write", change.Change.NewValue);
+    }
+
+    [Theory]
+    [InlineData("type")]
+    [InlineData("interface")]
+    public void M18_DataAccess_ExplicitWriteEqualsOmitted_IsNoChange(string owner)
+    {
+        Assert.Empty(Change(owner, m => m.Authorization!.DataAccess = CkMethodDataAccessDto.Write));
+
+        // Also when the authorization block is added or removed around an unchanged (default) data access.
+        var noBlock = Model();
+        Method(noBlock, owner).Authorization = null;
+        var onlyDataAccess = Model();
+        Method(onlyDataAccess, owner).Authorization = new CkMethodAuthorizationDto { DataAccess = CkMethodDataAccessDto.Write };
+        Assert.DoesNotContain(Classify(noBlock, onlyDataAccess), c => c.Change.Property == "dataAccess");
+    }
+
+    [Fact]
+    public void M18_DataAccess_ReadDeclaredWithTheBlockAdded_IsStillItsOwnMinorChange()
+    {
+        var noBlock = Model();
+        Method(noBlock, "type").Authorization = null;
+        var readOnly = Model();
+        Method(readOnly, "type").Authorization = new CkMethodAuthorizationDto { DataAccess = CkMethodDataAccessDto.Read };
+
+        var classified = Classify(noBlock, readOnly);
+
+        var change = Assert.Single(classified, c => c.Change.Property == "dataAccess");
+        Assert.Equal(CkSemVerLevel.Minor, change.Level);
+        Assert.True(change.RequiresAcknowledge);
+        // The block itself grants nothing (no roles, scopes, self-calls): row M12 says None.
+        Assert.All(classified.Where(c => c.Change.Property == "authorization"), c => Assert.Equal(CkSemVerLevel.None, c.Level));
+    }
+
+    [Fact]
+    public void M18_NewMethodThatDeclaresRead_IsAMethodAddition()
+    {
+        var current = Model();
+        Methods(current, "type").Add(new CkMethodDto
+        {
+            MethodId = "Peek-1", Authorization = new CkMethodAuthorizationDto { Roles = ["Admin"], DataAccess = CkMethodDataAccessDto.Read }
+        });
+
+        // Row M1: a new type method is Minor; a new method has no previous data access to widen.
+        Assert.Equal(CkSemVerLevel.Minor, Level(Model(), current));
+        Assert.DoesNotContain(Classify(Model(), current), c => c.Change.Property == "dataAccess");
+    }
+
     [Fact]
     public void M17_ResultSensitive_Unchanged_IsNoChange()
     {

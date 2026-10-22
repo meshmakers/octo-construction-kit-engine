@@ -274,6 +274,51 @@ public class CkMethodAuthorizationDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public List<string>? Scopes { get; set; }
+
+    /// <summary>
+    ///     CK v2 Phase 3 (AB#7036): the data permission a caller needs on the method's target record. <c>Read</c>
+    ///     declares that the method only reads its target, so a read grant on the target suffices; <c>null</c>
+    ///     (omitted) means <see cref="CkMethodDataAccessDto.Write" />: the method needs a write grant (the effective
+    ///     value is <see cref="CkMethodAuthorization.Resolve" />). The declaration widens what a read-only caller may
+    ///     do, so it is security-relevant for SemVer (row M18). Not serialized when omitted, so models that do not use
+    ///     the key serialize byte-identically; a model that uses it carries a raised <c>minEngineVersion</c>
+    ///     (<c>CkEngineVersion.DataAccessMinEngineVersion</c>), so older engines refuse it with message 126 instead of
+    ///     silently dropping the declaration. Requires <c>ckLanguage: 2</c>.
+    /// </summary>
+    [YamlMember(Alias = "dataAccess", DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CkMethodDataAccessDto? DataAccess { get; set; }
+}
+
+/// <summary>
+///     The data permission a method call needs on its target record (CK v2 Phase 3, AB#7036), declared with
+///     <c>authorization.dataAccess</c>.
+/// </summary>
+public enum CkMethodDataAccessDto
+{
+    /// <summary>
+    ///     Default: the method may change its target, so the caller needs a write grant on it.
+    /// </summary>
+    Write = 0,
+
+    /// <summary>
+    ///     The method only reads its target, so a read grant on the target suffices.
+    /// </summary>
+    Read = 1
+}
+
+/// <summary>
+///     Effective values of <see cref="CkMethodAuthorizationDto" /> (AB#7036).
+/// </summary>
+public static class CkMethodAuthorization
+{
+    /// <summary>
+    ///     The effective data access of a method: the declared value, otherwise <see cref="CkMethodDataAccessDto.Write" />
+    ///     (also for a method without an authorization block).
+    /// </summary>
+    public static CkMethodDataAccessDto Resolve(CkMethodAuthorizationDto? authorization) =>
+        authorization?.DataAccess ?? CkMethodDataAccessDto.Write;
 }
 
 /// <summary>

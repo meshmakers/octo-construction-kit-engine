@@ -1114,7 +1114,7 @@ Notes:
   `ReadWrite`, visibility `Public`, derivable `Any`) through a `JsonTypeInfo` modifier in `CkCache` (`OmitCkV2Defaults`), so v1 caches stay
   byte-identical; reading tolerates the missing keys (trailing defaulted `[JsonConstructor]` parameters on
   `CkTypeGraph`, init setter on `CkTypeAttributeGraph.Access`).
-- Message codes for CK v2: 90–113 and 118–134 are in use (table below); **spare: 111, 114–117, 135**. Range
+- Message codes for CK v2: 90–113 and 118–135 are in use (table below); **spare: 111, 114–117, 136**. Range
   retention (F0.2) has no message codes of its own — its failures are `ModelValidationException`s and the
   unbound-reference diagnostic is the source-generator diagnostic OM1004.
   Warnings (e.g. 110, 124) of a successful compile are printed by `octo-ckc -c compile` (to **stderr**, also with
@@ -1141,7 +1141,7 @@ exists in Industry.Basic-2.6.0. Check the model prefix of the reference."). `OCT
 
 | Code | Key | Where | Rule |
 | ---- | --- | ----- | ---- |
-| 90 | `CkLanguageFeatureRequiresV2` | `ElementResolver` | `interfaces`, `implements`, `methods`, any `access` (type, record, association-role assignment), any `visibility` / `derivable` (type, method, record, enum, attribute, association role), or a type association `targetCkInterfaceId` without `ckLanguage: 2` |
+| 90 | `CkLanguageFeatureRequiresV2` | `ElementResolver` | `interfaces`, `implements`, `methods` (also its keys `replacesGenericCreate`, `authorization.dataAccess`), any `access` (type, record, association-role assignment), any `visibility` / `derivable` (type, method, record, enum, attribute, association role), or a type association `targetCkInterfaceId` without `ckLanguage: 2` |
 | 91 | `CkLanguageNotSupported` | `ElementResolver`, catalog + repository dependency resolvers | `ckLanguage` outside 1..`MaxSupportedCkLanguage` (also raised when a compiled model is resolved, e.g. on import, and — review L2 — for every **dependency** model: it is not appended, its dependents are skipped, and a hard resolve throws with the message) |
 | 92 | `CkInterfaceIdNotUnique` | `ElementResolver` | same interface id twice (`Named-1` and `Named-2` are different contracts) |
 | 93 | `CkInterfaceNameCollidesWithType` | `ElementResolver` | interface name == type name of the same model (I-5, GraphQL type namespace) |
@@ -1178,6 +1178,7 @@ exists in Industry.Basic-2.6.0. Check the model prefix of the reference."). `OCT
 | 132 | `CkMethodPipelineSensitiveParameter` | `InheritanceResolver.ValidateMethodHandler` (M-6) | AB#7004 (decision OD-9, option *forbid*): a method with `execution.handler: pipeline` has at least one parameter with `sensitive: true` (the message names the method, the type and the sensitive parameters). A pipeline execution stores its input; a method with a sensitive parameter must use `handler: service`. Reported in addition to 131 when 131 applies too. A sensitive **result** is message 134. The runtime refusal in the pipeline handler (AB#6879) stays as a second gate |
 | 133 | `CkMethodReplacesGenericCreateInvalid` | `InheritanceResolver.ValidateMethodReplacesGenericCreate` / `ValidateAtMostOneReplacesGenericCreate` (M-7) | AB#7024: `replacesGenericCreate: true` on a method that is not `kind: Static`, on an **interface** method, on a method of an **abstract** type, or a second flagged method on a concrete type (own or inherited; reported on the type that declares one of them, naming all flagged methods). One message per offending method with a `{reason}`. The flag in a `ckLanguage` 1 model is message 90 (feature `replacesGenericCreate`), an older engine refuses a model that uses it with message 126 (raised `minEngineVersion`). Code taken as the next free number after 132 |
 | 134 | `CkMethodPipelineSensitiveResult` | `InheritanceResolver.ValidateMethodHandler` (M-6) | AB#7006 (decision OD-9 follow-up): a method with `execution.handler: pipeline` whose `result.sensitive` is `true` (the message names the method and the type). A pipeline execution stores its output, so a method with a sensitive result must use `handler: service`. Own code next to 132 because the remedy differs (a parameter can be dropped, a result cannot be hidden from the pipeline); both are reported when both apply, and 131 as well when it applies. Interface methods refuse `pipeline` already (131); a sensitive result on a `service` method (type or interface) is fine. The marker in a `ckLanguage` 1 model cannot occur (methods are v2 only, message 90); an older engine refuses a model that uses it with message 126 (raised `minEngineVersion`) |
+| 135 | `CkMethodDataAccessInvalid` | `InheritanceResolver.ValidateMethodDataAccess` (M-8) | AB#7036: `authorization.dataAccess` of a method is `Read` on a method with `replacesGenericCreate: true` (creating an entity is a write; `Write` is fine) or a value outside `Read`/`Write` (a YAML model is stopped by the JSON schema first, so the message covers a JSON or programmatic model). One message per offending method with a `{reason}`. The key in a `ckLanguage` 1 model is message 90 (feature `authorization.dataAccess`); an older engine refuses a model that uses it with message 126 (raised `minEngineVersion`) |
 
 `InheritanceResolver.ResolveInterfacesAndMethods` also completes `AllImplementedInterfaces` (own ∪ every base
 type's declared interfaces), `AllMethods` (nearest declaration wins; `CkMethodGraph.DeclaringCkTypeId` is the
@@ -1228,7 +1229,7 @@ Public→Internal and `derivable` Any→Model Major, the reverse Minor, type ass
 changed Major and cleared Minor) plus the F2.1 rule rows with one test each (`tests/ConstructionKit.Engine.Tests/SemVer/Rows/`):
 N1–N5 internal elements (AB#6266, `CkVisibilityIndex` caps changes of internal elements and of members of internal
 owners at Minor), I1–I12 interfaces (AB#6267, optional members Minor — an optional attribute member only with a new or previously internal definition of this model, AB#6337, association members keyed by role with a `target`
-property), M1–M17 methods (AB#6268, one change per method field, element kinds `MethodParameter` / `MethodError`, the
+property), M1–M18 methods (AB#6268, one change per method field, element kinds `MethodParameter` / `MethodError`, the
 rendered `signature` stays as a level-None summary; AB#6338: M12 under default-deny — roles any-of and case-insensitive (P3-3), scopes all-of, an omitted block or empty roles admit administrators only, block add/remove is one change, looser changes are behavioural "security: method access widened"; AB#6336: I12 lifts every invocation-contract change of an interface method to Major), D1–D8 range retention (AB#6271; AB#5435 D8: a resolved dependency moving up inside its major on a range-retaining model is level None, exact-pinned models keep the Minor rule until F2.6 / AB#5688, the verdict line names the move; AB#6340: a range/floor excluding the previously resolved version, or a resolved version going down, is Major; element kind `DependencyRange`,
 model property `rangeRetention`), T1–T7 / E1–E2 / R1–R2 / A1–A3 public types, stable bases, enums, records, attribute
 definitions and access (AB#6269; access tightening Major, security exception Minor + `RequiresAcknowledge` for
@@ -1262,7 +1263,7 @@ that gate is green.
 | 3 | DTO | `CkModelPropertiesDto.CkLanguage` | `CkInterfaceDto`, `CkElementsRootDto`, `CkModelRootBase` | `CkTypeDto.Implements` | `CkTypeAttributeDto.Access` | `CkTypeDto.Methods` + `CkMethodDto` family | `CkVisibilityDto` / `CkDerivableDto` on the 7 element DTOs | `CkInterfaceDto`, `CkInterfaceAssociationDto`, `CkTypeAssociationDto.TargetCkInterfaceId` |
 | 4 | Compiler hand-copies | `CompilerService` candidate, `CatalogModelResolver` | same + `interfaces/` loop | `CompilerService` type copy | by reference | `CompilerService` type copy | `CompilerService` type copy (others by reference) | by reference |
 | 5 | Graph + `[JsonConstructor]` | `CkCacheRoot.Models` (set in `ElementResolver` / `AppendModel`) | `CkInterfaceGraph`, `CkModelGraph`, `CkCacheRoot`, cache getters | `CkTypeGraph` | `CkTypeAttributeGraph` (init setter) | `CkTypeGraph` + `CkMethodGraph` | settable effective properties, set by `CkModelGraph.ApplyCkV2Modifiers` | `CkInterfaceGraph` (defaulted `[JsonConstructor]` params), `CkInterfaceAssociationGraph`, `CkInterfaceMethodGraph`, `CkTypeAssociationGraph` |
-| 6 | Resolvers + codes | 90/91, 126 | 92–94, 118–124, 127 | 95–99, 121, 124 | 90, 99, 105–108 | 100–104, 122, 125, 131–134 | 90, 112, 113, 129 | 90, 118–124, 128 |
+| 6 | Resolvers + codes | 90/91, 126 | 92–94, 118–124, 127 | 95–99, 121, 124 | 90, 99, 105–108 | 100–104, 122, 125, 131–135 | 90, 112, 113, 129 | 90, 118–124, 128 |
 | 7 | SemVer diff + classifier rule + row test (gate: `CkSemVerClassificationGuardTests`, mandatory) | yes | yes | yes | yes | yes | yes (`CkModelDiffService.DiffModifiers`) | yes |
 | 8 | Source generator | — | yes (ids + `IRt<Name>`) | yes (explicit impls) | — | yes (ids, parameter/result records) | `sealed` (v2; no `abstract`, E-M3) | `IRt<Name>` (extends = interface inheritance) |
 | 9 | Docs generator | — | yes | yes | — | yes | yes (non-default only) | yes |
@@ -1350,6 +1351,31 @@ marker (fail-open: nothing would be redacted). The constant must equal the numbe
 (the next patch after the last `r3.5.x` tag at merge time). Tests: `CkV2MethodResolverTests` (`Code134_*`, `Code122_*`),
 `CkV2CompileTests.SensitiveResult_*`, `CkV2GraphJsonRoundTripTests.SensitiveResult_*`, `CkV2GeneratedContractsTests`,
 `CkEngineVersionTests`, `MethodRowTests.M17_*`, `CkV2SchemaTests`.
+
+**Method `authorization.dataAccess` (AB#7036, F3.4b) touch points**, same numbering (the field lives on `CkMethodAuthorizationDto`,
+next to `roles` / `allowSelf` / `scopes`; enum `CkMethodDataAccessDto` `Read` | `Write`, PascalCase like `visibility`; nullable, omitted =
+`Write`; it declares the data permission a caller needs on the target record of the method call — `Read` = the method only reads its
+target, a read grant suffices; the gateway check that consumes it is AB#7037, nothing in the engine enforces it): (1) method schema
+`CkMethodAuthorization.dataAccess` (string enum `Read`/`Write`; the model-language key needs a **schema release** at
+schemas.meshmakers.cloud, a catalog model must not use it before that; an older compiler refuses the key loudly because the definition has
+`additionalProperties: false`); (2) compiled schema via the shared `$ref`; (3) `CkMethodAuthorizationDto.DataAccess`
+(`CkMethodDataAccessDto?`, `OmitNull` in YAML, `JsonIgnore(WhenWritingNull)` + `JsonStringEnumConverter` in JSON, so models that do not use the key
+serialize byte-identically); effective value `CkMethodAuthorization.Resolve(authorization)` (omitted or no block = `Write`); (4) copied by
+reference with `Methods`; (5) `CkMethodGraph.DataAccess` (`[JsonIgnore]`, effective value, derived from the serialized definition; the
+cache JSON carries the key only where it is declared); (6) message 135 (`InheritanceResolver.ValidateMethodDataAccess`) and message 90 in a
+v1 model (`ElementResolver.CheckCkLanguage`, feature `authorization.dataAccess`); (7) diff property `dataAccess` (effective values, emitted
+independently of the authorization block), classifier row **M18** (`Write` → `Read` Minor + `requiresAcknowledge` + behavioural "security:
+method access widened", change key `TypeMethod:<Type>/<Method>#Modified:dataAccess`; `Read` → `Write` Major), guard probe
+`CkMethodAuthorizationDto.DataAccess`, the method `signature` summary appends `, dataAccess Read` only for `Read`; (8) source generator: the
+generated `{Type}{Method}Parameters` record gets `public const CkMethodDataAccessDto CkDataAccess` (effective value); (9) `Types.md` marks a
+`Read` method `(data access: Read)`, nothing for the default; (10) engine-mongodb `CkMethodAuthorization.DataAccess` (reflection gate);
+(11) asset-repo CK meta and (12) Studio: not part of AB#7036, cut when Studio needs to show the field. **minEngineVersion:**
+`CkEngineVersion.GetRequiredMinEngineVersion` raises the value to `DataAccessMinEngineVersion` for a model in which any type **or interface**
+method declares `dataAccess` (also `Write`; the maximum with the other markers; models without it keep their minimum), so an engine that
+predates the field refuses the model with message 126 instead of dropping the key and treating a `Read` method as `Write`. The constant must
+equal the number of the release that first ships the field (the next patch after the last `r3.5.x` tag at merge time; `3.5.40` when `r3.5.39` was
+the last tag). Tests: `CkV2MethodResolverTests` (`Code135_*`), `CkV2CompileTests.DataAccess_*`, `CkV2GraphJsonRoundTripTests.DataAccess_*`,
+`CkV2GeneratedContractsTests`, `CkEngineVersionTests`, `MethodRowTests.M18_*`, `CkV2SchemaTests`.
 
 **`securitySensitive` (AB#6269) touch points**, same numbering: (1) attribute schema `CkAttribute.securitySensitive`;
 (2) compiled schema via the shared `$ref`; (3) `CkAttributeDto.SecuritySensitive` (`bool?`, omitted when null); (4) copied

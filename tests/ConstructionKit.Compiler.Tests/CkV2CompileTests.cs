@@ -367,6 +367,110 @@ public sealed class CkV2CompileTests : IDisposable
         Assert.Contains("| Unlock-1 | Instance |", types);
     }
 
+    [Fact]
+    public async Task DataAccess_ReachesCompiledOutputRoundTripGraphDocsAndMinEngineVersion_AndDefaultStaysByteIdentical()
+    {
+        await PublishSystemAsync(_fixture);
+
+        // Golden: a model that does not use the key has no 'dataAccess' member and keeps the CK v2 floor.
+        var plain = await _fixture.CompileAsync(_fixture.WriteSource("plain", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], KitchenSinkFiles(), ckLanguage: 2));
+        Assert.DoesNotContain("dataAccess", await ToYamlAsync(_fixture, plain));
+        Assert.Equal(CkEngineVersion.CkV2MinEngineVersion, plain.MinEngineVersion);
+
+        var compiled = await _fixture.CompileAndPublishAsync(_fixture.WriteSource("ks", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], KitchenSinkWithAccountMethod(
+                "      - methodId: Peek-1\n        authorization:\n          roles: [ Reader ]\n          dataAccess: Read\n"),
+            ckLanguage: 2));
+
+        // Compiled model, serialized YAML and read-back carry the value.
+        var peek = compiled.Types!.Single(t => t.TypeId.Name == "Account").Methods!.Single(m => m.MethodId == "Peek-1");
+        Assert.Equal(CkMethodDataAccessDto.Read, peek.Authorization!.DataAccess);
+        var yaml = await ToYamlAsync(_fixture, compiled);
+        Assert.Contains("dataAccess: Read", yaml);
+        var operationResult = new OperationResult();
+        var readBack = await _fixture.Services.GetRequiredService<ICkSerializer>()
+            .DeserializeCompiledModelRootAsync(yaml, "ks.yaml", operationResult);
+        Assert.False(operationResult.HasErrors, string.Join("; ", operationResult.Messages));
+        Assert.Equal(CkMethodDataAccessDto.Read, readBack.Types!.Single(t => t.TypeId.Name == "Account").Methods!
+            .Single(m => m.MethodId == "Peek-1").Authorization!.DataAccess);
+
+        // minEngineVersion is raised, so an engine that predates the field refuses the model (message 126).
+        Assert.Equal(CkEngineVersion.DataAccessMinEngineVersion, compiled.MinEngineVersion);
+        Assert.Contains($"minEngineVersion: {CkEngineVersion.DataAccessMinEngineVersion}", yaml);
+        var refusal = new OperationResult();
+        Assert.False(CkEngineVersion.CheckModel(compiled, "ks", refusal, new Version(3, 5, 31)));
+        Assert.Equal(126, Assert.Single(refusal.Messages).MessageNumber);
+
+        // The resolved graph carries the effective value; the other methods are Write.
+        var graph = await _fixture.Services.GetRequiredService<ICatalogModelResolver>()
+            .HardResolveAsync(compiled, new OriginFileResolver("-"), new OperationResult());
+        var account = graph.Types[new CkId<CkTypeId>("KitchenSink-1.0.0/Account")];
+        Assert.Equal(CkMethodDataAccessDto.Read, account.AllMethods["Peek-1"].DataAccess);
+        Assert.Equal(CkMethodDataAccessDto.Write, account.AllMethods["Unlock-1"].DataAccess);
+        Assert.Equal(CkMethodDataAccessDto.Write, account.AllMethods["ChangePassword-1"].DataAccess);
+
+        // Docs generator: the Read method is marked, the others are not.
+        var docs = Path.Combine(_fixture.Root, "docs");
+        await _fixture.Services.GetRequiredService<Engine.Documentation.IContentGenerator>()
+            .GenerateTypesMarkdownTable(graph, docs, compiled.ModelId, "1.0.0", "/docs/");
+        var types = await File.ReadAllTextAsync(
+            Directory.GetFiles(docs, "*.md", SearchOption.AllDirectories).Single(f => f.EndsWith("Types.md")),
+            TestContext.Current.CancellationToken);
+        Assert.Contains("| Peek-1 (data access: Read) | Instance |", types);
+        Assert.Contains("| Unlock-1 | Instance |", types);
+    }
+
+    [Theory]
+    [InlineData("      - methodId: Peek-1\n        authorization:\n          dataAccess: Delete\n")]
+    [InlineData("      - methodId: Peek-1\n        authorization:\n          dataAccess: read\n")]
+    public async Task DataAccess_AValueOutsideReadAndWrite_IsRejectedByTheCompiler(string method)
+    {
+        await PublishSystemAsync(_fixture);
+
+        var operationResult = new OperationResult();
+        await Assert.ThrowsAnyAsync<Exception>(() => _fixture.Services.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(_fixture.WriteSource("ks", "KitchenSink-1.0.0", ["System-[2.5,3.0)"],
+                KitchenSinkWithAccountMethod(method), ckLanguage: 2), operationResult));
+
+        Assert.True(operationResult.HasErrors);
+        Assert.Contains(operationResult.Messages, m => m.MessageText.Contains("dataAccess", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task DataAccess_ReadTogetherWithReplacesGenericCreate_FailsWith135()
+    {
+        await PublishSystemAsync(_fixture);
+
+        var operationResult = new OperationResult();
+        await Assert.ThrowsAnyAsync<Exception>(() => _fixture.Services.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(_fixture.WriteSource("ks", "KitchenSink-1.0.0", ["System-[2.5,3.0)"],
+                KitchenSinkWithAccountMethod("      - methodId: Provision-1\n        kind: Static\n        replacesGenericCreate: true\n" +
+                                             "        authorization:\n          roles: [ Admin ]\n          dataAccess: Read\n"),
+                ckLanguage: 2), operationResult));
+
+        var message = Assert.Single(operationResult.Messages.Where(m => m.MessageNumber == 135).Take(1));
+        Assert.Contains("Provision-1", message.MessageText);
+        Assert.Contains("creating an entity is a write", message.MessageText);
+    }
+
+    [Fact]
+    public async Task DataAccess_InACkLanguage1Model_FailsWith90()
+    {
+        await PublishSystemAsync(_fixture);
+
+        var operationResult = new OperationResult();
+        await Assert.ThrowsAnyAsync<Exception>(() => _fixture.Services.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(_fixture.WriteSource("v1", "V1Model-1.0.0", ["System-[2.5,3.0)"],
+                new Dictionary<string, string>
+                {
+                    ["types/t.yaml"] = "types:\n  - typeId: Gadget\n    derivedFromCkTypeId: ${System}/Entity\n" +
+                                       "    methods:\n      - methodId: Peek-1\n        authorization:\n          dataAccess: Read\n"
+                }), operationResult));
+
+        Assert.Contains(operationResult.Messages, m => m.MessageNumber == 90);
+    }
+
     [Theory]
     [InlineData("      - methodId: Provision-1\n        replacesGenericCreate: true\n", "Static")]
     [InlineData("      - methodId: Provision-1\n        kind: Static\n        replacesGenericCreate: true\n" +

@@ -136,7 +136,7 @@ public class CkModelDiffService : ICkModelDiffService
             [typeof(CkMethodAuthorizationDto)] =
             [
                 nameof(CkMethodAuthorizationDto.Roles), nameof(CkMethodAuthorizationDto.AllowSelf),
-                nameof(CkMethodAuthorizationDto.Scopes)
+                nameof(CkMethodAuthorizationDto.Scopes), nameof(CkMethodAuthorizationDto.DataAccess)
             ],
             [typeof(CkMethodExecutionDto)] =
             [
@@ -239,7 +239,7 @@ public class CkModelDiffService : ICkModelDiffService
         string[] methodProperties =
         [
             "description", "signature", "visibility", "kind", "replacesGenericCreate", "result", "resultSensitive", "timeoutSeconds", "idempotent", "handler", "authorization",
-            "roles", "scopes", "allowSelf"
+            "roles", "scopes", "allowSelf", "dataAccess"
         ];
         Element(CkModelElementKind.TypeMethod, methodProperties);
         Element(CkModelElementKind.Attribute, "valueType", "valueCkRecordId", "valueCkEnumId", "defaultValues",
@@ -615,6 +615,12 @@ public class CkModelDiffService : ICkModelDiffService
                         baselineMethod.Authorization?.AllowSelf ?? false, currentMethod.Authorization?.AllowSelf ?? false);
                 }
 
+                // AB#7036 (row M18): the effective data access (omitted = Write), independent of the authorization
+                // block: a block added or removed does not hide a data access change, and Write vs omitted is no change.
+                AddModified(methodChanges, kind, id, "dataAccess",
+                    CkMethodAuthorization.Resolve(baselineMethod.Authorization).ToString(),
+                    CkMethodAuthorization.Resolve(currentMethod.Authorization).ToString());
+
                 DiffElements(methodChanges, CkModelElementKind.MethodParameter, baselineMethod.Parameters,
                     currentMethod.Parameters, p => $"{id}/{p.Name}",
                     (parameterChanges, parameterId, baselineParameter, currentParameter) =>
@@ -693,7 +699,8 @@ public class CkModelDiffService : ICkModelDiffService
         var authorization = method.Authorization == null
             ? "none"
             : $"roles [{string.Join(", ", RoleSet(method.Authorization.Roles).OrderBy(r => r, StringComparer.Ordinal))}], allowSelf " +
-              $"{FormatBool(method.Authorization.AllowSelf)}, scopes [{string.Join(", ", method.Authorization.Scopes ?? [])}]";
+              $"{FormatBool(method.Authorization.AllowSelf)}, scopes [{string.Join(", ", method.Authorization.Scopes ?? [])}]" +
+              (CkMethodAuthorization.Resolve(method.Authorization) == CkMethodDataAccessDto.Read ? ", dataAccess Read" : "");
         var timeout = (method.Execution?.TimeoutSeconds ?? CkMethodExecutionDto.DefaultTimeoutSeconds)
             .ToString(CultureInfo.InvariantCulture);
         return $"{method.Kind} ({parameters}) -> {result}; errors [{errors}]; authorization {authorization}; " +

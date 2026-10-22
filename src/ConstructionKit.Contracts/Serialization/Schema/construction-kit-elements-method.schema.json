@@ -190,6 +190,14 @@
             "type": "string"
           },
           "description": "Additional required scopes. 'octo_api' is always required."
+        },
+        "dataAccess": {
+          "type": "string",
+          "enum": [
+            "Read",
+            "Write"
+          ],
+          "description": "AB#7036: the data permission a caller needs on the target record. Read = the method only reads its target, a read grant suffices. Omitted = Write (a write grant is needed). Not allowed together with replacesGenericCreate (a create is a write; message 135). Requires ckLanguage: 2."
         }
       },
       "additionalProperties": false

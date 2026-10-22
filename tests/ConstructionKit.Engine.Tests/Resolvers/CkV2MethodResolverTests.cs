@@ -603,6 +603,70 @@ public class CkV2MethodResolverTests(ITestOutputHelper output) : CkV2ResolverTes
         Assert.Contains("/Principal", message.MessageText);
     }
 
+    // ── authorization.dataAccess (AB#7036, message 135) ──────────────────────────────
+
+    [Fact]
+    public void Code135_ReadOrWriteOnAMethod_OK_AndReachesTheGraphAsTheEffectiveValue()
+    {
+        var model = Model();
+        Type(model, "Principal").Methods!.Single(m => m.MethodId == "ChangePassword-1").Authorization!.DataAccess =
+            CkMethodDataAccessDto.Read;
+        Type(model, "Account").Methods!.Single(m => m.MethodId == "Lock-1").Authorization =
+            new CkMethodAuthorizationDto { Roles = ["Admin"], DataAccess = CkMethodDataAccessDto.Write };
+
+        var operationResult = new OperationResult();
+        var graph = Resolve(model, operationResult);
+
+        Assert.Empty(operationResult.Messages);
+        var methods = graph.Types[$"{M}/Account"].AllMethods;
+        Assert.Equal(CkMethodDataAccessDto.Read, methods["ChangePassword-1"].DataAccess);
+        Assert.Equal(CkMethodDataAccessDto.Write, methods["Lock-1"].DataAccess);
+        // No authorization block at all, and a block without the key: Write.
+        Assert.Equal(CkMethodDataAccessDto.Write, methods["Unlock-1"].DataAccess);
+    }
+
+    [Fact]
+    public void Code135_ReadOnAMethodThatReplacesTheGenericCreate()
+    {
+        var model = Model();
+        Type(model, "Tag").Methods = [new()
+        {
+            MethodId = "Make-1", Kind = CkMethodKindDto.Static, ReplacesGenericCreate = true,
+            Authorization = new() { Roles = ["Admin"], DataAccess = CkMethodDataAccessDto.Read }
+        }];
+
+        var message = Assert.Single(ResolveExpectingOnly(model, 135));
+        Assert.Contains("Make-1", message.MessageText);
+        Assert.Contains("creating an entity is a write", message.MessageText);
+    }
+
+    [Fact]
+    public void Code135_WriteOnAMethodThatReplacesTheGenericCreate_OK()
+    {
+        var model = Model();
+        Type(model, "Tag").Methods = [new()
+        {
+            MethodId = "Make-1", Kind = CkMethodKindDto.Static, ReplacesGenericCreate = true,
+            Authorization = new() { Roles = ["Admin"], DataAccess = CkMethodDataAccessDto.Write }
+        }];
+
+        var operationResult = new OperationResult();
+        Resolve(model, operationResult);
+        Assert.Empty(operationResult.Messages);
+    }
+
+    [Fact]
+    public void Code135_AValueOutsideReadAndWrite_FromAJsonOrProgrammaticModel()
+    {
+        var model = Model();
+        Type(model, "Principal").Methods!.Single(m => m.MethodId == "ChangePassword-1").Authorization!.DataAccess =
+            (CkMethodDataAccessDto)7;
+
+        var message = Assert.Single(ResolveExpectingOnly(model, 135));
+        Assert.Contains("ChangePassword-1", message.MessageText);
+        Assert.Contains("'Read' or 'Write'", message.MessageText);
+    }
+
     // ── replacesGenericCreate (AB#7024, message 133) ─────────────────────────────────
 
     [Fact]

@@ -254,6 +254,52 @@ public class CkEngineVersionTests(ITestOutputHelper output) : CkV2ResolverTestBa
             Version.Parse(CkEngineVersion.ReplacesGenericCreateMinEngineVersion)));
     }
 
+    // ── authorization.dataAccess (AB#7036) ──────────────────────────────────────────
+
+    [Fact]
+    public void RequiredMinEngineVersion_RaisedOnlyWhenAMethodDeclaresDataAccess_AlsoWhenItIsWrite()
+    {
+        var plain = Model();
+        Assert.Equal(CkEngineVersion.CkV2MinEngineVersion, CkEngineVersion.GetRequiredMinEngineVersion(plain));
+
+        var declared = Model();
+        Type(declared, "Principal").Methods!.Single(m => m.MethodId == "ChangePassword-1").Authorization!.DataAccess =
+            CkMethodDataAccessDto.Read;
+        Assert.Equal(CkEngineVersion.DataAccessMinEngineVersion, CkEngineVersion.GetRequiredMinEngineVersion(declared));
+        Assert.True(Version.Parse(CkEngineVersion.DataAccessMinEngineVersion) >
+                    Version.Parse(CkEngineVersion.CkV2MinEngineVersion));
+
+        // An interface method counts, and the higher of two markers wins.
+        var onInterface = Model();
+        (onInterface.Interfaces ??= []).Add(new CkInterfaceDto
+        {
+            InterfaceId = "Readers-1",
+            Methods = [new() { MethodId = "Peek-1", Authorization = new() { DataAccess = CkMethodDataAccessDto.Read } }]
+        });
+        Type(onInterface, "Account").Methods!.Single(m => m.MethodId == "Lock-1").ReplacesGenericCreate = true;
+        var expected = new[] { CkEngineVersion.ReplacesGenericCreateMinEngineVersion, CkEngineVersion.DataAccessMinEngineVersion }
+            .Select(Version.Parse).Max()!.ToString();
+        Assert.Equal(expected, CkEngineVersion.GetRequiredMinEngineVersion(onInterface));
+    }
+
+    [Fact]
+    public void Code126_ModelWithDataAccess_IsRefusedByAnEngineThatPredatesTheField()
+    {
+        // The last version without the field would drop the key and treat a Read method as Write.
+        var model = Model();
+        Type(model, "Principal").Methods!.Single(m => m.MethodId == "ChangePassword-1").Authorization!.DataAccess =
+            CkMethodDataAccessDto.Read;
+        model.MinEngineVersion = CkEngineVersion.GetRequiredMinEngineVersion(model);
+        var operationResult = new OperationResult();
+        var previous = Version.Parse(CkEngineVersion.DataAccessMinEngineVersion);
+        var predating = new Version(previous.Major, previous.Minor, previous.Build - 1);
+
+        Assert.False(CkEngineVersion.CheckModel(model, "loc", operationResult, predating));
+        Assert.Equal(126, Assert.Single(operationResult.Messages).MessageNumber);
+
+        Assert.True(CkEngineVersion.CheckModel(model, "loc", new OperationResult(), previous));
+    }
+
     // ── sensitive method result (AB#7006) ───────────────────────────────────────────
 
     [Fact]

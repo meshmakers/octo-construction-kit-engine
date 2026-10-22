@@ -376,6 +376,9 @@ internal static class MessageCodes
     internal static OperationMessage CkMethodPipelineSensitiveResult(string? location, object methodId, object ckTypeId) =>
         GetMessage("CkMethodPipelineSensitiveResult", location, methodId, ckTypeId);
 
+    internal static OperationMessage CkMethodDataAccessInvalid(string? location, object methodId, object ckTypeId, object reason) =>
+        GetMessage("CkMethodDataAccessInvalid", location, methodId, ckTypeId, reason);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1079,6 +1082,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  134, "Method '{methodId}' of '{ckTypeId}' declares 'execution.handler: pipeline' but its result is sensitive: a pipeline execution stores its output, so a method with a sensitive result must use 'execution.handler: service'",
                  new [] {"methodId", "ckTypeId"})
+        },
+        {
+            "CkMethodDataAccessInvalid",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 135, "Method '{methodId}' of '{ckTypeId}' declares an invalid 'authorization.dataAccess': {reason}",
+                 new [] {"methodId", "ckTypeId", "reason"})
         },
     };
 }

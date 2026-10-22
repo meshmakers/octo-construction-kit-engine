@@ -351,7 +351,7 @@ internal class ContentGenerator(
                 var parameters = string.Join(", ", (method.Definition.Parameters ?? []).Select(p =>
                     $"{p.Name}{(p.IsOptional ? "?" : "")}: {p.ValueType}"));
                 await outputFile.WriteLineAsync(
-                        $"| {method.Definition.MethodId}{(method.Visibility == CkVisibilityDto.Internal ? " (internal)" : "")}{HandlerMarker(method.Definition)}{ReplacesGenericCreateMarker(method.Definition)} | {method.Definition.Kind} | {parameters} | " +
+                        $"| {method.Definition.MethodId}{(method.Visibility == CkVisibilityDto.Internal ? " (internal)" : "")}{HandlerMarker(method.Definition)}{ReplacesGenericCreateMarker(method.Definition)}{DataAccessMarker(method)} | {method.Definition.Kind} | {parameters} | " +
                         $"{ResultText(method.Definition)} | {method.DeclaringCkTypeId.ToRtCkId().SemanticVersionedFullName} |")
                     .ConfigureAwait(false);
             }
@@ -371,6 +371,13 @@ internal class ContentGenerator(
     /// </summary>
     private static string ReplacesGenericCreateMarker(CkMethodDto method) =>
         method.ReplacesGenericCreate ? " (replaces generic create)" : "";
+
+    /// <summary>
+    ///     AB#7036: <c> (data access: Read)</c> for a method that declares it only reads its target; empty for the
+    ///     default (<c>Write</c>), so the documentation of existing models is unchanged.
+    /// </summary>
+    private static string DataAccessMarker(CkMethodGraph method) =>
+        method.DataAccess == CkMethodDataAccessDto.Read ? " (data access: Read)" : "";
 
     /// <summary>
     ///     AB#6877: <c> (handler: pipeline)</c> for a method that is not implemented by a service; empty for the default,

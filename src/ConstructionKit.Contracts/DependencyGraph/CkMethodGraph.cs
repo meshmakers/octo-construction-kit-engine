@@ -51,4 +51,11 @@ public sealed record CkMethodGraph(CkId<CkTypeId> DeclaringCkTypeId, CkMethodDto
     /// </summary>
     [JsonIgnore]
     public bool HasSensitiveResult => Definition.Result?.Sensitive == true;
+
+    /// <summary>
+    ///     AB#7036: the effective data access of the method — the data permission a caller needs on the target record
+    ///     (declared <c>authorization.dataAccess</c>, otherwise <see cref="CkMethodDataAccessDto.Write" />).
+    /// </summary>
+    [JsonIgnore]
+    public CkMethodDataAccessDto DataAccess => CkMethodAuthorization.Resolve(Definition.Authorization);
 }

@@ -533,6 +533,12 @@ internal class ElementResolver : IElementResolver
                 Report(key, "replacesGenericCreate", $"{key}.{method.MethodId}");
             }
 
+            // AB#7036: likewise a CK v2 key of its own (message 90 names it next to 'methods').
+            foreach (var method in (ckType.Methods ?? []).Where(m => m.Authorization?.DataAccess != null))
+            {
+                Report(key, "authorization.dataAccess", $"{key}.{method.MethodId}");
+            }
+
             CheckAccess(key, key, ckType.Attributes);
         }
 

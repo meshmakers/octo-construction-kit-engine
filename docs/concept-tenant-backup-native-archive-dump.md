@@ -253,6 +253,18 @@ cache from the database that the restore is about to replace. The answer is the 
 tenant-bound `IStreamDataRepository.CheckStagingCopyReadinessAsync` gives (both delegate to one piece of code), and
 asking changes nothing in the cluster.
 
+**Before the MongoDB restore: check that the whole backup fits.** The same restore job then adds up the staged bytes of all archives
+in the manifest (the files are in the staging area by then) and asks the cluster whether they fit on the nodes
+(`IStreamDataRepositoryFactory.CheckStagingDiskHeadroomAsync`, AB#7274). The estimate is the staged (gzip) bytes times the size factor
+(`StagingCopyRunner.DiskSpaceFactor`, 12; one constant, measured on the sbeg raw archive: 10.5 times the staged gzip size right after the load), times the copies every shard has after the load (the
+tables get `number_of_replicas` back before the merge, so `min(2, nodes)` copies for the default `0-1`), divided by the number of nodes.
+A node fits when that is not more than its room **below the high disk watermark**
+(`cluster.routing.allocation.disk.watermark.high`: a percentage or ratio is the share of the disk that may be used, an absolute value
+the free space that must remain; not the raw free space, which would pass a node that CrateDB already treats as full). When a node does
+not fit, the job stops with needed / available / room below the watermark per refused node and `Nothing was restored.` - the tenant
+is as it was. The check is a read of `sys.nodes` and two cluster settings; space that the restore frees by replacing tables of the target
+tenant is not subtracted, and a cluster whose disks cannot be read does not stop the restore (the per-archive check below asks again).
+
 **Order of the archives: every source before the rollups that read it** (raw archives first, then rollups by the length of their source
 chain). A rollup can be activated only while its source is `Activated`, and the dump lists the archives in no dependency order. A source
 that was not `Activated` in the backup but has rollups stays `Activated` - with the restore reconcile marker set, which keeps forward
@@ -263,14 +275,26 @@ Per archive of the manifest that exists after the MongoDB restore and passes the
 1. Disable, drop the table and its generation map, activate (the platform creates both tables with
    its current DDL), disable — the sequence of AB#4231 §5.1.
 2. Check before loading: the columns of the dumped table against the columns of the new table
-   (`information_schema.columns`); free disk space per node against the expected size (a table
-   takes about nine times its gzip size right after the load and six and a half times after the
-   merge).
+   (`information_schema.columns`); the room per node below the high disk watermark against the expected size of the archive (the same
+   rule as the whole-backup check above, with the replica setting of the table; the node disks are read now, so the archives loaded
+   before this one count as used). The size factor is one constant (`DiskSpaceFactor`).
 3. Set bulk table settings (`number_of_replicas = 0`, `refresh_interval = 0`) and remember the
    previous values.
 4. Put the archive's files into the staging area and run one `COPY FROM … RETURN SUMMARY` per
    slice. A slice counts as loaded when `success_count` equals the row count in the manifest and
-   `error_count` is 0. A repeated slice uses `overwrite_duplicates = true`.
+   `error_count` is 0. **A slice that CrateDB refuses for a transient reason is loaded again** (AB#7274): at most three attempts in total
+   (`StagingCopyRunner.MaxLoadAttempts`), after 30 s and after 60 s, every repeat with `overwrite_duplicates = true` (a row the failed
+   attempt wrote is replaced by the identical row; the slice files come from a table with the same primary key, so their rows are unique)
+   and half the `bulk_size` of the attempt before (CrateDB's 10,000, then 5,000, then 2,500). Transient are: the memory circuit breaker
+   (`CircuitBreakingException`), a rejected execution, a node or shard that is not available, a statement timeout, and a summary that
+   is short with `error_count = 0` - CrateDB does not count a shard request that the breaker refused on another node as an error, so a
+   slice can lose rows silently (seen on a two-node cluster: 36 batches of 10,000 rows) - and a summary whose rejected rows all carry such a
+   text (`CopyFailureClassifier`). Everything else (a missing column, an unreadable file, a credential or access error, more rows than the
+   manifest holds) fails at once. After a repeat that reports success, the slice's range is counted in the table (the generation map: the
+   whole map) and must equal the manifest, otherwise the attempt counts as failed. Every failed attempt is logged with archive, slice,
+   attempt n of 3, the scrubbed reason and, before a repeat, the heap per node; a short summary also logs its per-node rows. The policy is
+   internal to the runner. The archive ends as failed only after the last attempt (message "after 3 attempts"), the table settings are
+   restored as ever and the merge does not run.
 5. Load the generation map the same way.
 6. Restore the table settings (also when the load failed), merge the segments
    (`OPTIMIZE … max_num_segments = 1`, can be switched off), refresh, compare the table's row count

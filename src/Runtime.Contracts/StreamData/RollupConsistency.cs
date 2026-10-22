@@ -45,14 +45,21 @@ public sealed record RollupConsistencyFinding(
 /// <summary>Why the validator could not check a rollup (or a part of it).</summary>
 public enum RollupNotCheckedCause
 {
-    /// <summary>The rollup has no table (status other than Created): a restore that failed to load it leaves this state.</summary>
+    /// <summary>The rollup has no table although it is Activated or Failed: a restore that failed to load it leaves this state.</summary>
     NoLiveTable = 0,
 
     /// <summary>The rollup was never activated (status Created) and has no table. Informational: it does not make the report not ok.</summary>
     NeverActivated = 1,
 
     /// <summary>A source archive of the rollup is missing (no entity, or an activated source without a table), so the watermark check cannot be decided.</summary>
-    SourceMissing = 2
+    SourceMissing = 2,
+
+    /// <summary>
+    /// The rollup is Disabled and has no table. Informational: a disabled rollup is neither aggregated nor read, so nothing can be
+    /// inconsistent (for example legacy rollups that were disabled in the source tenant of a backup). A restore that failed to load a
+    /// rollup reports that archive as failed itself.
+    /// </summary>
+    Disabled = 3
 }
 
 /// <summary>What the validator could not check of a rollup, and why.</summary>
@@ -62,11 +69,12 @@ public sealed record RollupNotChecked(RollupNotCheckedCause Cause, string Reason
 {
     /// <summary>
     /// True when the gap makes the entry (and the report) not ok and keeps the restore reconcile marker. False for
-    /// <see cref="RollupNotCheckedCause.NeverActivated"/>: a rollup that was never activated has no data, so nothing can be
-    /// inconsistent, and blocking the tenant's rollups for it would stop forward aggregation, recompute and reclaim for good.
-    /// Informational entries are still listed so that a reader sees that the rollup was not looked at.
+    /// <see cref="RollupNotCheckedCause.NeverActivated"/> and <see cref="RollupNotCheckedCause.Disabled"/>: such a rollup is not
+    /// aggregated and has no table, so nothing can be inconsistent, and blocking the tenant's rollups for it would stop forward
+    /// aggregation, recompute and reclaim for good (AB#7274). Informational entries are still listed so that a reader sees that the
+    /// rollup was not looked at.
     /// </summary>
-    public bool IsBlocking => Cause != RollupNotCheckedCause.NeverActivated;
+    public bool IsBlocking => Cause is not (RollupNotCheckedCause.NeverActivated or RollupNotCheckedCause.Disabled);
 }
 
 /// <summary>The validator's result for one rollup.</summary>
@@ -84,7 +92,7 @@ public sealed record RollupConsistencyEntry(
 
     /// <summary>
     /// True when no check found anything and no blocking gap remains. A rollup that was not checked is not ok, except one that was
-    /// never activated (informational: it has no data).
+    /// never activated or is disabled without a table (informational: it has no data).
     /// </summary>
     public bool IsOk => Findings.Count == 0 && !IsBlockedByNotChecked;
 }

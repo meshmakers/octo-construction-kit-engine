@@ -198,6 +198,21 @@ public class RollupConsistencyContractTests
     }
 
     [Fact]
+    public void ADisabledRollupWithoutATable_IsListedAsInformation_AndDoesNotBlock()
+    {
+        // AB#7274: legacy rollups disabled in the source tenant kept the restore reconcile marker of every restore for good.
+        var info = new RollupConsistencyEntry(Rt, [],
+            new RollupNotChecked(RollupNotCheckedCause.Disabled, "Disabled, no table."));
+        var report = new RollupConsistencyReport([info], DateTime.UtcNow);
+
+        Assert.False(info.NotChecked!.IsBlocking);
+        Assert.True(info.IsOk);
+        Assert.True(report.IsOk);
+        Assert.True(report.HasNotChecked);
+        Assert.False(report.HasBlockingNotChecked);
+    }
+
+    [Fact]
     public void NotChecked_RoundTripsThroughJson_AndAnOldDocumentWithoutItReadsAsChecked()
     {
         var entry = new RollupConsistencyEntry(Rt, [],

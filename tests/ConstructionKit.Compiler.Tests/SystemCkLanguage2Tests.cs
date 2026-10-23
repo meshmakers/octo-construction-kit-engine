@@ -76,11 +76,22 @@ public sealed class SystemCkLanguage2Tests : IDisposable
     private static string RemoveLine(string yaml, string line) =>
         string.Join("\n", yaml.Split('\n').Where(l => l.Trim() != line));
 
-    /// <summary>The ckLanguage 1 System: same sources without the language key and without the explicit modifiers.</summary>
-    private string CopyV1System(string version) => CopySystem($"system-v1-{version}", (path, yaml) =>
-        path == "ckModel.yaml"
-            ? RemoveLine(SetVersion(yaml, version), "ckLanguage: 2")
-            : RemoveLine(yaml, "derivable: Any"));
+    /// <summary>
+    ///     The ckLanguage 1 System: same sources without the language key, the explicit modifiers and the
+    ///     interfaces of AB#6929 (interfaces need ckLanguage 2).
+    /// </summary>
+    private string CopyV1System(string version)
+    {
+        var dir = CopySystem($"system-v1-{version}", (path, yaml) => path switch
+        {
+            "ckModel.yaml" => RemoveLine(SetVersion(yaml, version), "ckLanguage: 2"),
+            "types/query.yaml" => RemoveLine(RemoveLine(RemoveLine(RemoveLine(yaml, "implements:"), "- ${this}/Named-1"),
+                "- ${this}/Describable-1"), "derivable: Any"),
+            _ => RemoveLine(yaml, "derivable: Any")
+        });
+        Directory.Delete(Path.Combine(dir, "interfaces"), true);
+        return dir;
+    }
 
     private async Task<CkCompiledModelRoot> CompileToFileAndBackAsync(string sourceDir)
     {
@@ -118,7 +129,7 @@ public sealed class SystemCkLanguage2Tests : IDisposable
         Assert.True(CkCatalogLayout.RequiresV3(compiled));
         Assert.Equal(CkCatalogLayout.V3Root, CkCatalogLayout.GetPublishRoot(compiled));
         Assert.Equal("System", compiled.ModelId.Name);
-        Assert.Equal(new Version(2, 6, 0), new Version(compiled.ModelId.Version.ToString()));
+        Assert.Equal(new Version(2, 7, 0), new Version(compiled.ModelId.Version.ToString()));
     }
 
     [Fact]
@@ -211,7 +222,7 @@ public sealed class SystemCkLanguage2Tests : IDisposable
     }
 
     [Fact]
-    public async Task System26_AgainstSystem250_IsAMinor_NotAMajor()
+    public async Task System27_AgainstSystem250_IsAMinor_NotAMajor()
     {
         await PublishAsync(CopyV1System("2.5.0"), InMemoryPublishedCatalog.Name);
 
@@ -241,14 +252,14 @@ public sealed class SystemCkLanguage2Tests : IDisposable
     [Fact]
     public async Task AUniqueIndexOnEntity_IsAMajorWithAcknowledgement_BecauseEntityIsAStableBaseByDeclaration()
     {
-        // Row B4 against the real v2 System (not the v1 name branch of the classifier): System 2.6.0 is the baseline,
-        // a unique index on System/Entity in 2.7.0 is Major and needs an acknowledgement.
+        // Row B4 against the real v2 System (not the v1 name branch of the classifier): the current System is the baseline,
+        // a unique index on System/Entity in 2.8.0 is Major and needs an acknowledgement.
         await PublishAsync(RealSystemSource(), InMemoryPublishedCatalog.Name);
-        var next = CopySystem("system-2.7.0", (path, yaml) =>
+        var next = CopySystem("system-2.8.0", (path, yaml) =>
         {
             if (path == "ckModel.yaml")
             {
-                return SetVersion(yaml, "2.7.0");
+                return SetVersion(yaml, "2.8.0");
             }
 
             return path == "types/entity.yaml"

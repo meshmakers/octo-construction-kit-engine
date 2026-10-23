@@ -1,0 +1,8 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+interfaces:
+  - interfaceId: Describable-1
+    description: "Anything that carries a free-text description."
+    attributes:
+      - id: ${this}/Description
+        name: Description
+        isOptional: true

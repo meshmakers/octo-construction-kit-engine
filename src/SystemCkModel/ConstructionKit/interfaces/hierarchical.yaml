@@ -1,0 +1,9 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+interfaces:
+  - interfaceId: Hierarchical-1
+    description: "Anything that can be arranged in a tree through the System/ParentChild role: the outbound Parent side points to another implementor, Children is the inbound side of the same role."
+    extends:
+      - ${this}/Named-1
+    associations:
+      - id: ${this}/ParentChild
+        targetCkInterfaceId: ${this}/Hierarchical-1

@@ -30,6 +30,38 @@ public class EmbeddedCkModelResourceTests
     }
 
     /// <summary>
+    /// AB#6929: the generated System assembly carries the four interfaces, the interface members as typed properties
+    /// and the implementing Rt classes of the query hierarchy implement them. The enableable and the hierarchical
+    /// interfaces have no implementor inside System.
+    /// </summary>
+    [Fact]
+    public void SystemCkModel_GeneratesTheFourInterfaces_AndTheQueryTypesImplementThem()
+    {
+        var assembly = Assembly.Load("Meshmakers.Octo.ConstructionKit.Models.System");
+        var types = assembly.GetTypes();
+        Type Interface(string name) => Assert.Single(types, t => t.IsInterface && t.Name == name);
+
+        var named = Interface("IRtNamed");
+        var describable = Interface("IRtDescribable");
+        var enableable = Interface("IRtEnableable");
+        var hierarchical = Interface("IRtHierarchical");
+
+        Assert.NotNull(named.GetProperty("Name"));
+        Assert.NotNull(describable.GetProperty("Description"));
+        Assert.NotNull(enableable.GetProperty("Enabled"));
+        Assert.Contains(named, hierarchical.GetInterfaces());
+
+        foreach (var queryName in new[] { "RtPersistentQuery", "RtSimpleRtQuery" })
+        {
+            var query = Assert.Single(types, t => t.Name == queryName);
+            Assert.True(named.IsAssignableFrom(query), queryName);
+            Assert.True(describable.IsAssignableFrom(query), queryName);
+        }
+
+        Assert.DoesNotContain(types, t => t is { IsClass: true } && (enableable.IsAssignableFrom(t) || hierarchical.IsAssignableFrom(t)));
+    }
+
+    /// <summary>
     /// AB#6479: System.Files moved from the asset repository into this repository without a model change.
     /// AB#6691: 1.1.0 is the one-time MINOR bump forced by range retention becoming the compiler default (SemVer
     /// row D6, OCTO-CK100): same content, dependency pinned as a range. A further bump is a deliberate change of

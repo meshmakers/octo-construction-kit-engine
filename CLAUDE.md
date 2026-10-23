@@ -736,6 +736,19 @@ package, so it bootstraps through its own `Exec`-based targets. Every other CK-o
 (e.g. octo-identity-services, octo-communication-controller-services) uses the packaged
 targets, which do not re-enter the publish path from a test step.
 
+**System models are published only on an explicit decision (AB#7343).** The shared catalogs are published by the
+`validate-and-publish-ck-versions.yml` step of `azure-pipelines.yml`, not by the dotnet build. The pipeline parameter
+`publishSystemCkModels` (boolean, **default false**) feeds the template parameter `publishOnMain` (`tpl-v1.8.0`): a main build
+still runs ValidateVersion, the schema compile and the cascade check, but publishes nothing and prints the warning
+`[CK publish] publishOnMain=false ... NOT published`. Reason: on 2026-10-23 System-2.6.0 reached
+`construction-kit-libraries-build` right after PR #294, before the re-pin gate (AB#6708) allowed it; a new System version breaks
+exact-pinned dependents on live tenants until they are re-pinned. **To publish System explicitly:** Azure DevOps -> pipeline
+`octo-construction-kit-engine-CI` -> *Run pipeline* -> branch `main` -> tick *Publish System CK models to the CK catalogs (main)*
+(CLI: `az pipelines run --id 108 --branch main --parameters publishSystemCkModels=true`); needs the release decision of the
+platform owner, and the same commit must not already have been published (already-published versions are a no-op). `r*` tags
+(release train) publish as before. All three models are System models and are gated together. A merge that bumps a System model
+therefore leaves the version unpublished until that run; downstream repos that need it must wait for it.
+
 **Test-only models are never published to a GitHub catalog (AB#6114).** `tests/TestCkModel`
 (`Test`, `System.TestIdentity`) sets `OctoPublishCkModelToRemoteCatalog=false`, so its
 `CkCompile` publishes to the `LocalFileSystemCatalog` only. The tests consume both models

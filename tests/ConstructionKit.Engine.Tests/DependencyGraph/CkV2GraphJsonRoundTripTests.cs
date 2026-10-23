@@ -134,6 +134,35 @@ public class CkV2GraphJsonRoundTripTests(ITestOutputHelper output) : CkV2Resolve
     }
 
     [Fact]
+    public async Task DataAccess_SurvivesTheCacheJson_AndOmittedMeansWriteWithoutAKey()
+    {
+        var model = Model();
+        Type(model, "Principal").Methods!.Single(m => m.MethodId == "ChangePassword-1").Authorization!.DataAccess =
+            CkMethodDataAccessDto.Read;
+        var operationResult = new OperationResult();
+        var graph = Resolve(model, operationResult);
+        Assert.Empty(operationResult.Messages);
+
+        var cache = await RoundTripAsync(graph);
+
+        var account = cache.GetRtCkType("target", new RtCkId<CkTypeId>($"{M}/Account"));
+        Assert.Equal(CkMethodDataAccessDto.Read, account.AllMethods["ChangePassword-1"].DataAccess);
+        Assert.Equal(CkMethodDataAccessDto.Read, account.AllMethods["ChangePassword-1"].Definition.Authorization!.DataAccess);
+        // Omitted = Write: no authorization block at all, and a block without the key.
+        Assert.Equal(CkMethodDataAccessDto.Write, account.AllMethods["Unlock-1"].DataAccess);
+
+        // A model that does not use the key writes none into the cache JSON.
+        var plainSource = new CkCacheService(NullLogger<CkCacheService>.Instance);
+        plainSource.CreateTenant("plain");
+        plainSource.LoadCkModelGraph("plain", Resolve(Model(), new OperationResult()));
+        using var stream = new MemoryStream();
+        await plainSource.SaveCacheAsync("plain", stream);
+        Assert.DoesNotContain("dataAccess", Encoding.UTF8.GetString(stream.ToArray()), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(CkMethodDataAccessDto.Write,
+            plainSource.GetRtCkType("plain", new RtCkId<CkTypeId>($"{M}/Account")).AllMethods["ChangePassword-1"].DataAccess);
+    }
+
+    [Fact]
     public async Task SensitiveResult_SurvivesTheCacheJson_AndDefaultMethodsCarryNoKey()
     {
         var model = Model();

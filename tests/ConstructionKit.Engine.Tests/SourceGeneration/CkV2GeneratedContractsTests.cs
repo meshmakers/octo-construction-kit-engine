@@ -120,6 +120,21 @@ public class CkV2GeneratedContractsTests(ITestOutputHelper output) : CkV2Resolve
     }
 
     [Fact]
+    public void MethodParametersRecord_ExposesTheDataAccess_DefaultWrite()
+    {
+        var (model, _) = Prepare(m =>
+            Type(m, "Principal").Methods!.Single(x => x.MethodId == "ChangePassword-1").Authorization!.DataAccess =
+                CkMethodDataAccessDto.Read);
+
+        var code = CkMethodCodeGenerator.Generate(Ns, model.Types!.Single(t => t.TypeId.Name == "Principal"));
+
+        Assert.Contains("CkDataAccess = global::Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.CkMethodDataAccessDto.Read;",
+            code);
+        Assert.Contains("CkDataAccess = global::Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.CkMethodDataAccessDto.Write;",
+            code);
+    }
+
+    [Fact]
     public void GeneratedV2Code_Compiles_AndToStringRedacts()
     {
         var (model, cache) = Prepare();
@@ -143,6 +158,7 @@ public class CkV2GeneratedContractsTests(ITestOutputHelper output) : CkV2Resolve
                 public static string Use()
                 {
                     _ = Make<RtPrincipal>();
+                    _ = PrincipalChangePasswordParameters.CkDataAccess;
                     IRtNamed named = new RtAccount();
                     var parameters = new PrincipalChangePasswordParameters
                     {

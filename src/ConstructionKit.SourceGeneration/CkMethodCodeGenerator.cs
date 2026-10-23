@@ -36,6 +36,12 @@ public static class CkMethodCodeGenerator
             sb.AppendLine("/// </summary>");
             sb.AppendLine($"public sealed partial record {name}Parameters");
             sb.AppendLine("{");
+            // AB#7036: the data permission a caller needs on the target (declared 'authorization.dataAccess', else Write).
+            sb.AppendLine("  /// <summary>The data permission a caller needs on the target record of the method.</summary>");
+            sb.AppendLine(
+                "  public const global::Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.CkMethodDataAccessDto " +
+                $"CkDataAccess = global::Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.CkMethodDataAccessDto.{CkMethodAuthorization.Resolve(method.Authorization)};");
+            sb.AppendLine();
             foreach (var parameter in parameters)
             {
                 if (!string.IsNullOrWhiteSpace(parameter.Description))

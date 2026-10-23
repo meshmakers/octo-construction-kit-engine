@@ -84,6 +84,10 @@ public class CkV2SchemaTests
                 execution:
                   timeoutSeconds: 90
                   handler: pipeline
+              - methodId: Describe-1
+                authorization:
+                  roles: [ Reader ]
+                  dataAccess: Read
         records:
           - recordId: Address
             attributes:
@@ -141,7 +145,7 @@ public class CkV2SchemaTests
         Assert.Equal(CkAttributeAccessDto.Hidden, elements.Records!.Single().Attributes!.Single().Access);
         Assert.Equal(CkAttributeAccessDto.ReadOnly, elements.AssociationRoles!.Single().Attributes!.Single().Access);
 
-        Assert.Equal(3, user.Methods!.Count);
+        Assert.Equal(4, user.Methods!.Count);
         var changePassword = user.Methods[0];
         Assert.Equal("ChangePassword-1", changePassword.MethodId);
         Assert.Equal(CkMethodKindDto.Instance, changePassword.Kind);
@@ -179,6 +183,12 @@ public class CkV2SchemaTests
         Assert.False(changePassword.ReplacesGenericCreate);
         Assert.Equal(90, user.Methods[2].Execution!.TimeoutSeconds);
         Assert.Null(changePassword.Execution.Handler);
+        // AB#7036: the data access is read as authored; an omitted key stays null (effective Write).
+        Assert.Equal(CkMethodDataAccessDto.Read, user.Methods[3].Authorization!.DataAccess);
+        Assert.Null(changePassword.Authorization.DataAccess);
+        Assert.Equal(CkMethodDataAccessDto.Read, CkMethodAuthorization.Resolve(user.Methods[3].Authorization));
+        Assert.Equal(CkMethodDataAccessDto.Write, CkMethodAuthorization.Resolve(changePassword.Authorization));
+        Assert.Equal(CkMethodDataAccessDto.Write, CkMethodAuthorization.Resolve(minimal.Authorization));
         Assert.Equal(CkMethodHandlers.Service, CkMethodHandlers.Effective(changePassword.Execution.Handler));
     }
 
@@ -200,6 +210,9 @@ public class CkV2SchemaTests
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        execution: { timeoutSeconds: 301 }\n", "timeout above maximum")]
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        execution: { handler: 3 }\n", "handler is a string")]
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        replacesGenericCreate: yes please\n", "replacesGenericCreate is a boolean")]
+    [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        authorization: { dataAccess: Delete }\n", "unknown dataAccess value")]
+    [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        authorization: { dataAccess: read }\n", "dataAccess is PascalCase")]
+    [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        authorization: { dataAccess: true }\n", "dataAccess is a string")]
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        result: { valueType: String, sensitive: yes please }\n", "result sensitive is a boolean")]
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        result: { sensitive: true }\n", "sensitive result without a value type")]
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        sensitive: true\n", "sensitive on a method without result")]
@@ -659,6 +672,7 @@ internal static class CkV2Assert
         Assert.Equal(expected.Authorization?.Roles, actual.Authorization?.Roles);
         Assert.Equal(expected.Authorization?.AllowSelf, actual.Authorization?.AllowSelf);
         Assert.Equal(expected.Authorization?.Scopes, actual.Authorization?.Scopes);
+        Assert.Equal(expected.Authorization?.DataAccess, actual.Authorization?.DataAccess);
         Assert.Equal(expected.Execution?.TimeoutSeconds, actual.Execution?.TimeoutSeconds);
         Assert.Equal(expected.Execution?.Idempotent, actual.Execution?.Idempotent);
         Assert.Equal(expected.Execution?.Handler, actual.Execution?.Handler);

@@ -701,6 +701,12 @@
       "number": 134,
       "level": "ERROR",
       "text": "Method '{methodId}' of '{ckTypeId}' declares 'execution.handler: pipeline' but its result is sensitive: a pipeline execution stores its output, so a method with a sensitive result must use 'execution.handler: service'"
+    },
+    {
+      "key": "CkMethodDataAccessInvalid",
+      "number": 135,
+      "level": "ERROR",
+      "text": "Method '{methodId}' of '{ckTypeId}' declares an invalid 'authorization.dataAccess': {reason}"
     }
   ]
 }

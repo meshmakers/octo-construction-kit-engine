@@ -514,6 +514,7 @@ internal class InheritanceResolver : IInheritanceResolver
             ValidateMethodHandler(method, ckTypeId, location, operationResult, isInterfaceMethod);
             ValidateMethodReplacesGenericCreate(method, ckTypeId, location, operationResult, isInterfaceMethod,
                 isAbstractType);
+            ValidateMethodDataAccess(method, ckTypeId, location, operationResult);
 
             // N4 (AB#6338): role and scope names are compared as sets by the classifier and the F3.4 gateway; a name
             // with separators or spaces could be mistaken for several names or an empty one.
@@ -591,6 +592,39 @@ internal class InheritanceResolver : IInheritanceResolver
         if (method.Result?.Sensitive == true)
         {
             operationResult.AddMessage(MessageCodes.CkMethodPipelineSensitiveResult(location, method.MethodId, ckTypeId));
+        }
+    }
+
+    /// <summary>
+    ///     AB#7036 (message 135): <c>authorization.dataAccess</c> must be <c>Read</c> or <c>Write</c> (a model from YAML
+    ///     is stopped by the schema first; this covers a JSON or programmatic model with another value), and a method
+    ///     that replaces the generic create cannot be <c>Read</c> — creating an entity is a write. The ckLanguage 2
+    ///     requirement is message 90 (<c>ElementResolver</c>).
+    /// </summary>
+    private static void ValidateMethodDataAccess(CkMethodDto method, object ckTypeId, string location,
+        OperationResult operationResult)
+    {
+        var dataAccess = method.Authorization?.DataAccess;
+        if (dataAccess == null)
+        {
+            return;
+        }
+
+        string? reason = null;
+        if (!Enum.IsDefined(typeof(CkMethodDataAccessDto), dataAccess.Value))
+        {
+            reason = $"the value '{(int)dataAccess.Value}' is unknown — use 'Read' or 'Write'";
+        }
+        else if (dataAccess == CkMethodDataAccessDto.Read && method.ReplacesGenericCreate)
+        {
+            reason = "'Read' is not allowed on a method that replaces the generic create — creating an entity is a " +
+                     "write; omit the key or use 'Write'";
+        }
+
+        if (reason != null)
+        {
+            operationResult.AddMessage(MessageCodes.CkMethodDataAccessInvalid(location, method.MethodId, ckTypeId,
+                reason));
         }
     }
 

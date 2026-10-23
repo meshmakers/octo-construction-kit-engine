@@ -42,6 +42,16 @@ public static class CkEngineVersion
     /// </summary>
     public const string SensitiveResultMinEngineVersion = "3.5.36";
 
+    /// <summary>
+    ///     The lowest engine version that reads a method's <c>authorization.dataAccess</c> declaration (AB#7036): the
+    ///     first libs release that contains the field. An older engine would drop the unknown key silently and treat a
+    ///     <c>Read</c> method as <c>Write</c>, so a model that declares any method <c>dataAccess</c> carries this value
+    ///     as <c>minEngineVersion</c> and older engines refuse it with message 126. Models that do not use the key keep
+    ///     their other minimum. <b>Must equal the number of the release that first ships the field</b> (the next patch
+    ///     after the last <c>r3.5.x</c> tag at merge time); raise it before merging when a release was cut in between.
+    /// </summary>
+    public const string DataAccessMinEngineVersion = "3.5.40";
+
     private static readonly Version? RunningVersion = ReadRunningVersion(typeof(CkEngineVersion).Assembly);
 
     // Test seam (AB#6274): never set outside tests, so production always reads RunningVersion.
@@ -84,7 +94,12 @@ public static class CkEngineVersion
         var usesSensitiveResult =
             model.Types?.Any(t => t.Methods?.Any(m => m.Result?.Sensitive == true) == true) == true ||
             model.Interfaces?.Any(i => i.Methods?.Any(m => m.Result?.Sensitive == true) == true) == true;
-        return usesSensitiveResult ? Max([required, SensitiveResultMinEngineVersion]) : required;
+        required = usesSensitiveResult ? Max([required, SensitiveResultMinEngineVersion]) : required;
+        // AB#7036: a model that declares 'authorization.dataAccess' on any method needs an engine that knows it.
+        var usesDataAccess =
+            model.Types?.Any(t => t.Methods?.Any(m => m.Authorization?.DataAccess != null) == true) == true ||
+            model.Interfaces?.Any(i => i.Methods?.Any(m => m.Authorization?.DataAccess != null) == true) == true;
+        return usesDataAccess ? Max([required, DataAccessMinEngineVersion]) : required;
     }
 
     /// <summary>

@@ -699,7 +699,8 @@ files for `SystemFilesCkModel` must therefore find only this repository.
 
 ## System on ckLanguage 2 (AB#6928, Epic AB#5584 F4.1)
 
-`src/SystemCkModel` is **System-2.6.0**, `ckLanguage: 2` (2.5.0 was ckLanguage 1). The release is a **Minor** and must stay one:
+`src/SystemCkModel` is **System-2.7.0**, `ckLanguage: 2` (2.5.0 was ckLanguage 1; 2.6.0 switched the language, 2.7.0 adds the interfaces, see
+"System interfaces" below). Every release of the line is a **Minor** against its predecessor and against 2.5.0 and must stay one:
 
 - **Every type and record declares `derivable: Any`.** Raising the language flips the default from `Any` to `Model`; without the explicit
   keys every model deriving from `System/Entity` would fail with message 113 and the SemVer verdict would be Major (row T6, `OCTO-CK200`).
@@ -716,15 +717,36 @@ files for `SystemFilesCkModel` must therefore find only this repository.
   exempts `_id` next to `Rt*` / `CkTypeId` (`InheritanceResolver.IsSystemIndexPath`, test `RestrictedAttributeRuleTests`).
 - **Generated C#.** For a v2 model the Rt class of an `isFinal` type is `sealed`: `RtAutoIncrement`, `RtBlueprintBackup`, `RtBlueprintHistory`,
   `RtBlueprintInstallation`, `RtMigrationHistory`, `RtTenant`, `RtTenantConfiguration`, `RtTenantModeConfiguration` (no subclass or mock of them in the monorepo, checked 2026-10-19).
-- **Not published by this change.** A service that embeds System 2.6 brings it to every tenant, and a model that is still exact-pinned to 2.5.0
-  would go `ResolveFailed`; publishing waits for the exact-pin scan (F2.6, AB#6708) and the release train, together with the interfaces story
-  (AB#6929). Never publish a ckLanguage 2 System into a shared catalog or environment before every service there runs the CK v2 engine.
+- **Publishing.** A service that embeds System 2.6 or later brings it to every tenant, and a model that is still exact-pinned to 2.5.0
+  would go `ResolveFailed`; publishing was meant to wait for the exact-pin scan (F2.6, AB#6708). **System-2.6.0 was published nevertheless**
+  by the engine main CI on 2026-10-23 09:02Z (private catalog `ck-models/v3`, also visible in `construction-kit-libraries`) right after PR #294 merged;
+  a published version is immutable, hence the interfaces are **2.7.0**, not an extension of 2.6.0. Never publish a ckLanguage 2 System into a shared
+  catalog or environment before every service there runs the CK v2 engine.
 - **Proof.** `scripts/prove-system-ckl2.sh --monorepo <root>` (private catalogs, throw-away `HOME`, nothing shared is read or written): compiles
   System 2.5.0 (git ref `origin/main`) and the 21 dependent models (committed HEAD of each repository) into a "before" catalog, runs
   `ValidateVersion` (Minor), `ValidateCascade` (0 Breaks, 0 NeedsRepin), shows the SHA-256 list of System before/after, proves the compiled
   surface identical apart from the explicit modifiers, publishes 2.6.0 into a copy of the catalog (`ck-models/v3` only) and recompiles every dependent
   without editing its `ckModel.yaml` (0 output changes; only the resolved closure line moves, row D8). Tests: `SystemCkLanguage2Tests`
   (Compiler.Tests; includes the negative control that the same switch without the explicit modifiers is `OCTO-CK200`).
+  `--additive` (AB#6929) accepts a candidate that only adds elements (the interfaces): the surface diff may consist of added lines only.
+
+### System interfaces (AB#6929, Epic AB#5584 F4.1)
+
+System-2.7.0 declares four interfaces in `src/SystemCkModel/ConstructionKit/interfaces/`; a model author implements them (`implements:`) instead of copying the attributes:
+
+| Interface | Members | Notes |
+| --- | --- | --- |
+| `Named-1` | `Name` (required) | **No index is declared** (AB#7019, decision of 2026-10-19): an implementer declares the index it needs for sorted interface queries; no latency promise without one. `DisplayName` is deliberately not a member (a later `Displayable-1`). |
+| `Describable-1` | `Description` (optional member) | The existing `PersistentQuery.Description` is optional, so the member is optional too. |
+| `Enableable-1` | `Enabled` (required) | No System type has `Enabled`; nobody in System implements it. |
+| `Hierarchical-1` | extends `Named-1`; required association member `System/ParentChild` (outbound `Parent`) to an implementor of `Hierarchical-1` | **No new association role**: it reuses the existing `ParentChild` (outbound `Parent` One, inbound `Children` N). An implementer declares `ParentChild` to a `Hierarchical-1` implementor (itself is fine); a root is a node without a Parent instance. Nobody in System implements it (no System type uses `ParentChild`). |
+
+Per existing System type: only `PersistentQuery` (abstract; every query type inherits it: `SimpleRtQuery`, `AggregationRtQuery`, `GroupingAggregationRtQuery`, `StreamDataQuery` and its `*SdQuery` children) has `Name` and the optional `Description` and
+implements `Named-1` and `Describable-1` (SemVer row T2, Minor). No other System type has the attributes `Name`, `Description` or `Enabled` under the System attribute ids (`BlueprintName`, `DatabaseName`, `CkModelName` are other
+attributes), none uses `ParentChild`, so there are no further implementers; making a type implement an interface it does not satisfy would need a new required member (Major) and does not happen in 2.x.
+Generated C# (Octo.Sdk generator): `IRtNamed`, `IRtDescribable`, `IRtEnableable`, `IRtHierarchical`; `RtPersistentQuery` implements the first two.
+Tests: `SystemInterfacesTests` (Compiler.Tests: members, per-type table, no index added, Minor against 2.5.0 and 2.6.0, probe model that implements all four, rule 121 and the missing-`Name` error for `Hierarchical-1`),
+`EmbeddedCkModelResourceTests.SystemCkModel_GeneratesTheFourInterfaces_AndTheQueryTypesImplementThem` (Runtime.Engine.Tests).
 
 ## CK Model Publishing Lanes (CI)
 

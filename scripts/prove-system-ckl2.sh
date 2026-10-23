@@ -11,7 +11,9 @@
 #      compared with the "before" build (identical, or equivalent = only the resolved dependency closure line moved, SemVer row D8).
 # Exit code != 0 when a claim is not met (a FINDING is never hidden). Rerunnable: the work directory is recreated.
 #
-# Usage: scripts/prove-system-ckl2.sh --monorepo DIR [--work DIR] [--ckc DLL] [--base-ref REF]
+# Usage: scripts/prove-system-ckl2.sh --monorepo DIR [--work DIR] [--ckc DLL] [--base-ref REF] [--additive]
+# --additive (AB#6929): the candidate adds elements to System (the four interfaces and their implements entries); the surface
+# comparison then only requires that nothing of the base was removed or changed (the diff may consist of added lines only).
 set -u -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,12 +23,14 @@ MONO="${OCTO_MONOREPO:-}"
 WORK="${TMPDIR:-/tmp}/ab6928-proof"
 CKC="$REPO/bin/DebugL/net10.0/octo-ckc.dll"
 BASE_REF="origin/main"
+ADDITIVE=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --monorepo) MONO="$2"; shift 2;;
     --work) WORK="$2"; shift 2;;
     --ckc) CKC="$2"; shift 2;;
     --base-ref) BASE_REF="$2"; shift 2;;
+    --additive) ADDITIVE=1; shift;;
     -h|--help) sed -n '2,16p' "$0"; exit 0;;
     *) echo "unknown option $1"; exit 64;;
   esac
@@ -160,8 +164,9 @@ PY
 cat_v2="$(find "$CAT2/ck-models/v2" -name 'ck-system-2.*.json' 2>/dev/null | sort | tail -1)"
 cat_v3="$(find "$CAT2/ck-models/v3" -path '*/System/*' -name 'ck-system-2.*.json' 2>/dev/null | sort | tail -3 | tr '\n' ' ')"
 say "    catalog: v3 = ${cat_v3##*/}; newest System file under v2: ${cat_v2##*/}"
-echo "$cat_v2" | grep -q "2\.6\.0" && finding "System 2.6.0 was written to ck-models/v2 (must be v3 only)"
-echo "$cat_v3" | grep -q "2\.6\.0" || finding "System 2.6.0 is missing under ck-models/v3"
+CAND_VER="${CAND_ID#System-}"
+echo "$cat_v2" | grep -q "${CAND_VER//./\\.}" && finding "System $CAND_VER was written to ck-models/v2 (must be v3 only)"
+echo "$cat_v3" | grep -q "${CAND_VER//./\\.}" || finding "System $CAND_VER is missing under ck-models/v3"
 
 # hash list and surface comparison, System before / after
 say; say "### SHA-256 of the compiled System (before / after) and the surface diff"
@@ -169,9 +174,11 @@ bf="$(ls "$OUT/system-base"/ck-*.yaml | head -1)"
 say "    before $(shasum -a 256 "$bf" | cut -c1-64)  $(basename "$bf")"
 say "    after  $(shasum -a 256 "$f" | cut -c1-64)  $(basename "$f")"
 # the public surface is identical when the version is normalised and the explicit modifiers / language keys are removed
-norm() { sed -e 's/System-2\.[56]\.0/System-X/g' -e '/^ *derivable: Any$/d' -e '/^ckLanguage:/d' -e '/^minEngineVersion:/d' "$1"; }
+norm() { sed -e 's/System-2\.[567]\.0/System-X/g' -e '/^ *derivable: Any$/d' -e '/^ckLanguage:/d' -e '/^minEngineVersion:/d' "$1"; }
 if diff <(norm "$bf") <(norm "$f") > "$CO/surface.diff"; then
   say "    surface identical: after normalising the version and removing the explicit 'derivable: Any', ckLanguage and minEngineVersion lines the compiled System 2.5.0 and 2.6.0 are byte-identical"
+elif [ $ADDITIVE -eq 1 ] && ! grep -q '^<' "$CO/surface.diff"; then
+  say "    surface additive: nothing of the base was removed or changed, $(grep -c '^>' "$CO/surface.diff") added lines (interfaces and implements entries)"
 else
   finding "compiled System surface differs beyond the explicit modifiers ($CO/surface.diff)"; head -20 "$CO/surface.diff" | sed 's/^/    /' | tee -a "$REPORT"
 fi

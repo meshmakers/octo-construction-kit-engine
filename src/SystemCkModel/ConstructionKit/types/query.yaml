@@ -6,6 +6,9 @@ types:
     derivedFromCkTypeId: ${this}/Entity
     isFinal: false
     isAbstract: true
+    implements:
+      - ${this}/Named-1
+      - ${this}/Describable-1
     attributes:
       - id: ${this}/Name
         name: Name

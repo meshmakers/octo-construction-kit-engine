@@ -1,0 +1,7 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+interfaces:
+  - interfaceId: Named-1
+    description: "Anything with a unique, human-readable name. Declares no index: an implementing type adds the index it needs for sorted queries through the interface."
+    attributes:
+      - id: ${this}/Name
+        name: Name

@@ -1,0 +1,7 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+interfaces:
+  - interfaceId: Enableable-1
+    description: "Anything that can be switched on and off."
+    attributes:
+      - id: ${this}/Enabled
+        name: Enabled

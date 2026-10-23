@@ -1,11 +1,13 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
   - typeId: Configuration
+    derivable: Any
     description: "Base type for all configuration types"
     derivedFromCkTypeId: ${this}/Entity
     isFinal: false
     isAbstract: true
   - typeId: TenantConfiguration
+    derivable: Any
     description: "Configuration for a tenant regarding data version of schema or identity data"
     derivedFromCkTypeId: ${this}/Configuration
     isFinal: true
@@ -15,6 +17,7 @@ types:
         name: ConfigurationValue
         isOptional: true
   - typeId: TenantModeConfiguration
+    derivable: Any
     description: "Configuration for a tenant if the tenant is in a specific mode, e.g. test mode or maintenance mode"
     derivedFromCkTypeId: ${this}/Configuration
     isFinal: true

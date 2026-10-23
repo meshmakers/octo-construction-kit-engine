@@ -1,6 +1,7 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
   - typeId: MigrationHistory
+    derivable: Any
     description: "Records executed CK model migrations per tenant. Each instance represents one migration execution from a source version to a target version."
     derivedFromCkTypeId: ${this}/Entity
     isFinal: true

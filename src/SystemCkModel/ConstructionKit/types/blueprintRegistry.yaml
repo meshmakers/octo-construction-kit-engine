@@ -1,6 +1,7 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
   - typeId: BlueprintInstallation
+    derivable: Any
     description: "Records a blueprint that is currently installed in the tenant. One entity per installed blueprint; replaced on update or re-apply, removed on uninstall."
     derivedFromCkTypeId: ${this}/Entity
     isFinal: true
@@ -29,6 +30,7 @@ types:
               - BlueprintName
 
   - typeId: BlueprintHistory
+    derivable: Any
     description: "Append-only audit log of blueprint apply operations in the tenant. One entity per apply (install, update, rollback, re-apply)."
     derivedFromCkTypeId: ${this}/Entity
     isFinal: true
@@ -65,6 +67,7 @@ types:
               - AppliedAt
 
   - typeId: BlueprintBackup
+    derivable: Any
     description: "Snapshot of seed entities captured immediately before a blueprint apply, used to support rollback."
     derivedFromCkTypeId: ${this}/Entity
     isFinal: true

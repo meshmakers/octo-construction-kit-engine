@@ -882,8 +882,10 @@ are members of their own. The rendered `signature` is still reported as a readab
 
 **Public types, stable bases, enums, records, attribute definitions (AB#6269).** A *stable base* is a type other
 models may derive from: in a `ckLanguage: 2` model a public, non-final type with effective `derivable: Any`; in a v1
-model only `System/Entity` and `System/Configuration` (derived, no meta-model field). Stable bases are public types,
-so T1–T7 apply to them unchanged.
+model only `System/Entity` and `System/Configuration` (derived, no meta-model field). Since System 2.6.0 (AB#6928) both
+are stable bases **by declaration** (`ckLanguage: 2`, public, not final, explicit `derivable: Any`); the name branch for
+v1 models stays for the System versions up to 2.5.x only (see "The System model on ckLanguage 2" below). Stable bases are
+public types, so T1–T7 apply to them unchanged.
 
 | Row | Change | Level |
 | --- | ------ | ----- |
@@ -943,6 +945,35 @@ dependency changed → Minor" is F2.4 (AB#5686).
 | D6 | Model switches from exact pins to range retention, or back (`rangeRetention`) | Minor, reason points to the one-time re-pin (F2.6); **Major** when the switch back to exact pins pins a version other than the one the previous release resolved (N3, 2026-10-10) |
 | D7 | `usedSurface` / `usedSurfaceHash` changed | not classified on its own (derived from the model's own changes); listed in `CkModelDiffService.ExcludedProperties` with that reason (AB#4472) |
 | D8 | The resolved dependency (closure entry) of a **range-retaining** model moved **up inside the dependency's major** (AB#5435), e.g. `System` 2.5.0 → 2.6.0 after a rebuild | **None** — no bump needed; the verdict line says why. The closure of a range-retaining model is compiler-set metadata (the same predicate, `CkClosureMove`, makes a rebuild an equivalent no-op in the publish gate, class (4) of the same-version rule); it only applies when the declared ranges and floors are unchanged. The model's references are major-qualified and bound at load, so the version the build resolved is not part of its surface; an additive base-model minor no longer forces a bump of every dependent (the cascade of AB#5432). Still Major: a version that goes down, a range or floor that excludes the previous resolution (D1–D4), a major switch, a removed dependency. **Exact-pinned (v1) models keep the Minor rule "compatible dependency version change"** (their compiled references are concrete) until the one-time re-pin (F2.6, AB#5688), which removes that branch |
+
+### The System model on ckLanguage 2 (AB#6928)
+
+System 2.6.0 is the first System with `ckLanguage: 2` and the release is a **Minor** against 2.5.0. Raising the language
+flips the `derivable` default from `Any` to `Model` (rows T6, and message 113 in every model that derives from the
+type), so every type and every record of the System declares `derivable: Any` explicitly. The other modifiers do not
+flip (`visibility` omitted = `Public`, attribute `access` omitted = `ReadWrite` in both languages). With that, the
+compiled System 2.5.0 and 2.6.0 are identical after the version, the explicit modifiers, `ckLanguage` and
+`minEngineVersion` are removed (checked by `scripts/prove-system-ckl2.sh`), and the verdict is:
+
+| Check | Result |
+| ----- | ------ |
+| `ValidateVersion` System-2.6.0 against System-2.5.0 | `MINOR bump -> minimum version 2.6.0`, `VALID` |
+| Same sources **without** the explicit `derivable: Any` | `OCTO-CK200`, a `derivable` change `Any -> Model` (Major, row T6) per type and record (the trap; `SystemCkLanguage2Tests.WithoutTheExplicitDerivableAny_TheSameSwitchWouldBeAMajor`) |
+| `ValidateCascade` over the 21 dependent models of the monorepo | 21 Compatible, 0 Breaks, 0 NeedsRepin |
+| The 21 dependents recompiled without editing a `ckModel.yaml` | 0 output changes; only the resolved `dependencies:` closure line moves (row D8) |
+| Unique index on `System/Entity` in a later System (row B4) | Major + acknowledgement, judged through the declared stable base, not through the name branch |
+
+New elements of the System default to `derivable: Model` like in any v2 model; a type that other models should derive
+from needs the explicit `derivable: Any`. The compiled System carries `minEngineVersion: 3.5.1` and is published under
+`ck-models/v3/` only, so an engine below 3.5.1 never sees it: a tenant served by such a service stays on 2.5.0, and the
+embedded-import downgrade guard keeps a newer installed System when an older service starts. **Publishing is not part of
+the story:** a service that embeds System 2.6 brings it to every tenant, and an exact-pinned model that is still
+installed would go `ResolveFailed`, so the publish waits for the exact-pin scan (F2.6).
+
+The v1 name branch of the classifier (`System/Entity`, `System/Configuration` as stable bases of a v1 model) is kept on
+purpose: the System 2.5.x sources and published files are ckLanguage 1 and are still compared (the proof scripts, the
+golden tests, a patch release of the 2.5 line). It has no effect on a v2 System. It goes away together with the last
+ckLanguage 1 System version, not earlier.
 
 ### usedSurface (AB#4472)
 

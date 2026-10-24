@@ -1551,7 +1551,8 @@ Semantics:
   must be a `RecordArray`; the match member and members must exist in the record (or a derived record); the match member must be
   String, Integer, Integer64 or Enum and cannot be written by the item update; members must be scalar (String, Integer, Integer64,
   Double, Boolean, DateTime, DateTimeOffset, TimeSpan, Enum); **`Secret` members are refused** (message 26); values are converted to the
-  member's CLR type and refused when they do not fit (a number is not stringified into a String member). Entries for the same item
+  member's CLR type and refused when they do not fit (a String member takes text and renders numbers, booleans and dates
+  as text - ISO-8601 for dates - because the pipeline data context turns ISO-8601 text into `DateTime`). Entries for the same item
   are merged, the last value wins.
 - **No match** (message 27, a *warning* in the caller's `OperationResult`, no exception, no `rtVersion` bump): when the info carries
   no regular attribute and no item matches - or the entity does not exist. Items that miss while others match are silent no-ops

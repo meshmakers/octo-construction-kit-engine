@@ -40,10 +40,11 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     }
 
     private EntityUpdateInfo(RtEntityId rtEntityId, TEntity rtEntity,
-        IEnumerable<RtRecordArrayItemUpdate> recordArrayItemUpdates)
+        IEnumerable<RtRecordArrayItemUpdate> recordArrayItemUpdates, IEnumerable<string>? clearSecretAttributes)
         : this(rtEntityId, rtEntity, EntityModOptions.Update)
     {
         RecordArrayItemUpdates = NormaliseItemUpdates(recordArrayItemUpdates);
+        ClearSecretAttributes = NormaliseClearList(clearSecretAttributes);
     }
 
     private EntityUpdateInfo(RtCkId<CkTypeId> ckTypeId, TEntity rtEntity, EntityModOptions modOption)
@@ -223,11 +224,12 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     /// <param name="rtEntityId">Runtime entity identifier for runtime id and construction kit type</param>
     /// <param name="rtEntity">Runtime entity with regular attribute updates (may carry no attributes)</param>
     /// <param name="recordArrayItemUpdates">The item updates; at least one</param>
+    /// <param name="clearSecretAttributes">Names (PascalCase) of Secret attributes to clear in the same statement (AB#5532)</param>
     public static EntityUpdateInfo<TEntity> CreateRecordArrayItemUpdate(RtEntityId rtEntityId, TEntity rtEntity,
-        IEnumerable<RtRecordArrayItemUpdate> recordArrayItemUpdates)
+        IEnumerable<RtRecordArrayItemUpdate> recordArrayItemUpdates, IEnumerable<string>? clearSecretAttributes = null)
     {
         ArgumentNullException.ThrowIfNull(recordArrayItemUpdates);
-        var info = new EntityUpdateInfo<TEntity>(rtEntityId, rtEntity, recordArrayItemUpdates);
+        var info = new EntityUpdateInfo<TEntity>(rtEntityId, rtEntity, recordArrayItemUpdates, clearSecretAttributes);
         if (info.RecordArrayItemUpdates == null)
         {
             throw new ArgumentException("At least one record array item update is required.",

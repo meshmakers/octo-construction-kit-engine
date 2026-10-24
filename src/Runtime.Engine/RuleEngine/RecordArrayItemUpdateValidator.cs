@@ -217,9 +217,11 @@ internal static class RecordArrayItemUpdateValidator
     }
 
     /// <summary>
-    ///     Converts <paramref name="raw" /> to the CLR type of <paramref name="valueType" />. A string is only accepted
-    ///     for a String member (a number is not silently stringified); everything else uses the lenient conversion of
-    ///     the regular write path and must end up with exactly the expected CLR type.
+    ///     Converts <paramref name="raw" /> to the CLR type of <paramref name="valueType" /> with the lenient conversion of
+    ///     the regular write path; the result must end up with exactly the expected CLR type, otherwise the value is
+    ///     refused. A String member takes text as it is and renders other scalars (numbers, booleans, dates as
+    ///     ISO-8601) as text - a pipeline cannot tell a date text from a date, its data context turns ISO-8601 text into
+    ///     <see cref="DateTime" />.
     /// </summary>
     internal static bool TryConvert(AttributeValueTypesDto valueType, object? raw, out object? converted)
     {
@@ -234,7 +236,16 @@ internal static class RecordArrayItemUpdateValidator
         {
             if (valueType == AttributeValueTypesDto.String)
             {
-                if (value is not string text)
+                var text = value switch
+                {
+                    string s => s,
+                    DateTime dateTime => dateTime.ToString("O", CultureInfo.InvariantCulture),
+                    DateTimeOffset dateTimeOffset => dateTimeOffset.ToString("O", CultureInfo.InvariantCulture),
+                    bool or sbyte or byte or short or ushort or int or uint or long or ulong or float or double
+                        or decimal => Convert.ToString(value, CultureInfo.InvariantCulture),
+                    _ => null
+                };
+                if (text == null)
                 {
                     return false;
                 }

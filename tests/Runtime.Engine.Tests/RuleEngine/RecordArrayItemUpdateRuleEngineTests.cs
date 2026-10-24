@@ -30,11 +30,12 @@ public class RecordArrayItemUpdateRuleEngineTests(CacheServiceFixture fixture) :
     }
 
     private static EntityUpdateInfo<RtEntity> Info(RtRecordArrayItemUpdate update,
-        Dictionary<string, object?>? regularAttributes = null)
+        Dictionary<string, object?>? regularAttributes = null, OctoObjectId? id = null)
     {
-        var id = new RtEntityId("Test/Country", EntityId);
-        var entity = new RtEntity("Test/Country", EntityId, regularAttributes ?? new Dictionary<string, object?>());
-        return EntityUpdateInfo<RtEntity>.CreateRecordArrayItemUpdate(id, entity, [update]);
+        var entityId = id ?? EntityId;
+        var rtId = new RtEntityId("Test/Country", entityId);
+        var entity = new RtEntity("Test/Country", entityId, regularAttributes ?? new Dictionary<string, object?>());
+        return EntityUpdateInfo<RtEntity>.CreateRecordArrayItemUpdate(rtId, entity, [update]);
     }
 
     private static RtRecordArrayItemUpdate Update(string attribute = "RecordArrayTests", string match = "Designation",
@@ -140,14 +141,34 @@ public class RecordArrayItemUpdateRuleEngineTests(CacheServiceFixture fixture) :
     }
 
     [Fact]
-    public async Task NumberForStringMember_IsRefused_NotStringified()
+    public async Task StringMember_TakesScalars_AsText()
     {
-        var (_, operation) = await ValidateAsync(Info(Update(matchValue: "A", members: new Dictionary<string, object?>
-        {
-            ["Designation"] = 12
-        })));
+        // DataCount (Integer) identifies the item, Designation (String) is written with a number and a date.
+        var (result, operation) = await ValidateAsync(
+            Info(Update(match: "DataCount", matchValue: 5, members: new Dictionary<string, object?>
+            {
+                ["Designation"] = 12
+            })),
+            Info(Update(match: "DataCount", matchValue: 6, members: new Dictionary<string, object?>
+            {
+                ["Designation"] = new DateTime(2026, 10, 24, 12, 0, 0, DateTimeKind.Utc)
+            }), id: OctoObjectId.Parse("67628789d10f47d162164d35")));
 
-        // Designation is the match member here: refused because it cannot be written by the item update
+        Assert.Empty(operation.Messages);
+        var items = result.RecordArrayItemUpdates.Values.SelectMany(v => v).ToList();
+        Assert.Equal("12", items.Single(i => (int)i.MatchValue == 5).MemberUpdates["Designation"]);
+        Assert.Equal("2026-10-24T12:00:00.0000000Z", items.Single(i => (int)i.MatchValue == 6).MemberUpdates["Designation"]);
+    }
+
+    [Fact]
+    public async Task ObjectForStringMember_IsRefused()
+    {
+        var (_, operation) = await ValidateAsync(
+            Info(Update(match: "DataCount", matchValue: 5, members: new Dictionary<string, object?>
+            {
+                ["Designation"] = new Dictionary<string, object?>()
+            })));
+
         Assert.Equal(25, Assert.Single(operation.Messages).MessageNumber);
     }
 
@@ -230,6 +251,26 @@ public class RecordArrayItemUpdateRuleEngineTests(CacheServiceFixture fixture) :
         Assert.Equal("Designation", item.MatchMember);
         Assert.Equal("A", item.MatchValue);
         Assert.Equal(3L, Convert.ToInt64(item.MemberUpdates["DataCount"]));
+    }
+
+    [Fact]
+    public async Task ItemUpdates_SurviveASystemTextJsonRoundTrip_AndStillValidate()
+    {
+        // The pipeline carries the update info through the data context, serialised with System.Text.Json.
+        var info = Info(Update(matchValue: "A", members: new Dictionary<string, object?> { ["DataCount"] = 3 }));
+
+        var json = System.Text.Json.JsonSerializer.Serialize(info, RtSystemTextJsonSerializer.Default);
+        var clone = System.Text.Json.JsonSerializer.Deserialize<EntityUpdateInfo<RtEntity>>(json,
+            RtSystemTextJsonSerializer.Default)!;
+
+        var item = Assert.Single(clone.RecordArrayItemUpdates!);
+        Assert.Equal("RecordArrayTests", item.AttributeName);
+        Assert.Equal("Designation", item.MatchMember);
+        var (result, operation) = await ValidateAsync(clone);
+        Assert.Empty(operation.Messages);
+        var validated = Assert.Single(Assert.Single(result.RecordArrayItemUpdates).Value);
+        Assert.Equal("A", validated.MatchValue);
+        Assert.Equal(3, validated.MemberUpdates["DataCount"]);
     }
 
     [Fact]

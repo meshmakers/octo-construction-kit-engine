@@ -5,7 +5,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
-using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
+using Meshmakers.Octo.Runtime.Engine.Exchange;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 
 namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
@@ -30,39 +30,13 @@ internal static class BlueprintGenericCreateGuard
     internal static async Task<IReadOnlyList<OperationMessage>> FindRefusalsAsync(
         ICkCacheService ckCacheService, IRuntimeRepository repository, IEnumerable<RtEntityTcDto> entities)
     {
-        var refusals = new List<OperationMessage>();
-        IOctoSession? session = null;
+        var offenders = await GenericCreateNewEntityCheck.FindAsync(ckCacheService, repository, null,
+            entities.Where(e => e.CkTypeId != null).Select(e => (e.CkTypeId, e.RtId))).ConfigureAwait(false);
 
-        foreach (var typeGroup in entities.Where(e => e.CkTypeId != null).GroupBy(e => e.CkTypeId))
-        {
-            if (!GenericCreateReplacement.TryGetReplacingMethod(ckCacheService, repository.TenantId, typeGroup.Key,
-                    out var method))
-            {
-                continue;
-            }
-
-            var candidates = typeGroup.ToList();
-            var rtIds = candidates.Select(e => e.RtId).Where(id => !id.Equals(OctoObjectId.Empty)).Distinct()
-                .ToList();
-            var stored = new HashSet<OctoObjectId>();
-            if (rtIds.Count > 0)
-            {
-                session ??= await repository.GetSessionAsync().ConfigureAwait(false);
-                var result = await repository.GetRtEntitiesByIdAsync(session, typeGroup.Key, rtIds,
-                    RtEntityQueryOptions.Create(), take: rtIds.Count).ConfigureAwait(false);
-                stored.UnionWith(result.Items.Select(e => e.RtId));
-            }
-
-            foreach (var entity in candidates.Where(e => !stored.Contains(e.RtId)))
-            {
-                refusals.Add(MessageCodes.BlueprintSeedCreateReplacedByMethod(
-                    $"{typeGroup.Key.SemanticVersionedFullName}@{entity.RtId}", entity.RtId,
-                    typeGroup.Key.SemanticVersionedFullName, method.QualifiedMethodId,
-                    GenericCreateReplacement.ReasonToken));
-            }
-        }
-
-        return refusals;
+        return offenders.Select(o => MessageCodes.BlueprintSeedCreateReplacedByMethod(
+                $"{o.CkTypeId.SemanticVersionedFullName}@{o.RtId}", o.RtId, o.CkTypeId.SemanticVersionedFullName,
+                o.Method.QualifiedMethodId, GenericCreateReplacement.ReasonToken))
+            .ToList();
     }
 
     /// <summary>The refusal as a single error string for the string-based result channels.</summary>

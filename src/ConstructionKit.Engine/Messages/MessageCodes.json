@@ -713,6 +713,12 @@
       "number": 136,
       "level": "ERROR",
       "text": "Blueprint apply refused: the new entity '{rtId}' of type '{ckTypeId}' cannot be created from seed data because method '{methodId}' replaces the generic create (reason {reason})"
+    },
+    {
+      "key": "ImportRtCreateReplacedByMethod",
+      "number": 137,
+      "level": "ERROR",
+      "text": "Import refused: the new entity '{rtId}' of type '{ckTypeId}' cannot be created by an import because method '{methodId}' replaces the generic create (reason {reason})"
     }
   ]
 }

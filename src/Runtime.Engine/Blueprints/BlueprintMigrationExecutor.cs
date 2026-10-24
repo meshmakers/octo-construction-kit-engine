@@ -330,6 +330,16 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
             Entities = [entityDto]
         };
 
+        // AB#7121: a migration never runs a CK method, so its Add step must not create a new entity of a type whose
+        // method replaces the generic create (an existing rtId is upserted as before).
+        var createRefusals = await BlueprintGenericCreateGuard
+            .FindRefusalsAsync(_ckCacheService, repository, root.Entities).ConfigureAwait(false);
+        if (createRefusals.Count > 0)
+        {
+            throw new InvalidOperationException(string.Join("; ",
+                createRefusals.Select(BlueprintGenericCreateGuard.ToErrorString)));
+        }
+
         await _importRtModelCommand.ImportModelAsync(
             repository, root, ImportStrategy.Upsert, cancellationToken).ConfigureAwait(false);
 

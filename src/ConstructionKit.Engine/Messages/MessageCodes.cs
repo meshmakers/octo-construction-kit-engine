@@ -379,6 +379,9 @@ internal static class MessageCodes
     internal static OperationMessage CkMethodDataAccessInvalid(string? location, object methodId, object ckTypeId, object reason) =>
         GetMessage("CkMethodDataAccessInvalid", location, methodId, ckTypeId, reason);
 
+    internal static OperationMessage BlueprintSeedCreateReplacedByMethod(string? location, object rtId, object ckTypeId, object methodId, object reason) =>
+        GetMessage("BlueprintSeedCreateReplacedByMethod", location, rtId, ckTypeId, methodId, reason);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1088,6 +1091,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  135, "Method '{methodId}' of '{ckTypeId}' declares an invalid 'authorization.dataAccess': {reason}",
                  new [] {"methodId", "ckTypeId", "reason"})
+        },
+        {
+            "BlueprintSeedCreateReplacedByMethod",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 136, "Blueprint apply refused: the new entity '{rtId}' of type '{ckTypeId}' cannot be created from seed data because method '{methodId}' replaces the generic create (reason {reason})",
+                 new [] {"rtId", "ckTypeId", "methodId", "reason"})
         },
     };
 }

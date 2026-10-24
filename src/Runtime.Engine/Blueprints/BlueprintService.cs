@@ -2338,6 +2338,27 @@ internal class BlueprintService : IBlueprintService
 
         if (entitiesToImport.Count > 0)
         {
+            // AB#7121: refuse a new entity of a type whose method replaces the generic create, before any write
+            // (an entity whose rtId exists in the tenant is upserted as before). Not softened by ContinueOnError.
+            try
+            {
+                var createRefusals = await BlueprintGenericCreateGuard
+                    .FindRefusalsAsync(_ckCacheService, repository, entitiesToImport).ConfigureAwait(false);
+                if (createRefusals.Count > 0)
+                {
+                    result.Errors.AddRange(createRefusals.Select(BlueprintGenericCreateGuard.ToErrorString));
+                    result.Success = false;
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking blueprint entities for {BlueprintId}", targetVersion);
+                result.Errors.Add($"Failed to check blueprint entities: {ex.Message}");
+                result.Success = false;
+                return;
+            }
+
             try
             {
                 var importRoot = new RtModelRootTcDto
@@ -3013,6 +3034,23 @@ internal class BlueprintService : IBlueprintService
                     repository, seedRoot, blueprint.BlueprintId, previousVersion, variables, operationResult,
                     cancellationToken)
                 .ConfigureAwait(false);
+
+            // AB#7121: a seed never runs a CK method, so it must not create a new entity of a type whose
+            // method replaces the generic create. Refused before anything of this blueprint is written.
+            var createRefusals = await BlueprintGenericCreateGuard
+                .FindRefusalsAsync(_ckCacheService, repository, seedRoot.Entities).ConfigureAwait(false);
+            if (createRefusals.Count > 0)
+            {
+                foreach (var refusal in createRefusals)
+                {
+                    operationResult.AddMessage(refusal);
+                }
+
+                _logger.LogWarning(
+                    "Seed data of blueprint {BlueprintId} refused: {Count} new entity(ies) of types whose method replaces the generic create",
+                    blueprint.BlueprintId, createRefusals.Count);
+                return 0;
+            }
 
             await _importRtModelCommand.ImportModelAsync(
                 repository, seedRoot, ImportStrategy.Upsert, cancellationToken).ConfigureAwait(false);

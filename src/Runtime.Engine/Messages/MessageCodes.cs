@@ -102,6 +102,15 @@ internal static class MessageCodes
     internal static OperationMessage MandatorySecretMissing(string? location, object tenantId, object attributePath, object rtEntityCkTypeId, object rtId) =>
         GetMessage("MandatorySecretMissing", location, tenantId, attributePath, rtEntityCkTypeId, rtId);
 
+    internal static OperationMessage RecordArrayItemUpdateInvalid(string? location, object tenantId, object rtEntityCkTypeId, object rtId, object attributeName, object memberName, object reason) =>
+        GetMessage("RecordArrayItemUpdateInvalid", location, tenantId, rtEntityCkTypeId, rtId, attributeName, memberName, reason);
+
+    internal static OperationMessage RecordArrayItemUpdateSecretMember(string? location, object tenantId, object rtEntityCkTypeId, object rtId, object attributeName, object memberName) =>
+        GetMessage("RecordArrayItemUpdateSecretMember", location, tenantId, rtEntityCkTypeId, rtId, attributeName, memberName);
+
+    internal static OperationMessage RecordArrayItemNotMatched(string? location, object tenantId, object rtEntityCkTypeId, object rtId, object attributeNames) =>
+        GetMessage("RecordArrayItemNotMatched", location, tenantId, rtEntityCkTypeId, rtId, attributeNames);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -247,6 +256,24 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.FatalError,
                  24, "{tenantId}: Mandatory Secret attribute '{attributePath}' of entity '{rtEntityCkTypeId}@{rtId}' has no value (empty values count as not set).",
                  ["tenantId", "attributePath", "rtEntityCkTypeId", "rtId"])
+        },
+        {
+            "RecordArrayItemUpdateInvalid",
+             new OperationMessageTemplate(MessageLevel.FatalError,
+                 25, "{tenantId}: Record array item update of entity '{rtEntityCkTypeId}@{rtId}' is invalid at attribute '{attributeName}', member '{memberName}': {reason}",
+                 ["tenantId", "rtEntityCkTypeId", "rtId", "attributeName", "memberName", "reason"])
+        },
+        {
+            "RecordArrayItemUpdateSecretMember",
+             new OperationMessageTemplate(MessageLevel.FatalError,
+                 26, "{tenantId}: Record array item update of entity '{rtEntityCkTypeId}@{rtId}' cannot write member '{memberName}' of attribute '{attributeName}': it is a Secret member, secrets are not written by item updates.",
+                 ["tenantId", "rtEntityCkTypeId", "rtId", "attributeName", "memberName"])
+        },
+        {
+            "RecordArrayItemNotMatched",
+             new OperationMessageTemplate(MessageLevel.Warning,
+                 27, "{tenantId}: No item of the record array(s) '{attributeNames}' of entity '{rtEntityCkTypeId}@{rtId}' matched the record array item update (or the entity does not exist); nothing was written.",
+                 ["tenantId", "rtEntityCkTypeId", "rtId", "attributeNames"])
         },
     };
 }

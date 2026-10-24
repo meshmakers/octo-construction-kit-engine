@@ -3,6 +3,7 @@ using System.Linq.Expressions;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
+using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
 namespace Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 
@@ -119,6 +120,67 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto>(
         // during a rolling restart) cannot happen here. Apply the update unconditionally
         // — the guard is a no-op in this backend.
         await UpdateOneAsync(session, new[] { document }).ConfigureAwait(false);
+        return true;
+    }
+
+    public async Task<bool> UpdateOneWithRecordArrayItemsAsync(IOctoSession session, TDocument document,
+        IReadOnlyCollection<RtRecordArrayItemUpdate> itemUpdates, bool requireItemMatch)
+    {
+        await LoadAsync().ConfigureAwait(false);
+
+        var key = dataSourceMapper.GetId(document);
+        _rtEntities.TryGetValue(key, out var savedDocument);
+        if (savedDocument == null)
+        {
+            if (requireItemMatch)
+            {
+                return false;
+            }
+
+            throw RuntimeRepositoryException.DocumentDoesNotExist(tenantId, key, typeof(TDocument));
+        }
+
+        if (savedDocument is not RtTypeWithAttributes savedAttributes)
+        {
+            throw new NotSupportedException(
+                $"Record array item updates are not supported for documents of type '{typeof(TDocument).Name}'.");
+        }
+
+        var matched = false;
+        foreach (var itemUpdate in itemUpdates)
+        {
+            if (!savedAttributes.Attributes.TryGetValue(itemUpdate.AttributeName, out var arrayValue) ||
+                arrayValue is not IEnumerable<object> items)
+            {
+                continue;
+            }
+
+            foreach (var item in items.OfType<RtRecord>())
+            {
+                if (!item.Attributes.TryGetValue(itemUpdate.MatchMember, out var storedKey) ||
+                    !string.Equals(Convert.ToString(storedKey, System.Globalization.CultureInfo.InvariantCulture),
+                        Convert.ToString(itemUpdate.MatchValue, System.Globalization.CultureInfo.InvariantCulture),
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                matched = true;
+                foreach (var memberUpdate in itemUpdate.MemberUpdates)
+                {
+                    item.SetAttributeRawValue(memberUpdate.Key, memberUpdate.Value);
+                }
+            }
+        }
+
+        if (requireItemMatch && !matched)
+        {
+            return false;
+        }
+
+        // Regular attribute updates and the change tracking fields go through the same mapper as UpdateOneAsync.
+        dataSourceMapper.Apply(savedDocument, document);
+        await SaveAsync().ConfigureAwait(false);
         return true;
     }
 

@@ -61,6 +61,30 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     Task<bool> UpdateOneIfGuardMatchesAsync(IOctoSession session, TDocument document, AttributeNewerThanGuard guard);
 
     /// <summary>
+    ///     Updates a single document and, in the same atomic statement, single items of its <c>RecordArray</c>
+    ///     attributes (AB#7445, see <see cref="RtRecordArrayItemUpdate" />). The stored document is not read first
+    ///     and no version is compared, so concurrent updates of different items of the same entity never lose
+    ///     each other; concurrent updates of the same item keep the last write.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="document">
+    ///     Document with the regular attribute updates (may carry no attributes); the id is taken from this document.
+    ///     The names and values of <paramref name="itemUpdates" /> are already validated and converted.
+    /// </param>
+    /// <param name="itemUpdates">The item updates; at least one</param>
+    /// <param name="requireItemMatch">
+    ///     <c>true</c>: the write is skipped when no item of any entry matches (the document carries nothing else to
+    ///     write). <c>false</c>: the regular attribute updates are written regardless; a missing document is an error
+    ///     as for <see cref="UpdateOneAsync" />.
+    /// </param>
+    /// <returns>
+    ///     <c>true</c> if the document was written; <c>false</c> if <paramref name="requireItemMatch" /> was set and
+    ///     the document is absent or none of the items matched - nothing was written (no version bump).
+    /// </returns>
+    Task<bool> UpdateOneWithRecordArrayItemsAsync(IOctoSession session, TDocument document,
+        IReadOnlyCollection<RtRecordArrayItemUpdate> itemUpdates, bool requireItemMatch);
+
+    /// <summary>
     /// Updates multiple documents in the collection based on a filter expression
     /// </summary>
     /// <param name="session">The session object</param>

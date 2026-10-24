@@ -13,13 +13,15 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     [Newtonsoft.Json.JsonConstructor]
     [System.Text.Json.Serialization.JsonConstructor]
     private EntityUpdateInfo(OctoObjectId? rtId, RtCkId<CkTypeId> ckTypeId, TEntity? rtEntity, EntityModOptions modOption,
-        IReadOnlyCollection<string>? clearSecretAttributes = null)
+        IReadOnlyCollection<string>? clearSecretAttributes = null,
+        IReadOnlyCollection<RtRecordArrayItemUpdate>? recordArrayItemUpdates = null)
     {
         RtId = rtId;
         CkTypeId = ckTypeId;
         ModOption = modOption;
         RtEntity = rtEntity;
         ClearSecretAttributes = NormaliseClearList(clearSecretAttributes);
+        RecordArrayItemUpdates = NormaliseItemUpdates(recordArrayItemUpdates);
     }
 
     private EntityUpdateInfo(RtEntityId rtEntityId, TEntity rtEntity, EntityModOptions modOption)
@@ -35,6 +37,13 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
         RtEntity = rtEntity;
         UpdateGuard = updateGuard;
         ClearSecretAttributes = NormaliseClearList(clearSecretAttributes);
+    }
+
+    private EntityUpdateInfo(RtEntityId rtEntityId, TEntity rtEntity,
+        IEnumerable<RtRecordArrayItemUpdate> recordArrayItemUpdates)
+        : this(rtEntityId, rtEntity, EntityModOptions.Update)
+    {
+        RecordArrayItemUpdates = NormaliseItemUpdates(recordArrayItemUpdates);
     }
 
     private EntityUpdateInfo(RtCkId<CkTypeId> ckTypeId, TEntity rtEntity, EntityModOptions modOption)
@@ -84,6 +93,15 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     [Newtonsoft.Json.JsonProperty(NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyCollection<string>? ClearSecretAttributes { get; }
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Serialized (both Newtonsoft and System.Text.Json); omitted from the wire when not set, so the shape of
+    ///     every existing update info is unchanged.
+    /// </remarks>
+    [Newtonsoft.Json.JsonProperty(NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyCollection<RtRecordArrayItemUpdate>? RecordArrayItemUpdates { get; }
 
     /// <inheritdoc />
     public RtEntityId GetRtEntityId()
@@ -194,6 +212,41 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     {
         return new EntityUpdateInfo<TEntity>(rtEntityId, rtEntity, EntityModOptions.Replace, null,
             clearSecretAttributes);
+    }
+
+    /// <summary>
+    ///     Creates a new instance of <see cref="EntityUpdateInfo{TEntity}" /> for update that changes single items of
+    ///     <c>RecordArray</c> attributes atomically, without reading the stored entity (AB#7445, see
+    ///     <see cref="RtRecordArrayItemUpdate" />). <paramref name="rtEntity" /> carries regular attribute updates
+    ///     that are written in the same statement; it may carry no attributes when only items are updated.
+    /// </summary>
+    /// <param name="rtEntityId">Runtime entity identifier for runtime id and construction kit type</param>
+    /// <param name="rtEntity">Runtime entity with regular attribute updates (may carry no attributes)</param>
+    /// <param name="recordArrayItemUpdates">The item updates; at least one</param>
+    public static EntityUpdateInfo<TEntity> CreateRecordArrayItemUpdate(RtEntityId rtEntityId, TEntity rtEntity,
+        IEnumerable<RtRecordArrayItemUpdate> recordArrayItemUpdates)
+    {
+        ArgumentNullException.ThrowIfNull(recordArrayItemUpdates);
+        var info = new EntityUpdateInfo<TEntity>(rtEntityId, rtEntity, recordArrayItemUpdates);
+        if (info.RecordArrayItemUpdates == null)
+        {
+            throw new ArgumentException("At least one record array item update is required.",
+                nameof(recordArrayItemUpdates));
+        }
+
+        return info;
+    }
+
+    private static IReadOnlyCollection<RtRecordArrayItemUpdate>? NormaliseItemUpdates(
+        IEnumerable<RtRecordArrayItemUpdate>? itemUpdates)
+    {
+        if (itemUpdates == null)
+        {
+            return null;
+        }
+
+        var list = itemUpdates.Where(u => u != null).ToList();
+        return list.Count == 0 ? null : list.AsReadOnly();
     }
 
     private static IReadOnlyCollection<string>? NormaliseClearList(IEnumerable<string>? clearSecretAttributes)

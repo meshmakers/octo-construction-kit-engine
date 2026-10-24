@@ -28,10 +28,21 @@ internal class BulkRtMutation(
     public ISecretWriteNormalizer SecretWriteNormalizer => secretWriteNormalizer;
 
     /// <inheritdoc />
-    public async Task ApplyChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+    public Task ApplyChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         ICkCacheService ckCacheService,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, BulkRtMutationOptions options)
+    {
+        return ApplyChangesAsync(session, repositoryDataSource, ckCacheService, entityUpdateInfoList,
+            associationUpdateInfoList, options, new OperationResult());
+    }
+
+    /// <inheritdoc />
+    public async Task ApplyChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        ICkCacheService ckCacheService,
+        IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
+        IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, BulkRtMutationOptions options,
+        OperationResult callerResult)
     {
         foreach (var entityUpdateInfo in entityUpdateInfoList)
         {
@@ -55,7 +66,8 @@ internal class BulkRtMutation(
 
         RuntimeRepositoryException.ThrowIfOperationResultError(operationResult);
 
-        await ApplyRtEntityChangesAsync(session, repositoryDataSource, ckCacheService, entityValidatorResult, options)
+        await ApplyRtEntityChangesAsync(session, repositoryDataSource, ckCacheService, entityValidatorResult, options,
+                callerResult)
             .ConfigureAwait(false);
         await ApplyRtAssociationChangesAsync(session, repositoryDataSource, graphValidationResult)
             .ConfigureAwait(false);
@@ -63,7 +75,8 @@ internal class BulkRtMutation(
 
     private async Task ApplyRtEntityChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         ICkCacheService ckCacheService,
-        EntityRuleEngineResult<RtEntity> entityRuleEngineResult, BulkRtMutationOptions options)
+        EntityRuleEngineResult<RtEntity> entityRuleEngineResult, BulkRtMutationOptions options,
+        OperationResult callerResult)
     {
         if (entityRuleEngineResult.RtEntitiesToDelete.Any())
         {
@@ -74,7 +87,8 @@ internal class BulkRtMutation(
         if (entityRuleEngineResult.RtEntitiesToUpdate.Any())
         {
             await UpdateRtEntities(session, repositoryDataSource, ckCacheService,
-                entityRuleEngineResult.RtEntitiesToUpdate, entityRuleEngineResult.UpdateGuards)
+                entityRuleEngineResult.RtEntitiesToUpdate, entityRuleEngineResult.UpdateGuards,
+                entityRuleEngineResult.RecordArrayItemUpdates, callerResult)
                 .ConfigureAwait(false);
         }
 
@@ -177,7 +191,9 @@ internal class BulkRtMutation(
     private async Task UpdateRtEntities(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         ICkCacheService ckCacheService,
         IReadOnlyDictionary<RtEntityId, RtEntity> rtEntities,
-        IReadOnlyDictionary<RtEntityId, AttributeNewerThanGuard> updateGuards)
+        IReadOnlyDictionary<RtEntityId, AttributeNewerThanGuard> updateGuards,
+        IReadOnlyDictionary<RtEntityId, IReadOnlyList<RtRecordArrayItemUpdate>> recordArrayItemUpdates,
+        OperationResult callerResult)
     {
         foreach (var rtEntityGrouping in rtEntities.GroupBy(x => x.Key.CkTypeId))
         {
@@ -187,14 +203,17 @@ internal class BulkRtMutation(
             }
 
             await UpdateRtEntitiesByCkId(session, repositoryDataSource, ckCacheService,
-                rtEntityGrouping.Key, rtEntityGrouping, updateGuards).ConfigureAwait(false);
+                rtEntityGrouping.Key, rtEntityGrouping, updateGuards, recordArrayItemUpdates, callerResult)
+                .ConfigureAwait(false);
         }
     }
 
     private async Task UpdateRtEntitiesByCkId(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         ICkCacheService ckCacheService,
         RtCkId<CkTypeId> ckTypeId, IGrouping<RtCkId<CkTypeId>, KeyValuePair<RtEntityId, RtEntity>> rtEntityGrouping,
-        IReadOnlyDictionary<RtEntityId, AttributeNewerThanGuard> updateGuards)
+        IReadOnlyDictionary<RtEntityId, AttributeNewerThanGuard> updateGuards,
+        IReadOnlyDictionary<RtEntityId, IReadOnlyList<RtRecordArrayItemUpdate>> recordArrayItemUpdates,
+        OperationResult callerResult)
     {
         var ckTypeGraph = ckCacheService.GetRtCkType(repositoryDataSource.TenantId, ckTypeId);
         var collection = repositoryDataSource.GetRtCollection<RtEntity>(ckTypeGraph);
@@ -287,7 +306,23 @@ internal class BulkRtMutation(
         var unguardedEntities = new List<RtEntity>();
         foreach (var keyValuePair in rtEntityGrouping)
         {
-            if (updateGuards.TryGetValue(keyValuePair.Key, out var guard))
+            if (recordArrayItemUpdates.TryGetValue(keyValuePair.Key, out var itemUpdates))
+            {
+                // AB#7445: regular attribute updates and the item updates go out as ONE atomic statement; the stored
+                // entity is not read. Without regular attributes the write is skipped when no item matches (no
+                // version bump) and reported as a warning, as UpdateRecordArrayItem skips a missing item.
+                var requireItemMatch = keyValuePair.Value.Attributes.Count == 0;
+                var written = await collection
+                    .UpdateOneWithRecordArrayItemsAsync(session, keyValuePair.Value, itemUpdates, requireItemMatch)
+                    .ConfigureAwait(false);
+                if (!written)
+                {
+                    callerResult.AddMessage(MessageCodes.RecordArrayItemNotMatched(
+                        null, repositoryDataSource.TenantId, keyValuePair.Key.CkTypeId, keyValuePair.Key.RtId,
+                        string.Join(", ", itemUpdates.Select(u => u.AttributeName).Distinct())));
+                }
+            }
+            else if (updateGuards.TryGetValue(keyValuePair.Key, out var guard))
             {
                 await collection.UpdateOneIfGuardMatchesAsync(session, keyValuePair.Value, guard)
                     .ConfigureAwait(false);

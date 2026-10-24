@@ -74,6 +74,8 @@ public class ExchangeException : PersistenceException
     /// <c>replacesGenericCreate</c>: only the method may create them, exactly as the GraphQL generic create refuses
     /// them. Raised before anything is written; one failure that lists every offender, each with its parameters.
     /// </summary>
+    private const int MaxOffendersInMessage = 20;
+
     internal static Exception GenericCreateReplacedByMethod(IReadOnlyList<OperationMessage> offenders)
     {
         var first = offenders[0];
@@ -82,7 +84,10 @@ public class ExchangeException : PersistenceException
             $"Import rejected [{first.MessageNumber}] {reason}: {offenders.Count} new entit" +
             (offenders.Count == 1 ? "y" : "ies") +
             " cannot be created by an import because a method replaces the generic create of its type. " +
-            $"Nothing was written. {string.Join("; ", offenders.Select(o => o.MessageText))}", first.MessageNumber)
+            $"Nothing was written. {string.Join("; ", offenders.Take(MaxOffendersInMessage).Select(o => o.MessageText))}" +
+            (offenders.Count > MaxOffendersInMessage
+                ? $"; and {offenders.Count - MaxOffendersInMessage} more (see Messages)"
+                : string.Empty), first.MessageNumber)
         {
             Messages = offenders
         };

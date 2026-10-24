@@ -280,6 +280,24 @@ public class ImportRtModelCommandGenericCreateTests : IDisposable
     }
 
     [Fact]
+    public async Task ManyOffenders_AllAreInMessages_ButTheExceptionTextNamesOnlyTheFirstTwenty()
+    {
+        var h = new Harness();
+        var offenders = Enumerable.Range(0, 25).Select(_ => Dto(AccountType)).ToArray();
+        h.YamlReturns(offenders);
+
+        var ex = await Assert.ThrowsAsync<ExchangeException>(() => h.CreateCommand()
+            .ImportAsCallerAsync(h.Repository, TempFile(), ExchangeMimeTypes.MimeTypeYaml, ImportStrategy.Insert,
+                User));
+
+        Assert.Equal(25, ex.Messages.Count);
+        Assert.Contains(offenders[0].RtId.ToString(), ex.Message);
+        Assert.Contains(offenders[19].RtId.ToString(), ex.Message);
+        Assert.DoesNotContain(offenders[20].RtId.ToString(), ex.Message);
+        Assert.Contains("and 5 more", ex.Message);
+    }
+
+    [Fact]
     public async Task ExistingEntityOfFlaggedType_Upsert_IsUpdatedAsBefore()
     {
         var h = new Harness();

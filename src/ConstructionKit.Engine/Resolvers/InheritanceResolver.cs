@@ -644,25 +644,29 @@ internal class InheritanceResolver : IInheritanceResolver
         }
 
         string? reason = null;
+        string? explanation = null;
         if (isInterfaceMethod)
         {
-            reason = "not allowed on an interface method — an interface has no entities of its own; declare the " +
+            reason = ReplacesGenericCreateReasons.InterfaceMethod;
+            explanation = "not allowed on an interface method — an interface has no entities of its own; declare the " +
                      "static method with the flag on the concrete type";
         }
         else if (method.Kind != CkMethodKindDto.Static)
         {
-            reason = "only a 'kind: Static' method can replace the generic create — an instance method needs an " +
+            reason = ReplacesGenericCreateReasons.InstanceMethod;
+            explanation = "only a 'kind: Static' method can replace the generic create — an instance method needs an " +
                      "existing entity";
         }
         else if (isAbstractType)
         {
-            reason = "not allowed on an abstract type — it is never instantiated; declare the method on a concrete type";
+            reason = ReplacesGenericCreateReasons.AbstractType;
+            explanation = "not allowed on an abstract type — it is never instantiated; declare the method on a concrete type";
         }
 
-        if (reason != null)
+        if (reason != null && explanation != null)
         {
             operationResult.AddMessage(MessageCodes.CkMethodReplacesGenericCreateInvalid(location, method.MethodId,
-                ckTypeId, reason));
+                ckTypeId, reason, explanation));
         }
     }
 
@@ -689,9 +693,21 @@ internal class InheritanceResolver : IInheritanceResolver
         foreach (var method in typeGraph.DefinedMethods.Where(m => m.ReplacesGenericCreate))
         {
             operationResult.AddMessage(MessageCodes.CkMethodReplacesGenericCreateInvalid(location, method.MethodId,
-                ckTypeId, "at most one method per concrete type — including inherited ones — may replace the generic " +
+                ckTypeId, ReplacesGenericCreateReasons.MultipleMethods, "at most one method per concrete type — including inherited ones — may replace the generic " +
                           $"create, but the type has {flagged.Count}: {string.Join(", ", flagged)}"));
         }
+    }
+
+    /// <summary>
+    ///     The stable <c>reason</c> tokens of message 133 (<c>Parameters["reason"]</c>). They are a published contract
+    ///     (see messageCodes.md): never rename or reuse one.
+    /// </summary>
+    internal static class ReplacesGenericCreateReasons
+    {
+        internal const string InstanceMethod = "instanceMethod";
+        internal const string InterfaceMethod = "interfaceMethod";
+        internal const string AbstractType = "abstractType";
+        internal const string MultipleMethods = "multipleMethods";
     }
 
     private static bool IsValidAuthorizationName(string? name) =>

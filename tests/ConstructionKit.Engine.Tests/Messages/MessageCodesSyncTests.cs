@@ -78,4 +78,41 @@ public class MessageCodesSyncTests
 
         Assert.True(duplicates.Count == 0, "Duplicate message numbers: " + string.Join("; ", duplicates));
     }
+
+    [Fact]
+    public void EveryTemplate_CarriesItsPlaceholderValuesAsParameters()
+    {
+        foreach (var (key, template) in ReadCSharp())
+        {
+            var args = template.Placeholders.Select(p => (object)$"value-of-{p}").ToArray();
+            var message = template.CreateMessage("loc", args);
+
+            Assert.True(template.Placeholders.Length == message.Parameters.Count,
+                $"{key}: {template.Placeholders.Length} placeholders vs {message.Parameters.Count} parameters");
+            foreach (var placeholder in template.Placeholders)
+            {
+                Assert.True(message.Parameters.TryGetValue(placeholder, out var value) &&
+                            value == $"value-of-{placeholder}",
+                    $"{key}: parameter '{placeholder}' missing or wrong");
+            }
+        }
+    }
+
+    [Fact]
+    public void Parameters_AreFormattedInvariantly()
+    {
+        var template = new OperationMessageTemplate(MessageLevel.Error, 1, "{a}", ["a"]);
+        var message = template.CreateMessage(null, 1234.5m);
+
+        Assert.Equal("1234.5", message.Parameters["a"]);
+    }
+
+    [Fact]
+    public void OperationMessage_ExistingConstructor_YieldsEmptyParameters_AndUnchangedToString()
+    {
+        var message = new OperationMessage(MessageLevel.Error, "loc", 42, "text");
+
+        Assert.Empty(message.Parameters);
+        Assert.EndsWith("Error 42 loc: text", message.ToString());
+    }
 }

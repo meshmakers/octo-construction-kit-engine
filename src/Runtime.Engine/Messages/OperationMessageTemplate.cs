@@ -1,3 +1,4 @@
+using System.Globalization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 
 namespace Meshmakers.Octo.Runtime.Engine.Messages;
@@ -56,6 +57,12 @@ internal class OperationMessageTemplate
             text = text.Replace($"{{{Placeholders[i]}}}", $"{{{i}}}");
         }
 
-        return new OperationMessage(MessageLevel, location, MessageNumber, string.Format(text, args));
+        var parameters = new Dictionary<string, string>(Placeholders.Length, StringComparer.Ordinal);
+        for (var i = 0; i < Placeholders.Length && i < args.Length; i++)
+        {
+            parameters[Placeholders[i]] = Convert.ToString(args[i], CultureInfo.InvariantCulture) ?? string.Empty;
+        }
+
+        return new OperationMessage(MessageLevel, location, MessageNumber, string.Format(text, args), parameters);
     }
 }

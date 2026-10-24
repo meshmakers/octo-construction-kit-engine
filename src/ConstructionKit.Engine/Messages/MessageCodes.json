@@ -707,6 +707,12 @@
       "number": 135,
       "level": "ERROR",
       "text": "Method '{methodId}' of '{ckTypeId}' declares an invalid 'authorization.dataAccess': {reason}"
+    },
+    {
+      "key": "BlueprintSeedCreateReplacedByMethod",
+      "number": 136,
+      "level": "ERROR",
+      "text": "Blueprint apply refused: the new entity '{rtId}' of type '{ckTypeId}' cannot be created from seed data because method '{methodId}' replaces the generic create (reason {reason})"
     }
   ]
 }

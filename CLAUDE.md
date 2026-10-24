@@ -286,6 +286,29 @@ asset-repo - implements the interface), to judge the **CK update set as one set*
   true, `IsCkUpgradeBlocked` + blockers are reported, nothing is written.
 - Tests: `tests/Runtime.Engine.Tests/Blueprints/BlueprintServiceCkUpgradeGuardTests.cs`.
 
+#### Blueprint apply and `replacesGenericCreate` (AB#7121, F3.7)
+
+A blueprint never runs a CK method, so a seed would skip what the method of a `replacesGenericCreate` type guarantees
+(certificate, provisioning). `BlueprintGenericCreateGuard.FindRefusalsAsync` (Runtime.Engine/Blueprints) is the preflight,
+modelled on `ImportBlueprintLockEnforcer.PreflightAsync`: per CK type of the entities it asks
+`GenericCreateReplacement.TryGetReplacingMethod` (types without such a method cost no read), reads the stored entities of
+the flagged types by rtId in one batched call and refuses every entity whose rtId is empty or does not exist in the tenant.
+An entity whose rtId exists is upserted as before. It runs before the import at three places, so a refusal writes nothing:
+- `ApplySeedDataForBlueprintAsync` (install, `--force`, dependency install): after the tenant-owned seed entities were
+  taken out; the message(s) go to the `OperationResult`, the blueprint is not recorded as installed (blueprints of the
+  install order that were applied before it keep their state, as for every other seed error);
+- `ApplyDiffAsync` (blueprint update, all modes): over the entities to import (adds, updates, promoted conflicts);
+  `ContinueOnError` does not soften it; the errors are `OCTO-CK136: <text>` strings in `BlueprintUpdateResult.Errors`;
+- `BlueprintMigrationExecutor.ExecuteAddAsync` (migration `Add` step): the step fails with the same `OCTO-CK136` text
+  (not for `DryRun`, which writes nothing).
+Out of scope on purpose: `CkModelMigrationService` (a model migration, not a blueprint), `ImportRt` and `ApplyChanges`
+(AB#7107 / AB#7120), an opt-out flag. The lookup itself is public: `GenericCreateReplacement.FindReplacingMethod(CkTypeGraph)`
+/ `TryGetReplacingMethod(ICkCacheService, tenantId, RtCkId<CkTypeId>, out CkMethodGraph)` and the shared reason token
+`GenericCreateReplacement.ReasonToken` live in `ConstructionKit.Contracts` (`DependencyGraph`); asset-repo's
+`GenericCreateReplacedByMethodGraphQlError.TryCreate` can call them instead of its own copy of the lookup. The CK message
+table of `ConstructionKit.Engine` is `internal`; the assembly makes it visible to `Meshmakers.Octo.Runtime.Engine` for this
+message. Tests: `BlueprintGenericCreateRefusalTests` (type graphs are built in the test, no System version involved).
+
 #### Runtime-State Preservation on Re-Import (Upsert)
 
 Any `ImportStrategy.Upsert` import maps to a full `ReplaceOne` in the
@@ -1178,7 +1201,7 @@ Notes:
   `ReadWrite`, visibility `Public`, derivable `Any`) through a `JsonTypeInfo` modifier in `CkCache` (`OmitCkV2Defaults`), so v1 caches stay
   byte-identical; reading tolerates the missing keys (trailing defaulted `[JsonConstructor]` parameters on
   `CkTypeGraph`, init setter on `CkTypeAttributeGraph.Access`).
-- Message codes for CK v2: 90–113 and 118–135 are in use (table below); **spare: 111, 114–117, 136**. Range
+- Message codes for CK v2: 90–113 and 118–136 are in use (table below); **spare: 111, 114–117, 137**. Range
   retention (F0.2) has no message codes of its own — its failures are `ModelValidationException`s and the
   unbound-reference diagnostic is the source-generator diagnostic OM1004.
   Warnings (e.g. 110, 124) of a successful compile are printed by `octo-ckc -c compile` (to **stderr**, also with
@@ -1243,6 +1266,7 @@ exists in Industry.Basic-2.6.0. Check the model prefix of the reference."). `OCT
 | 133 | `CkMethodReplacesGenericCreateInvalid` | `InheritanceResolver.ValidateMethodReplacesGenericCreate` / `ValidateAtMostOneReplacesGenericCreate` (M-7) | AB#7024: `replacesGenericCreate: true` on a method that is not `kind: Static`, on an **interface** method, on a method of an **abstract** type, or a second flagged method on a concrete type (own or inherited; reported on the type that declares one of them, naming all flagged methods). One message per offending method with a `{reason}`. The flag in a `ckLanguage` 1 model is message 90 (feature `replacesGenericCreate`), an older engine refuses a model that uses it with message 126 (raised `minEngineVersion`). Code taken as the next free number after 132 |
 | 134 | `CkMethodPipelineSensitiveResult` | `InheritanceResolver.ValidateMethodHandler` (M-6) | AB#7006 (decision OD-9 follow-up): a method with `execution.handler: pipeline` whose `result.sensitive` is `true` (the message names the method and the type). A pipeline execution stores its output, so a method with a sensitive result must use `handler: service`. Own code next to 132 because the remedy differs (a parameter can be dropped, a result cannot be hidden from the pipeline); both are reported when both apply, and 131 as well when it applies. Interface methods refuse `pipeline` already (131); a sensitive result on a `service` method (type or interface) is fine. The marker in a `ckLanguage` 1 model cannot occur (methods are v2 only, message 90); an older engine refuses a model that uses it with message 126 (raised `minEngineVersion`) |
 | 135 | `CkMethodDataAccessInvalid` | `InheritanceResolver.ValidateMethodDataAccess` (M-8) | AB#7036: `authorization.dataAccess` of a method is `Read` on a method with `replacesGenericCreate: true` (creating an entity is a write; `Write` is fine) or a value outside `Read`/`Write` (a YAML model is stopped by the JSON schema first, so the message covers a JSON or programmatic model). One message per offending method with a `{reason}`. The key in a `ckLanguage` 1 model is message 90 (feature `authorization.dataAccess`); an older engine refuses a model that uses it with message 126 (raised `minEngineVersion`) |
+| 136 | `BlueprintSeedCreateReplacedByMethod` | `BlueprintGenericCreateGuard` (Runtime.Engine, raised at blueprint apply, not by the compiler) | AB#7121: the seed data of a blueprint install, the diff of a blueprint update or the `Add` step of a blueprint migration would create a **new** entity (its rtId does not exist in the tenant) of a type whose static method declares `replacesGenericCreate` (own or inherited, so also a derived concrete type). Message parameters `rtId`, `ckTypeId`, `methodId` (the version-less qualified method id) and `reason` (`GENERIC_CREATE_REPLACED_BY_METHOD`, `GenericCreateReplacement.ReasonToken`); one message per entity. See "Blueprint apply and `replacesGenericCreate`" below |
 
 `InheritanceResolver.ResolveInterfacesAndMethods` also completes `AllImplementedInterfaces` (own ∪ every base
 type's declared interfaces), `AllMethods` (nearest declaration wins; `CkMethodGraph.DeclaringCkTypeId` is the

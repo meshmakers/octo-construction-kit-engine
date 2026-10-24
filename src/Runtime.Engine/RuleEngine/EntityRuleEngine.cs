@@ -25,6 +25,7 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
         var entitiesToReplace = new ConcurrentDictionary<RtEntityId, TEntity>();
         var entitiesToDelete = new ConcurrentBag<RtEntityId>();
         var updateGuards = new ConcurrentDictionary<RtEntityId, AttributeNewerThanGuard>();
+        var recordArrayItemUpdates = new ConcurrentDictionary<RtEntityId, IReadOnlyList<RtRecordArrayItemUpdate>>();
 
         await Parallel.ForEachAsync(entityUpdateInfos, (info, token) =>
         {
@@ -47,6 +48,15 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
             // null on the entity, which the Secret write step stores as "not set".
             var isInError = ApplyClearSecretAttributes(tenantId, ckTypeGraph, info, originFileResolver,
                 operationResult);
+
+            // AB#7445: atomic updates of single RecordArray items; validated against the CK, the stored entity is
+            // never read for them.
+            var itemUpdates = RecordArrayItemUpdateValidator.Validate(ckCache, tenantId, ckTypeGraph, info,
+                originFileResolver, operationResult);
+            if (itemUpdates == null && info.RecordArrayItemUpdates is { Count: > 0 })
+            {
+                isInError = true;
+            }
 
             // check if all attributes are applied that are mandatory. If there is a mandatory attribute missing and no default value is set, throw an exception
             if (info.ModOption == EntityModOptions.Insert || info.ModOption == EntityModOptions.Replace)
@@ -123,6 +133,11 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                         updateGuards.TryAdd(info.GetRtEntityId(), info.UpdateGuard);
                     }
 
+                    if (itemUpdates != null)
+                    {
+                        recordArrayItemUpdates.TryAdd(info.GetRtEntityId(), itemUpdates);
+                    }
+
                     break;
                 case EntityModOptions.Replace:
                     if (info.RtEntity == null)
@@ -158,7 +173,8 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                 entitiesToUpdate.ToDictionary(k => k.Key, v => v.Value),
                 entitiesToReplace.ToDictionary(k => k.Key, v => v.Value),
                 entitiesToDelete.ToList(),
-                updateGuards.ToDictionary(k => k.Key, v => v.Value));
+                updateGuards.ToDictionary(k => k.Key, v => v.Value),
+                recordArrayItemUpdates.ToDictionary(k => k.Key, v => v.Value));
 
         return entityValidatorResult;
     }

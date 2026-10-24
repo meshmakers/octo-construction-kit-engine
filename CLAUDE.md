@@ -1550,6 +1550,46 @@ runtime entity and its associations only get `RtState = Archived`, the document 
   (details and tests there, section "Re-importing an archived entity"). `LocalDataSourceCollection` (dev-only local
   directory repository) still treats every existing id as taken.
 
+## Atomic update of one RecordArray item (AB#7445)
+
+Problem: pipelines that read an entity, change one item of a `RecordArray` in memory and write the whole array back lose
+updates under parallel execution (two writers read the same baseline, the later write overwrites the other item).
+`$set attributes.<name>` per attribute makes scalar attributes safe, but a RecordArray is always replaced as a whole.
+
+Contract (additive, no CK model or meta-model change): `IEntityUpdateInfo<TEntity>.RecordArrayItemUpdates`
+(`IReadOnlyCollection<RtRecordArrayItemUpdate>?`, default `null`) and the factory
+`EntityUpdateInfo<TEntity>.CreateRecordArrayItemUpdate(rtEntityId, rtEntity, itemUpdates)`.
+`RtRecordArrayItemUpdate` = RecordArray attribute name, match member, match value and member -> value pairs (names PascalCase).
+The info serialises the list only when set (Newtonsoft and System.Text.Json), so the wire shape of every existing info is unchanged.
+
+Semantics:
+- **One atomic statement, no read, no version check, no retry.** The persistence layer writes the item members with one update
+  (MongoDB: `$set attributes.<arr>.$[iN].attributes.<member>` with `arrayFilters` on the match member, see engine-mongodb
+  `CLAUDE.md`). Updates of different items never interfere; updates of the same item keep the last write.
+- **Use it** when several writers change different items of the same RecordArray of one entity in parallel (e.g. one
+  `DataPoint` per state in `Loxone/Control.States`). **Do not use it** to replace or reorder the array, to add or remove items
+  (use a whole-value update), or when a single writer owns the entity.
+- `RtEntity` of the info carries regular attribute updates that go out in the **same** statement; it may carry none. A whole-value
+  update of the SAME RecordArray in the same info is refused as ambiguous.
+- **Validation** (`RecordArrayItemUpdateValidator`, run by `EntityRuleEngine`, message 25/26): mod option Update only; the attribute
+  must be a `RecordArray`; the match member and members must exist in the record (or a derived record); the match member must be
+  String, Integer, Integer64 or Enum and cannot be written by the item update; members must be scalar (String, Integer, Integer64,
+  Double, Boolean, DateTime, DateTimeOffset, TimeSpan, Enum); **`Secret` members are refused** (message 26); values are converted to the
+  member's CLR type and refused when they do not fit (a String member takes text and renders numbers, booleans and dates
+  as text - ISO-8601 for dates - because the pipeline data context turns ISO-8601 text into `DateTime`). Entries for the same item
+  are merged, the last value wins.
+- **No match** (message 27, a *warning* in the caller's `OperationResult`, no exception, no `rtVersion` bump): when the info carries
+  no regular attribute and no item matches - or the entity does not exist. Items that miss while others match are silent no-ops
+  (a single statement cannot say which one missed). With regular attributes in the info they are written regardless and a
+  missing entity is an error as for any update.
+- **Permissions** are those of a regular update of the entity: `DataPermissionWriteGuard` judges the info (write, visibility, owner,
+  blueprint lock) by entity id, regardless of how the write is expressed.
+- **Not covered**: display-name/description rules that reference the RecordArray are not recomputed by an item update (the stored entity
+  is not read); `IBulkRtMutation.ApplyChangesAsync(..., OperationResult)` is the overload that reports the warning (the
+  repository's `ApplyChangesAsync` passes its `OperationResult` through).
+- Tests: `RecordArrayItemUpdateRuleEngineTests`, `BulkRtMutationRecordArrayItemTests` (this repo); the real-MongoDB concurrency test
+  lives in engine-mongodb.
+
 ## Important Notes
 
 - The solution uses Azure Pipelines for CI/CD (`azure-pipelines.yml` in the repo root)

@@ -143,6 +143,24 @@
       "number": 24,
       "level": "FATALERROR",
       "text": "{tenantId}: Mandatory Secret attribute '{attributePath}' of entity '{rtEntityCkTypeId}@{rtId}' has no value (empty values and placeholders count as not set)."
+    },
+    {
+      "key": "RecordArrayItemUpdateInvalid",
+      "number": 25,
+      "level": "FATALERROR",
+      "text": "{tenantId}: Record array item update of entity '{rtEntityCkTypeId}@{rtId}' is invalid at attribute '{attributeName}', member '{memberName}': {reason}"
+    },
+    {
+      "key": "RecordArrayItemUpdateSecretMember",
+      "number": 26,
+      "level": "FATALERROR",
+      "text": "{tenantId}: Record array item update of entity '{rtEntityCkTypeId}@{rtId}' cannot write member '{memberName}' of attribute '{attributeName}': it is a Secret member, secrets are not written by item updates."
+    },
+    {
+      "key": "RecordArrayItemNotMatched",
+      "number": 27,
+      "level": "WARNING",
+      "text": "{tenantId}: No item of the record array(s) '{attributeNames}' of entity '{rtEntityCkTypeId}@{rtId}' matched the record array item update (or the entity does not exist); nothing was written."
     }
   ]
 }

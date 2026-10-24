@@ -20,6 +20,7 @@ public record EntityRuleEngineResult<TEntity> where TEntity : RtEntity
         RtEntitiesToReplace = new Dictionary<RtEntityId, TEntity>();
         RtEntitiesToDelete = [];
         UpdateGuards = new Dictionary<RtEntityId, AttributeNewerThanGuard>();
+        RecordArrayItemUpdates = new Dictionary<RtEntityId, IReadOnlyList<RtRecordArrayItemUpdate>>();
     }
 
     /// <summary>
@@ -34,15 +35,22 @@ public record EntityRuleEngineResult<TEntity> where TEntity : RtEntity
     ///     only for entries in <paramref name="rtEntitiesToUpdate" /> that were created via
     ///     <see cref="EntityUpdateInfo{TEntity}.CreateConditionalUpdate" />.
     /// </param>
+    /// <param name="recordArrayItemUpdates">
+    ///     Validated and normalised atomic RecordArray item updates (AB#7445) keyed by entity id. Entries are present
+    ///     only for entries in <paramref name="rtEntitiesToUpdate" /> whose update info carries item updates.
+    /// </param>
     public EntityRuleEngineResult(List<TEntity> rtEntitiesToInsert, Dictionary<RtEntityId, TEntity> rtEntitiesToUpdate,
         Dictionary<RtEntityId, TEntity> rtEntitiesToReplace, List<RtEntityId> rtEntitiesToDelete,
-        Dictionary<RtEntityId, AttributeNewerThanGuard>? updateGuards = null)
+        Dictionary<RtEntityId, AttributeNewerThanGuard>? updateGuards = null,
+        Dictionary<RtEntityId, IReadOnlyList<RtRecordArrayItemUpdate>>? recordArrayItemUpdates = null)
     {
         RtEntitiesToInsert = rtEntitiesToInsert;
         RtEntitiesToUpdate = rtEntitiesToUpdate;
         RtEntitiesToReplace = rtEntitiesToReplace;
         RtEntitiesToDelete = rtEntitiesToDelete;
         UpdateGuards = updateGuards ?? new Dictionary<RtEntityId, AttributeNewerThanGuard>();
+        RecordArrayItemUpdates = recordArrayItemUpdates ??
+                                 new Dictionary<RtEntityId, IReadOnlyList<RtRecordArrayItemUpdate>>();
     }
 
     /// <summary>
@@ -72,4 +80,11 @@ public record EntityRuleEngineResult<TEntity> where TEntity : RtEntity
     ///     Entities without a guard are updated unconditionally.
     /// </summary>
     public Dictionary<RtEntityId, AttributeNewerThanGuard> UpdateGuards { get; }
+
+    /// <summary>
+    ///     Atomic updates of single <c>RecordArray</c> items (AB#7445) keyed by entity id. An entry belongs to the
+    ///     corresponding update in <see cref="RtEntitiesToUpdate" /> and is written in the same statement, without
+    ///     reading the stored entity. See <see cref="RtRecordArrayItemUpdate" />.
+    /// </summary>
+    public Dictionary<RtEntityId, IReadOnlyList<RtRecordArrayItemUpdate>> RecordArrayItemUpdates { get; }
 }

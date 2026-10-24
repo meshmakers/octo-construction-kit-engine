@@ -50,6 +50,17 @@ public interface IEntityUpdateInfo<out TEntity> where TEntity : RtEntity
     public IReadOnlyCollection<string>? ClearSecretAttributes => null;
 
     /// <summary>
+    ///     Atomic updates of single items of <c>RecordArray</c> attributes (AB#7445). Each entry changes the item
+    ///     whose match member equals the match value, in one statement together with the regular attribute updates
+    ///     of <see cref="RtEntity" />, without reading the stored entity first - see
+    ///     <see cref="RtRecordArrayItemUpdate" />. Applies to <see cref="EntityModOptions.Update" /> only. A
+    ///     whole-value update of the same <c>RecordArray</c> in <see cref="RtEntity" /> is refused as ambiguous.
+    ///     When no entry matches an item (and <see cref="RtEntity" /> carries no attribute to write), nothing is
+    ///     written and the repository reports a warning. <c>null</c> or empty = no item updates.
+    /// </summary>
+    public IReadOnlyCollection<RtRecordArrayItemUpdate>? RecordArrayItemUpdates => null;
+
+    /// <summary>
     /// Gets the runtime entity identifier.
     /// </summary>
     /// <returns></returns>

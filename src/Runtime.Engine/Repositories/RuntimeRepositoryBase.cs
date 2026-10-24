@@ -511,7 +511,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     private async Task ApplyChangesGuardedAsync(IOctoSession session, ICkCacheService cacheService,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
-        BulkRtMutationOptions options)
+        BulkRtMutationOptions options, OperationResult? operationResult = null)
     {
         var securityContext = session.GetSecurityContext();
         if (!securityContext.IsSystem && _dataPermissionResolver != null)
@@ -537,7 +537,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         }
 
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entityUpdateInfoList,
-                associationUpdateInfoList, options)
+                associationUpdateInfoList, options, operationResult ?? new OperationResult())
             .ConfigureAwait(false);
     }
 
@@ -566,7 +566,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         await ApplyChangesGuardedAsync(session, cacheService, entityUpdateInfoList,
-                associationUpdateInfoList, BulkRtMutationOptions.FromDeleteOptions(deleteOptions))
+                associationUpdateInfoList, BulkRtMutationOptions.FromDeleteOptions(deleteOptions), operationResult)
             .ConfigureAwait(false);
     }
 

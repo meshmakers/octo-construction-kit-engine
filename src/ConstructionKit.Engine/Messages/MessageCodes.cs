@@ -370,8 +370,8 @@ internal static class MessageCodes
     internal static OperationMessage CkMethodPipelineSensitiveParameter(string? location, object methodId, object ckTypeId, object parameters) =>
         GetMessage("CkMethodPipelineSensitiveParameter", location, methodId, ckTypeId, parameters);
 
-    internal static OperationMessage CkMethodReplacesGenericCreateInvalid(string? location, object methodId, object ckTypeId, object reason) =>
-        GetMessage("CkMethodReplacesGenericCreateInvalid", location, methodId, ckTypeId, reason);
+    internal static OperationMessage CkMethodReplacesGenericCreateInvalid(string? location, object methodId, object ckTypeId, object reason, object explanation) =>
+        GetMessage("CkMethodReplacesGenericCreateInvalid", location, methodId, ckTypeId, reason, explanation);
 
     internal static OperationMessage CkMethodPipelineSensitiveResult(string? location, object methodId, object ckTypeId) =>
         GetMessage("CkMethodPipelineSensitiveResult", location, methodId, ckTypeId);
@@ -1077,8 +1077,8 @@ internal static class MessageCodes
         {
             "CkMethodReplacesGenericCreateInvalid",
              new OperationMessageTemplate(MessageLevel.Error,
-                 133, "Method '{methodId}' of '{ckTypeId}' declares an invalid 'replacesGenericCreate': {reason}",
-                 new [] {"methodId", "ckTypeId", "reason"})
+                 133, "Method '{methodId}' of '{ckTypeId}' declares an invalid 'replacesGenericCreate' ({reason}): {explanation}",
+                 new [] {"methodId", "ckTypeId", "reason", "explanation"})
         },
         {
             "CkMethodPipelineSensitiveResult",

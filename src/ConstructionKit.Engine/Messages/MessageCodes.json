@@ -694,7 +694,7 @@
       "key": "CkMethodReplacesGenericCreateInvalid",
       "number": 133,
       "level": "ERROR",
-      "text": "Method '{methodId}' of '{ckTypeId}' declares an invalid 'replacesGenericCreate': {reason}"
+      "text": "Method '{methodId}' of '{ckTypeId}' declares an invalid 'replacesGenericCreate' ({reason}): {explanation}"
     },
     {
       "key": "CkMethodPipelineSensitiveResult",

@@ -1,5 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.Resolvers;
 
@@ -693,6 +694,7 @@ public class CkV2MethodResolverTests(ITestOutputHelper output) : CkV2ResolverTes
         var message = Assert.Single(ResolveExpectingOnly(model, 133));
         Assert.Contains("Ping-1", message.MessageText);
         Assert.Contains("Static", message.MessageText);
+        AssertReason133(message, "instanceMethod", "Ping-1", "/Tag-1");
     }
 
     [Fact]
@@ -708,6 +710,7 @@ public class CkV2MethodResolverTests(ITestOutputHelper output) : CkV2ResolverTes
         var message = Assert.Single(ResolveExpectingOnly(model, 133));
         Assert.Contains("Make-1", message.MessageText);
         Assert.Contains("interface method", message.MessageText);
+        AssertReason133(message, "interfaceMethod", "Make-1", null);
     }
 
     [Fact]
@@ -722,6 +725,7 @@ public class CkV2MethodResolverTests(ITestOutputHelper output) : CkV2ResolverTes
         var message = Assert.Single(ResolveExpectingOnly(model, 133));
         Assert.Contains("Provision-1", message.MessageText);
         Assert.Contains("abstract", message.MessageText);
+        AssertReason133(message, "abstractType", "Provision-1", "/Principal-1");
     }
 
     [Fact]
@@ -737,6 +741,7 @@ public class CkV2MethodResolverTests(ITestOutputHelper output) : CkV2ResolverTes
         var messages = ResolveExpectingOnly(model, 133);
         Assert.Equal(2, messages.Count);
         Assert.All(messages, m => Assert.Contains("at most one", m.MessageText));
+        Assert.All(messages, m => AssertReason133(m, "multipleMethods", null, "/Tag-1"));
         Assert.All(messages, m => Assert.Contains($"{M}/Tag.Build-1", m.MessageText));
         Assert.All(messages, m => Assert.Contains($"{M}/Tag.Make-1", m.MessageText));
     }
@@ -757,6 +762,28 @@ public class CkV2MethodResolverTests(ITestOutputHelper output) : CkV2ResolverTes
         Assert.Contains("Open-1", message.MessageText);
         Assert.Contains($"{M}/Savings", message.MessageText);
         Assert.Contains($"{M}/Account.Lock-1", message.MessageText);
+        AssertReason133(message, "multipleMethods", "Open-1", "/Savings-1");
+    }
+
+    /// <summary>The machine-readable contract of message 133: the reason token and the ids, not the text.</summary>
+    private static void AssertReason133(OperationMessage message, string reason, string? methodId, string? ckTypeId)
+    {
+        Assert.Equal(133, message.MessageNumber);
+        Assert.Equal(reason, message.Parameters["reason"]);
+        Assert.Contains("explanation", message.Parameters.Keys);
+        if (methodId != null)
+        {
+            Assert.Equal(methodId, message.Parameters["methodId"]);
+        }
+
+        if (ckTypeId != null)
+        {
+            Assert.EndsWith(ckTypeId, message.Parameters["ckTypeId"]);
+        }
+        else
+        {
+            Assert.Contains("ckTypeId", message.Parameters.Keys);
+        }
     }
 
     [Fact]

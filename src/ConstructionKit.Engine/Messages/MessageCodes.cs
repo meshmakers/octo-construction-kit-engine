@@ -382,6 +382,9 @@ internal static class MessageCodes
     internal static OperationMessage BlueprintSeedCreateReplacedByMethod(string? location, object rtId, object ckTypeId, object methodId, object reason) =>
         GetMessage("BlueprintSeedCreateReplacedByMethod", location, rtId, ckTypeId, methodId, reason);
 
+    internal static OperationMessage ImportRtCreateReplacedByMethod(string? location, object rtId, object ckTypeId, object methodId, object reason) =>
+        GetMessage("ImportRtCreateReplacedByMethod", location, rtId, ckTypeId, methodId, reason);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1096,6 +1099,12 @@ internal static class MessageCodes
             "BlueprintSeedCreateReplacedByMethod",
              new OperationMessageTemplate(MessageLevel.Error,
                  136, "Blueprint apply refused: the new entity '{rtId}' of type '{ckTypeId}' cannot be created from seed data because method '{methodId}' replaces the generic create (reason {reason})",
+                 new [] {"rtId", "ckTypeId", "methodId", "reason"})
+        },
+        {
+            "ImportRtCreateReplacedByMethod",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 137, "Import refused: the new entity '{rtId}' of type '{ckTypeId}' cannot be created by an import because method '{methodId}' replaces the generic create (reason {reason})",
                  new [] {"rtId", "ckTypeId", "methodId", "reason"})
         },
     };

@@ -1,5 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
+using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 
 namespace Meshmakers.Octo.Runtime.Contracts.Exchange;
 
@@ -39,6 +40,13 @@ public class ExchangeException : PersistenceException
     public int? MessageNumber { get; private init; }
 
     /// <summary>
+    /// The machine-readable parts of the failure: the messages (one per offending entity) with their parameters
+    /// (<c>rtId</c>, <c>ckTypeId</c>, <c>methodId</c>, <c>reason</c>), when the failure has them, otherwise empty.
+    /// Tools branch on <see cref="MessageNumber"/> and these parameters, never on the text of <see cref="Exception.Message"/>.
+    /// </summary>
+    public IReadOnlyList<OperationMessage> Messages { get; private init; } = Array.Empty<OperationMessage>();
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="ExchangeException"/> class with a message number.
     /// </summary>
     /// <param name="message">Message that describes the error.</param>
@@ -59,6 +67,30 @@ public class ExchangeException : PersistenceException
             (offenders.Count == 1 ? "y is" : "ies are") +
             " locked by blueprint and cannot be overwritten by users (access denied). Nothing was written. " +
             $"Locked: {string.Join("; ", offenders)}", messageNumber);
+    }
+
+    /// <summary>
+    /// A user-initiated import would create NEW entities of types whose static method declares
+    /// <c>replacesGenericCreate</c>: only the method may create them, exactly as the GraphQL generic create refuses
+    /// them. Raised before anything is written; one failure that lists every offender, each with its parameters.
+    /// </summary>
+    private const int MaxOffendersInMessage = 20;
+
+    internal static Exception GenericCreateReplacedByMethod(IReadOnlyList<OperationMessage> offenders)
+    {
+        var first = offenders[0];
+        var reason = first.Parameters.TryGetValue("reason", out var token) ? token : string.Empty;
+        return new ExchangeException(
+            $"Import rejected [{first.MessageNumber}] {reason}: {offenders.Count} new entit" +
+            (offenders.Count == 1 ? "y" : "ies") +
+            " cannot be created by an import because a method replaces the generic create of its type. " +
+            $"Nothing was written. {string.Join("; ", offenders.Take(MaxOffendersInMessage).Select(o => o.MessageText))}" +
+            (offenders.Count > MaxOffendersInMessage
+                ? $"; and {offenders.Count - MaxOffendersInMessage} more (see Messages)"
+                : string.Empty), first.MessageNumber)
+        {
+            Messages = offenders
+        };
     }
 
     internal static Exception AttributeNotFound<TKey>(RtCkId<CkAttributeId> modelAttributeId, string elementType, CkId<TKey> ckId)

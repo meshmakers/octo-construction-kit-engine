@@ -4,6 +4,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.AuditTrails;
 using Meshmakers.Octo.Runtime.Contracts.DataPermissions;
@@ -197,6 +198,8 @@ internal class ImportRtModelCommand(
                     var rtModelRootDto = await _rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult)
                         .ConfigureAwait(false);
                     ValidateCkModels(runtimeRepository.TenantId, rtModelRootDto.Dependencies);
+                    await PreflightGenericCreateAsync(session, runtimeRepository, caller,
+                        rtModelRootDto.Entities.Select(e => (e.CkTypeId, e.RtId))).ConfigureAwait(false);
                     await PreflightBlueprintLockAsync(session, runtimeRepository, importStrategy,
                         rtModelRootDto.Entities.Select(e => (e.CkTypeId, e.RtId))).ConfigureAwait(false);
                     await ImportEntityAsync(session, rtModelRootDto.Entities, runtimeRepository, importStrategy)
@@ -204,12 +207,21 @@ internal class ImportRtModelCommand(
                 }
                 else
                 {
-                    if (_lockEnforcer != null && importStrategy == ImportStrategy.Upsert)
+                    // The JSON stream is imported in bulks; the preflights must see the whole file before the first
+                    // bulk is written, so the ids are collected in a first pass over the file. The pass is only made
+                    // when a preflight needs it: the blueprint lock on an Upsert, the generic-create check on a
+                    // tenant that has a type whose method replaces the generic create.
+                    var checkGenericCreate = caller != null &&
+                                             GenericCreateNewEntityCheck.TenantHasReplacingMethod(cacheService,
+                                                 runtimeRepository.TenantId);
+                    var checkBlueprintLock = _lockEnforcer != null && importStrategy == ImportStrategy.Upsert;
+                    if (checkGenericCreate || checkBlueprintLock)
                     {
-                        // The JSON stream is imported in bulks; the preflight must see the whole file before
-                        // the first bulk is written, so the ids are collected in a first pass over the file.
-                        await PreflightBlueprintLockAsync(session, runtimeRepository, importStrategy,
-                            await CollectEntityIdsAsync(filePath, cancellationToken).ConfigureAwait(false))
+                        var entityIds = await CollectEntityIdsAsync(filePath, cancellationToken)
+                            .ConfigureAwait(false);
+                        await PreflightGenericCreateAsync(session, runtimeRepository, caller, entityIds)
+                            .ConfigureAwait(false);
+                        await PreflightBlueprintLockAsync(session, runtimeRepository, importStrategy, entityIds)
                             .ConfigureAwait(false);
                     }
 
@@ -259,6 +271,39 @@ internal class ImportRtModelCommand(
         }
 
         await _lockEnforcer.PreflightAsync(session, entityIds, runtimeRepository).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Preflight of a user-initiated import (caller path only): a NEW entity of a type whose static method declares
+    /// <c>replacesGenericCreate</c> (own or inherited) cannot be created by an import, exactly as the GraphQL generic
+    /// create refuses it; only the method may create it. An entity whose rtId is already stored is updated as before
+    /// (also with Upsert). The check runs for Insert and Upsert, before the first write, and fails the whole file
+    /// with one <see cref="ExchangeException"/> that lists every offender. The system path (no caller: blueprint
+    /// seed data, <c>ImportModelAsync</c>) is not checked here; the blueprint writers run the same check
+    /// (<see cref="GenericCreateNewEntityCheck"/>) before they call the import.
+    /// </summary>
+    private async Task PreflightGenericCreateAsync(IOctoSession session, IRuntimeRepository runtimeRepository,
+        RtImportCallerContext? caller, IEnumerable<(RtCkId<CkTypeId> CkTypeId, OctoObjectId RtId)> entityIds)
+    {
+        if (caller == null)
+        {
+            return;
+        }
+
+        var offenders = await GenericCreateNewEntityCheck
+            .FindAsync(cacheService, runtimeRepository, session, entityIds).ConfigureAwait(false);
+        if (offenders.Count == 0)
+        {
+            return;
+        }
+
+        logger.LogWarning(
+            "Import into '{TenantId}' rejected: {Count} new entity(ies) of types whose method replaces the generic create (subject '{SubjectId}')",
+            runtimeRepository.TenantId, offenders.Count, caller.SubjectId);
+        throw ExchangeException.GenericCreateReplacedByMethod(offenders.Select(o =>
+            MessageCodes.ImportRtCreateReplacedByMethod($"{o.CkTypeId.SemanticVersionedFullName}@{o.RtId}", o.RtId,
+                o.CkTypeId.SemanticVersionedFullName, o.Method.QualifiedMethodId,
+                GenericCreateReplacement.ReasonToken)).ToList());
     }
 
     private async Task<List<(RtCkId<CkTypeId> CkTypeId, OctoObjectId RtId)>> CollectEntityIdsAsync(string filePath,

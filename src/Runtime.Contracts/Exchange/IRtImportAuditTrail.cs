@@ -15,14 +15,17 @@ public interface IRtImportAuditTrail
     /// <summary>
     /// Records that an imported entity is missing one or more mandatory attributes — attributes
     /// that are not optional and carry neither default values nor an auto-increment reference,
-    /// so nothing can ever fill them. The bulk import path bypasses the entity rule engine, so
+    /// so nothing can ever fill them. Required members inside records and RecordArray items count too. The bulk import path bypasses the entity rule engine, so
     /// such an entity is persisted in a state the CK model forbids (AB#4771/AB#4772) unless
     /// <see cref="RtImportOptions.StrictMandatoryValidation"/> rejects the import.
     /// </summary>
     /// <param name="tenantId">Tenant the import targets.</param>
     /// <param name="ckTypeId">Runtime CK type id of the affected entity.</param>
     /// <param name="rtId">Runtime id of the affected entity.</param>
-    /// <param name="missingCkAttributeIds">The missing attributes' CK attribute ids.</param>
+    /// <param name="missingCkAttributeIds">
+    /// The missing attributes' CK attribute ids; a member of a record (or RecordArray item) is reported
+    /// as <c>"&lt;ckAttributeId&gt; at &lt;path&gt;"</c>, e.g. <c>"System.Communication-1/ExternalId at States[3]"</c> (AB#7450).
+    /// </param>
     Task RecordMissingMandatoryAttributesAsync(
         string? tenantId,
         RtCkId<CkTypeId> ckTypeId,

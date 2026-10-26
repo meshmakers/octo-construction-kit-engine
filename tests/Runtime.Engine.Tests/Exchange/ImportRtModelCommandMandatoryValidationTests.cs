@@ -101,6 +101,162 @@ public class ImportRtModelCommandMandatoryValidationTests
         Assert.Equal("Columns", missing[0].AttributeName);
     }
 
+    // ---- AB#7450: required members inside records and RecordArrays ----
+
+    private static readonly CkId<CkRecordId> DataPointRecordId = new($"{TestCkModelId}/DataPoint");
+    private static readonly CkId<CkRecordId> OuterRecordId = new($"{TestCkModelId}/Outer");
+
+    private static CkTypeAttributeGraph BuildRecordAttr(string name, AttributeValueTypesDto valueType,
+        CkId<CkRecordId> recordId, bool isOptional = true)
+    {
+        var attrId = new CkId<CkAttributeId>($"{TestCkModelId}/{name}");
+        var ckAttrGraph = new CkAttributeGraph(attrId,
+            new CkAttributeDto { AttributeId = name, ValueType = valueType, ValueCkRecordId = recordId });
+        return new CkTypeAttributeGraph(attrId,
+            new CkTypeAttributeDto { CkAttributeId = attrId, AttributeName = name, IsOptional = isOptional },
+            ckAttrGraph);
+    }
+
+    private static CkRecordGraph BuildRecordGraph(CkId<CkRecordId> id, params CkTypeAttributeGraph[] members)
+    {
+        return new CkRecordGraph(id, false, false, [], null, [], [], members.ToDictionary(a => a.CkAttributeId, a => a),
+            id.ToString());
+    }
+
+    // DataPoint = { ExternalId (required), CurrentValue (optional), LastUpdate (optional) } (the AB#7446 shape)
+    private static CkRecordGraph DataPointRecord() => BuildRecordGraph(DataPointRecordId,
+        BuildTypeAttr("ExternalId"),
+        BuildTypeAttr("CurrentValue", isOptional: true),
+        BuildTypeAttr("LastUpdate", isOptional: true));
+
+    // Outer = { Inner : DataPoint (record, optional), Name (required) }
+    private static CkRecordGraph OuterRecord() => BuildRecordGraph(OuterRecordId,
+        BuildRecordAttr("Inner", AttributeValueTypesDto.Record, DataPointRecordId),
+        BuildTypeAttr("Name"));
+
+    private static CkRecordGraph? Resolve(RtCkId<CkRecordId> id)
+    {
+        var key = id.ToString();
+        if (key.EndsWith("/DataPoint", StringComparison.Ordinal)) return DataPointRecord();
+        if (key.EndsWith("/Outer", StringComparison.Ordinal)) return OuterRecord();
+        return null;
+    }
+
+    private static RtRecord Record(CkId<CkRecordId> id, params (string Name, object? Value)[] attrs)
+    {
+        var record = new RtRecord { CkRecordId = id.ToRtCkId() };
+        foreach (var (name, value) in attrs)
+        {
+            record.SetAttributeRawValue(name, value);
+        }
+
+        return record;
+    }
+
+    private static CkTypeAttributeGraph[] StatesAttr(AttributeValueTypesDto type, CkId<CkRecordId> recordId,
+        string name = "States") => [BuildRecordAttr(name, type, recordId)];
+
+    [Fact]
+    public void RecordArray_ItemWithoutRequiredMember_IsFlaggedWithPath()
+    {
+        var attrs = StatesAttr(AttributeValueTypesDto.RecordArray, DataPointRecordId);
+        var entity = Entity(("States", new List<RtRecord>
+        {
+            Record(DataPointRecordId, ("ExternalId", "a")),
+            Record(DataPointRecordId, ("CurrentValue", 1)),              // ExternalId missing
+            Record(DataPointRecordId, ("ExternalId", null)),             // null counts as missing
+        }));
+
+        var missing = ImportRtModelCommand.FindMissingMandatoryMembers(attrs, entity, Resolve);
+
+        Assert.Equal(
+            [$"{TestCkModelId}/ExternalId-1 at States[1]", $"{TestCkModelId}/ExternalId-1 at States[2]"], missing);
+    }
+
+    [Fact]
+    public void RecordArray_ItemsLackingOnlyOptionalMembers_ProduceNoViolation()
+    {
+        var attrs = StatesAttr(AttributeValueTypesDto.RecordArray, DataPointRecordId);
+        var entity = Entity(("States", new List<RtRecord> { Record(DataPointRecordId, ("ExternalId", "a")) }));
+
+        Assert.Empty(ImportRtModelCommand.FindMissingMandatoryMembers(attrs, entity, Resolve));
+    }
+
+    [Fact]
+    public void Record_WithoutRequiredMember_IsFlaggedWithPath()
+    {
+        var attrs = StatesAttr(AttributeValueTypesDto.Record, DataPointRecordId, "Primary");
+        var entity = Entity(("Primary", Record(DataPointRecordId)));
+
+        var missing = ImportRtModelCommand.FindMissingMandatoryMembers(attrs, entity, Resolve);
+
+        Assert.Equal([$"{TestCkModelId}/ExternalId-1 at Primary"], missing);
+    }
+
+    [Fact]
+    public void NestedRecord_WithoutRequiredMember_IsFlaggedWithFullPath()
+    {
+        var attrs = StatesAttr(AttributeValueTypesDto.RecordArray, OuterRecordId, "Groups");
+        var entity = Entity(("Groups", new List<RtRecord>
+        {
+            Record(OuterRecordId, ("Name", "ok"), ("Inner", Record(DataPointRecordId, ("ExternalId", "x")))),
+            Record(OuterRecordId, ("Inner", Record(DataPointRecordId))),  // Name and Inner.ExternalId missing
+        }));
+
+        var missing = ImportRtModelCommand.FindMissingMandatoryMembers(attrs, entity, Resolve);
+
+        Assert.Equal(
+        [
+            $"{TestCkModelId}/Name-1 at Groups[1]",
+            $"{TestCkModelId}/ExternalId-1 at Groups[1].Inner"
+        ], missing);
+    }
+
+    [Fact]
+    public void AbsentOrNullRecordValuedAttribute_IsNotInspected()
+    {
+        var attrs = new[]
+        {
+            BuildRecordAttr("Absent", AttributeValueTypesDto.Record, DataPointRecordId),
+            BuildRecordAttr("NullRecord", AttributeValueTypesDto.Record, DataPointRecordId),
+            BuildRecordAttr("NullArray", AttributeValueTypesDto.RecordArray, DataPointRecordId),
+            BuildRecordAttr("EmptyArray", AttributeValueTypesDto.RecordArray, DataPointRecordId),
+        };
+        var entity = Entity(("NullRecord", null), ("NullArray", null), ("EmptyArray", new List<RtRecord>()));
+
+        Assert.Empty(ImportRtModelCommand.FindMissingMandatoryMembers(attrs, entity, Resolve));
+    }
+
+    [Fact]
+    public void RecordMember_WithDefaultValues_IsNotFlagged()
+    {
+        var withDefault = BuildRecordGraph(DataPointRecordId, BuildTypeAttr("ExternalId", defaultValues: ["n/a"]));
+        var attrs = StatesAttr(AttributeValueTypesDto.RecordArray, DataPointRecordId);
+        var entity = Entity(("States", new List<RtRecord> { Record(DataPointRecordId) }));
+
+        Assert.Empty(ImportRtModelCommand.FindMissingMandatoryMembers(attrs, entity, _ => withDefault));
+    }
+
+    [Fact]
+    public void TopLevelAndRecordViolations_AreReportedTogether_TopLevelWithoutPath()
+    {
+        var attrs = new[] { BuildTypeAttr("Columns"), BuildRecordAttr("States", AttributeValueTypesDto.RecordArray, DataPointRecordId) };
+        var entity = Entity(("States", new List<RtRecord> { Record(DataPointRecordId) }));
+
+        var missing = ImportRtModelCommand.FindMissingMandatoryMembers(attrs, entity, Resolve);
+
+        Assert.Equal([$"{TestCkModelId}/Columns-1", $"{TestCkModelId}/ExternalId-1 at States[0]"], missing);
+    }
+
+    [Fact]
+    public void UnresolvableRecord_IsSkipped()
+    {
+        var attrs = StatesAttr(AttributeValueTypesDto.RecordArray, DataPointRecordId);
+        var entity = Entity(("States", new List<RtRecord> { Record(DataPointRecordId) }));
+
+        Assert.Empty(ImportRtModelCommand.FindMissingMandatoryMembers(attrs, entity, _ => null));
+    }
+
     private static CkTypeAttributeGraph BuildTypeAttr(
         string name,
         bool isOptional = false,

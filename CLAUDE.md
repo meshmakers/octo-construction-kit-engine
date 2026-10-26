@@ -380,6 +380,21 @@ import choke point** so every Upsert caller gets it automatically:
   entries, Insert is rejected by the database with a duplicate key). Tests:
   `ImportRtModelCommandStateResetTests`. Imports on one instance must stay
   sequential.
+- **Mandatory-attribute validation (AB#4772, AB#7450)**: the bulk path bypasses the
+  entity rule engine, so `ImportRtModelCommand.FindMissingMandatoryMembers` applies
+  the rule engine's insert predicate (not optional, no value, no default values, no
+  auto-increment reference; empty Secret = not set) to every imported entity. Since
+  AB#7450 it also recurses into every `Record` value and every item of a `RecordArray`
+  value, nested records included (same recursion as `EntityRuleEngine.SetDefaultValuesOnInsert`);
+  an absent or null record-valued attribute is not inspected, unresolvable records are
+  skipped. A top-level violation is reported as the CK attribute id, a record member as
+  `<ckAttributeId> at <path>` (e.g. `System.Communication-1/ExternalId at States[3]`,
+  nested `Groups[1].Inner`). Reporting: one warning log + one `IRtImportAuditTrail.RecordMissingMandatoryAttributesAsync`
+  audit event per entity (all its violations); with `Import:StrictMandatoryValidation`
+  (`RtImportOptions`, default off) the import is rejected before anything is written
+  (`ExchangeException.MandatoryAttributesMissing`, summary capped at 20 entities).
+  Default mode still imports, so existing tenant imports, blueprint applies and
+  restores are unchanged. Tests: `ImportRtModelCommandMandatoryValidationTests`.
 - **Who benefits**: because it sits in the import command, all Upsert
   callers are covered with no per-caller code:
   - blueprint seed apply (`BlueprintService.ApplySeedDataForBlueprintAsync`

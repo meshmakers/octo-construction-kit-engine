@@ -391,11 +391,13 @@ internal class ImportRtModelCommand(
             // seeded rollups without Archive.Columns broke the non-null GraphQL field for the
             // whole archives list). Collect violations here; they are reported (and, in strict
             // mode, rejected) before anything is written.
-            var missingMandatory = FindMissingMandatoryAttributes(ckTypeGraph.AllAttributes.Values, rtEntity);
+            // AB#7450: records and RecordArray items are inspected too (API-path parity); a nested
+            // violation carries its path, e.g. "System.Communication-1/ExternalId at States[3]".
+            var missingMandatory = FindMissingMandatoryMembers(ckTypeGraph.AllAttributes.Values, rtEntity,
+                ResolveRecordFunc(runtimeRepository.TenantId));
             if (missingMandatory.Count > 0)
             {
-                _mandatoryViolations.Enqueue((rtEntity.RtId, modelRtEntity.CkTypeId,
-                    missingMandatory.Select(a => a.CkAttributeId.ToString()).ToList()));
+                _mandatoryViolations.Enqueue((rtEntity.RtId, modelRtEntity.CkTypeId, missingMandatory));
             }
 
             _importEntityQueue.Enqueue(rtEntity);
@@ -468,6 +470,80 @@ internal class ImportRtModelCommand(
         }
 
         return missing ?? [];
+    }
+
+    /// <summary>
+    /// AB#7450: <see cref="FindMissingMandatoryAttributes"/> plus the same check inside every
+    /// <c>Record</c> value and every item of a <c>RecordArray</c> value (nested records included),
+    /// exactly like <c>EntityRuleEngine.SetDefaultValuesOnInsert</c> recurses on the API path.
+    /// A record-valued attribute that is absent or null is not inspected. Returns one entry per
+    /// violation: the CK attribute id for a top-level attribute, and
+    /// <c>"&lt;ckAttributeId&gt; at &lt;path&gt;"</c> for a record member, with the path built from
+    /// attribute names (<c>States[3]</c>, <c>Config.Items[0]</c>). Records whose CK record cannot be
+    /// resolved are skipped (the import already fails for them while assigning attributes).
+    /// </summary>
+    internal static List<string> FindMissingMandatoryMembers(
+        IEnumerable<CkTypeAttributeGraph> attributeGraphs, RtTypeWithAttributes rtType,
+        Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord)
+    {
+        var attributes = attributeGraphs as IReadOnlyCollection<CkTypeAttributeGraph> ?? attributeGraphs.ToList();
+        var result = FindMissingMandatoryAttributes(attributes, rtType)
+            .Select(a => a.CkAttributeId.ToString()).ToList();
+        CollectMissingInRecords(attributes, rtType, resolveRecord, null, result);
+        return result;
+    }
+
+    private static void CollectMissingInRecords(IEnumerable<CkTypeAttributeGraph> attributeGraphs,
+        RtTypeWithAttributes rtType, Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord, string? parentPath,
+        List<string> result)
+    {
+        foreach (var attribute in attributeGraphs)
+        {
+            if (attribute.ValueType is not (AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray) ||
+                !rtType.Attributes.TryGetValue(attribute.AttributeName, out var value) || value == null)
+            {
+                continue;
+            }
+
+            var path = parentPath == null ? attribute.AttributeName : $"{parentPath}.{attribute.AttributeName}";
+            if (attribute.ValueType == AttributeValueTypesDto.Record)
+            {
+                InspectRecord(value as RtRecord, path, resolveRecord, result);
+                continue;
+            }
+
+            if (value is not IEnumerable items || value is string)
+            {
+                continue;
+            }
+
+            var index = 0;
+            foreach (var item in items)
+            {
+                InspectRecord(item as RtRecord, $"{path}[{index}]", resolveRecord, result);
+                index++;
+            }
+        }
+    }
+
+    private static void InspectRecord(RtRecord? record, string path,
+        Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord, List<string> result)
+    {
+        if (record == null)
+        {
+            return;
+        }
+
+        var recordGraph = resolveRecord(record.CkRecordId);
+        if (recordGraph == null)
+        {
+            return;
+        }
+
+        var members = recordGraph.AllAttributes.Values.ToList();
+        result.AddRange(FindMissingMandatoryAttributes(members, record)
+            .Select(a => $"{a.CkAttributeId} at {path}"));
+        CollectMissingInRecords(members, record, resolveRecord, path, result);
     }
 
     /// <summary>

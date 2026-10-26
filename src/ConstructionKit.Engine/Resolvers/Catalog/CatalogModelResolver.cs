@@ -84,6 +84,10 @@ internal class CatalogModelResolver : ModelResolver, ICatalogModelResolver
         SecretAttributeValidator.Validate(compileCandidate, compileCandidate.DependencyRanges, modelGraph,
             originFileResolver, operationResult);
 
+        // AB#7467: warning 138 - an exported record-valued attribute whose record has a required member that the
+        // export drops. Warning only; reads the effective ownership from the resolved graph.
+        ExportedRecordMemberValidator.Validate(compileCandidate, modelGraph, originFileResolver, operationResult);
+
         var compiledModel = new CkCompiledModelRoot
         {
             ModelId = compileCandidate.ModelId,

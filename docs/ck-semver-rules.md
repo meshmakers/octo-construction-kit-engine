@@ -1055,6 +1055,20 @@ A rename is not structurally detectable and appears as remove+add — which corr
 major bump. The report hints at possible renames when removals and additions of the same element
 kind occur in one diff.
 
+## Record members and export (AB#7467)
+
+Ownership is evaluated per attribute, and `ExportRt` evaluates the members of an exported record individually against their own
+effective ownership. The rule for a model author: **members of an exported record need the same export behaviour as the
+record-valued attribute that carries them, or must be optional.** A required member without a default value whose ownership is
+`RuntimeState` or `Secret` is dropped from every exported record, so the exported record is incomplete and cannot be imported again
+(AB#7446: `Loxone/Control.States`, a `SeedOwned` `RecordArray` of `System.Communication/DataPoint` whose required member `ExternalId`
+was `RuntimeState`).
+
+The compiler reports this as warning **138** `ExportedRecordDropsRequiredMember` for the model being compiled (message table in
+`CLAUDE.md`). It is a diagnostic only: it does not change a verdict of the classifier, no row above applies, and existing models
+compile unchanged. Changing a member's `ownership` or `isOptional` is classified by the ownership and required/optional rows of
+the rule set as before.
+
 ## Migration reconciliation
 
 If the diff requires a major bump, the command checks whether the model defines a migration with

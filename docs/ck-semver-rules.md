@@ -498,9 +498,9 @@ redeclares it; the finding says so.
 (defaults, display rules, non-unique indexes, change streams, method timeouts), data compatibility of existing runtime entities,
 or that a dependent that is not in any readable catalog still compiles. Dependents that cannot be loaded are listed as warnings.
 
-The checker is the public engine service `ICkSurfaceSatisfactionChecker` (one dependent against a prepared `CkSurfaceCandidate`),
-the discovery and the walk are `ICkCascadeService`; the publish gate (F2.3) and the tenant upgrade guard (F2.5, see "Tenant upgrade guard" below) call them without
-the CLI.
+The checker is the public engine service `ICkSurfaceSatisfactionChecker` (one dependent against a prepared `CkSurfaceCandidate`);
+the publish gate (F2.3) and the tenant upgrade guard (F2.5, see "Tenant upgrade guard" below) call it without the CLI. The
+discovery and the walk over the catalog dependents are `ICkCascadeService`, used by the cascade dry run and the publish gate only.
 
 Sample report:
 

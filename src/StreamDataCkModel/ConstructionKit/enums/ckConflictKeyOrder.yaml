@@ -11,3 +11,6 @@ enums:
       - key: 1
         name: LowerWins
         description: "The smaller value is the better one. Use for rank-like codes numbered best-first, where a lower code must never be displaced by a higher one."
+      - key: 2
+        name: Ignore
+        description: "Only valid on the reserved key $Origin: the archive opts out of ranking by row origin, so a manual value has no priority and the other keys (or the last write) decide. Without it, raw and time-range archives always rank by $Origin first. Refused on a column key."

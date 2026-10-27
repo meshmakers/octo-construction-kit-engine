@@ -38,12 +38,12 @@ internal class StreamDataRepositoryStub : IStreamDataRepository
     public Task BackfillComputedColumnAsync(ArchiveSnapshot snapshot, string columnName,
         CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-    public Task InsertAsync(OctoObjectId archiveRtId, StreamDataPoint datapoint) => throw new NotSupportedException();
+    public Task<StreamDataWriteResult> InsertAsync(OctoObjectId archiveRtId, StreamDataPoint datapoint) => throw new NotSupportedException();
 
-    public Task InsertAsync(OctoObjectId archiveRtId, IEnumerable<StreamDataPoint> datapoints) =>
+    public Task<StreamDataWriteResult> InsertAsync(OctoObjectId archiveRtId, IEnumerable<StreamDataPoint> datapoints) =>
         throw new NotSupportedException();
 
-    public Task InsertTimeRangeAsync(OctoObjectId archiveRtId, IEnumerable<TimeRangeStreamDataPoint> datapoints,
+    public Task<StreamDataWriteResult> InsertTimeRangeAsync(OctoObjectId archiveRtId, IEnumerable<TimeRangeStreamDataPoint> datapoints,
         CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
     public Task<StreamDataQueryResult> ExecuteQueryAsync(OctoObjectId archiveRtId, StreamDataQueryOptions options) =>

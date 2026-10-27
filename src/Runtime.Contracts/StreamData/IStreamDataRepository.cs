@@ -117,14 +117,22 @@ public interface IStreamDataRepository
     /// <c>ArchiveNotActivatedException</c> if the archive's status is not <c>Activated</c>;
     /// throws <c>RequiredAttributeMissingException</c> on a missing required path.
     /// </summary>
-    Task InsertAsync(OctoObjectId archiveRtId, StreamDataPoint datapoint);
+    /// <returns>
+    /// How many rows were stored and which were not, with the reason (AB#7598). Throws
+    /// <see cref="ManualStreamDataNotAppliedException" /> when a manual row could not be stored.
+    /// </returns>
+    Task<StreamDataWriteResult> InsertAsync(OctoObjectId archiveRtId, StreamDataPoint datapoint);
 
     /// <summary>
     /// Inserts multiple data points into the archive. Pre-validates the entire batch before any
     /// SQL is sent; on first violation no row is written and the offending point's index is
     /// surfaced via the thrown exception.
     /// </summary>
-    Task InsertAsync(OctoObjectId archiveRtId, IEnumerable<StreamDataPoint> datapoints);
+    /// <returns>
+    /// How many rows were stored and which were not, with the reason (AB#7598). Throws
+    /// <see cref="ManualStreamDataNotAppliedException" /> when a manual row could not be stored.
+    /// </returns>
+    Task<StreamDataWriteResult> InsertAsync(OctoObjectId archiveRtId, IEnumerable<StreamDataPoint> datapoints);
 
     /// <summary>
     /// Inserts externally pre-aggregated time-range data points into a <c>TimeRangeArchive</c>.
@@ -134,7 +142,11 @@ public interface IStreamDataRepository
     /// upsert. Concept §3 / §5. Throws <c>ArchiveNotActivatedException</c> if the archive is not
     /// in Activated state, and <c>ArgumentException</c> if any point has <c>To &lt;= From</c>.
     /// </summary>
-    Task InsertTimeRangeAsync(
+    /// <returns>
+    /// How many rows were stored and which were not, with the reason (AB#7598). Throws
+    /// <see cref="ManualStreamDataNotAppliedException" /> when a manual row could not be stored.
+    /// </returns>
+    Task<StreamDataWriteResult> InsertTimeRangeAsync(
         OctoObjectId archiveRtId,
         IEnumerable<TimeRangeStreamDataPoint> datapoints,
         CancellationToken cancellationToken = default);

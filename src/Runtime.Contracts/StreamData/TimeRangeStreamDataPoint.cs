@@ -45,4 +45,10 @@ public class TimeRangeStreamDataPoint
     /// </summary>
     public IReadOnlyDictionary<string, object?> Attributes { get; init; }
         = new Dictionary<string, object?>();
+
+    /// <summary>
+    /// Whether the value was entered manually or delivered automatically. Defaults to
+    /// <see cref="ArchiveRowOrigin.Automated" />, so a writer that declares nothing writes an automated row.
+    /// </summary>
+    public ArchiveRowOrigin Origin { get; init; } = ArchiveRowOrigin.Automated;
 }

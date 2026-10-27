@@ -251,7 +251,9 @@ already built — and which does not apply here, since this node calls `InsertTi
 decided by the archive's `Archive.ConflictPrecedence` (see the storage concept in
 `octo-construction-kit-engine-mongodb/docs/streamdata-archive-concept.md`). The node's job is to map
 the ranking columns — a quality code, the source document's own date — into the archive alongside the
-values.
+values. Whether a value was entered manually or delivered automatically is not a quality code: it is the
+row's origin (`ArchiveRowOrigin`, column `row_origin`, AB#5356), which an archive ranks with the reserved
+precedence key `$Origin` — a manual value then is permanent against automated deliveries.
 
 ## §4 Storage Layout
 

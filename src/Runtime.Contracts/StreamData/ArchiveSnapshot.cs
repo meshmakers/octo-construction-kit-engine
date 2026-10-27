@@ -125,7 +125,29 @@ public enum ConflictKeyOrder
 /// layer maps it onto the physical column name.
 /// </param>
 /// <param name="Order">Which direction of the column counts as better.</param>
-public sealed record ArchiveConflictKey(string Column, ConflictKeyOrder Order);
+public sealed record ArchiveConflictKey(string Column, ConflictKeyOrder Order)
+{
+    /// <summary>
+    /// Reserved <see cref="Column" /> that ranks by the row's <see cref="ArchiveRowOrigin" /> instead of
+    /// a user column. The <c>$</c> prefix cannot occur in an attribute path, so it never collides with a
+    /// declared column.
+    /// </summary>
+    /// <remarks>
+    /// Declared with <see cref="ConflictKeyOrder.HigherWins" /> (manual ranks above automated). Unlike a
+    /// column key it does not fall through to the next key when both writes are manual:
+    /// <list type="bullet">
+    /// <item>incoming manual, stored automated: the incoming write wins;</item>
+    /// <item>incoming automated, stored manual: the stored value stays — a manual value is permanent;</item>
+    /// <item>both manual: the later write wins, whatever the following keys say, so a wrong manual value
+    /// is fixed with another manual write;</item>
+    /// <item>both automated: the following keys decide, exactly as without this key.</item>
+    /// </list>
+    /// </remarks>
+    public const string OriginKey = "$Origin";
+
+    /// <summary>True when this key ranks by origin (<see cref="OriginKey" />) rather than by a column.</summary>
+    public bool IsOrigin => string.Equals(Column, OriginKey, System.StringComparison.OrdinalIgnoreCase);
+}
 
 /// <summary>
 /// Minimal projection of a <c>CkArchive.columns[]</c> entry — enough for the data-store provider

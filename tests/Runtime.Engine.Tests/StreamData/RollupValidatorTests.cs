@@ -943,4 +943,135 @@ public class RollupValidatorTests
             () => RollupValidator.ValidateForActivation(rollup, new[] { hourly with { Rollup = null } }));
         Assert.Equal(SecondSourceRt, ex.SourceArchiveRtId);
     }
+
+    // ---- AB#7727: aggregations over the row origin fields ----
+
+    private static RollupArchiveSnapshot OriginRollup(params CkRollupAggregationSpec[] aggregations) =>
+        Rollup(aggregations: aggregations) with { BucketSize = TimeSpan.FromHours(1) };
+
+    // The origin fields are system columns of every raw and time-range table, never declared in Columns.
+    [Theory]
+    [InlineData("manual_written_at", CkRollupFunction.Count)]
+    [InlineData("manual_written_by", CkRollupFunction.Count)]
+    [InlineData("manual_reason", CkRollupFunction.Count)]
+    [InlineData("manual_written_at", CkRollupFunction.Max)]
+    [InlineData("manual_written_at", CkRollupFunction.Min)]
+    [InlineData("MANUAL_WRITTEN_AT", CkRollupFunction.Count)]
+    public void ValidateForActivation_SupportedOriginAggregationOverBaseArchive_DoesNotThrow(string path, CkRollupFunction function)
+    {
+        var rollup = OriginRollup(new CkRollupAggregationSpec(path, function, null));
+
+        RollupValidator.ValidateForActivation(rollup, Activation(rollup, Source(paths: "voltage")));
+        RollupValidator.ValidateForActivation(rollup, Activation(rollup, TimeRangeBase("voltage")));
+    }
+
+    [Theory]
+    [InlineData("manual_written_by", CkRollupFunction.Sum)]
+    [InlineData("manual_reason", CkRollupFunction.Avg)]
+    [InlineData("manual_written_by", CkRollupFunction.Max)]
+    [InlineData("manual_written_at", CkRollupFunction.Sum)]
+    [InlineData("manual_written_at", CkRollupFunction.Avg)]
+    [InlineData("manual_written_at", CkRollupFunction.TimeWeightedAvg)]
+    [InlineData("manual_written_at", CkRollupFunction.First)]
+    [InlineData("manual_written_at", CkRollupFunction.Last)]
+    [InlineData("row_origin", CkRollupFunction.Count)]
+    [InlineData("row_origin", CkRollupFunction.Max)]
+    public void ValidateForActivation_MeaninglessOriginAggregation_IsRefusedWithAClearMessage(string path, CkRollupFunction function)
+    {
+        var rollup = OriginRollup(new CkRollupAggregationSpec(path, function, null));
+
+        var ex = Assert.Throws<RollupOriginAggregationNotSupportedException>(
+            () => RollupValidator.ValidateForActivation(rollup, Activation(rollup, Source(paths: "voltage"))));
+
+        Assert.Equal(path, ex.SourcePath);
+        Assert.Equal(function, ex.Function);
+        Assert.Equal(SourceRt, ex.SourceArchiveRtId);
+        Assert.Contains($"{function} over the row origin field '{path}'", ex.Message);
+        Assert.Contains("Supported are Count over 'manual_written_at'", ex.Message);
+    }
+
+    [Fact]
+    public void ValidateForActivation_CountOverRowOrigin_PointsToManualWrittenAt()
+    {
+        var rollup = OriginRollup(new CkRollupAggregationSpec("row_origin", CkRollupFunction.Count, null));
+
+        var ex = Assert.Throws<RollupOriginAggregationNotSupportedException>(
+            () => RollupValidator.ValidateForActivation(rollup, Activation(rollup, Source(paths: "voltage"))));
+
+        Assert.Contains("'row_origin' is set on every row", ex.Message);
+    }
+
+    // A source that declares a column of that name keeps rule 1: the declared column wins, no origin policy.
+    [Fact]
+    public void ValidateForActivation_SourceDeclaringAColumnNamedLikeAnOriginField_UsesTheDeclaredColumn()
+    {
+        var rollup = OriginRollup(new CkRollupAggregationSpec("manual_reason", CkRollupFunction.Sum, null));
+
+        RollupValidator.ValidateForActivation(rollup, Activation(rollup, Source(paths: "manual_reason")));
+    }
+
+    // Hourly -> daily: the logical origin spec resolves by rule 2 on the hourly rollup (counts sum, max stays max).
+    [Theory]
+    [InlineData(CkRollupFunction.Count)]
+    [InlineData(CkRollupFunction.Max)]
+    [InlineData(CkRollupFunction.Min)]
+    public void ValidateForActivation_LogicalOriginSpecOverRollupSource_DoesNotThrow(CkRollupFunction function)
+    {
+        var rollup = RollupWithSources(
+            new[] { new RollupSourceReference(SecondSourceRt) },
+            new[] { new CkRollupAggregationSpec("manual_written_at", function, null) })
+            with { BucketSize = TimeSpan.FromDays(1) };
+
+        RollupValidator.ValidateForActivation(rollup, new[]
+        {
+            HourlyRollupSource(rollup.Sources[0], new CkRollupAggregationSpec("manual_written_at", function, null)),
+        });
+    }
+
+    // A rollup does not carry origin columns: an origin path over a rollup source that does not store
+    // the same aggregation does not resolve.
+    [Fact]
+    public void ValidateForActivation_OriginSpecOverRollupSourceWithoutThatAggregation_ThrowsPathMissing()
+    {
+        var rollup = RollupWithSources(
+            new[] { new RollupSourceReference(SecondSourceRt) },
+            new[] { new CkRollupAggregationSpec("manual_written_at", CkRollupFunction.Count, null) })
+            with { BucketSize = TimeSpan.FromDays(1) };
+
+        Assert.Throws<RollupSourcePathMissingException>(() => RollupValidator.ValidateForActivation(rollup, new[]
+        {
+            HourlyRollupSource(rollup.Sources[0], new CkRollupAggregationSpec("Amount.Value", CkRollupFunction.Sum, null)),
+        }));
+    }
+
+    // Physical-name chaining of a stored origin timestamp would put a timestamp into a numeric column.
+    [Fact]
+    public void ValidateForActivation_PhysicalNameChainOverStoredOriginTimestamp_IsRefused()
+    {
+        var rollup = RollupWithSources(
+            new[] { new RollupSourceReference(SecondSourceRt) },
+            new[] { new CkRollupAggregationSpec("manual_written_at_max", CkRollupFunction.Max, null) })
+            with { BucketSize = TimeSpan.FromDays(1) };
+
+        var ex = Assert.Throws<RollupOriginTimestampChainException>(() => RollupValidator.ValidateForActivation(rollup, new[]
+        {
+            HourlyRollupSource(rollup.Sources[0], new CkRollupAggregationSpec("manual_written_at", CkRollupFunction.Max, null)),
+        }));
+        Assert.Contains("Use SourcePath 'manual_written_at' with Function Max", ex.Message);
+    }
+
+    // Physical-name chaining of a stored origin COUNT stays numeric and keeps working.
+    [Fact]
+    public void ValidateForActivation_PhysicalNameChainOverStoredOriginCount_DoesNotThrow()
+    {
+        var rollup = RollupWithSources(
+            new[] { new RollupSourceReference(SecondSourceRt) },
+            new[] { new CkRollupAggregationSpec("manual_written_at_count", CkRollupFunction.Sum, null) })
+            with { BucketSize = TimeSpan.FromDays(1) };
+
+        RollupValidator.ValidateForActivation(rollup, new[]
+        {
+            HourlyRollupSource(rollup.Sources[0], new CkRollupAggregationSpec("manual_written_at", CkRollupFunction.Count, null)),
+        });
+    }
 }

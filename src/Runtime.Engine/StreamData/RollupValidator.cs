@@ -313,10 +313,54 @@ public static class RollupValidator
             // base archive and over an hourly rollup of it alike (AC1 mixed sources).
             foreach (var agg in rollup.Aggregations)
             {
-                if (RollupSourceColumnResolver.TryResolve(agg, archive, source.Rollup) is null)
+                var resolution = RollupSourceColumnResolver.TryResolve(agg, archive, source.Rollup);
+                if (resolution is null)
                 {
                     throw new RollupSourcePathMissingException(rollup.RtId, sourceRtId, agg.SourcePath);
                 }
+
+                ValidateOriginAggregation(rollup, source, agg, resolution);
+            }
+        }
+    }
+
+    /// <summary>
+    /// AB#7727: a row origin field is a text or timestamp column, so only some functions mean
+    /// something on it (<see cref="ArchiveRowOriginFields.SupportsRollupAggregation"/>). A rollup
+    /// chained on such an aggregation reads it through rule 2 with the same function, which keeps the
+    /// value a count or a timestamp; addressing a stored origin timestamp by its physical column name
+    /// (the pre-AB#5157 chained style) would store it in a numeric column and is refused.
+    /// </summary>
+    private static void ValidateOriginAggregation(
+        RollupArchiveSnapshot rollup,
+        RollupActivationSource source,
+        CkRollupAggregationSpec agg,
+        RollupSourceColumnResolution resolution)
+    {
+        var sourceRtId = source.Reference.SourceArchiveRtId;
+        if (resolution.Kind == RollupSourceColumnResolutionKind.OriginColumn)
+        {
+            if (!ArchiveRowOriginFields.SupportsRollupAggregation(agg.SourcePath, agg.Function))
+            {
+                throw new RollupOriginAggregationNotSupportedException(
+                    rollup.RtId, sourceRtId, agg.SourcePath, agg.Function);
+            }
+
+            return;
+        }
+
+        if (resolution.Kind != RollupSourceColumnResolutionKind.DeclaredColumn
+            || source.Rollup?.Aggregations is not { } childSpecs)
+        {
+            return;
+        }
+
+        foreach (var child in childSpecs)
+        {
+            if (ArchiveRowOriginFields.IsTimestampAggregation(child.SourcePath, child.Function)
+                && RollupColumnGenerator.TargetColumnNamesFor(child).Contains(agg.SourcePath, StringComparer.Ordinal))
+            {
+                throw new RollupOriginTimestampChainException(rollup.RtId, sourceRtId, agg.SourcePath, child.Function);
             }
         }
     }

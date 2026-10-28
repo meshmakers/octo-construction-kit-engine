@@ -441,6 +441,63 @@ public sealed class RollupSourcePathMissingException : StreamDataException
 }
 
 /// <summary>
+/// An aggregation names a row origin field (<see cref="ArchiveRowOriginFields" />) of a raw or time-range
+/// source with a function that is not meaningful for it — for example <c>Sum</c> over the text field
+/// <c>manual_written_by</c>, or <c>Count</c> over <c>row_origin</c>, which is set on every row. Refused at
+/// activation. AB#7727.
+/// </summary>
+public sealed class RollupOriginAggregationNotSupportedException : StreamDataException
+{
+    public OctoObjectId SourceArchiveRtId { get; }
+    public string SourcePath { get; }
+    public CkRollupFunction Function { get; }
+
+    public RollupOriginAggregationNotSupportedException(
+        OctoObjectId rollupArchiveRtId, OctoObjectId sourceArchiveRtId, string sourcePath, CkRollupFunction function)
+        : base(
+            $"Rollup archive {Describe(rollupArchiveRtId)}: aggregation {function} over the row origin field '{sourcePath}' " +
+            $"of source archive '{sourceArchiveRtId}' is not supported. " +
+            (string.Equals(sourcePath, ArchiveRowOriginFields.RowOrigin, StringComparison.OrdinalIgnoreCase)
+                ? $"'{ArchiveRowOriginFields.RowOrigin}' is set on every row; count the manually entered rows with Count over " +
+                  $"'{ArchiveRowOriginFields.ManualWrittenAt}'. "
+                : string.Empty) +
+            $"Supported are Count over '{ArchiveRowOriginFields.ManualWrittenAt}', '{ArchiveRowOriginFields.ManualWrittenBy}' or " +
+            $"'{ArchiveRowOriginFields.ManualReason}' (the number of manually entered rows) and Min/Max over " +
+            $"'{ArchiveRowOriginFields.ManualWrittenAt}' (the earliest/latest manual entry).",
+            rollupArchiveRtId)
+    {
+        SourceArchiveRtId = sourceArchiveRtId;
+        SourcePath = sourcePath;
+        Function = function;
+    }
+}
+
+/// <summary>
+/// A rollup source stores a timestamp aggregation of a row origin field (Min/Max over
+/// <see cref="ArchiveRowOriginFields.ManualWrittenAt" />) and the parent addresses that stored column by its
+/// physical name. The parent would store the timestamp in a numeric column; it has to name the logical path
+/// instead, so the value stays a timestamp up the chain. AB#7727.
+/// </summary>
+public sealed class RollupOriginTimestampChainException : StreamDataException
+{
+    public OctoObjectId SourceArchiveRtId { get; }
+    public string SourcePath { get; }
+
+    public RollupOriginTimestampChainException(
+        OctoObjectId rollupArchiveRtId, OctoObjectId sourceArchiveRtId, string sourcePath, CkRollupFunction childFunction)
+        : base(
+            $"Rollup archive {Describe(rollupArchiveRtId)}: aggregation source path '{sourcePath}' names the stored " +
+            $"{childFunction} of '{ArchiveRowOriginFields.ManualWrittenAt}' on rollup source '{sourceArchiveRtId}', a timestamp. " +
+            $"Use SourcePath '{ArchiveRowOriginFields.ManualWrittenAt}' with Function {childFunction} instead, so the rollup reads " +
+            "the source's value as a timestamp.",
+            rollupArchiveRtId)
+    {
+        SourceArchiveRtId = sourceArchiveRtId;
+        SourcePath = sourcePath;
+    }
+}
+
+/// <summary>
 /// The declared sources close a cycle in the rollup graph — the rollup reaches itself again by
 /// following source edges, directly or transitively. Checked over all source edges at create time
 /// and again at activation. AB#5157.

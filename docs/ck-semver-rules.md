@@ -678,6 +678,13 @@ octo-ckc -c Unpublish -m <model> -ve <version> [-cn <catalogName>] [-f] [-rs <re
   message of every catalog change and of the withdrawn record. The private and dev catalogs need `-f` only (a reason is recorded when given).
 - **Replay of 2026-09-30.** `System-2.3.0` published, nothing depends on it: `octo-ckc -c Unpublish -m System -ve 2.3.0 -cn <catalog> -f`
   withdraws it; `ValidateVersion` of `2.2.3` afterwards uses `2.2.2` as the baseline.
+- **Withdrawals so far.** `System-2.3.0` (2026-09-30, replay above); `Wwc26.Challenge` (AB#7258); and on 2026-10-28 (AB#7260) the retired
+  and test-only models `Monitoring` (1.0.0, 2.0.0, 2.1.0 - retired by AB#5432, replaced by platform CK health), `Test` 1.1.0,
+  `System.TestIdentity` 1.1.0 and `Smoke.CkV2` 1.0.0 (test-only models published by mistake, AB#6114), unpublished with `Unpublish -f`
+  from both shared catalogs (private `construction-kit-libraries-build` HEAD `ea656323`, public `meshmakers.github.io` HEAD `3e4e3a46`).
+  Afterwards `ValidateCatalog -rf` resolved 33/33 models in `PrivateGitHubCatalog` and 32/32 in `PublicGitHubCatalog`. Use `-rf`: without it
+  a stale local cache reported `Smoke.CkV2-1.0.0` as not found. A copy already installed in a tenant stays (test-2 `octosystem` holds
+  `Monitoring 2.1.0`, ResolveFailed, accepted, AB#7137).
 
 Engine API: `ICatalog.UnpublishAsync` (per catalog: `LocalFileSystemCatalog`, `GitHubCatalog`; the embedded catalog is read-only),
 `ICatalogService.PlanUnpublishAsync` (the dry run) and `ICatalogService.UnpublishAsync` (reason policy, dependents check, then the catalog).

@@ -1115,6 +1115,15 @@ side lists the installed versions through the optional `IRepositoryVersionLister
 it reports the range without versions. **No special treatment for System and Meshmakers-shipped models.** Blueprint floor
 semantics are not changed (AB#6672). Rules page: `docs/ck-semver-rules.md`, "Dependency resolution by SemVer".
 
+**Message of an unsatisfiable dependency in a repository (AB#7381).** The repository (tenant) resolver judges against the repository's own
+`Available` models, not against a catalog. `RepositoryDependencyResolver` therefore asks the optional `IRepositoryInstalledVersionLister`
+(`ListInstalledVersionsAsync`: every held version with its state; `RepositoryManagementService` forwards to the `IModelRepository`, engine-mongodb
+implements it) and throws `ModelValidationException.UnknownCkModelsInRepository`: `Industry.Basic-[2.5,3.0): the tenant has no Available version of
+Industry.Basic (installed: 2.5.0 ResolveFailed)`, or `... has Available versions of X (2.4.0, 3.0.0), none satisfies the range`, or `... has no version of X
+installed`; the text never says "catalog". A repository without the interface keeps the AB#4468 text ("does not match any visible version of X (...)");
+the catalog resolver's message is unchanged. Tests: `RepositoryUnresolvedDependencyMessageTests`. The import itself (engine-mongodb) leaves a previously
+installed version of the imported model in place when this error (or any validation error) aborts it - see engine-mongodb `CLAUDE.md`.
+
 **Range audit (AB#6683).** The one-major-per-range rule lives in `CkDependencyRangeRule` (`FloorOf`, `IsWithinOneMajor`), called by
 `CatalogModelResolver` and by `CkModelRangeAudit` / `octo-ckc -c AuditRanges -p <dir>` (read-only scan of `ckModel.yaml` files, non-zero
 exit when a range is rejected) and `scripts/audit-ck-ranges.sh <monorepo-root>` (all repositories with CK sources, list in

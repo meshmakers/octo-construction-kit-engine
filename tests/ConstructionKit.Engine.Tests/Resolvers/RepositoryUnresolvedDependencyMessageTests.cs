@@ -3,6 +3,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
+using Meshmakers.Octo.ConstructionKit.Engine.ModelRepositories;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Repository;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -56,6 +57,21 @@ public class RepositoryUnresolvedDependencyMessageTests
         var message = await ResolveAndGetMessageAsync(repository);
 
         Assert.Contains("does not match any visible version of Industry.Basic (2.4.0)", message);
+    }
+
+    [Fact]
+    public async Task ManagementServiceOverARepositoryWithoutListing_FallsBackToTheVisibleVersionsText()
+    {
+        var modelRepository = A.Fake<IModelRepository>(o => o.Implements<IRepositoryVersionLister>());
+        A.CallTo(() => modelRepository.IsExistingAsync(A<CkModelIdVersionRange>._, A<object?>._))
+            .Returns(Task.FromResult(new ModelExistingResult { Exists = false }));
+        A.CallTo(() => ((IRepositoryVersionLister)modelRepository).ListVersionsAsync(A<string>._, A<object?>._))
+            .Returns(Task.FromResult<IReadOnlyList<CkModelId>>([new CkModelId("Industry.Basic-2.4.0")]));
+
+        var message = await ResolveAndGetMessageAsync(new RepositoryManagementService(modelRepository));
+
+        Assert.Contains("does not match any visible version of Industry.Basic (2.4.0)", message);
+        Assert.DoesNotContain("no version of Industry.Basic installed", message);
     }
 
     private static Task<string> ResolveAndGetMessageAsync((string Version, string State)[] held)

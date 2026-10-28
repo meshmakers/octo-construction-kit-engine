@@ -20,9 +20,11 @@ internal class RepositoryManagementService(IModelRepository modelRepository)
     public Task<IReadOnlyList<RepositoryModelVersion>> ListInstalledVersionsAsync(string ckModelName,
         object? sourceIdentifier = null)
     {
+        // Not supported is not "empty": the resolver falls back to the visible-versions text on this signal.
         return modelRepository is IRepositoryInstalledVersionLister lister
             ? lister.ListInstalledVersionsAsync(ckModelName, sourceIdentifier)
-            : Task.FromResult<IReadOnlyList<RepositoryModelVersion>>([]);
+            : throw new NotSupportedException(
+                "The model repository cannot list its installed versions with their state.");
     }
 
     public Task<bool> IsExistingAsync(CkModelId ckModelId, object? sourceIdentifier = null)

@@ -20,7 +20,8 @@ public interface IRepositoryInstalledVersionLister
 {
     /// <summary>
     ///     Returns all versions of the model <paramref name="ckModelName" /> in the repository, ascending by version.
-    ///     Best effort: an unreadable repository must not mask the original error.
+    ///     Best effort: an unreadable repository must not mask the original error. A wrapper whose underlying
+    ///     repository cannot list throws <see cref="NotSupportedException" /> (an empty list means "none installed").
     /// </summary>
     /// <param name="ckModelName">The construction kit model name</param>
     /// <param name="sourceIdentifier">An object that describes the source the repository should search</param>

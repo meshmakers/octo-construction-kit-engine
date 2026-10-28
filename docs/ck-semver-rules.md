@@ -641,6 +641,63 @@ Engine API: `ICatalog.UnpublishAsync` (per catalog: `LocalFileSystemCatalog`, `G
 A real GitHub catalog is only ever written by an explicit command; the tests run against the local file system catalog and an in-memory
 GitHub client.
 
+## Older majors of published models ("legacy major, accepted", AB#7049)
+
+Range retention (F2.6) applies to the **current** major of every published model. An **older major** whose newest version is
+exact-pinned (a classic `dependencies` list, no `dependencyRanges`) cannot be superseded inside its major: a range-retaining version
+needs a newer MINOR of that major, that is a rebuild against current dependencies for a line that receives no releases.
+
+**Rule (decided by Thor 2026-10-21, with Gerald's agreement via Odin):**
+
+> An exact-pinned older major stays published with the status **legacy major, accepted**. It is not unpublished and gets no
+> "last range-retaining MINOR". The only exception is a retired model, which is withdrawn as a whole (`Unpublish`, see above).
+
+Why this is harmless for the current System line:
+
+1. **No dangling pin.** An older major pins old versions of its dependencies exactly. Those versions stay published (a catalog is
+   append-only and System versions are never withdrawn), so the catalog keeps no dangling pin and `ValidateCatalog` stays green.
+2. **Never a silent break.** Such a model cannot sit next to the current System unseen: its exact System pin is unmet, so the
+   tenant upgrade guard and the dependency check report it (LibraryStatus "Incompatible"). `System` is service-managed, and an
+   explicit downgrade of System does not stick, because the next tenant resolve upgrades it back to the embedded version. The
+   failure is visible and limited to the old model.
+3. **Unpublishing gains nothing.** `Unpublish` refuses a version that another published (older-major) model pins, and a withdrawn
+   version number is burned for good.
+4. **No maintenance of old lines.** A rebuild per old major is work for lines nobody releases; removing special cases is preferred.
+
+**Condition (the real risk is installed copies, not the catalog).** Before a new System minor reaches a cluster, LibraryStatus of
+every tenant of that cluster must show no installed exact-pinned older major, or the entry is named and accepted. The tenant
+inventory (AB#6708) found none on the tenants read on 2026-10-27 (test-2, staging-1, prod-1, prod-2); the unreadable tenants and the
+accepted exceptions (`Monitoring 2.1.0`, ResolveFailed on one test-2 tenant; `Maco 1.0.0` on prod-2, not in any catalog) are
+tracked in AB#6708.
+
+**Entries (scan of 2026-10-27, newest version per older major, exact-pinned).** Every entry is **keep, legacy major, accepted**,
+except `Monitoring 1.0.0`. This table does not list current-major entries (AB#7260: `Monitoring 2.1.0`, `Test`,
+`System.TestIdentity`, `Smoke.CkV2`; AB#7048: `Demo.Tickets`), which are retired or republished instead.
+
+| Catalog | Model and version (older major) | Decision | Reason |
+| ------- | ------------------------------- | -------- | ------ |
+| Private | `EnergyCommunity 3.2.0` | keep, legacy major, accepted | Superseded by the current major; legacy tenants may still hold 3.x |
+| Private | `Industry.Logistics 1.2.0`, `2.2.0` | keep, legacy major, accepted | Current major is 3.x |
+| Private | `Loxone 4.11.0` | keep, legacy major, accepted | Current major is 5.x |
+| Private | `Meshmakers.Accounting 1.31.0`, `2.5.0` | keep, legacy major, accepted | Current major is 3.x |
+| Private | `Monitoring 1.0.0` | **unpublish** (with `Monitoring 2.1.0`, AB#7260) | Retired model: source removed 2026-09-30 (AB#5432), CK health is a platform function; only the already ResolveFailed copy on one test-2 tenant remains |
+| Private | `System.Ai 1.0.0`, `2.0.0`, `3.13.0` | keep, legacy major, accepted | System lines are never withdrawn; later majors are range-retaining |
+| Private | `System.Bot 1.0.0`, `2.0.0` | keep, legacy major, accepted | as above |
+| Private | `System.Communication 1.0.0`, `2.2.0`, `3.41.0` | keep, legacy major, accepted | as above; the Pool to DeploymentSite migration references 3.x |
+| Private | `System.Identity 1.0.0` | keep, legacy major, accepted | as above |
+| Private | `System.Notification 1.0.0` | keep, legacy major, accepted | as above |
+| Private | `System.Reporting 1.0.0` | keep, legacy major, accepted | as above |
+| Private | `System.UI 1.0.2` | keep, legacy major, accepted | as above |
+| Public | all private entries above (except `Monitoring 1.0.0`, which is withdrawn from both catalogs) | keep, legacy major, accepted | Same lines, same reasons |
+| Public | `Basic 1.0.0` | keep, legacy major, accepted | Current major is 2.x |
+| Public | `EnergyCommunity 1.0.0`, `2.0.0`, `3.4.0` | keep, legacy major, accepted | Current major is 4.x |
+| Public | `Environment 1.0.0`, `2.0.0` | keep, legacy major, accepted | Current major is 3.x |
+| Public | `Industry.Basic`, `Industry.Energy`, `Industry.Fluid`, `Industry.Maintenance` (older major lines 1.x and 2.x; newest exact-pinned version per line as in the scan) | keep, legacy major, accepted | The current version of each model is range-retaining; the exact version per line is in the scan (AB#7049) |
+| Public | `OctoSdkDemo 1.0.1` | keep, legacy major, accepted | Current major is 2.x |
+
+The scan counts 19 older-major entries in the private and 27 in the public catalog (before `Monitoring 1.0.0` is withdrawn). A new
+older-major entry is added to the table with its decision when a major is superseded; the default is the rule above.
+
 ## Dependency resolution by SemVer (AB#4468, AB#6671)
 
 The rules above say when a version must change; the resolvers apply the same SemVer reading when a model is

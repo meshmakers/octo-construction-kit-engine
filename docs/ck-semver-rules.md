@@ -498,9 +498,9 @@ redeclares it; the finding says so.
 (defaults, display rules, non-unique indexes, change streams, method timeouts), data compatibility of existing runtime entities,
 or that a dependent that is not in any readable catalog still compiles. Dependents that cannot be loaded are listed as warnings.
 
-The checker is the public engine service `ICkSurfaceSatisfactionChecker` (one dependent against a prepared `CkSurfaceCandidate`),
-the discovery and the walk are `ICkCascadeService`; the publish gate (F2.3) and the tenant upgrade guard (F2.5) call them without
-the CLI.
+The checker is the public engine service `ICkSurfaceSatisfactionChecker` (one dependent against a prepared `CkSurfaceCandidate`);
+the publish gate (F2.3) and the tenant upgrade guard (F2.5, see "Tenant upgrade guard" below) call it without the CLI. The
+discovery and the walk over the catalog dependents are `ICkCascadeService`, used by the cascade dry run and the publish gate only.
 
 Sample report:
 
@@ -516,6 +516,49 @@ Candidate change level: MINOR (minimum version 2.3.0, declared 2.3.0: ok)
 
 2 dependent(s): 1 Breaks, 0 NeedsRepin, 1 Compatible, 0 NotInRange
 ```
+
+### Tenant upgrade guard (F2.5, AB#6867)
+
+The cascade dry run judges a candidate against the **catalog** dependents. The tenant upgrade guard (`ITenantUpgradeGuard` in
+`octo-construction-kit-engine-mongodb`, reached through `ITenantContext.EvaluateCkUpdateAsync`) judges an **update set** against the
+**installed models of one tenant**: it reads persisted data only (model rows, `dependencyRanges`, `usedSurface`), writes nothing and
+needs no catalog. Both use `ICkSurfaceSatisfactionChecker` for range-retaining dependents; the guard adds the pin rule for
+exact-pinned ones. A blocker means: after the import the dependent would turn `ResolveFailed`.
+
+| Blocker kind (`CkUpgradeBlockerKind`) | Code | Trigger in the tenant | Matching cascade verdict |
+| ------------------------------------- | ---- | --------------------- | ------------------------ |
+| `ExactPin` | `CK_UPGRADE_EXACT_PIN` | An exact-pinned dependent (no `dependencyRanges`) pins another version of the replaced model's major; a pin on the candidate's own version is fine, a pin on another major is not affected. | `NeedsRepin` |
+| `FloorNotMet` | `CK_UPGRADE_FLOOR_NOT_MET` | The candidate is below the floor of the range-retaining dependent's range (`floor not met`). | `Breaks` |
+| `RangeNotSatisfied` | `CK_UPGRADE_RANGE_NOT_SATISFIED` | The dependent's range does not admit the candidate (for example an upper bound below it). | `NotInRange` (listed, not counted by the dry run; the guard blocks, because the range is unsatisfied after the import) |
+| `ElementRemoved` | `CK_UPGRADE_ELEMENT_REMOVED` | An element or `usedSurface` member the dependent uses is no longer defined by the candidate (removed or re-identified). | `Breaks` |
+| `ElementChanged` | `CK_UPGRADE_ELEMENT_CHANGED` | An element the dependent uses changes incompatibly (a Major change of the classifier). | `Breaks` |
+| `ElementBecameInternal` | `CK_UPGRADE_ELEMENT_BECAME_INTERNAL` | An element the dependent uses is internal in the candidate. | `Breaks` |
+| `NameCollision` | `CK_UPGRADE_NAME_COLLISION` | A member the candidate newly declares collides with a member of a type of the dependent that derives from it (rows H6 / N2; includes a duplicate method id). | `Breaks` (name collision) |
+
+The codes come from `TenantUpgradeGuard.CodeOf`; a finding of the checker is mapped to a kind by `TenantUpgradeGuard.Classify`
+(fixed phrases, pinned by the guard's unit tests). A dependent that is itself part of the update set is judged with its new version
+(a replaced dependent that fits is no blocker).
+
+**Never reported** (not a blocker, whatever the candidate does):
+
+- dependents that are `ResolveFailed` or `Importing` (not caused by the update);
+- service-managed candidates (`System`, `System.*`), unless the caller is explicit (file import and its preview, AB#6966;
+  `EvaluateExplicitCkImportAsync`): there the embedded-import downgrade guard and the service version decide;
+- candidates of another major than the installed one (a parallel install);
+- candidates that are not installed or already have the installed version;
+- a `ResolveFailed` installed base (the update may repair it).
+
+**Unknowns are announced, not guessed.** A range-retaining dependent without `usedSurface` (compiled before AB#4472) is judged by
+its referenced elements only and yields a note in `CkUpgradeGuardResult.Notes`, as does a dependent or baseline that cannot be
+loaded; neither is assumed healthy or broken.
+
+Sources of truth: `octo-construction-kit-engine-mongodb`
+[`CLAUDE.md`](https://github.com/meshmakers/octo-construction-kit-engine-mongodb/blob/main/CLAUDE.md), section "Tenant upgrade guard
+(CK v2 F2.5, AB#6867)" (rules and never-reported list),
+[`CkUpgradeBlockerKind.cs`](https://github.com/meshmakers/octo-construction-kit-engine-mongodb/blob/main/src/Runtime.Contracts.MongoDb/UpgradeGuard/CkUpgradeBlockerKind.cs)
+and
+[`TenantUpgradeGuard.cs`](https://github.com/meshmakers/octo-construction-kit-engine-mongodb/blob/main/src/Runtime.Engine.MongoDb/UpgradeGuard/TenantUpgradeGuard.cs)
+(`CodeOf`, `Classify`).
 
 ### First publication vs. unreachable catalogs
 

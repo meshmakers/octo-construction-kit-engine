@@ -45,12 +45,51 @@ internal class RepositoryDependencyResolver(
                 operationResult.AddMessage(MessageCodes.UnknownCkModel(originFileResolver.Resolve(ckDependency),
                     ckDependency));
             }
+            // AB#7381: a repository that can list every held version with its state explains the rejection in its own
+            // terms (never "no catalog knows ..."); otherwise the visible-versions text of AB#4468 is used.
+            var held = await DescribeHeldVersionsAsync(resolveResult.UnresolvedDependencyModelIds, sourceIdentifier)
+                .ConfigureAwait(false);
+            if (held != null)
+            {
+                throw ModelValidationException.UnknownCkModelsInRepository(resolveResult.UnresolvedDependencyModelIds,
+                    held);
+            }
+
             throw ModelValidationException.UnknownCkModels(resolveResult.UnresolvedDependencyModelIds,
                 await DescribeVisibleVersionsAsync(resolveResult.UnresolvedDependencyModelIds, sourceIdentifier)
                     .ConfigureAwait(false));
         }
 
         return resolveResult.RootDependencyModelIds;
+    }
+
+    /// <summary>
+    ///     AB#7381: every version the repository holds of each unresolved model, with its state; <c>null</c> when the
+    ///     repository cannot list them (then the AB#4468 text applies).
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, IReadOnlyList<RepositoryModelVersion>>?> DescribeHeldVersionsAsync(
+        IEnumerable<CkModelIdVersionRange> unresolved, object? sourceIdentifier)
+    {
+        if (ckRepositoryManagementService.Value is not IRepositoryInstalledVersionLister lister)
+        {
+            return null;
+        }
+
+        var result = new Dictionary<string, IReadOnlyList<RepositoryModelVersion>>();
+        foreach (var name in unresolved.Select(u => u.Name).Distinct())
+        {
+            try
+            {
+                result[name] = await lister.ListInstalledVersionsAsync(name, sourceIdentifier).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                logger.LogDebug(e, "Could not list the held versions of {CkModelName}", name);
+                return null;
+            }
+        }
+
+        return result;
     }
 
     /// <summary>

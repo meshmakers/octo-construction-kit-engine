@@ -1,5 +1,5 @@
-
 using System.Globalization;
+using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
@@ -120,6 +120,44 @@ public class ModelValidationException : CkModelException
             "If the dependency is built in the same repository or build, the dependent project must reference it " +
             "(ProjectReference) so it is compiled and published to the LocalFileSystemCatalog first; otherwise " +
             "publish the dependency, or check that the dependency range is correct.");
+    }
+
+    /// <summary>
+    ///     AB#7381: unresolved dependencies of an import into a <b>repository</b> (a tenant), explained with the versions
+    ///     the repository holds and their state. The repository resolves against its own <c>Available</c> models, never
+    ///     against a catalog, so the text must not say "catalog".
+    /// </summary>
+    internal static Exception UnknownCkModelsInRepository(
+        IReadOnlyCollection<CkModelIdVersionRange> unresolvedDependencies,
+        IReadOnlyDictionary<string, IReadOnlyList<RepositoryModelVersion>> heldVersionsByModel,
+        string repositoryName = "tenant")
+    {
+        var modelIds = string.Join(", ",
+            unresolvedDependencies.Select(d => d.ToString(CultureInfo.InvariantCulture)));
+        var details = string.Join("; ", unresolvedDependencies.Select(d =>
+        {
+            heldVersionsByModel.TryGetValue(d.Name, out var held);
+            held ??= [];
+            var available = held.Where(v => v.State == "Available").ToList();
+            if (available.Count > 0)
+            {
+                return $"{d}: the {repositoryName} has Available versions of {d.Name} " +
+                       $"({string.Join(", ", available.Select(v => v.ModelId.Version))}), none satisfies the range";
+            }
+
+            if (held.Count > 0)
+            {
+                return $"{d}: the {repositoryName} has no Available version of {d.Name} " +
+                       $"(installed: {string.Join(", ", held.Select(v => $"{v.ModelId.Version} {v.State}"))})";
+            }
+
+            return $"{d}: the {repositoryName} has no version of {d.Name} installed";
+        }));
+        return new ModelValidationException(
+            $"Dependencies '{modelIds}' cannot be resolved against the {repositoryName}: {details}. " +
+            $"Only Available models of the {repositoryName} satisfy a dependency; import the missing dependency, " +
+            "or repair models that are ResolveFailed, before importing the model. " +
+            "A previously installed version of the imported model is not changed by the failed import.");
     }
 
     /// <summary>

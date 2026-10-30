@@ -311,13 +311,14 @@ Semantics (normative, decided on AB#7880/AB#7918):
 |---|---|
 | Interpolation | **Step only** (LOCF): a value holds until the next row of the same `rtId` or the window end. No linear mode (AB#7922 removed). |
 | Unit | value unit × hours: kW → kWh, W → Wh. |
-| Window start | The last row before `from` (carry-in, engine default lookback 35 d) opens the window. |
+| Window start | The last row before `from` (carry-in) opens the window. It is looked up at most 35 days back (engine default lookback, raw archives have no own setting); an older row is not carried, so a window without rows then yields `null`. |
 | Sampling | Independent of the cadence: uniform 5 s and 10 s rows of the same constant power give the same integral; rows written on change are weighted by how long they held. |
 | Gaps | The last value holds across the gap until the next row or the window end (same as TWA). |
 | NULL values | A NULL observation contributes 0 for its interval. |
 | Several rtIds | Integrated per `rtId` (LOCF never crosses entities), then summed — the site total. Grouped queries sum per group. |
 | Carry only | No row in the window but a carry row: carry value × window length. |
 | Empty window | No row in the window and no carry row: `null`, not 0. |
+| Only NULL values | Rows (and carry) exist but none carries a value: `null` — no measured energy is not zero energy. As soon as one interval has a value, the NULL intervals count 0. |
 | `from` / `to` | Both required; a missing one is `StreamDataException.InvalidQueryParameters` (structured 400). |
 | Plain columns | Ride along in the same statement and still exclude the carry row. |
 | Archive kinds | Raw (event-based) archives only. Rollup and time-range archives are refused with `InvalidQueryParameters`; rollup support (re-aggregating the stored `_integral` of a TimeWeightedAvg rollup) is AB#7920. |

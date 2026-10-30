@@ -83,7 +83,7 @@ public class DependencyRangeRowTests
         Assert.Equal(CkModelElementKind.Dependency, change.Change.ElementKind);
         Assert.Equal(CkSemVerLevel.Major, change.Level);
 
-        // Exact pins (no range retention) keep the v1 rule: Minor.
+        // Legacy exact-pinned input (no range retention): the one rule for a non-D8 version move, Minor (AB#6882).
         var v1Baseline = SemVerTestModels.CreateModel();
         v1Baseline.Dependencies = [new CkModelId("Base-2.6.0")];
         var v1Current = SemVerTestModels.CreateModel();
@@ -171,10 +171,11 @@ public class DependencyRangeRowTests
     }
 
     [Fact]
-    public void D8_ExactPinnedModels_KeepTheMinorRule()
+    public void D8_LegacyExactPinnedInput_IsJudgedByTheOneRuleForNonD8Moves()
     {
-        // Pinned so that nobody removes the exact-pin branch early: its removal belongs to the one-time re-pin
-        // (F2.6, AB#5688). Both sides exact-pinned, and a range-retaining baseline with an exact-pinned current model.
+        // AB#6882 (AC 2): the exact-pin special case is gone; legacy input (no range retention) is judged by the same
+        // rule as every dependency version move that is not a D8 move, so the old catalog entries stay readable by the
+        // publish gate and ValidateCascade. Both sides exact-pinned, and a legacy baseline with a range-retaining candidate.
         var v1Baseline = SemVerTestModels.CreateModel();
         v1Baseline.Dependencies = [new CkModelId("Base-2.5.0")];
         var v1Current = SemVerTestModels.CreateModel();
@@ -182,6 +183,11 @@ public class DependencyRangeRowTests
         var change = Assert.Single(Classify(v1Baseline, v1Current));
         Assert.Equal(CkSemVerLevel.Minor, change.Level);
         Assert.Equal("compatible dependency version change", change.Reason);
+
+        // Major switch of a legacy pin: Major, as for every model.
+        var v1Major = SemVerTestModels.CreateModel();
+        v1Major.Dependencies = [new CkModelId("Base-3.0.0")];
+        Assert.Equal(CkSemVerLevel.Major, Level(v1Baseline, v1Major));
 
         // Only one side range-retaining: not the range-retaining case.
         var mixed = Assert.Single(Classify(v1Baseline, ResolvedAt("2.6.0")),

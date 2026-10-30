@@ -15,8 +15,9 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.SemVer;
 ///         decide as before: baseline and current are both range-retaining; their declared ranges and floors are
 ///         identical; the entry exists on both sides, its version went <b>up</b> (a lower version is row D3, Major),
 ///         stays in the <b>same major</b>, and for a direct dependency the current version satisfies the effective range
-///         (range with the floor). Exact-pinned (v1) models never take this path: their references are concrete, a
-///         dependency move is a real change until the one-time re-pin (F2.6, AB#5688).
+///         (range with the floor). Models without range retention (legacy exact-pinned input) never take this path: their
+///         references are concrete, so a dependency move is a real change and the classifier's one rule for every
+///         other dependency version move applies (AB#6882).
 ///     </para>
 /// </summary>
 internal static class CkClosureMove

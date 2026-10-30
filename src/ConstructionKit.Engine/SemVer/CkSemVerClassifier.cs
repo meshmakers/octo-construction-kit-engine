@@ -883,7 +883,8 @@ public class CkSemVerClassifier : ICkSemVerClassifier
         // AB#5435 (row D8, decision of Thor 2026-10-14): the resolved closure of a range-retaining model is compiler-set
         // metadata. A move up inside the declared range (same major, same ranges and floors) is not a change of the
         // model: level None. One shared predicate with the publish gate's same-version equivalence (CkClosureMove).
-        // Exact-pinned (v1) models keep the Minor rule below until the one-time re-pin (F2.6, AB#5688).
+        // Every other dependency version move (AB#6882: no special case for exact-pinned input) is judged by the one
+        // rule at the end of this method, whatever the pinning of the two models.
         if (change is { ChangeKind: CkModelChangeKind.Modified, Property: "version" } &&
             change.OldValue != null && change.NewValue != null)
         {
@@ -907,6 +908,9 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             case CkModelChangeKind.Removed:
                 return (CkSemVerLevel.Major, "consumers may rely on the transitively provided model (defensive)");
             case CkModelChangeKind.Modified when change.Property == "version":
+                // One rule for every input (AB#6882). It reads the old catalog entries too: a legacy exact-pinned
+                // baseline judged against a range-retaining candidate (the re-pin, row D6) or a legacy model of an
+                // older major ("legacy major, accepted", AB#7049) is not rejected, it gets this verdict.
                 var oldMajor = change.OldValue == null ? -1 : new CkVersion(change.OldValue).Major;
                 var newMajor = change.NewValue == null ? -1 : new CkVersion(change.NewValue).Major;
                 return oldMajor != newMajor

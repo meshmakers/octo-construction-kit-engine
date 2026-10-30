@@ -786,8 +786,9 @@ files for `SystemFilesCkModel` must therefore find only this repository.
 
 ## System on ckLanguage 2 (AB#6928, Epic AB#5584 F4.1)
 
-`src/SystemCkModel` is **System-2.7.0**, `ckLanguage: 2` (2.5.0 was ckLanguage 1; 2.6.0 switched the language, 2.7.0 adds the interfaces, see
-"System interfaces" below). Every release of the line is a **Minor** against its predecessor and against 2.5.0 and must stay one:
+`src/SystemCkModel` is **System-2.8.0**, `ckLanguage: 2` (2.5.0 was ckLanguage 1; 2.6.0 switched the language, 2.7.0 adds the interfaces, see
+"System interfaces" below; 2.8.0 adds the `AggregationTypes` value `Integral` = 7, AB#7918, unpublished until the explicit System publish).
+`src/SystemCkModel/ConstructionKit/CHANGELOG.md` records each version from 2.8.0 on (`ValidateVersion -cl` plus a Compatibility section). Every release of the line is a **Minor** against its predecessor and against 2.5.0 and must stay one:
 
 - **Every type and record declares `derivable: Any`.** Raising the language flips the default from `Any` to `Model`; without the explicit
   keys every model deriving from `System/Entity` would fail with message 113 and the SemVer verdict would be Major (row T6, `OCTO-CK200`).

@@ -93,6 +93,27 @@ public class ExchangeException : PersistenceException
         };
     }
 
+    /// <summary>
+    /// AB#7767: an import carries a value for an attribute that only a CK method may write (<c>access: Hidden</c> or
+    /// <c>MethodOnly</c>). Raised before anything is written; one failure that lists every offender with its
+    /// parameters (ckTypeId, attributePath, rtId).
+    /// </summary>
+    internal static Exception AttributeWriteRestricted(IReadOnlyList<OperationMessage> offenders)
+    {
+        var first = offenders[0];
+        return new ExchangeException(
+            $"Import rejected [{first.MessageNumber}]: {offenders.Count} attribute value" +
+            (offenders.Count == 1 ? "" : "s") +
+            " cannot be written by an import because only a CK method may write them (access Hidden or MethodOnly). " +
+            $"Nothing was written. {string.Join("; ", offenders.Take(MaxOffendersInMessage).Select(o => o.MessageText))}" +
+            (offenders.Count > MaxOffendersInMessage
+                ? $"; and {offenders.Count - MaxOffendersInMessage} more (see Messages)"
+                : string.Empty), first.MessageNumber)
+        {
+            Messages = offenders
+        };
+    }
+
     internal static Exception AttributeNotFound<TKey>(RtCkId<CkAttributeId> modelAttributeId, string elementType, CkId<TKey> ckId)
         where TKey : IComparable<TKey>, ICkElementId
     {

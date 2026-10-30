@@ -96,6 +96,7 @@ internal class ImportRtModelCommand(
             var rtModelRoot = await _rtYamlSerializer.DeserializeAsync(jsonText, "-", operationResult)
                 .ConfigureAwait(false);
             ValidateCkModels(runtimeRepository.TenantId, rtModelRoot.Dependencies);
+            PreflightAttributeAccess(runtimeRepository.TenantId, rtModelRoot.Entities);
             await ImportEntityAsync(session, rtModelRoot.Entities, runtimeRepository, importStrategy)
                 .ConfigureAwait(false);
 
@@ -133,6 +134,7 @@ internal class ImportRtModelCommand(
             session.StartTransaction();
 
             ValidateCkModels(runtimeRepository.TenantId, rtModelRoot.Dependencies);
+            PreflightAttributeAccess(runtimeRepository.TenantId, rtModelRoot.Entities);
             await ImportEntityAsync(session, rtModelRoot.Entities, runtimeRepository, importStrategy)
                 .ConfigureAwait(false);
 
@@ -198,6 +200,7 @@ internal class ImportRtModelCommand(
                     var rtModelRootDto = await _rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult)
                         .ConfigureAwait(false);
                     ValidateCkModels(runtimeRepository.TenantId, rtModelRootDto.Dependencies);
+                    PreflightAttributeAccess(runtimeRepository.TenantId, rtModelRootDto.Entities);
                     await PreflightGenericCreateAsync(session, runtimeRepository, caller,
                         rtModelRootDto.Entities.Select(e => (e.CkTypeId, e.RtId))).ConfigureAwait(false);
                     await PreflightBlueprintLockAsync(session, runtimeRepository, importStrategy,
@@ -215,10 +218,17 @@ internal class ImportRtModelCommand(
                                              GenericCreateNewEntityCheck.TenantHasReplacingMethod(cacheService,
                                                  runtimeRepository.TenantId);
                     var checkBlueprintLock = _lockEnforcer != null && importStrategy == ImportStrategy.Upsert;
-                    if (checkGenericCreate || checkBlueprintLock)
+                    // AB#7767: the attribute-access check needs the values, so it is part of the same first pass; the
+                    // pass is skipped on tenants without a Hidden or MethodOnly attribute.
+                    var checkAttributeAccess =
+                        RtAttributeAccessCheck.TenantHasRestrictedAttribute(cacheService, runtimeRepository.TenantId);
+                    if (checkGenericCreate || checkBlueprintLock || checkAttributeAccess)
                     {
-                        var entityIds = await CollectEntityIdsAsync(filePath, cancellationToken)
+                        var restrictedWrites = new List<RestrictedAttributeWrite>();
+                        var entityIds = await CollectEntityIdsAsync(filePath, cancellationToken,
+                                checkAttributeAccess ? runtimeRepository.TenantId : null, restrictedWrites)
                             .ConfigureAwait(false);
+                        ThrowIfAttributeAccessRefused(runtimeRepository.TenantId, restrictedWrites);
                         await PreflightGenericCreateAsync(session, runtimeRepository, caller, entityIds)
                             .ConfigureAwait(false);
                         await PreflightBlueprintLockAsync(session, runtimeRepository, importStrategy, entityIds)
@@ -306,8 +316,39 @@ internal class ImportRtModelCommand(
                 GenericCreateReplacement.ReasonToken)).ToList());
     }
 
+    /// <summary>
+    /// AB#7767: an import (every path, user-initiated or system, so also the blueprint seed) cannot set an attribute
+    /// that only a CK method may write (<c>access: Hidden</c> or <c>MethodOnly</c>; ReadOnly stays importable).
+    /// Runs over the whole entity list before the first write and fails the whole file with one
+    /// <see cref="ExchangeException"/> that lists every offender.
+    /// </summary>
+    private void PreflightAttributeAccess(string tenantId, IReadOnlyCollection<RtEntityTcDto> entities)
+    {
+        if (!RtAttributeAccessCheck.TenantHasRestrictedAttribute(cacheService, tenantId))
+        {
+            return;
+        }
+
+        ThrowIfAttributeAccessRefused(tenantId, RtAttributeAccessCheck.Find(cacheService, tenantId, entities));
+    }
+
+    private void ThrowIfAttributeAccessRefused(string tenantId, IReadOnlyList<RestrictedAttributeWrite> offenders)
+    {
+        if (offenders.Count == 0)
+        {
+            return;
+        }
+
+        logger.LogWarning(
+            "Import into '{TenantId}' rejected: {Count} value(s) for attributes that only a CK method may write (access Hidden or MethodOnly)",
+            tenantId, offenders.Count);
+        throw ExchangeException.AttributeWriteRestricted(
+            offenders.Select(RtAttributeAccessCheck.ToMessage).ToList());
+    }
+
     private async Task<List<(RtCkId<CkTypeId> CkTypeId, OctoObjectId RtId)>> CollectEntityIdsAsync(string filePath,
-        CancellationToken? cancellationToken)
+        CancellationToken? cancellationToken, string? accessCheckTenantId = null,
+        List<RestrictedAttributeWrite>? restrictedWrites = null)
     {
         var ids = new List<(RtCkId<CkTypeId> CkTypeId, OctoObjectId RtId)>();
         await using var stream = File.OpenRead(filePath);
@@ -316,6 +357,12 @@ internal class ImportRtModelCommand(
         rtDeserializeStream.BulkDeserialized += (_, args) =>
         {
             ids.AddRange(args.DeserializedEntities.Select(e => (e.CkTypeId, e.RtId)));
+            if (accessCheckTenantId != null && restrictedWrites != null)
+            {
+                restrictedWrites.AddRange(RtAttributeAccessCheck.Find(cacheService, accessCheckTenantId,
+                    args.DeserializedEntities));
+            }
+
             args.IsHandled = true;
         };
         await rtDeserializeStream.ReadAsync().ConfigureAwait(false);

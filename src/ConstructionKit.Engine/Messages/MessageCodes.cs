@@ -388,6 +388,9 @@ internal static class MessageCodes
     internal static OperationMessage ExportedRecordDropsRequiredMember(string? location, object ckElementId, object attributeName, object ckRecordId, object memberPath, object memberOwnership) =>
         GetMessage("ExportedRecordDropsRequiredMember", location, ckElementId, attributeName, ckRecordId, memberPath, memberOwnership);
 
+    internal static OperationMessage RtAttributeWriteRestricted(string? location, object rtId, object ckTypeId, object attributePath) =>
+        GetMessage("RtAttributeWriteRestricted", location, rtId, ckTypeId, attributePath);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1115,6 +1118,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Warning,
                  138, "Attribute '{attributeName}' of '{ckElementId}' is exported, but the required member '{memberPath}' of record '{ckRecordId}' has ownership {memberOwnership} and is dropped from the export, so an exported record cannot be imported again. Give the member SeedOwned or TenantOwned ownership (definition or record attribute override), make it optional, give it a default value, or make the record-valued attribute RuntimeState as a whole",
                  new [] {"ckElementId", "attributeName", "ckRecordId", "memberPath", "memberOwnership"})
+        },
+        {
+            "RtAttributeWriteRestricted",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 139, "Write refused: the entity '{rtId}' of type '{ckTypeId}' sets attribute '{attributePath}', which only a CK method may write (access Hidden or MethodOnly); an import, blueprint seed, blueprint update or migration step cannot set it",
+                 new [] {"rtId", "ckTypeId", "attributePath"})
         },
     };
 }

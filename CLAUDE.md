@@ -330,6 +330,34 @@ method cost no read, one batched read per flagged type).
   tenant that does not hold them is therefore not possible with `ImportRt`; use a restore or the method.
 - Tests: `ImportRtModelCommandGenericCreateTests`.
 
+#### RT export and import honour `access` (AB#7767, F4.2; findings H2/H3)
+
+`access: Hidden` / `MethodOnly` used to restrict only asset-repo GraphQL. The RT exchange paths now keep the promise too.
+The rule lives in one place on the CK graph: `AttributeAccess.IsReadableOutsideMethod` (not `Hidden`) and
+`AttributeAccess.IsWritableOutsideMethod` (`ReadWrite`/`ReadOnly`), exposed as `CkTypeAttributeGraph.IsReadableOutsideMethod` /
+`IsWritableOutsideMethod`. Asset-repo `AccessQueryGuard`, the mesh adapter (AB#7768) and the MCP service can call these instead of
+testing the enum inline.
+- **Export** (`RtEntityToTcDtoConverter`, the only export converter): a `Hidden` attribute is never emitted - type attributes and
+  record members one by one (the loop is re-entered for records, same granularity as ownership). `MethodOnly` and `ReadOnly`
+  stay exported (readable).
+- **Import**: a value for a `Hidden` or `MethodOnly` attribute (also a record member, `Profile.Token` / `Credentials[1].Token`;
+  an explicit `null` counts) is refused with `OCTO-CK139` before anything is written, on **every** path and for system and user
+  imports alike: `ImportAsCallerAsync`, `ImportAsync` (YAML and JSON stream), `ImportTextAsync` and `ImportModelAsync`
+  (`ImportRtModelCommand.PreflightAttributeAccess`). The JSON file is checked in the same first pass that `CollectEntityIdsAsync`
+  makes for the other preflights; the pass is only made when the tenant has a restricted attribute
+  (`RtAttributeAccessCheck.TenantHasRestrictedAttribute`), so other imports cost nothing extra. One `ExchangeException`
+  (`MessageNumber` 139, `Messages` one per offender: parameters `rtId`, `ckTypeId`, `attributePath`). `ReadOnly` stays importable.
+  Unlike 137 the check is not limited to the caller path: the system path (`ImportModelAsync`, used by blueprint seed) is checked too.
+- **Blueprints**: `BlueprintGenericCreateGuard.FindRefusalsAsync` runs the same check first (seed on install, update diff, migration
+  `Add`; same three call sites as 136, same error shapes: `OperationResult` message, `OCTO-CK139: <text>` in
+  `BlueprintUpdateResult.Errors`, failed `Add` step). The migration **`Update` and `Transform` steps** (they write attributes by name
+  through `ApplyAttributeUpdate`) refuse a `Hidden`/`MethodOnly` target or source attribute for the whole step before the first
+  entity is replaced (`EnsureWritableOutsideMethod`; `rtId` is `000...` in that message, a step has no single entity).
+- **Round trip**: an export that contains `MethodOnly` values cannot be imported again (139). A tenant restore works on MongoDB
+  directly and is unaffected. No published model uses `Hidden`/`MethodOnly` yet (first: System.Identity, AB#7772).
+- Tests: `RtAttributeAccessCheckTests`, `RtEntityToTcDtoConverterAccessTests`, `ImportRtModelCommandAttributeAccessTests`,
+  `BlueprintAttributeAccessRefusalTests` (synthetic graph `Access/AccessTestModel.cs`).
+
 #### Runtime-State Preservation on Re-Import (Upsert)
 
 Any `ImportStrategy.Upsert` import maps to a full `ReplaceOne` in the
@@ -1320,6 +1348,7 @@ exists in Industry.Basic-2.6.0. Check the model prefix of the reference."). `OCT
 | 136 | `BlueprintSeedCreateReplacedByMethod` | `BlueprintGenericCreateGuard` (Runtime.Engine, raised at blueprint apply, not by the compiler) | AB#7121: the seed data of a blueprint install, the diff of a blueprint update or the `Add` step of a blueprint migration would create a **new** entity (its rtId does not exist in the tenant) of a type whose static method declares `replacesGenericCreate` (own or inherited, so also a derived concrete type). Message parameters `rtId`, `ckTypeId`, `methodId` (the version-less qualified method id) and `reason` (`GENERIC_CREATE_REPLACED_BY_METHOD`, `GenericCreateReplacement.ReasonToken`); one message per entity. See "Blueprint apply and `replacesGenericCreate`" below |
 | 137 | `ImportRtCreateReplacedByMethod` | `ImportRtModelCommand.PreflightGenericCreateAsync` (Runtime.Engine, raised by a user-initiated `ImportRt`, not by the compiler) | AB#7107: the import file would create a **new** entity of a type whose static method declares `replacesGenericCreate` (own or inherited). Message parameters `rtId`, `ckTypeId`, `methodId` and `reason` (`GENERIC_CREATE_REPLACED_BY_METHOD`); one message per entity, carried by one `ExchangeException` (`MessageNumber` 137, `Messages`). See "`ImportRt` and `replacesGenericCreate`" above |
 | 138 | `ExportedRecordDropsRequiredMember` | `ExportedRecordMemberValidator` (from `CatalogModelResolver.CompileAsync`, after `SecretAttributeValidator`) | AB#7467 (follow-up of AB#7446), **warning**: an attribute assignment declared in the compiled model (type or record; interfaces are not walked) whose value type is `Record`/`RecordArray` and whose effective ownership is exported (`SeedOwned`/`TenantOwned`; assignment override over definition) reaches - through the referenced record, also from a dependency model, and nested exported record members - a member that is required (`isOptional` false), has no default value and whose effective ownership `IsExcludedFromExport()` (`RuntimeState`, `Secret`). This is the shape `RtEntityToTcDtoConverter.ConvertAttributes` drops (it evaluates record members individually). One message per member; parameters `ckElementId` (declaring type/record, versioned id), `attributeName`, `ckRecordId` (record that contains the member), `memberPath` (e.g. `States.ExternalId`), `memberOwnership`. Not reported: optional or defaulted members, anything below a record-valued attribute/member that is itself excluded (dropped as one unit, e.g. `MappingTargets`), records not reachable from an assignment of the compiled model (reported where they are used). A warning only, so existing models compile unchanged; no generated code, cache or catalog change. Tests: `ExportedRecordMemberValidatorTests`, `CkExportedRecordMemberCompileTests`. Rules: `docs/ck-semver-rules.md` "Record members and export" |
+| 139 | `RtAttributeWriteRestricted` | `RtAttributeAccessCheck` (Runtime.Engine/Exchange; raised by `ImportRtModelCommand` on every RT import path and by `BlueprintGenericCreateGuard` / `BlueprintMigrationExecutor`, not by the compiler) | AB#7767 (H3): an RT import, blueprint seed, blueprint update diff or migration step sets an attribute with `access: Hidden` or `MethodOnly` (also a record member). Parameters `rtId`, `ckTypeId`, `attributePath`; one message per value, refused before anything is written. `ReadOnly` stays importable. See "RT export and import honour `access`" above |
 
 `InheritanceResolver.ResolveInterfacesAndMethods` also completes `AllImplementedInterfaces` (own ∪ every base
 type's declared interfaces), `AllMethods` (nearest declaration wins; `CkMethodGraph.DeclaringCkTypeId` is the

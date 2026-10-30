@@ -451,7 +451,7 @@ form and whatever validity span the reference carries. Remove or replace the rol
 **Sources are immutable after activation, and enforced (AB#7872).** `createRollupArchive` is the
 supported way to declare sources, and Studio's edit mode is rename-only and shows them read-only. The generic
 CK mutation, `ImportRt` and a blueprint update are refused with `RollupSchemaImmutableException` when they would
-change the sources of an activated rollup (`ArchiveDefinitionGuard`). The storage form does not count: a
+change the sources of an activated rollup, or of a disabled one that was activated before (`ArchiveDefinitionGuard`). The storage form does not count: a
 list that names the same source as the deprecated scalar is no change. The former decision that a guard
 is out of scope is revised.
 

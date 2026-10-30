@@ -16,6 +16,10 @@ attributes:
     defaultValues:
       - 0
     isRuntimeState: true
+  - id: Archive.FirstActivatedAt
+    description: "When the archive was first seen activated (AB#7872): set by the platform when the archive is activated, or when it leaves Activated if it was activated before this attribute existed. Null on an archive that was never activated, which has no table yet. A disabled archive with this value is guarded like an activated one, because enabling it again would meet the same table."
+    valueType: DateTime
+    isRuntimeState: true
   - id: Archive.RawRetentionMs
     description: "Retention window for raw data points in milliseconds. When set, the partition pruner may drop source partitions older than (now - RawRetentionMs), but never ahead of the slowest attached rollup's watermark. Null means keep forever."
     valueType: Int

@@ -16,7 +16,7 @@ using Meshmakers.Octo.Runtime.Engine.Exchange;
 namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 
 /// <summary>
-/// Refuses a change to an activated archive that the platform cannot apply (AB#7872). The definition of an archive is a
+/// Refuses a change to an archive with a table that the platform cannot apply (AB#7872). The definition of an archive is a
 /// plain entity, so the generic entity API, <c>ImportRt</c> and a blueprint update can write any attribute of it; the
 /// table does not follow, and a rollup then stops with only a log line telling. The check runs where those ways in
 /// write: <see cref="Repositories.RuntimeRepositoryBase" />'s public ApplyChanges and the import.
@@ -30,10 +30,12 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 /// Compared is what the write would store (<see cref="BlueprintEntityComparer" />, the comparison of the blueprint
 /// preview), not what the input literally says, so a re-apply of an unchanged definition passes whatever form it has.
 /// The columns of a rollup are derived and not compared, and its platform columns (AB#7727) are no part of its definition.
-/// Only <see cref="CkArchiveStatus.Activated" /> is guarded. <see cref="CkArchiveStatus.Disabled" /> cannot be: seeds
-/// import their archives as Disabled, so most disabled archives have no table yet and their seed must stay free to
-/// change. A <see cref="CkArchiveStatus.Failed" /> archive stays editable as well: removing an offending column is the
-/// way out of that state (the archive stops ingesting on a Hidden attribute, for example).
+/// Guarded are <see cref="CkArchiveStatus.Activated" /> and a <see cref="CkArchiveStatus.Disabled" /> archive that was
+/// activated before: enabling it again meets the same table, so disable, change, enable would be a way around the guard.
+/// Seeds import their archives as Disabled, so a disabled archive that was never activated has no table and its seed
+/// stays free to change. <c>FirstActivatedAt</c> tells them apart; a rollup activated before that attribute existed
+/// shows it by its watermark. A <see cref="CkArchiveStatus.Failed" /> archive stays editable: removing an offending
+/// column is the way out of that state (the archive stops ingesting on a Hidden attribute, for example).
 /// </para>
 /// </remarks>
 internal static class ArchiveDefinitionGuard
@@ -41,6 +43,8 @@ internal static class ArchiveDefinitionGuard
     private const string ModelName = "System.StreamData";
     private const string ArchiveTypeName = "Archive";
     private const string StatusAttribute = "Status";
+    private const string FirstActivatedAtAttribute = "FirstActivatedAt";
+    private const string LastAggregatedBucketEndAttribute = "LastAggregatedBucketEnd";
     private const string TargetCkTypeIdAttribute = "TargetCkTypeId";
     private const string ColumnsAttribute = "Columns";
     private const string AggregationsAttribute = "Aggregations";
@@ -262,7 +266,15 @@ internal static class ArchiveDefinitionGuard
             : CkArchiveStatus.Created;
 
     private static bool IsGuarded(RtEntity stored)
-        => stored.RtState != RtState.Archived && StatusOf(stored) == CkArchiveStatus.Activated;
+        => stored.RtState != RtState.Archived && StatusOf(stored) switch
+        {
+            CkArchiveStatus.Activated => true,
+            CkArchiveStatus.Disabled => HasValue(stored, FirstActivatedAtAttribute) || HasValue(stored, LastAggregatedBucketEndAttribute),
+            _ => false
+        };
+
+    private static bool HasValue(RtEntity stored, string attribute)
+        => stored.Attributes.TryGetValue(attribute, out var value) && value != null;
 
     private static void ThrowIfFrozen(CkTypeGraph ckType, RtEntity stored, string attribute)
     {

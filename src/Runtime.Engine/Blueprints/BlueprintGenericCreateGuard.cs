@@ -17,6 +17,8 @@ namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
 ///     provisioning). The preflight reads the stored state like <c>ImportBlueprintLockEnforcer.PreflightAsync</c>
 ///     and runs before the import, so a refusal writes nothing. An entity whose rtId already exists in the tenant is
 ///     allowed (it is upserted as before); only new entities are refused. Types without such a method cost no read.
+///     AB#7767 extends the same preflight: the entities must not carry a value for an attribute that only a CK method
+///     may write (<c>access: Hidden</c> or <c>MethodOnly</c>, message 139), which reads no stored state.
 /// </summary>
 internal static class BlueprintGenericCreateGuard
 {
@@ -24,14 +26,25 @@ internal static class BlueprintGenericCreateGuard
     internal const int MessageNumber = 136;
 
     /// <summary>
-    ///     Returns one error message per entity that would be created new although a method replaces the generic
-    ///     create of its type (own or inherited). Empty when the blueprint creates no such entity.
+    ///     Returns one error message per value for a Hidden or MethodOnly attribute (AB#7767), then one per entity that
+    ///     would be created new although a method replaces the generic create of its type (own or inherited). Empty
+    ///     when the blueprint does neither.
     /// </summary>
     internal static async Task<IReadOnlyList<OperationMessage>> FindRefusalsAsync(
         ICkCacheService ckCacheService, IRuntimeRepository repository, IEnumerable<RtEntityTcDto> entities)
     {
+        var entityList = entities as IReadOnlyCollection<RtEntityTcDto> ?? entities.ToList();
+
+        var restricted = RtAttributeAccessCheck.TenantHasRestrictedAttribute(ckCacheService, repository.TenantId)
+            ? RtAttributeAccessCheck.Find(ckCacheService, repository.TenantId, entityList)
+            : [];
+        if (restricted.Count > 0)
+        {
+            return restricted.Select(RtAttributeAccessCheck.ToMessage).ToList();
+        }
+
         var offenders = await GenericCreateNewEntityCheck.FindAsync(ckCacheService, repository, null,
-            entities.Where(e => e.CkTypeId != null).Select(e => (e.CkTypeId, e.RtId))).ConfigureAwait(false);
+            entityList.Where(e => e.CkTypeId != null).Select(e => (e.CkTypeId, e.RtId))).ConfigureAwait(false);
 
         return offenders.Select(o => MessageCodes.BlueprintSeedCreateReplacedByMethod(
                 $"{o.CkTypeId.SemanticVersionedFullName}@{o.RtId}", o.RtId, o.CkTypeId.SemanticVersionedFullName,

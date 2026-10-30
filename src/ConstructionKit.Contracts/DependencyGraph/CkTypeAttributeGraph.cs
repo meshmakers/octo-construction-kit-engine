@@ -170,6 +170,22 @@ public class CkTypeAttributeGraph
     public CkAttributeAccessDto Access { get; init; }
 
     /// <summary>
+    ///     AB#7767: true when the value may be read outside a CK method (not <see cref="CkAttributeAccessDto.Hidden" />).
+    ///     Consumers such as the RT export, the mesh adapter and the MCP service ask this instead of testing
+    ///     <see cref="Access" /> inline.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsReadableOutsideMethod => AttributeAccess.IsReadableOutsideMethod(Access);
+
+    /// <summary>
+    ///     AB#7767: true when the value may be written outside a CK method — by an import, a seed or a migration step
+    ///     (<see cref="CkAttributeAccessDto.ReadWrite" /> and <see cref="CkAttributeAccessDto.ReadOnly" />; not
+    ///     <see cref="CkAttributeAccessDto.MethodOnly" /> or <see cref="CkAttributeAccessDto.Hidden" />).
+    /// </summary>
+    [JsonIgnore]
+    public bool IsWritableOutsideMethod => AttributeAccess.IsWritableOutsideMethod(Access);
+
+    /// <summary>
     ///     If true, the attribute is optional, that means it can be null
     /// </summary>
     public bool IsOptional { get; }

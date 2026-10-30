@@ -12,6 +12,7 @@ using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
+using Meshmakers.Octo.Runtime.Engine.Exchange;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
@@ -379,6 +380,7 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
         }
 
         var ckTypeGraph = ResolveCkTypeGraph(tenantId, step.Target);
+        EnsureWritableOutsideMethod(ckTypeGraph, step.Target, attributeUpdates.Keys);
 
         var session = await repository.GetSessionAsync().ConfigureAwait(false);
         var affected = 0;
@@ -493,6 +495,7 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
         }
 
         var ckTypeGraph = ResolveCkTypeGraph(tenantId, step.Target);
+        EnsureWritableOutsideMethod(ckTypeGraph, step.Target, AttributesWrittenBy(transform));
 
         var session = await repository.GetSessionAsync().ConfigureAwait(false);
         var affected = 0;
@@ -904,6 +907,42 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
                 $"CK type '{target.CkTypeId}' not found in cache for tenant '{tenantId}' — cannot type-check migration attribute updates");
         }
         return ckTypeGraph;
+    }
+
+    /// <summary>
+    /// AB#7767: the attributes a transform writes (a Rename also clears its source, a Delete clears its source).
+    /// </summary>
+    private static IEnumerable<string> AttributesWrittenBy(TransformConfigDto transform)
+    {
+        var names = transform.Type switch
+        {
+            TransformType.Rename => new[] { transform.SourceAttribute, transform.TargetAttribute },
+            TransformType.Copy => [transform.TargetAttribute],
+            TransformType.Delete => [transform.SourceAttribute],
+            TransformType.SetValue or TransformType.MapValue => [transform.TargetAttribute ?? transform.SourceAttribute],
+            _ => Array.Empty<string?>()
+        };
+        return names.Where(n => !string.IsNullOrEmpty(n)).Select(n => n!);
+    }
+
+    /// <summary>
+    /// AB#7767: a migration never runs a CK method, so an Update or Transform step must not write an attribute that
+    /// only a method may write (<c>access: Hidden</c> or <c>MethodOnly</c>). Checked for the whole step before the
+    /// first entity is replaced; attributes unknown to the type are left to <see cref="ApplyAttributeUpdate"/>.
+    /// </summary>
+    private static void EnsureWritableOutsideMethod(CkTypeGraph ckTypeGraph, EntityTargetDto target,
+        IEnumerable<string> attributeNames)
+    {
+        var refusals = attributeNames
+            .Where(n => ckTypeGraph.AllAttributesByName.TryGetValue(n, out var a) && !a.IsWritableOutsideMethod)
+            .Select(n => RtAttributeAccessCheck.ToMessage(new RestrictedAttributeWrite(
+                new RtCkId<CkTypeId>(target.CkTypeId!), OctoObjectId.Empty, n)))
+            .ToList();
+        if (refusals.Count > 0)
+        {
+            throw new InvalidOperationException(string.Join("; ",
+                refusals.Select(BlueprintGenericCreateGuard.ToErrorString)));
+        }
     }
 
     /// <summary>

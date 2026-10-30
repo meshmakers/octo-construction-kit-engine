@@ -7,8 +7,11 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 /// <remarks>
 ///     The engine parses, persists and carries the value through the graph; the API layer (asset-repo GraphQL)
 ///     enforces it — <see cref="Hidden" /> is never exposed in output or input. The compiler keeps Hidden out of
-///     display rules, indexes, auto-complete values and association roles (messages 105–108). The value restricts
-///     the API surface only — the engine repository, imports and exports still read and write the attribute.
+///     display rules, indexes, auto-complete values and association roles (messages 105–108). The engine
+///     repository itself still reads and writes the attribute (CK methods run through it), but the RT exchange paths
+///     honour the access too (AB#7767): <c>ExportRt</c> never emits a <see cref="Hidden" /> value, and an import,
+///     blueprint seed, blueprint update or migration Add step refuses a value for a <see cref="Hidden" /> or
+///     <see cref="MethodOnly" /> attribute (message 139).
 /// </remarks>
 public enum CkAttributeAccessDto
 {
@@ -63,4 +66,20 @@ public static class AttributeAccess
     /// </summary>
     public static bool IsGenericallyWritable(CkAttributeAccessDto access, bool isCreate) =>
         access == CkAttributeAccessDto.ReadWrite || (isCreate && access == CkAttributeAccessDto.ReadOnly);
+
+    /// <summary>
+    ///     AB#7767: true when a value may be read outside a CK method — in a generic query, an RT export, a pipeline
+    ///     or any other tool (everything except <see cref="CkAttributeAccessDto.Hidden" />). Same rule as
+    ///     <see cref="IsExposedInOutput" />, named for the question the non-GraphQL consumers ask.
+    /// </summary>
+    public static bool IsReadableOutsideMethod(CkAttributeAccessDto access) => IsExposedInOutput(access);
+
+    /// <summary>
+    ///     AB#7767: true when a value may be written outside a CK method — by an RT import, a blueprint seed or a
+    ///     migration step (<see cref="CkAttributeAccessDto.ReadWrite" /> and <see cref="CkAttributeAccessDto.ReadOnly" />).
+    ///     <see cref="CkAttributeAccessDto.MethodOnly" /> and <see cref="CkAttributeAccessDto.Hidden" /> are written by
+    ///     CK methods only. Unlike <see cref="IsGenericallyWritable" /> it does not distinguish create from update:
+    ///     an import has no such split, and ReadOnly stays importable.
+    /// </summary>
+    public static bool IsWritableOutsideMethod(CkAttributeAccessDto access) => IsExposedInGenericInput(access);
 }

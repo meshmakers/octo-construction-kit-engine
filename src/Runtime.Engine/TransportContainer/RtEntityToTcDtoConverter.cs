@@ -66,8 +66,13 @@ public class RtEntityToTcDtoConverter(ICkCacheService ckCacheService) : IRtEntit
             // attribute that contains them, or a TenantOwned record exports with its members stripped.
             // AB#5532: a Secret value is never exported - its ownership is always Secret (compiler
             // rule); the value-type check also covers a stale cache.
+            //
+            // AB#7767: a Hidden attribute (access: Hidden) is never exported either — its value must not leave the
+            // engine through any tool. Same granularity as ownership: type attributes and record members are
+            // evaluated one by one (this loop is re-entered for records). MethodOnly stays exported: it is readable.
             if (ckTypeAttributeGraph.Ownership.IsExcludedFromExport() ||
-                ckTypeAttributeGraph.ValueType == AttributeValueTypesDto.Secret)
+                ckTypeAttributeGraph.ValueType == AttributeValueTypesDto.Secret ||
+                !ckTypeAttributeGraph.IsReadableOutsideMethod)
             {
                 continue;
             }

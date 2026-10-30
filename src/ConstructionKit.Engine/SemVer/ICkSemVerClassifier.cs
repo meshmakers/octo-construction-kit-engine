@@ -54,6 +54,15 @@ public interface ICkSemVerClassifier
         CkCompiledModelRoot current);
 
     /// <summary>
+    ///     AB#7771: true when the history passed to <c>Classify</c> must hold the earlier versions of <b>every</b> major of
+    ///     the model, not only of the baseline's major: the first-ckLanguage-2-release exception is once per model, so
+    ///     a ckLanguage 2 version of an older major closes it even after the model dropped back to ckLanguage 1.
+    ///     Implies <see cref="NeedsMajorLineHistory" />; the T7 major-line rule still looks at the baseline's major only.
+    /// </summary>
+    bool NeedsFullModelHistory(IReadOnlyList<CkModelChange> changes, CkCompiledModelRoot baseline,
+        CkCompiledModelRoot current);
+
+    /// <summary>
     ///     Returns the highest level of the classified changes — the minimum bump level the
     ///     declared version must satisfy. Returns <see cref="CkSemVerLevel.None" /> for an
     ///     empty diff.

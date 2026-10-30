@@ -180,6 +180,18 @@ public sealed class CkPublishGateSecurityTighteningTests : IDisposable
     }
 
     [Fact]
+    public async Task The_exception_is_once_per_model_also_after_dropping_back_to_ckLanguage1_in_a_later_major()
+    {
+        await _h.SeedAsync(Record("1.0.0", 2, false)); // the model was ckLanguage 2 once
+        await _h.SeedAsync(Record("2.0.0", 1, false)); // dropped back in a Major
+
+        var result = await _h.EvaluateAsync(Record("2.1.0", true, CkAttributeAccessDto.Hidden,
+            (AccessKey, "Close credential exposure R13")));
+
+        Assert.Contains("OCTO-CK200", Codes(result));
+    }
+
+    [Fact]
     public async Task Widening_a_method_role_needs_an_acknowledgement()
     {
         var baseline = Model();

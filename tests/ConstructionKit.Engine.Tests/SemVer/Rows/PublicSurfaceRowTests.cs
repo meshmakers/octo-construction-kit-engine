@@ -261,6 +261,30 @@ public class PublicSurfaceRowTests
     }
 
     [Fact]
+    public void T7a_A_ckLanguage2VersionOfAnEarlierMajor_ClosesTheExceptionForTheWholeModel()
+    {
+        var baseline = FirstRelease("2.0.0", 1, false);
+        var current = FirstRelease("2.1.0", 2, true, CkAttributeAccessDto.Hidden);
+        var classifier = new Engine.SemVer.CkSemVerClassifier();
+        var diff = new Engine.SemVer.CkModelDiffService().Diff(baseline, current);
+
+        var change = Assert.Single(ClassifyWithHistory(baseline, current, FirstRelease("1.0.0", 2, false)),
+            c => c.Change.Property == "access");
+        Assert.Equal(CkSemVerLevel.Major, change.Level);
+        Assert.False(change.RequiresAcknowledge);
+
+        // Classic versions of an earlier major do not close it; the callers load every major only for this case.
+        var open = Assert.Single(ClassifyWithHistory(baseline, current, FirstRelease("1.0.0", 1, false)),
+            c => c.Change.Property == "access");
+        Assert.Equal(CkSemVerLevel.Minor, open.Level);
+        Assert.True(classifier.NeedsFullModelHistory(diff, baseline, current));
+        var sensitiveBoth = FirstRelease("2.0.0", 2, true);
+        var tightened = FirstRelease("2.1.0", 2, true, CkAttributeAccessDto.Hidden);
+        Assert.False(classifier.NeedsFullModelHistory(
+            new Engine.SemVer.CkModelDiffService().Diff(sensitiveBoth, tightened), sensitiveBoth, tightened));
+    }
+
+    [Fact]
     public void T7a_ClassicToClassic_IsNotAFirstCkLanguage2Release()
     {
         var baseline = FirstRelease("1.0.0", 1, false);

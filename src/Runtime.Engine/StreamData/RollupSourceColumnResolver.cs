@@ -26,15 +26,6 @@ public enum RollupSourceColumnResolutionKind
     /// (see <see cref="RollupSourceColumnResolver.TryResolve"/>).
     /// </summary>
     ChildAggregation,
-
-    /// <summary>
-    /// Rule 1b (AB#7727): the source is a raw or time-range archive and the spec names one of its row
-    /// origin fields (<see cref="ArchiveRowOriginFields" />). These are platform columns every such
-    /// table carries without declaring them, so the function is applied directly to that column, as
-    /// for <see cref="DeclaredColumn"/>. Which functions make sense on them is checked separately
-    /// (<see cref="ArchiveRowOriginFields.SupportsRollupAggregation" />).
-    /// </summary>
-    OriginColumn,
 }
 
 /// <summary>
@@ -56,10 +47,6 @@ public sealed record RollupSourceColumnResolution(
     /// <summary>The rule-1 outcome: a declared column, no child spec involved.</summary>
     public static readonly RollupSourceColumnResolution Declared =
         new(RollupSourceColumnResolutionKind.DeclaredColumn, null);
-
-    /// <summary>The rule-1b outcome: a row origin field of a base archive, no child spec involved.</summary>
-    public static readonly RollupSourceColumnResolution Origin =
-        new(RollupSourceColumnResolutionKind.OriginColumn, null);
 }
 
 /// <summary>
@@ -147,9 +134,6 @@ public static class RollupSourceColumnResolver
     /// <see cref="CapturedPaths"/> of <paramref name="source"/> contains
     /// <see cref="CkRollupAggregationSpec.SourcePath"/> verbatim — the pre-AB#5157 behaviour, which
     /// covers base archives, computed columns and physical-name chained specs; otherwise
-    /// <see cref="RollupSourceColumnResolutionKind.OriginColumn"/> (rule 1b) when the source is a raw
-    /// or time-range archive and the path names a row origin field
-    /// (<see cref="ArchiveRowOriginFields.IsOriginField"/>, AB#7727); otherwise
     /// <see cref="RollupSourceColumnResolutionKind.ChildAggregation"/> (rule 2) with the first child
     /// spec of <paramref name="sourceRollup"/> whose <see cref="CkRollupAggregationSpec.Function"/>
     /// equals the parent's and whose <see cref="NormalisePath">normalised</see> source path equals
@@ -198,13 +182,6 @@ public static class RollupSourceColumnResolver
         if (CapturedPaths(source).Contains(spec.SourcePath))
         {
             return RollupSourceColumnResolution.Declared;
-        }
-
-        // Rule 1b — a row origin field of a raw / time-range source (AB#7727). Not on a rollup
-        // source: rollup rows carry no origin, a chained origin aggregation resolves by rule 2.
-        if (source.RollupAggregations is null && ArchiveRowOriginFields.IsOriginField(spec.SourcePath))
-        {
-            return RollupSourceColumnResolution.Origin;
         }
 
         // Rule 2 — the same logical aggregation stored by a rollup source.

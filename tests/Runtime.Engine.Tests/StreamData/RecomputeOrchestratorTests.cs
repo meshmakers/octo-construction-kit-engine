@@ -414,6 +414,56 @@ public class RecomputeOrchestratorTests
         A.CallTo(() => _stateStore.ClearDirtyWindowsAsync(SourceRt)).MustHaveHappenedOnceExactly();
     }
 
+    // AB#7594 / AB#7727: the detector exempts a manual correction from the cap; the propagation must not
+    // drop it afterwards, or the rollups keep the replaced value and miss it in their manual_count.
+    [Fact]
+    public async Task Propagate_ManualWindowBeyondTheRetroReachCap_ReachesTheDependent()
+    {
+        var child = Rollup(OctoObjectId.GenerateNewId(), SourceRt, lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _archiveStore.GetAsync(SourceRt)).Returns(SourceWithCap(60 * 60 * 1000));
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt)).Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
+        {
+            new ArchiveDirtyWindow(
+                new DateTime(2026, 5, 11, 2, 15, 0, DateTimeKind.Utc),
+                new DateTime(2026, 5, 11, 2, 30, 0, DateTimeKind.Utc),
+                RecomputeChangeKind.RetroactiveModify, RecomputeChangeSource.Manual, Now),
+        });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == new DateTime(2026, 5, 11, 2, 0, 0, DateTimeKind.Utc)
+                    && rs[0].RangeEnd == new DateTime(2026, 5, 11, 3, 0, 0, DateTimeKind.Utc))))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    // FrozenUntil stops the forward aggregation only: a retroactive change inside the frozen range is still
+    // queued, so a correction there reaches the rollup. Pinned as the behaviour AB#7727 relies on.
+    [Fact]
+    public async Task Propagate_WindowInsideTheFrozenRange_StillReachesTheDependent()
+    {
+        var child = Rollup(OctoObjectId.GenerateNewId(), SourceRt, lastAggregatedBucketEnd: Now) with { FrozenUntil = Now };
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt)).Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
+        {
+            new ArchiveDirtyWindow(
+                new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc),
+                new DateTime(2026, 5, 11, 10, 30, 0, DateTimeKind.Utc),
+                RecomputeChangeKind.RetroactiveModify, RecomputeChangeSource.Manual, Now),
+        });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(child.RtId, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
     // AB#4196: with the source carrying a bounded-retro-reach cap, a dirty window that reaches
     // further back than (dependent watermark - cap) has its start floored to the cap, so a single
     // very-late change can never drag the automatic recompute past the cap.

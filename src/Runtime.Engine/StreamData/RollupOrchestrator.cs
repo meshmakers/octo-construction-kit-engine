@@ -177,6 +177,10 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
     private async Task<int> ProcessRollupSnapshotAsync(
         RollupArchiveSnapshot rollup, CancellationToken cancellationToken)
     {
+        // AB#7727: before everything that can skip the rollup — a daily rollup may have no due bucket
+        // for a day, and a frozen or stalled one for much longer, while readers already ask for the columns.
+        await _repository.EnsureRollupPlatformColumnsAsync(rollup.RtId, cancellationToken);
+
         if (rollup.BucketSize <= TimeSpan.Zero)
         {
             _logger.LogWarning(

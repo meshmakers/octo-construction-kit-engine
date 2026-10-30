@@ -58,8 +58,8 @@ public static class RollupValidator
     /// <summary>
     /// Validates the structural invariants of a rollup snapshot that do not require any source
     /// archive — non-empty aggregations, no direct self-cycle, no duplicate
-    /// <c>(SourcePath, Function)</c> pairs, a <c>ComparisonValue</c> on every StateDuration.
-    /// Since AB#5157 this runs at create time as well as at activation.
+    /// <c>(SourcePath, Function)</c> pairs, a <c>ComparisonValue</c> on every StateDuration, no
+    /// aggregation column with a name the platform keeps for itself. Since AB#5157 this runs at create time as well as at activation.
     /// </summary>
     public static void ValidateForSave(RollupArchiveSnapshot rollup)
     {
@@ -87,6 +87,16 @@ public static class RollupValidator
             if (agg.Function == CkRollupFunction.StateDuration && string.IsNullOrWhiteSpace(agg.ComparisonValue))
             {
                 throw new RollupComparisonValueRequiredException(rollup.RtId, agg.SourcePath);
+            }
+
+            // AB#7727: every rollup carries these columns itself, a generated name counts as well
+            // (Count over an attribute 'Manual' is stored as manual_count).
+            foreach (var columnName in RollupColumnGenerator.TargetColumnNamesFor(agg))
+            {
+                if (ArchiveRowOriginFields.IsRollupField(columnName))
+                {
+                    throw new ArchiveReservedColumnNameException(rollup.RtId, columnName);
+                }
             }
         }
     }
@@ -313,54 +323,10 @@ public static class RollupValidator
             // base archive and over an hourly rollup of it alike (AC1 mixed sources).
             foreach (var agg in rollup.Aggregations)
             {
-                var resolution = RollupSourceColumnResolver.TryResolve(agg, archive, source.Rollup);
-                if (resolution is null)
+                if (RollupSourceColumnResolver.TryResolve(agg, archive, source.Rollup) is null)
                 {
                     throw new RollupSourcePathMissingException(rollup.RtId, sourceRtId, agg.SourcePath);
                 }
-
-                ValidateOriginAggregation(rollup, source, agg, resolution);
-            }
-        }
-    }
-
-    /// <summary>
-    /// AB#7727: a row origin field is a text or timestamp column, so only some functions mean
-    /// something on it (<see cref="ArchiveRowOriginFields.SupportsRollupAggregation"/>). A rollup
-    /// chained on such an aggregation reads it through rule 2 with the same function, which keeps the
-    /// value a count or a timestamp; addressing a stored origin timestamp by its physical column name
-    /// (the pre-AB#5157 chained style) would store it in a numeric column and is refused.
-    /// </summary>
-    private static void ValidateOriginAggregation(
-        RollupArchiveSnapshot rollup,
-        RollupActivationSource source,
-        CkRollupAggregationSpec agg,
-        RollupSourceColumnResolution resolution)
-    {
-        var sourceRtId = source.Reference.SourceArchiveRtId;
-        if (resolution.Kind == RollupSourceColumnResolutionKind.OriginColumn)
-        {
-            if (!ArchiveRowOriginFields.SupportsRollupAggregation(agg.SourcePath, agg.Function))
-            {
-                throw new RollupOriginAggregationNotSupportedException(
-                    rollup.RtId, sourceRtId, agg.SourcePath, agg.Function);
-            }
-
-            return;
-        }
-
-        if (resolution.Kind != RollupSourceColumnResolutionKind.DeclaredColumn
-            || source.Rollup?.Aggregations is not { } childSpecs)
-        {
-            return;
-        }
-
-        foreach (var child in childSpecs)
-        {
-            if (ArchiveRowOriginFields.IsTimestampAggregation(child.SourcePath, child.Function)
-                && RollupColumnGenerator.TargetColumnNamesFor(child).Contains(agg.SourcePath, StringComparer.Ordinal))
-            {
-                throw new RollupOriginTimestampChainException(rollup.RtId, sourceRtId, agg.SourcePath, child.Function);
             }
         }
     }

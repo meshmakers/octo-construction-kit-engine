@@ -93,6 +93,20 @@ public class RollupOrchestratorTests
             .MustNotHaveHappened();
     }
 
+    // AB#7727: an existing rollup offers the platform columns right after the update, also with no bucket due.
+    [Fact]
+    public async Task Tick_ActivatedRollup_NoBucketDue_StillEnsuresThePlatformColumns()
+    {
+        StubRollups(Rollup(BaseTime));
+        StubActivatedSource();
+
+        var committed = await NewSut(BaseTime.AddMinutes(1)).TickAsync(CancellationToken.None);
+
+        Assert.Equal(0, committed);
+        A.CallTo(() => _repo.EnsureRollupPlatformColumnsAsync(RollupRt, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
     [Fact]
     public async Task Tick_ActivatedRollup_ClosedBuckets_AggregatesAndAdvances()
     {

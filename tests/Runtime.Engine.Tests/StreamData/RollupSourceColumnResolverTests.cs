@@ -454,49 +454,4 @@ public class RollupSourceColumnResolverTests
         Assert.Throws<ArgumentNullException>(() =>
             RollupSourceColumnResolver.TryResolve(Spec("Amount.Value", CkRollupFunction.Sum), null!, null));
     }
-
-    // ---- Rule 1b: row origin fields of a base archive (AB#7727) -----------------------------
-
-    [Theory]
-    [InlineData("row_origin")]
-    [InlineData("manual_written_by")]
-    [InlineData("manual_written_at")]
-    [InlineData("manual_reason")]
-    public void TryResolve_OriginFieldOnBaseArchive_ResolvesAsOriginColumn(string path)
-    {
-        var timeRange = Base("Amount.Value");
-        var raw = Base("Amount.Value") with { IsTimeRange = false, Period = null };
-
-        Assert.Equal(RollupSourceColumnResolutionKind.OriginColumn,
-            RollupSourceColumnResolver.TryResolve(Spec(path, CkRollupFunction.Count), timeRange, null)!.Kind);
-        Assert.Equal(RollupSourceColumnResolutionKind.OriginColumn,
-            RollupSourceColumnResolver.TryResolve(Spec(path, CkRollupFunction.Count), raw, null)!.Kind);
-    }
-
-    [Fact]
-    public void TryResolve_DeclaredColumnNamedLikeAnOriginField_WinsOverRule1b()
-    {
-        var resolution = RollupSourceColumnResolver.TryResolve(
-            Spec("manual_reason", CkRollupFunction.Count), Base("manual_reason"), null);
-
-        Assert.Equal(RollupSourceColumnResolutionKind.DeclaredColumn, resolution!.Kind);
-    }
-
-    [Fact]
-    public void TryResolve_OriginFieldOnRollupSource_UsesRule2Only()
-    {
-        var (archive, rollup) = Hourly(Spec("manual_written_at", CkRollupFunction.Count));
-
-        var count = RollupSourceColumnResolver.TryResolve(Spec("manual_written_at", CkRollupFunction.Count), archive, rollup);
-        var max = RollupSourceColumnResolver.TryResolve(Spec("manual_written_at", CkRollupFunction.Max), archive, rollup);
-
-        Assert.Equal(RollupSourceColumnResolutionKind.ChildAggregation, count!.Kind);
-        Assert.Null(max);
-    }
-
-    [Fact]
-    public void TryResolve_NonOriginUndeclaredPathOnBaseArchive_StillDoesNotResolve()
-    {
-        Assert.Null(RollupSourceColumnResolver.TryResolve(Spec("manual_other", CkRollupFunction.Count), Base("Amount.Value"), null));
-    }
 }

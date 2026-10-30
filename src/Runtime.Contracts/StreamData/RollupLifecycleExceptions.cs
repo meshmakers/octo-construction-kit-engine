@@ -441,59 +441,22 @@ public sealed class RollupSourcePathMissingException : StreamDataException
 }
 
 /// <summary>
-/// An aggregation names a row origin field (<see cref="ArchiveRowOriginFields" />) of a raw or time-range
-/// source with a function that is not meaningful for it — for example <c>Sum</c> over the text field
-/// <c>manual_written_by</c>, or <c>Count</c> over <c>row_origin</c>, which is set on every row. Refused at
-/// activation. AB#7727.
+/// A user-defined column takes one of the names the platform keeps for itself on every rollup
+/// (<see cref="ArchiveRowOriginFields.RollupFields" />), directly or as a generated aggregation column
+/// (<c>Count</c> over an attribute <c>Manual</c> is stored as <c>manual_count</c>). AB#7727.
 /// </summary>
-public sealed class RollupOriginAggregationNotSupportedException : StreamDataException
+public sealed class ArchiveReservedColumnNameException : StreamDataException
 {
-    public OctoObjectId SourceArchiveRtId { get; }
-    public string SourcePath { get; }
-    public CkRollupFunction Function { get; }
+    public string ColumnName { get; }
 
-    public RollupOriginAggregationNotSupportedException(
-        OctoObjectId rollupArchiveRtId, OctoObjectId sourceArchiveRtId, string sourcePath, CkRollupFunction function)
+    public ArchiveReservedColumnNameException(OctoObjectId archiveRtId, string columnName)
         : base(
-            $"Rollup archive {Describe(rollupArchiveRtId)}: aggregation {function} over the row origin field '{sourcePath}' " +
-            $"of source archive '{sourceArchiveRtId}' is not supported. " +
-            (string.Equals(sourcePath, ArchiveRowOriginFields.RowOrigin, StringComparison.OrdinalIgnoreCase)
-                ? $"'{ArchiveRowOriginFields.RowOrigin}' is set on every row; count the manually entered rows with Count over " +
-                  $"'{ArchiveRowOriginFields.ManualWrittenAt}'. "
-                : string.Empty) +
-            $"Supported are Count over '{ArchiveRowOriginFields.ManualWrittenAt}', '{ArchiveRowOriginFields.ManualWrittenBy}' or " +
-            $"'{ArchiveRowOriginFields.ManualReason}' (the number of manually entered rows) and Min/Max over " +
-            $"'{ArchiveRowOriginFields.ManualWrittenAt}' (the earliest/latest manual entry).",
-            rollupArchiveRtId)
+            $"Archive {Describe(archiveRtId)}: the column name '{columnName}' is reserved. Every rollup reports " +
+            $"'{ArchiveRowOriginFields.ManualCount}' and '{ArchiveRowOriginFields.LastManualAt}' as platform columns; " +
+            "choose another name (for an aggregation: TargetColumnName).",
+            archiveRtId)
     {
-        SourceArchiveRtId = sourceArchiveRtId;
-        SourcePath = sourcePath;
-        Function = function;
-    }
-}
-
-/// <summary>
-/// A rollup source stores a timestamp aggregation of a row origin field (Min/Max over
-/// <see cref="ArchiveRowOriginFields.ManualWrittenAt" />) and the parent addresses that stored column by its
-/// physical name. The parent would store the timestamp in a numeric column; it has to name the logical path
-/// instead, so the value stays a timestamp up the chain. AB#7727.
-/// </summary>
-public sealed class RollupOriginTimestampChainException : StreamDataException
-{
-    public OctoObjectId SourceArchiveRtId { get; }
-    public string SourcePath { get; }
-
-    public RollupOriginTimestampChainException(
-        OctoObjectId rollupArchiveRtId, OctoObjectId sourceArchiveRtId, string sourcePath, CkRollupFunction childFunction)
-        : base(
-            $"Rollup archive {Describe(rollupArchiveRtId)}: aggregation source path '{sourcePath}' names the stored " +
-            $"{childFunction} of '{ArchiveRowOriginFields.ManualWrittenAt}' on rollup source '{sourceArchiveRtId}', a timestamp. " +
-            $"Use SourcePath '{ArchiveRowOriginFields.ManualWrittenAt}' with Function {childFunction} instead, so the rollup reads " +
-            "the source's value as a timestamp.",
-            rollupArchiveRtId)
-    {
-        SourceArchiveRtId = sourceArchiveRtId;
-        SourcePath = sourcePath;
+        ColumnName = columnName;
     }
 }
 

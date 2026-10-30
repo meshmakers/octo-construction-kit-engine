@@ -528,7 +528,7 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
 
         // AB#4196 belt-and-suspenders: the retroactive-write detector already floors an automatic
         // dirty window at the source's bounded-retro-reach cap, so a freshly-detected window is
-        // in-reach by construction. Re-apply the source's per-archive cap here too, so a dirty window
+        // in-reach by construction. Re-apply the source's per-archive cap here too, so an automatic dirty window
         // recorded before the cap existed (legacy / pre-1.6.8) — or from any future non-detector
         // source — can still never drag an unbounded automatic recompute. The fleet-wide hard limit is
         // enforced authoritatively at detection; here we only have the per-archive value.
@@ -544,8 +544,11 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
                 continue;
             }
 
+            // A manual correction is exempt from the cap (AB#7594): the detector does not floor it, and a
+            // rollup must not keep the replaced value, however old the window is.
             await EnqueueOnDirectDependentsAsync(
-                sourceArchiveRtId, window.WindowStart, window.WindowEnd, cancellationToken, maxRetroReach);
+                sourceArchiveRtId, window.WindowStart, window.WindowEnd, cancellationToken,
+                window.Source == RecomputeChangeSource.Manual ? null : maxRetroReach);
         }
 
         await _stateStore.ClearDirtyWindowsAsync(sourceArchiveRtId);

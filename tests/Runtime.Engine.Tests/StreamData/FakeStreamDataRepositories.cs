@@ -68,6 +68,9 @@ internal class StreamDataRepositoryStub : IStreamDataRepository
         DateTime bucketStart, DateTime bucketEnd, CancellationToken cancellationToken) =>
         throw new NotSupportedException();
 
+    public Task EnsureRollupPlatformColumnsAsync(OctoObjectId rollupRtId, CancellationToken cancellationToken) =>
+        Task.CompletedTask;
+
     public Task ClearRecomputeGenerationsAsync(OctoObjectId rollupRtId, DateTime fromBucketEnd,
         CancellationToken cancellationToken = default) => throw new NotSupportedException();
 

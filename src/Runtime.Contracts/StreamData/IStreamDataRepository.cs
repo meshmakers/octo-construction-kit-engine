@@ -469,6 +469,16 @@ public interface IStreamDataRepository
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Makes sure the table of the rollup carries the platform columns
+    /// (<see cref="ArchiveRowOriginFields.RollupFields" />, AB#7727). A rollup table provisioned before
+    /// they existed has to offer them to readers from the platform update on, also when no bucket is due
+    /// for a long time. Called by the orchestrator tick; the check is made once per table and process.
+    /// </summary>
+    /// <param name="rollupRtId">The rollup archive.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task EnsureRollupPlatformColumnsAsync(OctoObjectId rollupRtId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Clears the per-window recompute generation pointers for a rollup archive at and after
     /// <paramref name="fromBucketEnd"/>, so a subsequent forward re-aggregation (which writes
     /// generation 0) becomes visible again. Called when a rollup watermark is rewound over a range

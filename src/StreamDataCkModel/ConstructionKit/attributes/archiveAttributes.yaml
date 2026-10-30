@@ -1,11 +1,11 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 attributes:
   - id: Archive.TargetCkTypeId
-    description: "Construction Kit type ID that this archive captures time-series data for."
+    description: "Construction Kit type ID that this archive captures time-series data for. A change is refused on an activated archive (AB#7872): it needs a new archive."
     valueType: String
     ownership: SeedOwned
   - id: Archive.Columns
-    description: "Set of columns (attribute paths) the archive captures. At least one column is required."
+    description: "Set of columns (attribute paths) the archive captures. At least one column is required. On an activated raw or time-range archive a column can be added; removing a column or changing its type is refused (AB#7872) and needs a new archive."
     valueType: RecordArray
     valueCkRecordId: ${this}/CkArchiveColumn
     ownership: SeedOwned

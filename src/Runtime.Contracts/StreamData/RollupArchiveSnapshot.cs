@@ -157,6 +157,12 @@ public sealed record RollupArchiveSnapshot(
     public OctoObjectId? ConflictingSourceArchiveRtId { get; init; }
 
     /// <summary>
+    /// Failed runs of the rollup orchestrator in a row; 0 while the rollup runs (AB#7872). The reason is on the
+    /// entity (<c>LastRunError</c>, <c>LastRunErrorAt</c>).
+    /// </summary>
+    public int ConsecutiveRunFailures { get; init; }
+
+    /// <summary>
     /// The single source archive id for read surfaces that still expose the deprecated
     /// <c>sourceArchiveRtId</c> field — non-null only when the rollup declares exactly one source
     /// and that source is unbounded. <c>null</c> for every genuinely multi-source rollup, for a

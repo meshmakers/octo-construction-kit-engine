@@ -1,7 +1,7 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
   - typeId: RollupArchive
-    description: "Concrete Archive subtype for derived bucketed aggregations of another archive (raw or rollup-of-rollup). Columns are generated from Aggregations[] at activation time and immutable afterwards. Inserts happen exclusively through the system-internal rollup orchestrator. The inherited Columns attribute is populated automatically; direct edits are rejected by validation."
+    description: "Concrete Archive subtype for derived bucketed aggregations of another archive (raw or rollup-of-rollup). Columns are derived from Aggregations[], the inherited Columns attribute is populated automatically and an edit of it has no effect. Every rollup also carries the platform columns manual_count and last_manual_at, which are no part of the definition. Inserts happen exclusively through the system-internal rollup orchestrator. Aggregations, bucket size, alignment, time zone and sources are refused on an activated rollup (AB#7872): such a change needs a new rollup."
     derivedFromCkTypeId: ${this}/Archive
     isFinal: true
     isAbstract: false
@@ -32,4 +32,13 @@ types:
         isOptional: true
       - id: ${this}/RollupArchive.CarryLookbackMs
         name: CarryLookbackMs
+        isOptional: true
+      - id: ${this}/RollupArchive.LastRunError
+        name: LastRunError
+        isOptional: true
+      - id: ${this}/RollupArchive.LastRunErrorAt
+        name: LastRunErrorAt
+        isOptional: true
+      - id: ${this}/RollupArchive.ConsecutiveRunFailures
+        name: ConsecutiveRunFailures
         isOptional: true

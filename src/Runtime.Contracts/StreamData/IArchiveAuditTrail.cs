@@ -43,6 +43,16 @@ public interface IArchiveAuditTrail
         TimeSpan elapsed);
 
     /// <summary>
+    /// Records that a rollup keeps failing: the orchestrator gave up on it <paramref name="failures"/> times in a row
+    /// and the watermark does not advance (AB#7872). Emitted once per failing streak.
+    /// </summary>
+    Task RecordRollupRunFailingAsync(
+        string tenantId,
+        OctoObjectId rollupRtId,
+        int failures,
+        string reason);
+
+    /// <summary>
     /// Records a freeze (manual or implicit when source data was truncated). <paramref name="reason"/>
     /// carries a free-text reason or the triggering event id; <c>null</c> for explicit operator
     /// freezes via the GraphQL mutation. Concept (rollup-archives) §11.

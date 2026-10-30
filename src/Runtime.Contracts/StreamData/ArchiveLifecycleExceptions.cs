@@ -71,13 +71,23 @@ public sealed class InvalidArchiveStateTransitionException : StreamDataException
 }
 
 /// <summary>
-/// A schema-relevant change (target type or columns) was attempted on an archive that has already
-/// left the <see cref="CkArchiveStatus.Created"/> state.
+/// A change that an activated archive cannot apply was attempted: its target type, the removal or the type
+/// of a column (AB#7872). The table does not follow such a change, so it is refused on every way in instead
+/// of leaving the archive out of step with its definition. Adding a column stays possible.
 /// </summary>
 public sealed class ArchiveSchemaImmutableException : StreamDataException
 {
-    public ArchiveSchemaImmutableException(OctoObjectId archiveRtId, CkArchiveStatus currentStatus)
-        : base($"Archive '{archiveRtId}' is in status {currentStatus}; its column definitions and target type are frozen.", archiveRtId) { }
+    /// <summary>The attribute that would have changed.</summary>
+    public string Field { get; }
+
+    public ArchiveSchemaImmutableException(OctoObjectId archiveRtId, string? wellKnownName, CkArchiveStatus currentStatus, string field, string change)
+        : base($"Archive {DescribeNamed(archiveRtId, wellKnownName)} is {currentStatus}: {change}. Such a change needs a new archive.", archiveRtId)
+    {
+        Field = field;
+    }
+
+    private static string DescribeNamed(OctoObjectId archiveRtId, string? wellKnownName) =>
+        string.IsNullOrEmpty(wellKnownName) ? Describe(archiveRtId) : $"{Describe(archiveRtId)} ('{wellKnownName}')";
 }
 
 /// <summary>

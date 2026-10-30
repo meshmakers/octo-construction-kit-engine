@@ -12,6 +12,7 @@ using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Engine.Repositories.Query;
 using Meshmakers.Octo.Runtime.Engine.Secrets;
 using Meshmakers.Octo.Runtime.Engine.Security;
+using Meshmakers.Octo.Runtime.Engine.StreamData;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable MemberCanBePrivate.Global
@@ -565,9 +566,34 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         OperationResult operationResult)
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
+        await EnsureArchiveDefinitionsUnchangedAsync(session, cacheService, entityUpdateInfoList).ConfigureAwait(false);
         await ApplyChangesGuardedAsync(session, cacheService, entityUpdateInfoList,
                 associationUpdateInfoList, BulkRtMutationOptions.FromDeleteOptions(deleteOptions), operationResult)
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     AB#7872: the generic entity API must not change what an activated archive cannot apply. Only this public
+    ///     change set is checked, the stream data stores write through <c>UpdateOneRtEntityById</c>.
+    /// </summary>
+    private async Task EnsureArchiveDefinitionsUnchangedAsync(IOctoSession session, ICkCacheService cacheService,
+        IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList)
+    {
+        foreach (var update in entityUpdateInfoList)
+        {
+            if (update.ModOption is not (EntityModOptions.Update or EntityModOptions.Replace)
+                || update.RtId is not { } rtId || update.RtEntity == null
+                || !ArchiveDefinitionGuard.IsArchive(cacheService, TenantId, update.CkTypeId, out var ckType))
+            {
+                continue;
+            }
+
+            var stored = await GetRtEntityByRtIdAsync(session, new RtEntityId(update.CkTypeId, rtId)).ConfigureAwait(false);
+            if (stored != null)
+            {
+                ArchiveDefinitionGuard.EnsureUnchanged(cacheService, TenantId, ckType!, stored, update);
+            }
+        }
     }
 
     /// <inheritdoc />

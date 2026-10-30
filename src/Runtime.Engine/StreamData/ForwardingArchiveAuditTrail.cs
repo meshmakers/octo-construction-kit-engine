@@ -67,6 +67,24 @@ public sealed class ForwardingArchiveAuditTrail : IArchiveAuditTrail
     }
 
     /// <inheritdoc />
+    public Task RecordRollupRunFailingAsync(string tenantId, OctoObjectId rollupRtId, int failures, string reason)
+    {
+        return _sink.PublishAsync(new AuditEvent(
+            tenantId,
+            AuditEventLevel.Error,
+            "Archive.RollupRunFailing",
+            $"Rollup {rollupRtId} failed {failures} runs in a row and does not advance: {reason}")
+        {
+            Metadata = new Dictionary<string, object?>
+            {
+                ["rollupRtId"] = rollupRtId.ToString(),
+                ["failures"] = failures,
+                ["reason"] = reason,
+            },
+        });
+    }
+
+    /// <inheritdoc />
     public Task RecordRollupRunAsync(
         string tenantId,
         OctoObjectId rollupRtId,

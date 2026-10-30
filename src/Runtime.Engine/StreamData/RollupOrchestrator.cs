@@ -43,6 +43,12 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
     /// <summary>Default upper bound on the number of buckets processed for a single rollup per tick.</summary>
     public const int DefaultMaxBucketsPerTick = 60;
 
+    /// <summary>Failed runs in a row after which a rollup is reported in the event log (AB#7872).</summary>
+    internal const int FailuresBeforeAlert = 3;
+
+    /// <summary>The part of an exception message kept as the reason on the entity.</summary>
+    private const int MaxFailureReasonLength = 2000;
+
     private readonly string _tenantId;
     private readonly IArchiveRuntimeStore _archiveStore;
     private readonly IRollupArchiveRuntimeStore _rollupStore;
@@ -122,6 +128,10 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
             try
             {
                 total += await ProcessRollupSnapshotAsync(snapshot, cancellationToken);
+                if (snapshot.ConsecutiveRunFailures > 0)
+                {
+                    await _rollupStore.ClearRunFailureAsync(snapshot.RtId);
+                }
             }
             catch (OperationCanceledException)
             {
@@ -129,16 +139,40 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
             }
             catch (Exception ex)
             {
-                // One rollup failing must not stop the tick — log + continue. Per-rollup failure
-                // tracking → CkArchiveStatus.Failed escalation lives in the lifecycle service
-                // (concept §8) and is invoked separately.
+                // One rollup failing must not stop the tick — log + continue.
                 _logger.LogError(ex,
                     "Rollup orchestrator: failed to process rollup {RollupRtId} for tenant {TenantId}",
                     snapshot.RtId, _tenantId);
+                await RecordRunFailureAsync(snapshot, ex);
             }
         }
 
         return total;
+    }
+
+    /// <summary>
+    /// AB#7872: a rollup that keeps failing shows it, on its entity from the first failed run, in the event log once it
+    /// failed <see cref="FailuresBeforeAlert"/> runs in a row. Its status stays <c>Activated</c>: <c>Failed</c> would stop
+    /// the reads and the ingest of what is a passing problem more often than not (a CrateDB restart), and the next
+    /// tick retries anyway. A failure here must not stop the tick either.
+    /// </summary>
+    private async Task RecordRunFailureAsync(RollupArchiveSnapshot snapshot, Exception exception)
+    {
+        var reason = exception.Message.Length <= MaxFailureReasonLength
+            ? exception.Message
+            : exception.Message[..MaxFailureReasonLength];
+        try
+        {
+            await _rollupStore.RecordRunFailureAsync(snapshot.RtId, reason, _clock());
+            if (snapshot.ConsecutiveRunFailures + 1 == FailuresBeforeAlert)
+            {
+                await _audit.RecordRollupRunFailingAsync(_tenantId, snapshot.RtId, FailuresBeforeAlert, reason);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Rollup {RollupRtId}: failed to record the failed run.", snapshot.RtId);
+        }
     }
 
     /// <inheritdoc />

@@ -48,7 +48,8 @@ public class CkCompatibilityVerdictService : ICkCompatibilityVerdictService
         var changes = _diffService.Diff(baselineModel, current);
         // AB#6585: the security exception for an access tightening is judged against the whole major line.
         var earlierInMajor = _classifier.NeedsMajorLineHistory(changes, baselineModel, current)
-            ? await LoadEarlierInMajorAsync(resolution, publishedModelId, baselineCatalogName).ConfigureAwait(false)
+            ? await LoadEarlierInMajorAsync(resolution, publishedModelId, baselineCatalogName,
+                    _classifier.NeedsFullModelHistory(changes, baselineModel, current)).ConfigureAwait(false)
             : [];
         var classifiedChanges = _classifier.Classify(changes, baselineModel, current, earlierInMajor);
         var requiredLevel = _classifier.GetRequiredLevel(classifiedChanges);
@@ -76,9 +77,11 @@ public class CkCompatibilityVerdictService : ICkCompatibilityVerdictService
     ///     AB#6585: the published versions of the baseline's major below the baseline, read from the baseline's catalog
     ///     (the authoritative snapshot of a publish resolution when there is one). A version that cannot be loaded fails
     ///     the verdict: the history decides whether a security exception applies, so it is never guessed.
+    ///     <paramref name="allMajors" /> (AB#7771, the first-ckLanguage-2-release exception is once per model) reads the
+    ///     versions of every major below the baseline.
     /// </summary>
     private async Task<IReadOnlyList<CkCompiledModelRoot>> LoadEarlierInMajorAsync(CkBaselineResolution resolution,
-        CkModelId baselineId, string? catalogName)
+        CkModelId baselineId, string? catalogName, bool allMajors)
     {
         IEnumerable<CkModelId> known;
         if (resolution.KnownVersions.Count > 0)
@@ -97,7 +100,8 @@ public class CkCompatibilityVerdictService : ICkCompatibilityVerdictService
 
         var earlier = known
             .Where(id => string.Equals(id.Name, baselineId.Name, StringComparison.OrdinalIgnoreCase) &&
-                         id.Version.Major == baselineId.Version.Major && id.Version.CompareTo(baselineId.Version) < 0)
+                         (allMajors || id.Version.Major == baselineId.Version.Major) &&
+                         id.Version.CompareTo(baselineId.Version) < 0)
             .GroupBy(id => id.Version)
             .Select(g => g.First())
             .OrderBy(id => id.Version)
@@ -113,7 +117,7 @@ public class CkCompatibilityVerdictService : ICkCompatibilityVerdictService
             {
                 throw new CompilerException(
                     $"Error loading '{id.FullName}' from catalog '{catalogName}' to judge the security exception " +
-                    $"against the history of major {id.Version.Major}.",
+                    $"against the history of the model.",
                     result);
             }
 

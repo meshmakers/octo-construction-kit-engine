@@ -251,7 +251,8 @@ public class CkCatalogValidationService : ICkCatalogValidationService
             if (_classifier.NeedsMajorLineHistory(changes, baselineModel, candidate))
             {
                 var baselineVersion = predecessor!.Version;
-                foreach (var id in versions.Where(v => v.Version.Major == baselineVersion.Major &&
+                var allMajors = _classifier.NeedsFullModelHistory(changes, baselineModel, candidate);
+                foreach (var id in versions.Where(v => (allMajors || v.Version.Major == baselineVersion.Major) &&
                                                        v.Version.CompareTo(baselineVersion) < 0))
                 {
                     if (await cache.GetAsync(id).ConfigureAwait(false) is { } earlierModel)

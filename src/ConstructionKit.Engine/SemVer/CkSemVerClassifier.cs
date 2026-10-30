@@ -40,6 +40,13 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                           IsFirstCkLanguage2Candidate(c, baseline, current)));
 
     /// <inheritdoc />
+    public bool NeedsFullModelHistory(IReadOnlyList<CkModelChange> changes, CkCompiledModelRoot baseline,
+        CkCompiledModelRoot current) =>
+        changes.Any(c => c.ElementKind is CkModelElementKind.TypeAttribute or CkModelElementKind.RecordAttribute
+                             or CkModelElementKind.AssociationRoleAttribute &&
+                         IsAccessTightening(c) && IsFirstCkLanguage2Candidate(c, baseline, current));
+
+    /// <inheritdoc />
     public IReadOnlyList<CkClassifiedModelChange> Classify(IReadOnlyList<CkModelChange> changes,
         CkCompiledModelRoot baseline, CkCompiledModelRoot current, IReadOnlyList<CkCompiledModelRoot> earlierInMajor)
     {
@@ -1003,7 +1010,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 // version of this major in which it exists. One that became sensitive within the major line is judged
                 // as if the marker were absent: the two-step "mark in one Minor, tighten in the next" ships a Major
                 // break as Minors.
-                return FirstNonSensitiveVersion(change, earlierInMajor) is { } since
+                return FirstNonSensitiveVersion(change, baseline, earlierInMajor) is { } since
                     ? (CkSemVerLevel.Major,
                         $"access/security: access tightened on an attribute that became securitySensitive within this major " +
                         $"line (not sensitive in {since}) — the security exception does not apply, a Major bump is required " +
@@ -1078,8 +1085,9 @@ public class CkSemVerClassifier : ICkSemVerClassifier
     /// <summary>
     ///     AB#7771 (G1 = B): the security exception for the one release that moves a classic model to ckLanguage 2.
     ///     Detected from the published baseline (ckLanguage 1) and the candidate (ckLanguage 2) alone, never from an
-    ///     author-set flag; defensively also requires that no published earlier version of the major is ckLanguage 2,
-    ///     so a second ckLanguage 2 release (baseline already ckLanguage 2) never qualifies.
+    ///     author-set flag; also requires that no published earlier version of the model - of any major - is
+    ///     ckLanguage 2, so a second ckLanguage 2 release never qualifies, not even after the model dropped back to
+    ///     ckLanguage 1 in a later major ("once per model").
     /// </summary>
     private static bool IsFirstCkLanguage2Release(CkModelChange change, CkCompiledModelRoot baseline,
         CkCompiledModelRoot current, IReadOnlyList<CkCompiledModelRoot> earlierInMajor) =>
@@ -1092,10 +1100,14 @@ public class CkSemVerClassifier : ICkSemVerClassifier
     ///     without the assignment is skipped (an attribute born sensitive qualifies); a definition of another model
     ///     cannot be inspected and counts as not sensitive.
     /// </summary>
-    private static CkVersion? FirstNonSensitiveVersion(CkModelChange change,
-        IReadOnlyList<CkCompiledModelRoot> earlierInMajor)
+    private static CkVersion? FirstNonSensitiveVersion(CkModelChange change, CkCompiledModelRoot baseline,
+        IReadOnlyList<CkCompiledModelRoot> history)
     {
-        foreach (var model in earlierInMajor.OrderBy(m => m.ModelId.Version))
+        // The history may hold versions of other majors (AB#7771: the ckLanguage check of the first-release exception
+        // spans the whole model); row T7 judges the major line of the baseline only.
+        var baselineMajor = baseline.ModelId.Version.Major;
+        foreach (var model in history.Where(m => m.ModelId.Version.Major == baselineMajor)
+                     .OrderBy(m => m.ModelId.Version))
         {
             var assignment = FindAttributeAssignment(model, change.ElementKind, change.ElementId);
             if (assignment == null)
@@ -1165,7 +1177,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                                       or CkModelElementKind.RecordAttribute or CkModelElementKind.AssociationRoleAttribute &&
                                   IsAccessTightening(change) &&
                                   (IsSecuritySensitiveInBoth(change, baseline, current) &&
-                                   FirstNonSensitiveVersion(change, earlierInMajor) == null ||
+                                   FirstNonSensitiveVersion(change, baseline, earlierInMajor) == null ||
                                    IsFirstCkLanguage2Release(change, baseline, current, earlierInMajor));
 
         // AB#6585 (row M12): a looser method authorization (a role added - also Everyone -, a scope dropped, self-calls

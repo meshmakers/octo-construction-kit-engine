@@ -37,6 +37,16 @@ public interface IEntityUpdateInfo<out TEntity> where TEntity : RtEntity
     public AttributeNewerThanGuard? UpdateGuard { get; }
 
     /// <summary>
+    ///     Optional optimistic-concurrency check on <see cref="RtEntity.RtVersion" /> (AB#7769) for
+    ///     <see cref="EntityModOptions.Update" /> and <see cref="EntityModOptions.Replace" />: the write is applied
+    ///     only if the stored entity still has exactly this version, and the stored version then becomes
+    ///     <c>expected + 1</c>. If another writer changed the entity in between, nothing is written and the repository
+    ///     throws <see cref="RtVersionConflictException" /> (never a silent skip). <c>null</c> = no check.
+    ///     Cannot be combined with <see cref="UpdateGuard" />. Ignored for insert and delete.
+    /// </summary>
+    public ulong? ExpectedRtVersion => null;
+
+    /// <summary>
     ///     Names (PascalCase, as in <see cref="RtTypeWithAttributes.Attributes" />) of top-level
     ///     <c>Secret</c> attributes to clear explicitly (AB#5532, concept §4.3 <c>clearSecretAttributes</c>).
     ///     Clearing is the only way to remove a stored secret through an update: an omitted, <c>""</c>

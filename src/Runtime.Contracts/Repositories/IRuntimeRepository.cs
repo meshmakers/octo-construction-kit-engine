@@ -1,4 +1,4 @@
-﻿using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
@@ -292,6 +292,45 @@ public interface IRuntimeRepository
     Task ReplaceOneRtEntityAsync(IOctoSession session, FieldFilterCriteria fieldFilterCriteria, RtEntity entity);
 
     /// <summary>
+    ///     Replaces a single runtime entity only if the stored entity still has <paramref name="expectedRtVersion" />
+    ///     (optimistic concurrency, AB#7769): the check and the write are one atomic statement, and the stored
+    ///     <see cref="RtEntity.RtVersion" /> becomes <c>expectedRtVersion + 1</c>. Typical use: read the entity, change it,
+    ///     write it with the <see cref="RtEntity.RtVersion" /> that was read, and retry from the read on conflict.
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="ckTypeId">Construction kit type id</param>
+    /// <param name="rtId">Runtime object id</param>
+    /// <param name="rtEntity">Runtime object that is used as replacement</param>
+    /// <param name="expectedRtVersion">The <see cref="RtEntity.RtVersion" /> the caller read</param>
+    /// <exception cref="RtVersionConflictException">
+    ///     The entity exists with a different version; nothing was written. A missing entity raises the usual
+    ///     not-found error.
+    /// </exception>
+    /// <returns></returns>
+    Task ReplaceOneRtEntityByIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId,
+        RtEntity rtEntity, ulong expectedRtVersion);
+
+    /// <summary>
+    ///     Replaces a single runtime entity only if the stored entity still has <paramref name="expectedRtVersion" />
+    ///     (optimistic concurrency, AB#7769): the check and the write are one atomic statement, and the stored
+    ///     <see cref="RtEntity.RtVersion" /> becomes <c>expectedRtVersion + 1</c>. Typical use: read the entity, change it,
+    ///     write it with the <see cref="RtEntity.RtVersion" /> that was read, and retry from the read on conflict.
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="rtId">Runtime object id</param>
+    /// <param name="rtEntity">Runtime object that is used as replacement</param>
+    /// <param name="expectedRtVersion">The <see cref="RtEntity.RtVersion" /> the caller read</param>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
+    /// <exception cref="RtVersionConflictException">
+    ///     The entity exists with a different version; nothing was written. A missing entity raises the usual
+    ///     not-found error.
+    /// </exception>
+    /// <returns></returns>
+    Task ReplaceOneRtEntityByIdAsync<TEntity>(IOctoSession session, OctoObjectId rtId, TEntity rtEntity,
+        ulong expectedRtVersion)
+        where TEntity : RtEntity, new();
+
+    /// <summary>
     ///     Replace a single runtime entity
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
@@ -333,6 +372,45 @@ public interface IRuntimeRepository
     /// <param name="rtEntity">Runtime object that is used as replacement</param>
     /// <returns></returns>
     Task UpdateOneRtEntityAsync(IOctoSession session, FieldFilterCriteria fieldFilterCriteria, RtEntity rtEntity);
+
+    /// <summary>
+    ///     Updates a single runtime entity only if the stored entity still has <paramref name="expectedRtVersion" />
+    ///     (optimistic concurrency, AB#7769): the check and the write are one atomic statement, and the stored
+    ///     <see cref="RtEntity.RtVersion" /> becomes <c>expectedRtVersion + 1</c>. Typical use: read the entity, change it,
+    ///     write it with the <see cref="RtEntity.RtVersion" /> that was read, and retry from the read on conflict.
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="ckTypeId">Construction kit type id</param>
+    /// <param name="rtId">Runtime object id</param>
+    /// <param name="rtEntity">Runtime object that carries the attributes to update</param>
+    /// <param name="expectedRtVersion">The <see cref="RtEntity.RtVersion" /> the caller read</param>
+    /// <exception cref="RtVersionConflictException">
+    ///     The entity exists with a different version; nothing was written. A missing entity raises the usual
+    ///     not-found error.
+    /// </exception>
+    /// <returns></returns>
+    Task UpdateOneRtEntityByIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId,
+        RtEntity rtEntity, ulong expectedRtVersion);
+
+    /// <summary>
+    ///     Updates a single runtime entity only if the stored entity still has <paramref name="expectedRtVersion" />
+    ///     (optimistic concurrency, AB#7769): the check and the write are one atomic statement, and the stored
+    ///     <see cref="RtEntity.RtVersion" /> becomes <c>expectedRtVersion + 1</c>. Typical use: read the entity, change it,
+    ///     write it with the <see cref="RtEntity.RtVersion" /> that was read, and retry from the read on conflict.
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="rtId">Runtime object id</param>
+    /// <param name="rtEntity">Runtime object that carries the attributes to update</param>
+    /// <param name="expectedRtVersion">The <see cref="RtEntity.RtVersion" /> the caller read</param>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
+    /// <exception cref="RtVersionConflictException">
+    ///     The entity exists with a different version; nothing was written. A missing entity raises the usual
+    ///     not-found error.
+    /// </exception>
+    /// <returns></returns>
+    Task UpdateOneRtEntityByIdAsync<TEntity>(IOctoSession session, OctoObjectId rtId, TEntity rtEntity,
+        ulong expectedRtVersion)
+        where TEntity : RtEntity, new();
 
     /// <summary>
     ///     Updates a single runtime entity. Only attributes of the entity that are set in the update object are updated.

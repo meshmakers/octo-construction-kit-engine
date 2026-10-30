@@ -14,9 +14,11 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     [System.Text.Json.Serialization.JsonConstructor]
     private EntityUpdateInfo(OctoObjectId? rtId, RtCkId<CkTypeId> ckTypeId, TEntity? rtEntity, EntityModOptions modOption,
         IReadOnlyCollection<string>? clearSecretAttributes = null,
-        IReadOnlyCollection<RtRecordArrayItemUpdate>? recordArrayItemUpdates = null)
+        IReadOnlyCollection<RtRecordArrayItemUpdate>? recordArrayItemUpdates = null,
+        ulong? expectedRtVersion = null)
     {
         RtId = rtId;
+        ExpectedRtVersion = expectedRtVersion;
         CkTypeId = ckTypeId;
         ModOption = modOption;
         RtEntity = rtEntity;
@@ -37,6 +39,14 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
         RtEntity = rtEntity;
         UpdateGuard = updateGuard;
         ClearSecretAttributes = NormaliseClearList(clearSecretAttributes);
+    }
+
+    private EntityUpdateInfo(RtEntityId rtEntityId, TEntity rtEntity, EntityModOptions modOption,
+        ulong expectedRtVersion)
+        : this(rtEntityId, modOption)
+    {
+        RtEntity = rtEntity;
+        ExpectedRtVersion = expectedRtVersion;
     }
 
     private EntityUpdateInfo(RtEntityId rtEntityId, TEntity rtEntity,
@@ -85,6 +95,15 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     [Newtonsoft.Json.JsonIgnore]
     [System.Text.Json.Serialization.JsonIgnore]
     public AttributeNewerThanGuard? UpdateGuard { get; }
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Serialized (both Newtonsoft and System.Text.Json) so an expected version survives a hop between processes;
+    ///     omitted from the wire when not set, so the shape of every existing update info is unchanged.
+    /// </remarks>
+    [Newtonsoft.Json.JsonProperty(NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public ulong? ExpectedRtVersion { get; }
 
     /// <inheritdoc />
     /// <remarks>
@@ -173,6 +192,37 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
         AttributeNewerThanGuard updateGuard)
     {
         return new EntityUpdateInfo<TEntity>(rtEntityId, rtEntity, EntityModOptions.Update, updateGuard, null);
+    }
+
+    /// <summary>
+    ///     Creates a new instance of <see cref="EntityUpdateInfo{TEntity}" /> for an update that is applied only if
+    ///     the stored entity still has <paramref name="expectedRtVersion" /> (optimistic concurrency, AB#7769, see
+    ///     <see cref="ExpectedRtVersion" />). On success the stored version becomes <c>expectedRtVersion + 1</c>;
+    ///     otherwise the repository throws <see cref="RtVersionConflictException" /> and writes nothing.
+    /// </summary>
+    /// <param name="rtEntityId">Runtime entity identifier for runtime id and construction kit type</param>
+    /// <param name="rtEntity">Runtime entity to update</param>
+    /// <param name="expectedRtVersion">The <see cref="RtEntity.RtVersion" /> the caller read</param>
+    public static EntityUpdateInfo<TEntity> CreateUpdate(RtEntityId rtEntityId, TEntity rtEntity,
+        ulong expectedRtVersion)
+    {
+        return new EntityUpdateInfo<TEntity>(rtEntityId, rtEntity, EntityModOptions.Update, expectedRtVersion);
+    }
+
+    /// <summary>
+    ///     Creates a new instance of <see cref="EntityUpdateInfo{TEntity}" /> for a replace that is applied only if
+    ///     the stored entity still has <paramref name="expectedRtVersion" /> (optimistic concurrency, AB#7769, see
+    ///     <see cref="ExpectedRtVersion" />). On success the stored version becomes <c>expectedRtVersion + 1</c>
+    ///     (the version of <paramref name="rtEntity" /> is set accordingly); otherwise the repository throws
+    ///     <see cref="RtVersionConflictException" /> and writes nothing.
+    /// </summary>
+    /// <param name="rtEntityId">Runtime entity identifier for runtime id and construction kit type</param>
+    /// <param name="rtEntity">Runtime entity to replace</param>
+    /// <param name="expectedRtVersion">The <see cref="RtEntity.RtVersion" /> the caller read</param>
+    public static EntityUpdateInfo<TEntity> CreateReplace(RtEntityId rtEntityId, TEntity rtEntity,
+        ulong expectedRtVersion)
+    {
+        return new EntityUpdateInfo<TEntity>(rtEntityId, rtEntity, EntityModOptions.Replace, expectedRtVersion);
     }
 
     /// <summary>

@@ -88,14 +88,16 @@ internal class BulkRtMutation(
         {
             await UpdateRtEntities(session, repositoryDataSource, ckCacheService,
                 entityRuleEngineResult.RtEntitiesToUpdate, entityRuleEngineResult.UpdateGuards,
-                entityRuleEngineResult.RecordArrayItemUpdates, callerResult)
+                entityRuleEngineResult.RecordArrayItemUpdates, entityRuleEngineResult.ExpectedRtVersions,
+                callerResult)
                 .ConfigureAwait(false);
         }
 
         if (entityRuleEngineResult.RtEntitiesToReplace.Any())
         {
             await ReplaceRtEntities(session, repositoryDataSource, ckCacheService,
-                entityRuleEngineResult.RtEntitiesToReplace, options).ConfigureAwait(false);
+                entityRuleEngineResult.RtEntitiesToReplace, entityRuleEngineResult.ExpectedRtVersions, options)
+                .ConfigureAwait(false);
         }
 
         if (entityRuleEngineResult.RtEntitiesToInsert.Any())
@@ -165,7 +167,8 @@ internal class BulkRtMutation(
 
     private async Task ReplaceRtEntities(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         ICkCacheService ckCacheService,
-        IReadOnlyDictionary<RtEntityId, RtEntity> rtEntities, BulkRtMutationOptions options)
+        IReadOnlyDictionary<RtEntityId, RtEntity> rtEntities,
+        IReadOnlyDictionary<RtEntityId, ulong> expectedRtVersions, BulkRtMutationOptions options)
     {
         if (!options.DisablePreDocumentModifications)
         {
@@ -184,7 +187,7 @@ internal class BulkRtMutation(
             }
 
             await ReplaceRtEntitiesByCkId(session, repositoryDataSource, ckCacheService,
-                rtEntityGrouping.Key, rtEntityGrouping, options).ConfigureAwait(false);
+                rtEntityGrouping.Key, rtEntityGrouping, expectedRtVersions, options).ConfigureAwait(false);
         }
     }
 
@@ -193,6 +196,7 @@ internal class BulkRtMutation(
         IReadOnlyDictionary<RtEntityId, RtEntity> rtEntities,
         IReadOnlyDictionary<RtEntityId, AttributeNewerThanGuard> updateGuards,
         IReadOnlyDictionary<RtEntityId, IReadOnlyList<RtRecordArrayItemUpdate>> recordArrayItemUpdates,
+        IReadOnlyDictionary<RtEntityId, ulong> expectedRtVersions,
         OperationResult callerResult)
     {
         foreach (var rtEntityGrouping in rtEntities.GroupBy(x => x.Key.CkTypeId))
@@ -203,7 +207,8 @@ internal class BulkRtMutation(
             }
 
             await UpdateRtEntitiesByCkId(session, repositoryDataSource, ckCacheService,
-                rtEntityGrouping.Key, rtEntityGrouping, updateGuards, recordArrayItemUpdates, callerResult)
+                rtEntityGrouping.Key, rtEntityGrouping, updateGuards, recordArrayItemUpdates, expectedRtVersions,
+                callerResult)
                 .ConfigureAwait(false);
         }
     }
@@ -213,6 +218,7 @@ internal class BulkRtMutation(
         RtCkId<CkTypeId> ckTypeId, IGrouping<RtCkId<CkTypeId>, KeyValuePair<RtEntityId, RtEntity>> rtEntityGrouping,
         IReadOnlyDictionary<RtEntityId, AttributeNewerThanGuard> updateGuards,
         IReadOnlyDictionary<RtEntityId, IReadOnlyList<RtRecordArrayItemUpdate>> recordArrayItemUpdates,
+        IReadOnlyDictionary<RtEntityId, ulong> expectedRtVersions,
         OperationResult callerResult)
     {
         var ckTypeGraph = ckCacheService.GetRtCkType(repositoryDataSource.TenantId, ckTypeId);
@@ -252,6 +258,15 @@ internal class BulkRtMutation(
                     rtEntity.GetAttributeLinkedBinaryValueOrDefault(ckTypeAttributeGraph.AttributeName) != null)
                 {
                     throw RuntimeRepositoryException.GuardedUpdateWithLinkedBinary(rtEntity.ToRtEntityId(),
+                        ckTypeAttributeGraph.AttributeName);
+                }
+
+                // AB#7769: same reason for an expected version - a conflict skips the entity write after the bytes
+                // were stored.
+                if (expectedRtVersions.ContainsKey(rtEntity.ToRtEntityId()) &&
+                    rtEntity.GetAttributeLinkedBinaryValueOrDefault(ckTypeAttributeGraph.AttributeName) != null)
+                {
+                    throw RuntimeRepositoryException.ExpectedRtVersionWithLinkedBinary(rtEntity.ToRtEntityId(),
                         ckTypeAttributeGraph.AttributeName);
                 }
             }
@@ -327,6 +342,16 @@ internal class BulkRtMutation(
                 await collection.UpdateOneIfGuardMatchesAsync(session, keyValuePair.Value, guard)
                     .ConfigureAwait(false);
             }
+            else if (expectedRtVersions.TryGetValue(keyValuePair.Key, out var expectedRtVersion))
+            {
+                // AB#7769: optimistic concurrency on rtVersion; a mismatch is an error, never a silent skip.
+                if (!await collection
+                        .UpdateOneIfVersionMatchesAsync(session, keyValuePair.Value, expectedRtVersion)
+                        .ConfigureAwait(false))
+                {
+                    throw new RtVersionConflictException(keyValuePair.Key, expectedRtVersion);
+                }
+            }
             else
             {
                 unguardedEntities.Add(keyValuePair.Value);
@@ -389,6 +414,7 @@ internal class BulkRtMutation(
     private async Task ReplaceRtEntitiesByCkId(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         ICkCacheService ckCacheService,
         RtCkId<CkTypeId> ckTypeId, IGrouping<RtCkId<CkTypeId>, KeyValuePair<RtEntityId, RtEntity>> rtEntityGrouping,
+        IReadOnlyDictionary<RtEntityId, ulong> expectedRtVersions,
         BulkRtMutationOptions options)
     {
         var ckTypeGraph = ckCacheService.GetRtCkType(repositoryDataSource.TenantId, ckTypeId);
@@ -410,6 +436,26 @@ internal class BulkRtMutation(
         ApplySecretWriteRules(repositoryDataSource.TenantId, ckCacheService, ckTypeGraph, rtEntities,
             SecretWriteOperation.Replace, storedById);
 
+        // AB#7769: an expected rtVersion is checked against the stored read first, so that a replace that is bound to
+        // conflict neither deletes nor uploads linked binaries. The write below repeats the check atomically
+        // (filter on the version); this early check only narrows the window.
+        var versionedReplaces = new List<(RtEntity Entity, ulong Expected)>();
+        foreach (var keyValuePair in rtEntityGrouping)
+        {
+            if (!expectedRtVersions.TryGetValue(keyValuePair.Key, out var expected))
+            {
+                continue;
+            }
+
+            if (storedById.TryGetValue(keyValuePair.Key.RtId, out var storedForVersion) &&
+                storedForVersion.RtVersion != expected)
+            {
+                throw new RtVersionConflictException(keyValuePair.Key, expected);
+            }
+
+            versionedReplaces.Add((keyValuePair.Value, expected));
+        }
+
         foreach (var keyValuePair in rtEntityGrouping)
         {
             // We need to delete the binary data from the file system if it is a linked binary
@@ -422,15 +468,47 @@ internal class BulkRtMutation(
         // Upload the new linked binary data
         await HandleUploadLinkedBinary(session, repositoryDataSource, ckTypeGraph, rtEntities).ConfigureAwait(false);
 
-        if (options.UseBulkMode)
+        // AB#7769: replaces with an expected version are written one by one with the version filter (the new version
+        // is expected + 1); they never go through the bulk upsert, which cannot compare a version.
+        var versionedIds = versionedReplaces.Select(v => v.Entity.RtId).ToHashSet();
+        var unversionedEntities = versionedIds.Count == 0
+            ? rtEntities
+            : rtEntities.Where(e => !versionedIds.Contains(e.RtId)).ToList();
+
+        if (unversionedEntities.Count > 0)
         {
-            // For replace operations, always use Upsert strategy to ensure existing entities are updated
-            await collection.BulkImportAsync(session, rtEntities,
-                new BulkOperationOptions { InsertStrategy = BulkInsertStrategies.Upsert }).ConfigureAwait(false);
+            if (options.UseBulkMode)
+            {
+                // For replace operations, always use Upsert strategy to ensure existing entities are updated
+                await collection.BulkImportAsync(session, unversionedEntities,
+                    new BulkOperationOptions { InsertStrategy = BulkInsertStrategies.Upsert }).ConfigureAwait(false);
+            }
+            else
+            {
+                await collection.ReplaceManyAsync(session, unversionedEntities).ConfigureAwait(false);
+            }
         }
-        else
+
+        foreach (var (entity, expected) in versionedReplaces)
         {
-            await collection.ReplaceManyAsync(session, rtEntities).ConfigureAwait(false);
+            entity.RtVersion = expected + 1;
+            bool replaced;
+            try
+            {
+                replaced = await collection.ReplaceByIdIfVersionMatchesAsync(session, entity.RtId, entity, expected)
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+                entity.RtVersion = expected;
+                throw;
+            }
+
+            if (!replaced)
+            {
+                entity.RtVersion = expected;
+                throw new RtVersionConflictException(entity.ToRtEntityId(), expected);
+            }
         }
     }
 

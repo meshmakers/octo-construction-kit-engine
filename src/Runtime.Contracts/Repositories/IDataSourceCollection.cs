@@ -61,6 +61,21 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     Task<bool> UpdateOneIfGuardMatchesAsync(IOctoSession session, TDocument document, AttributeNewerThanGuard guard);
 
     /// <summary>
+    ///     Updates a single document only if the stored document still has <paramref name="expectedRtVersion" />
+    ///     (optimistic concurrency on <c>RtVersion</c>, AB#7769). Check and write are one atomic statement. The
+    ///     stored version is incremented like for every update.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="document">Document with the new values; the id is taken from this document</param>
+    /// <param name="expectedRtVersion">The version the caller read</param>
+    /// <returns>
+    ///     <c>true</c> if the document was updated; <c>false</c> if it exists with a different version - nothing was
+    ///     written (the repository turns this into <see cref="RtVersionConflictException" />).
+    /// </returns>
+    /// <remarks>A missing document raises the same not-found error as <see cref="UpdateOneAsync(IOctoSession, IEnumerable{TDocument})" />.</remarks>
+    Task<bool> UpdateOneIfVersionMatchesAsync(IOctoSession session, TDocument document, ulong expectedRtVersion);
+
+    /// <summary>
     ///     Updates a single document and, in the same atomic statement, single items of its <c>RecordArray</c>
     ///     attributes (AB#7445, see <see cref="RtRecordArrayItemUpdate" />). The stored document is not read first
     ///     and no version is compared, so concurrent updates of different items of the same entity never lose
@@ -110,6 +125,23 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     /// <param name="document">The document the existing of is replaced</param>
     /// <returns></returns>
     Task ReplaceByIdAsync(IOctoSession session, TKey key, TDocument document);
+
+    /// <summary>
+    ///     Replaces a document only if the stored document still has <paramref name="expectedRtVersion" />
+    ///     (optimistic concurrency on <c>RtVersion</c>, AB#7769). Check and write are one atomic statement. The
+    ///     caller sets the version of <paramref name="document" /> to the new value (<c>expected + 1</c>) before the
+    ///     call; a replace does not increment on its own.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="key">The unique key</param>
+    /// <param name="document">The replacement document, already carrying the new version</param>
+    /// <param name="expectedRtVersion">The version the caller read</param>
+    /// <returns>
+    ///     <c>true</c> if the document was replaced; <c>false</c> if it exists with a different version - nothing was
+    ///     written (the repository turns this into <see cref="RtVersionConflictException" />).
+    /// </returns>
+    /// <remarks>A missing document raises the same not-found error as <see cref="ReplaceByIdAsync" />.</remarks>
+    Task<bool> ReplaceByIdIfVersionMatchesAsync(IOctoSession session, TKey key, TDocument document, ulong expectedRtVersion);
 
     /// <summary>
     ///     Deletes the document with the given key

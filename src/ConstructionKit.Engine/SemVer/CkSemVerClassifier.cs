@@ -35,7 +35,9 @@ public class CkSemVerClassifier : ICkSemVerClassifier
         CkCompiledModelRoot current) =>
         changes.Any(c => c.ElementKind is CkModelElementKind.TypeAttribute or CkModelElementKind.RecordAttribute
                              or CkModelElementKind.AssociationRoleAttribute &&
-                         IsAccessTightening(c) && IsSecuritySensitiveInBoth(c, baseline, current));
+                         IsAccessTightening(c) &&
+                         (IsSecuritySensitiveInBoth(c, baseline, current) ||
+                          IsFirstCkLanguage2Candidate(c, baseline, current)));
 
     /// <inheritdoc />
     public IReadOnlyList<CkClassifiedModelChange> Classify(IReadOnlyList<CkModelChange> changes,
@@ -980,6 +982,17 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                         "access/security: access relaxed — GraphQL exposure of this attribute widens (row T7)");
                 }
 
+                // AB#7771 (G1 = B): in the one release that moves a classic model to ckLanguage 2 the baseline cannot
+                // carry the marker (ckLanguage 1 cannot express it), so an attribute marked securitySensitive in that
+                // release is judged by the current version alone: Minor + acknowledge, once per model.
+                if (IsFirstCkLanguage2Release(change, baseline, current, earlierInMajor))
+                {
+                    return (CkSemVerLevel.Minor,
+                        "access/security: access tightened on an attribute marked securitySensitive in the first ckLanguage 2 " +
+                        "release of this classic model — accepted security exception (once per model), requires acknowledge " +
+                        "(row T7a)");
+                }
+
                 if (!IsSecuritySensitiveInBoth(change, baseline, current))
                 {
                     return (CkSemVerLevel.Major,
@@ -1036,6 +1049,42 @@ public class CkSemVerClassifier : ICkSemVerClassifier
 
         return IsSensitive(baseline) && IsSensitive(current);
     }
+
+    /// <summary>
+    ///     AB#7771: the attribute definition behind an assignment is <c>securitySensitive</c> in the current model.
+    ///     Definitions of another model cannot be inspected and never qualify.
+    /// </summary>
+    private static bool IsSecuritySensitiveInCurrent(CkModelChange change, CkCompiledModelRoot current)
+    {
+        var assignment = FindAttributeAssignment(current, change.ElementKind, change.ElementId);
+        if (assignment == null || assignment.CkAttributeId.ModelId.Name != current.ModelId.Name)
+        {
+            return false;
+        }
+
+        return current.Attributes?.FirstOrDefault(a =>
+            a.AttributeId.FullName == assignment.CkAttributeId.ElementId.FullName)?.SecuritySensitive == true;
+    }
+
+    /// <summary>
+    ///     AB#7771: the diff is the step from a classic (ckLanguage 1) baseline to a ckLanguage 2 version and the
+    ///     attribute is marked sensitive in the current version. The history is not consulted yet.
+    /// </summary>
+    private static bool IsFirstCkLanguage2Candidate(CkModelChange change, CkCompiledModelRoot baseline,
+        CkCompiledModelRoot current) =>
+        baseline.EffectiveCkLanguage < 2 && current.EffectiveCkLanguage >= 2 &&
+        IsSecuritySensitiveInCurrent(change, current);
+
+    /// <summary>
+    ///     AB#7771 (G1 = B): the security exception for the one release that moves a classic model to ckLanguage 2.
+    ///     Detected from the published baseline (ckLanguage 1) and the candidate (ckLanguage 2) alone, never from an
+    ///     author-set flag; defensively also requires that no published earlier version of the major is ckLanguage 2,
+    ///     so a second ckLanguage 2 release (baseline already ckLanguage 2) never qualifies.
+    /// </summary>
+    private static bool IsFirstCkLanguage2Release(CkModelChange change, CkCompiledModelRoot baseline,
+        CkCompiledModelRoot current, IReadOnlyList<CkCompiledModelRoot> earlierInMajor) =>
+        IsFirstCkLanguage2Candidate(change, baseline, current) &&
+        earlierInMajor.All(m => m.EffectiveCkLanguage < 2);
 
     /// <summary>
     ///     AB#6585: the first published version of this major line (ascending) in which the attribute behind the
@@ -1114,8 +1163,10 @@ public class CkSemVerClassifier : ICkSemVerClassifier
 
         var requiresAcknowledge = change.ElementKind is CkModelElementKind.TypeAttribute
                                       or CkModelElementKind.RecordAttribute or CkModelElementKind.AssociationRoleAttribute &&
-                                  IsAccessTightening(change) && IsSecuritySensitiveInBoth(change, baseline, current) &&
-                                  FirstNonSensitiveVersion(change, earlierInMajor) == null;
+                                  IsAccessTightening(change) &&
+                                  (IsSecuritySensitiveInBoth(change, baseline, current) &&
+                                   FirstNonSensitiveVersion(change, earlierInMajor) == null ||
+                                   IsFirstCkLanguage2Release(change, baseline, current, earlierInMajor));
 
         // AB#6585 (row M12): a looser method authorization (a role added - also Everyone -, a scope dropped, self-calls
         // admitted, a looser block) changes who may invoke the method; it stays Minor but must be acknowledged with a

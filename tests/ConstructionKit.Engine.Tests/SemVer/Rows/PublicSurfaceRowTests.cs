@@ -199,6 +199,77 @@ public class PublicSurfaceRowTests
         Assert.Equal(CkSemVerLevel.Major, bornPlain.Level);
     }
 
+    private static CkCompiledModelRoot FirstRelease(string version, int ckLanguage, bool sensitive,
+        CkAttributeAccessDto? access = null)
+    {
+        var model = Sensitive(sensitive, version);
+        model.CkLanguage = ckLanguage;
+        Serial(model).Access = access;
+        return model;
+    }
+
+    [Fact]
+    public void T7a_FirstCkLanguage2Release_TighteningAMarkedAttribute_IsMinorAndRequiresAcknowledge()
+    {
+        // AB#7771 (G1 = B): baseline classic (cannot carry the marker), candidate ckLanguage 2 marks and hides.
+        var baseline = FirstRelease("1.0.0", 1, false);
+        var current = FirstRelease("1.1.0", 2, true, CkAttributeAccessDto.Hidden);
+
+        var change = Assert.Single(Classify(baseline, current), c => c.Change.Property == "access");
+        Assert.Equal(CkSemVerLevel.Minor, change.Level);
+        Assert.True(change.RequiresAcknowledge);
+        Assert.Contains("first ckLanguage 2 release", change.Reason);
+
+        // With history (all classic): same verdict.
+        var withHistory = Assert.Single(ClassifyWithHistory(baseline, current, FirstRelease("1.0.0", 1, false)),
+            c => c.Change.Property == "access");
+        Assert.Equal(CkSemVerLevel.Minor, withHistory.Level);
+        Assert.True(withHistory.RequiresAcknowledge);
+
+        // The history is requested so the exception can be checked against it.
+        var diff = new Engine.SemVer.CkModelDiffService().Diff(baseline, current);
+        Assert.True(new Engine.SemVer.CkSemVerClassifier().NeedsMajorLineHistory(diff, baseline, current));
+    }
+
+    [Fact]
+    public void T7a_FirstCkLanguage2Release_AnAttributeNotMarkedSensitive_StaysMajor()
+    {
+        var baseline = FirstRelease("1.0.0", 1, false);
+        var current = FirstRelease("1.1.0", 2, false, CkAttributeAccessDto.Hidden);
+
+        var change = Assert.Single(Classify(baseline, current), c => c.Change.Property == "access");
+        Assert.Equal(CkSemVerLevel.Major, change.Level);
+        Assert.False(change.RequiresAcknowledge);
+    }
+
+    [Fact]
+    public void T7a_SecondCkLanguage2Release_CannotUseTheExceptionAgain()
+    {
+        // Baseline is already ckLanguage 2: marking and hiding in one release is a Major.
+        var baseline = FirstRelease("1.1.0", 2, false);
+        var current = FirstRelease("1.2.0", 2, true, CkAttributeAccessDto.Hidden);
+
+        var change = Assert.Single(Classify(baseline, current), c => c.Change.Property == "access");
+        Assert.Equal(CkSemVerLevel.Major, change.Level);
+        Assert.False(change.RequiresAcknowledge);
+
+        // Defensive: a ckLanguage 2 version anywhere earlier in the major also closes the exception.
+        var classicBaseline = FirstRelease("1.2.0", 1, false);
+        var viaHistory = Assert.Single(ClassifyWithHistory(classicBaseline, current, FirstRelease("1.0.0", 2, false)),
+            c => c.Change.Property == "access");
+        Assert.Equal(CkSemVerLevel.Major, viaHistory.Level);
+    }
+
+    [Fact]
+    public void T7a_ClassicToClassic_IsNotAFirstCkLanguage2Release()
+    {
+        var baseline = FirstRelease("1.0.0", 1, false);
+        var current = FirstRelease("1.1.0", 1, true, CkAttributeAccessDto.Hidden);
+
+        Assert.DoesNotContain(Classify(baseline, current),
+            c => c is { Level: CkSemVerLevel.Minor, RequiresAcknowledge: true });
+    }
+
     [Fact]
     public void T7_NeedsMajorLineHistory_OnlyForAnAccessTighteningOnASensitiveAttribute()
     {

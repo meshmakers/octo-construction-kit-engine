@@ -45,8 +45,10 @@ public interface ICkSemVerClassifier
 
     /// <summary>
     ///     AB#6585: true when a change of this diff is judged against the history of the major line (an access
-    ///     tightening of an attribute that is security-sensitive in the baseline and the current model). Callers load
-    ///     the earlier versions of the major only then.
+    ///     tightening of an attribute that is security-sensitive in the baseline and the current model, or one marked
+    ///     sensitive in a ckLanguage 2 candidate whose baseline is ckLanguage 1: the first-release exception of
+    ///     AB#7771 is closed by any earlier ckLanguage 2 version). Callers load the earlier versions of the major only
+    ///     then.
     /// </summary>
     bool NeedsMajorLineHistory(IReadOnlyList<CkModelChange> changes, CkCompiledModelRoot baseline,
         CkCompiledModelRoot current);

@@ -72,7 +72,7 @@ Subtype of `CkArchive`. `CkArchive` must lose `isFinal: true` to allow this.
 
 | Attribute | Type | Notes |
 |---|---|---|
-| `Sources` | `RecordArray<CkRollupSourceReference>` | The source archives this rollup aggregates from (raw, time-range or themselves rollups), each with an optional half-open validity span `[ValidFrom, ValidTo)`. At least one entry required. Immutable after `Activated` (documented, not enforced). See [concept-multi-source-rollups.md](concept-multi-source-rollups.md) §2. |
+| `Sources` | `RecordArray<CkRollupSourceReference>` | The source archives this rollup aggregates from (raw, time-range or themselves rollups), each with an optional half-open validity span `[ValidFrom, ValidTo)`. At least one entry required. Immutable after `Activated`, enforced by `ArchiveDefinitionGuard` (see §10). See [concept-multi-source-rollups.md](concept-multi-source-rollups.md) §2. |
 | `SourceArchiveRtId` | `OctoObjectId?` | **Deprecated since 1.8.0**, optional. A set value is normalised into one unbounded `Sources` entry on read; the platform never writes it. |
 | `BucketSize` | `Duration` | Bucket width, e.g. `PT1M`, `PT1H`, `P1D`. Must be a positive interval supported by CrateDB's `date_trunc` or `date_bin`. Immutable after `Activated`. |
 | `WatermarkLag` | `Duration` | How far behind real-time the orchestrator stays to absorb late inserts. Default `PT5M`. Mutable. |

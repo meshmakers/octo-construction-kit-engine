@@ -658,6 +658,18 @@ public class RollupOrchestratorTests
     }
 
     [Fact]
+    public async Task Tick_ARunThatStallsOnADisabledSource_KeepsTheError()
+    {
+        StubRollups(Failing(4));
+        A.CallTo(() => _archiveStore.GetAsync(SourceRt))
+            .Returns(ActivatedSource() with { Status = CkArchiveStatus.Disabled });
+
+        await NewSut(BaseTime.AddHours(1)).TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _rollupStore.ClearRunFailureAsync(A<OctoObjectId>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
     public async Task Tick_WhenTheErrorCannotBeCleared_TheRunStaysASuccess()
     {
         StubRollups(Failing(RollupOrchestrator.FailuresBeforeAlert - 1));

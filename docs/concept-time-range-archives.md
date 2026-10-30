@@ -178,6 +178,9 @@ public class TimeRangeStreamDataPoint
     public required DateTime From { get; init; }      // inclusive
     public required DateTime To   { get; init; }      // exclusive
     public IReadOnlyDictionary<string, object?> Attributes { get; init; } = ...;
+    public ArchiveRowOrigin Origin { get; init; }     // Automated unless a writer declares Manual
+    public string? ManualWrittenBy { get; init; }
+    public string? ManualReason { get; init; }
 }
 ```
 
@@ -189,7 +192,7 @@ the repository normalises non-UTC inputs the same way the existing `InsertAsync`
 `IStreamDataRepository` gains:
 
 ```csharp
-Task InsertTimeRangeAsync(
+Task<StreamDataWriteResult> InsertTimeRangeAsync(
     OctoObjectId archiveRtId,
     IEnumerable<TimeRangeStreamDataPoint> datapoints,
     CancellationToken cancellationToken = default);

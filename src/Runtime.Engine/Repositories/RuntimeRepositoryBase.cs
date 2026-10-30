@@ -512,7 +512,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     private async Task ApplyChangesGuardedAsync(IOctoSession session, ICkCacheService cacheService,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
-        BulkRtMutationOptions options, OperationResult? operationResult = null)
+        BulkRtMutationOptions options, OperationResult? operationResult = null, bool checkArchiveDefinitions = false)
     {
         var securityContext = session.GetSecurityContext();
         if (!securityContext.IsSystem && _dataPermissionResolver != null)
@@ -535,6 +535,14 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
                 RuntimeRepositoryException.ThrowIfOperationResultError(guardResult);
             }
+        }
+
+        // After the data-permission guard: an archive the caller may not see stays a missing entity (AB#7126), the
+        // refusal of the definition guard would tell its existence, status and name.
+        if (checkArchiveDefinitions)
+        {
+            await EnsureArchiveDefinitionsUnchangedAsync(session, cacheService, entityUpdateInfoList)
+                .ConfigureAwait(false);
         }
 
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entityUpdateInfoList,
@@ -566,9 +574,9 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         OperationResult operationResult)
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
-        await EnsureArchiveDefinitionsUnchangedAsync(session, cacheService, entityUpdateInfoList).ConfigureAwait(false);
         await ApplyChangesGuardedAsync(session, cacheService, entityUpdateInfoList,
-                associationUpdateInfoList, BulkRtMutationOptions.FromDeleteOptions(deleteOptions), operationResult)
+                associationUpdateInfoList, BulkRtMutationOptions.FromDeleteOptions(deleteOptions), operationResult,
+                checkArchiveDefinitions: true)
             .ConfigureAwait(false);
     }
 

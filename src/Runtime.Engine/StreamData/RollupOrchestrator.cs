@@ -125,13 +125,11 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
                 continue;
             }
 
+            bool succeeded;
             try
             {
                 total += await ProcessRollupSnapshotAsync(snapshot, cancellationToken);
-                if (snapshot.ConsecutiveRunFailures > 0)
-                {
-                    await _rollupStore.ClearRunFailureAsync(snapshot.RtId);
-                }
+                succeeded = true;
             }
             catch (OperationCanceledException)
             {
@@ -144,10 +142,32 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
                     "Rollup orchestrator: failed to process rollup {RollupRtId} for tenant {TenantId}",
                     snapshot.RtId, _tenantId);
                 await RecordRunFailureAsync(snapshot, ex);
+                succeeded = false;
+            }
+
+            if (succeeded && snapshot.ConsecutiveRunFailures > 0)
+            {
+                await ClearRunFailureAsync(snapshot);
             }
         }
 
         return total;
+    }
+
+    /// <summary>
+    /// AB#7872: outside the run on purpose. A run that succeeded stays a success when the error state cannot be cleared;
+    /// the next successful run clears it.
+    /// </summary>
+    private async Task ClearRunFailureAsync(RollupArchiveSnapshot snapshot)
+    {
+        try
+        {
+            await _rollupStore.ClearRunFailureAsync(snapshot.RtId);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Rollup {RollupRtId}: failed to clear the recorded run failure.", snapshot.RtId);
+        }
     }
 
     /// <summary>

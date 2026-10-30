@@ -56,7 +56,7 @@ public sealed class LoggingArchiveAuditTrail : IArchiveAuditTrail
     public Task RecordRollupRunFailingAsync(string tenantId, OctoObjectId rollupRtId, int failures, string reason)
     {
         _logger.LogError(
-            "Rollup {RollupRtId} (tenant {TenantId}) failed {Failures} runs in a row and does not advance: {Reason}",
+            "Rollup {RollupRtId} (tenant {TenantId}) failed {Failures} runs in a row, buckets after the failing one are not aggregated: {Reason}",
             rollupRtId, tenantId, failures, reason);
         return Task.CompletedTask;
     }

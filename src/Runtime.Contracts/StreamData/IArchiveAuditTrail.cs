@@ -44,7 +44,7 @@ public interface IArchiveAuditTrail
 
     /// <summary>
     /// Records that a rollup keeps failing: the orchestrator gave up on it <paramref name="failures"/> times in a row
-    /// and the watermark does not advance (AB#7872). Emitted once per failing streak.
+    /// and it stops at the failing bucket; earlier buckets of a run may still advance the watermark (AB#7872). Emitted once per failing streak.
     /// </summary>
     Task RecordRollupRunFailingAsync(
         string tenantId,

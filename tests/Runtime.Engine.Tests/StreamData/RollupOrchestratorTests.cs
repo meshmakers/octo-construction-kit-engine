@@ -658,6 +658,20 @@ public class RollupOrchestratorTests
     }
 
     [Fact]
+    public async Task Tick_WhenTheErrorCannotBeCleared_TheRunStaysASuccess()
+    {
+        StubRollups(Failing(RollupOrchestrator.FailuresBeforeAlert - 1));
+        StubActivatedSource();
+        A.CallTo(() => _rollupStore.ClearRunFailureAsync(A<OctoObjectId>._))
+            .Throws(new InvalidOperationException("store down"));
+
+        await NewSut(BaseTime.AddHours(1)).TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _rollupStore.RecordRunFailureAsync(A<OctoObjectId>._, A<string>._, A<DateTime>._)).MustNotHaveHappened();
+        A.CallTo(() => _audit.RecordRollupRunFailingAsync(A<string>._, A<OctoObjectId>._, A<int>._, A<string>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
     public async Task Tick_AHealthyRollup_DoesNotTouchItsEntityForTheErrorState()
     {
         StubRollups(Failing(0));

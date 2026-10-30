@@ -73,7 +73,7 @@ public sealed class ForwardingArchiveAuditTrail : IArchiveAuditTrail
             tenantId,
             AuditEventLevel.Error,
             "Archive.RollupRunFailing",
-            $"Rollup {rollupRtId} failed {failures} runs in a row and does not advance: {reason}")
+            $"Rollup {rollupRtId} failed {failures} runs in a row, buckets after the failing one are not aggregated: {reason}")
         {
             Metadata = new Dictionary<string, object?>
             {

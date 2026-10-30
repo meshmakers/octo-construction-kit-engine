@@ -7,7 +7,8 @@ cascade function-matching in the series resolver (`RollupLadderFunctionResolver`
 AB#4290 Phase-1 limitation). Live-validated on the energyiq `LuminaireArchive`: forward
 aggregation and recompute reproduce a hand-computed interval sum bit-identically; the grouped
 query returns the recombined duty cycle. Open: CrateDB integration tests in CI, Studio UI,
-TWA in downsampling bins, linear interpolation.
+TWA in downsampling bins, linear interpolation. Fourth increment (AB#7918): `Integral` (energy over the
+query window, value × hours, step/LOCF) over raw archives — §6.5; rollup support AB#7920.
 **Work item:** **AB#4336** (Stream data: time-weighted state-duration aggregation for event-based archives).
 **Related:**
 - [`concept-rollup-archives.md`](concept-rollup-archives.md) — the rollup orchestrator + SQL-per-bucket model this concept extends; the AVG `_sum`/`_count` two-column materialisation is the precedent for the new integral/duration pair.
@@ -289,6 +290,56 @@ automatically.
 - Optional UI affordances (not required for the wire path): rollup-editor function dropdown +
   line-chart `requiredAggregation` option list gain a "Time-weighted average" entry.
 
+### §6.5 Integral (energy over the query window, AB#7918)
+
+`AggregationType.Integral` (System 2.8.0, `AggregationTypes` key 7; `AggregationFunction.Integral` = 7;
+SDK `AggregationTypesDto.Integral` = 8) returns the **step integral** of a numeric column over the
+half-open query window `[from, to)`:
+
+```
+Integral = Σ value_i × Δt_i / 3 600 000      (Δt_i in ms → result in value unit × hours)
+```
+
+It reuses the §6.2 statement unchanged — `TimeWeightedQuerySqlBuilder` already computes the
+integral as the numerator of the TWA; the `IntegralColumn` kind returns
+`SUM(CASE WHEN v IS NOT NULL THEN v * dt_ms END) / 3600000.0` instead of dividing by the covered
+time. Output alias / wire suffix **`_integral`** (e.g. `activepower_integral`), value type Double.
+
+Semantics (normative, decided on AB#7880/AB#7918):
+
+| Case | Result |
+|---|---|
+| Interpolation | **Step only** (LOCF): a value holds until the next row of the same `rtId` or the window end. No linear mode (AB#7922 removed). |
+| Unit | value unit × hours: kW → kWh, W → Wh. |
+| Window start | The last row before `from` (carry-in, engine default lookback 35 d) opens the window. |
+| Sampling | Independent of the cadence: uniform 5 s and 10 s rows of the same constant power give the same integral; rows written on change are weighted by how long they held. |
+| Gaps | The last value holds across the gap until the next row or the window end (same as TWA). |
+| NULL values | A NULL observation contributes 0 for its interval. |
+| Several rtIds | Integrated per `rtId` (LOCF never crosses entities), then summed — the site total. Grouped queries sum per group. |
+| Carry only | No row in the window but a carry row: carry value × window length. |
+| Empty window | No row in the window and no carry row: `null`, not 0. |
+| `from` / `to` | Both required; a missing one is `StreamDataException.InvalidQueryParameters` (structured 400). |
+| Plain columns | Ride along in the same statement and still exclude the carry row. |
+| Archive kinds | Raw (event-based) archives only. Rollup and time-range archives are refused with `InvalidQueryParameters`; rollup support (re-aggregating the stored `_integral` of a TimeWeightedAvg rollup) is AB#7920. |
+
+**Sign split — use a computed column, never a field filter.** Field filters select the event set
+the LOCF weighting runs over (§6.2). A filter `ActivePower > 0` would therefore carry the last
+*positive* value across an export period and overstate the import. Split a signed power with an
+archive computed column (AB#4189, mXparser) and integrate that column:
+
+| Computed column (raw GridConnection archive, e.g. via `octo-cli -c AddComputedColumn`) | Formula |
+|---|---|
+| `ImportPower` | `if(ActivePower > 0, ActivePower, 0)` |
+| `ExportPower` | `if(ActivePower < 0, -ActivePower, 0)` |
+
+`Integral(ImportPower)` is the grid import in kWh, `Integral(ExportPower)` the feed-in.
+
+**Meter check (fixture).** The recorded Fusch grid rows of AB#7692 (2026-10-30T10:30:10.7Z–11:15:45.8Z,
+45.6 min, 548 rows every ~5 s, timestamps and ActivePower only) integrate over the positive part to
+0.9297 kWh against the `ImportedEnergy` register delta of 0.924 kWh (+0.6 %, within 1 %); the old
+board formula `SUM(kW) × 10/3600` over the same rows gives 1.862 kWh (+101 %). Integration test
+`StreamDataIntegralIntegrationTests` in `octo-construction-kit-engine-mongodb`.
+
 ## §7 Acceptance (from AB#4336)
 
 - A rollup/aggregation over an event-based 0/100 signal reports the correct time-weighted duty
@@ -374,6 +425,7 @@ CLR types swapped (`long?`/`int?`) — corrected, first surfaced by `CarryLookba
 | **StateDuration** (`CkRollupFunction.StateDuration` = 6, `CkRollupAggregation.ComparisonValue`) | StreamDataCkModel 1.6.5 → **1.6.6**; single BIGINT column (`RollupColumnGenerator` / `RollupColumnTypeResolver`); LOCF SQL `SUM(CASE WHEN col = <literal> THEN dt)` (`CrateSqlLiteral.StateLiteral`); read back via target SUM or dedicated StateDuration; save-time `RollupComparisonValueRequiredException` |
 | **Query surface StateDuration** (`AggregationTypes.StateDuration` = 6, `AggregationQueryColumn.ComparisonValue`) | SystemCkModel 2.2.1 → **2.2.2**; `AggregationColumn.ComparisonValue`; SDK `AggregationTypesDto.StateDuration` (=7); `StreamDataQueryColumnInput.comparisonValue`; raw + rollup grouped/aggregation queries; wire suffix `_stateduration` |
 | **Direct raw TWA/StateDuration query** (§6.2) | `TimeWeightedQuerySqlBuilder` (`TwaColumn`/`StateColumn`/`PlainColumn`, field-filter pass-through) + `ExecuteRawTimeWeightedAggregationAsync` |
+| **Integral** (AB#7918, §6.5) | SystemCkModel 2.7.0 → **2.8.0** (`AggregationTypes.Integral` = 7, additive); `AggregationFunction.Integral` = 7; SDK `AggregationTypesDto.Integral` = 8; `TimeWeightedQuerySqlBuilder.IntegralColumn` + routing in `CrateDbStreamDataRepository` (raw only, windowed refused); tests `TimeWeightedQuerySqlBuilderTests`, `StreamDataIntegralIntegrationTests` (Testcontainer CrateDB, Fusch meter fixture) |
 | **Cascade series matching** | `RollupLadderFunctionResolver` (DB-neutral chain walk; incomplete pair excluded) |
 | Bar-chart `valueScale` (ms → h etc.) | `octo-frontend-libraries` bar-chart widget config |
 | Unit tests | `RollupColumnGeneratorTests` (engine); `RollupAggregationSqlBuilderTests`, `RollupColumnTypeResolverTests`, `RollupQueryAggregationResolverTests`, `RollupChainAggregationResolverTests`, `TimeWeightedQuerySqlBuilderTests` (mongodb) |

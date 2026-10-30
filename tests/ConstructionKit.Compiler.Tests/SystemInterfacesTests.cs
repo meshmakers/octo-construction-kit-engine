@@ -95,6 +95,15 @@ public sealed class SystemInterfacesTests : IDisposable
         return dir;
     }
 
+    /// <summary>System 2.7.0 as it was published: the 2.8.0 sources without the <c>Integral</c> aggregation type (AB#7918).</summary>
+    private string CopySystem270() =>
+        CopySystem("system-2.7.0", (path, yaml) => path switch
+        {
+            "ckModel.yaml" => SetVersion(yaml, "2.7.0"),
+            "enums/aggregationTypes.yaml" => yaml[..yaml.IndexOf("  - key: 7", StringComparison.Ordinal)],
+            _ => yaml
+        });
+
     private async Task PublishAsync(string sourceDir, string catalog)
     {
         var compiled = await _fixture.CompileAsync(sourceDir);
@@ -192,6 +201,27 @@ public sealed class SystemInterfacesTests : IDisposable
         // Four new interfaces and two new implements entries (PersistentQuery), all additive.
         Assert.Equal(4, against260.Verdict.ClassifiedChanges.Count(c =>
             c.Change.ElementKind == CkModelElementKind.Interface && c.Change.ChangeKind == CkModelChangeKind.Added));
+    }
+
+    [Fact]
+    public async Task System28_AgainstSystem270_IsAMinor_WithTheIntegralAggregationTypeAsTheOnlyChange()
+    {
+        // AB#7918: AggregationTypes gains Integral (key 7). An added enum value is additive (Minor),
+        // needs no migration, and stored AggregationSdQuery entities keep their values.
+        await PublishAsync(CopySystem270(), InMemoryPublishedCatalog.Name);
+        var against270 = await RunGateAsync(RealSystemSource());
+
+        Assert.Empty(Errors(against270));
+        Assert.Equal(CkSemVerLevel.Minor, against270.Verdict!.RequiredLevel);
+        Assert.Contains("2.7.0", against270.Verdict.BaselineId.ToString());
+        var structural = against270.Verdict.ClassifiedChanges
+            .Where(c => c.Change.ElementKind != CkModelElementKind.Model)
+            .ToList();
+        var change = Assert.Single(structural);
+        Assert.Equal(CkModelElementKind.EnumValue, change.Change.ElementKind);
+        Assert.Equal(CkModelChangeKind.Added, change.Change.ChangeKind);
+        Assert.Contains("AggregationTypes", change.Change.ElementId, StringComparison.Ordinal);
+        Assert.Equal(CkSemVerLevel.Minor, change.Level);
     }
 
     private async Task<(OperationResult Result, CkCompiledModelRoot? Compiled)> CompileProbeAsync(string typeYaml)

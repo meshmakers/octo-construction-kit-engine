@@ -129,7 +129,7 @@ public sealed class SystemCkLanguage2Tests : IDisposable
         Assert.True(CkCatalogLayout.RequiresV3(compiled));
         Assert.Equal(CkCatalogLayout.V3Root, CkCatalogLayout.GetPublishRoot(compiled));
         Assert.Equal("System", compiled.ModelId.Name);
-        Assert.Equal(new Version(2, 7, 0), new Version(compiled.ModelId.Version.ToString()));
+        Assert.Equal(new Version(2, 8, 0), new Version(compiled.ModelId.Version.ToString()));
     }
 
     [Fact]

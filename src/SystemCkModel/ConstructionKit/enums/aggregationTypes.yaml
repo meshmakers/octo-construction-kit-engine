@@ -24,3 +24,6 @@ enums:
   - key: 6
     name: StateDuration
     description: Absolute time (milliseconds) an event-based signal held the column's ComparisonValue within the query window, with last-observation-carried-forward semantics. Requires AggregationQueryColumn.ComparisonValue. Supported over raw event archives and rollup archives that materialise a StateDuration aggregation. AB#4336/AB#4341.
+  - key: 7
+    name: Integral
+    description: Step integral of a numeric event-based signal over the half-open query window [from, to), in value unit x hours (kW gives kWh, W gives Wh). Last observation carried forward - each value holds until the next row of the same entity or the window end, and the last row before the window opens it. Several entities in scope are summed; an empty window yields null; from and to are required. Served over raw event archives at query time (rollup archives with a TimeWeightedAvg aggregation follow in AB#7920). AB#7918.

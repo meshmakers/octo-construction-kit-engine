@@ -21,17 +21,24 @@ public sealed class CkPublishGateSecurityTighteningTests : IDisposable
     private static string[] Codes(CkPublishGateResult r) => GateHarness.ErrorCodes(r);
 
     private static CkCompiledModelRoot Record(string version, bool sensitive, CkAttributeAccessDto? access = null,
-        params (string Change, string Reason)[] acknowledge) => new()
+        params (string Change, string Reason)[] acknowledge) =>
+        Record(version, 2, sensitive, access, acknowledge);
+
+    private static CkCompiledModelRoot Record(string version, int ckLanguage, bool sensitive,
+        CkAttributeAccessDto? access = null, params (string Change, string Reason)[] acknowledge) => new()
     {
         ModelId = new CkModelId(M, version),
         Description = "Publishable fixture",
-        CkLanguage = 2,
+        CkLanguage = ckLanguage,
         Attributes = [new CkAttributeDto { AttributeId = "Secret", ValueType = AttributeValueTypesDto.String, SecuritySensitive = sensitive }],
         Records =
         [
             new CkRecordDto
             {
                 RecordId = "Login",
+                // The ckLanguage 2 default is Model; adopting it silently is a Major (derivable row), so a classic
+                // model declares Any in the release that moves it.
+                Derivable = ckLanguage >= 2 ? CkDerivableDto.Any : null,
                 Attributes =
                 [
                     new CkTypeAttributeDto
@@ -131,6 +138,45 @@ public sealed class CkPublishGateSecurityTighteningTests : IDisposable
             (AccessKey, "Close accepted risk R13")));
 
         Assert.Equal(CkPublishGateDecision.Proceed, result.Decision);
+    }
+
+    // ── AB#7771 (G1 = B): the one release that moves a classic model to ckLanguage 2 ─────────────────────────────
+
+    [Fact]
+    public async Task First_ckLanguage2_release_may_hide_a_sensitive_attribute_as_Minor_with_an_acknowledgement()
+    {
+        await _h.SeedAsync(Record("1.0.0", 1, false));
+
+        var missing = await _h.EvaluateAsync(Record("1.1.0", true, CkAttributeAccessDto.Hidden));
+        var acknowledged = await _h.EvaluateAsync(Record("1.1.0", true, CkAttributeAccessDto.Hidden,
+            (AccessKey, "Close credential exposure R13")));
+
+        Assert.Equal(["OCTO-CK203"], Codes(missing));
+        Assert.Equal(CkPublishGateDecision.Proceed, acknowledged.Decision);
+        Assert.Single(acknowledged.Verdict!.Acknowledgement.Acknowledged);
+    }
+
+    [Fact]
+    public async Task First_ckLanguage2_release_still_needs_Major_for_an_attribute_not_marked_sensitive()
+    {
+        await _h.SeedAsync(Record("1.0.0", 1, false));
+
+        var result = await _h.EvaluateAsync(Record("1.1.0", false, CkAttributeAccessDto.Hidden,
+            (AccessKey, "Close credential exposure R13")));
+
+        Assert.Contains("OCTO-CK200", Codes(result));
+    }
+
+    [Fact]
+    public async Task A_second_ckLanguage2_release_cannot_use_the_exception_again()
+    {
+        await _h.SeedAsync(Record("1.0.0", 1, false));
+        await _h.SeedAsync(Record("1.1.0", 2, false)); // the first ckLanguage 2 release, attribute not yet marked
+
+        var result = await _h.EvaluateAsync(Record("1.2.0", true, CkAttributeAccessDto.Hidden,
+            (AccessKey, "Close credential exposure R13")));
+
+        Assert.Contains("OCTO-CK200", Codes(result));
     }
 
     [Fact]

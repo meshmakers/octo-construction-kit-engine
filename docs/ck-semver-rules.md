@@ -746,7 +746,7 @@ except `Monitoring 1.0.0`. This table does not list current-major entries (AB#72
 | Private | `OctoSdkDemo 1.0.1` (private, older major; current major 2.5.0 range-retaining) | keep, legacy major, accepted | Superseded by the range-retaining current major; gets no further releases |
 | Public | `OctoSdkDemo 1.0.1` | keep, legacy major, accepted | Current major is 2.x |
 
-The scan counts 19 older-major entries in the private and 27 in the public catalog (before `Monitoring 1.0.0` is withdrawn). A new
+The scan of 2026-10-27 counts 19 older-major entries in the private and 27 in the public catalog (before `Monitoring 1.0.0` is withdrawn); with the private `OctoSdkDemo 1.0.1` row added by AB#6882 the private table lists 20. A new
 older-major entry is added to the table with its decision when a major is superseded; the default is the rule above.
 
 ## Dependency resolution by SemVer (AB#4468, AB#6671)
@@ -1209,7 +1209,7 @@ command is fully read-only.
 - **Foreign attribute defaults:** whether a *required* attribute referencing an attribute
   definition of another model carries default values cannot be inspected — such additions are
   classified Major defensively.
-- **Dependency ranges of exact-pinned (legacy, v1) models are classified via their resolved versions** (range-retaining models
+- **Dependency ranges of exact-pinned models (no range retention) are classified via their resolved versions** (range-retaining models
   are compared on their declared ranges, rows D1–D8). The compiled baseline model
   persists only the *resolved* dependency versions, not the declared ranges (and the compiled
   model schema is closed, so persisting ranges is a catalog-format evolution). A range edit that

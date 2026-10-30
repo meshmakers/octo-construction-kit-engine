@@ -337,7 +337,8 @@ archive computed column (AB#4189, mXparser) and integrate that column:
 **Meter check (fixture).** The recorded Fusch grid rows of AB#7692 (2026-10-30T10:30:10.7Z–11:15:45.8Z,
 45.6 min, 548 rows every ~5 s, timestamps and ActivePower only) integrate over the positive part to
 0.9297 kWh against the `ImportedEnergy` register delta of 0.924 kWh (+0.6 %, within 1 %); the old
-board formula `SUM(kW) × 10/3600` over the same rows gives 1.862 kWh (+101 %). Integration test
+board formula `SUM(kW) × 10/3600` over the same rows gives 1.862 kWh (+101 %). A fresh 47.6-min window bounded by two register reads (2026-10-30 18:44:01Z–19:31:39Z, 571 rows, register delta
+0.197 kWh) integrates to 0.1976 kWh (+0.3 %). Integration test
 `StreamDataIntegralIntegrationTests` in `octo-construction-kit-engine-mongodb`.
 
 ## §7 Acceptance (from AB#4336)

@@ -123,6 +123,33 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto>(
         return true;
     }
 
+    public async Task<bool> UpdateOneIfVersionMatchesAsync(IOctoSession session, TDocument document,
+        ulong expectedRtVersion)
+    {
+        // The local file-based store is single-process (no cross-process race), so check-then-apply is enough here.
+        await LoadAsync().ConfigureAwait(false);
+
+        var key = dataSourceMapper.GetId(document);
+        if (!_rtEntities.TryGetValue(key, out var savedDocument))
+        {
+            throw RuntimeRepositoryException.DocumentDoesNotExist(tenantId, key, typeof(TDocument));
+        }
+
+        if (savedDocument is RtEntity savedEntity && savedEntity.RtVersion != expectedRtVersion)
+        {
+            return false;
+        }
+
+        dataSourceMapper.Apply(savedDocument, document);
+        if (savedDocument is RtEntity appliedEntity)
+        {
+            appliedEntity.RtVersion = expectedRtVersion + 1;
+        }
+
+        await SaveAsync().ConfigureAwait(false);
+        return true;
+    }
+
     public async Task<bool> UpdateOneWithRecordArrayItemsAsync(IOctoSession session, TDocument document,
         IReadOnlyCollection<RtRecordArrayItemUpdate> itemUpdates, bool requireItemMatch)
     {
@@ -234,6 +261,31 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto>(
         dataSourceMapper.Apply(savedDocument, document);
 
         await SaveAsync().ConfigureAwait(false);
+    }
+
+    public async Task<bool> ReplaceByIdIfVersionMatchesAsync(IOctoSession session, TKey key, TDocument document,
+        ulong expectedRtVersion)
+    {
+        await LoadAsync().ConfigureAwait(false);
+
+        if (!_rtEntities.TryGetValue(key, out var savedDocument))
+        {
+            throw RuntimeRepositoryException.DocumentDoesNotExist(tenantId, key, typeof(TDocument));
+        }
+
+        if (savedDocument is RtEntity savedEntity && savedEntity.RtVersion != expectedRtVersion)
+        {
+            return false;
+        }
+
+        dataSourceMapper.Apply(savedDocument, document);
+        if (savedDocument is RtEntity appliedEntity)
+        {
+            appliedEntity.RtVersion = expectedRtVersion + 1;
+        }
+
+        await SaveAsync().ConfigureAwait(false);
+        return true;
     }
 
     public async Task DeleteOneAsync(IOctoSession session, TKey key)

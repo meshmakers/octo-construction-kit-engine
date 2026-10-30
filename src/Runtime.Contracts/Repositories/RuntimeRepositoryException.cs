@@ -137,6 +137,22 @@ public class RuntimeRepositoryException : PersistenceException
             "stored binary (AB#6248). Update the linked binary without a guard.");
     }
 
+    internal static Exception ExpectedRtVersionNotCombinable(RtEntityId rtEntityId)
+    {
+        return new RuntimeRepositoryException(
+            $"Entity '{rtEntityId}' is updated with an expected rtVersion and an update guard or atomic record array " +
+            "item updates. The expected version is a separate optimistic-concurrency mechanism and cannot be combined " +
+            "with them (AB#7769).");
+    }
+
+    internal static Exception ExpectedRtVersionWithLinkedBinary(RtEntityId rtEntityId, string attributeName)
+    {
+        return new RuntimeRepositoryException(
+            $"Entity '{rtEntityId}' is updated with an expected rtVersion and a linked binary ('{attributeName}'). " +
+            "A version conflict would skip the entity write after the bytes were stored (AB#6248, AB#7769). " +
+            "Update the linked binary without an expected version.");
+    }
+
     internal static Exception InvalidValueType(object value, Type type)
     {
         return new RuntimeRepositoryException(

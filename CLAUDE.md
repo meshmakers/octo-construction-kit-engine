@@ -1672,6 +1672,42 @@ Semantics:
 - Tests: `RecordArrayItemUpdateRuleEngineTests`, `BulkRtMutationRecordArrayItemTests` (this repo); the real-MongoDB concurrency test
   lives in engine-mongodb.
 
+## Expected rtVersion - optimistic concurrency for update and replace (AB#7769)
+
+Problem: a service that reads an entity, changes it in memory and writes it back (identity's user store: `AccessFailedCount`,
+finding L9) loses updates when two writers run in parallel - both read version n, the later write overwrites the other.
+`AttributeNewerThanGuard` does not help: it compares a timestamp the caller writes, and it skips a rejected write silently.
+
+Contract (additive; callers that pass nothing behave exactly as before):
+- `EntityUpdateInfo<TEntity>.CreateUpdate(rtEntityId, rtEntity, ulong expectedRtVersion)` and
+  `CreateReplace(rtEntityId, rtEntity, ulong expectedRtVersion)`; `IEntityUpdateInfo<TEntity>.ExpectedRtVersion` (`ulong?`, default
+  `null`; serialised only when set, Newtonsoft and System.Text.Json).
+- Repository shortcuts by id: `ReplaceOneRtEntityByIdAsync(session, [ckTypeId,] rtId, rtEntity, expectedRtVersion)` and
+  `UpdateOneRtEntityByIdAsync(session, [ckTypeId,] rtId, rtEntity, expectedRtVersion)` (typed and untyped). Bulk: put several infos with
+  an expected version into one `ApplyChangesAsync`.
+- `IDataSourceCollection.UpdateOneIfVersionMatchesAsync` / `ReplaceByIdIfVersionMatchesAsync` (`bool`: `true` applied, `false` = the
+  document exists with another version; a missing document keeps the backend's not-found error).
+
+Semantics:
+- The write applies only if the stored `rtVersion` equals the expected one; the stored version then becomes **expected + 1**
+  (update: the usual `$inc`; replace: the engine sets `rtEntity.RtVersion = expected + 1` on the entity that is written - read it back
+  from the entity after the call, and keep the version you passed if you retry).
+- A mismatch is **`RtVersionConflictException`** (`RtEntityId`, `ExpectedRtVersion`), never a silent skip. Nothing is written for the
+  conflicting entity. In a transactional session the exception rolls the transaction back as usual, so an `ApplyChangesAsync` batch is
+  all-or-nothing there; without a transaction the entities before the conflicting one stay written.
+- The caller's loop: read -> change -> write with the version read -> on `RtVersionConflictException` read again (new session /
+  transaction) and repeat. Two writers need at most one retry.
+- One mechanism per write: an expected version cannot be combined with `AttributeNewerThanGuard` or atomic RecordArray item
+  updates (rule engine throws `RuntimeRepositoryException`), nor with a linked binary in the same update (the conflict would skip the
+  entity write after the bytes were stored, same reason as AB#6248). A replace checks the stored version once before it touches
+  linked binaries, so a replace that is bound to conflict does not delete them; the write itself repeats the check atomically.
+- A replace **without** an expected version is unchanged: it writes the entity as given (including its own `RtVersion`) and does not
+  increment. A writer that wants to be detected by guarded writers must therefore also use the expected version.
+- `LocalDataSourceCollection` (dev-only) checks and applies in-process; the atomic MongoDB statement is in engine-mongodb
+  `CLAUDE.md`, "Expected rtVersion".
+- Tests: `BulkRtMutationExpectedRtVersionTests` (this repo); the real-MongoDB tests (50 repeated parallel increments) live in
+  engine-mongodb.
+
 ## Important Notes
 
 - The solution uses Azure Pipelines for CI/CD (`azure-pipelines.yml` in the repo root)

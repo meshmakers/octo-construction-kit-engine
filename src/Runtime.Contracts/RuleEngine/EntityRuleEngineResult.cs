@@ -21,6 +21,7 @@ public record EntityRuleEngineResult<TEntity> where TEntity : RtEntity
         RtEntitiesToDelete = [];
         UpdateGuards = new Dictionary<RtEntityId, AttributeNewerThanGuard>();
         RecordArrayItemUpdates = new Dictionary<RtEntityId, IReadOnlyList<RtRecordArrayItemUpdate>>();
+        ExpectedRtVersions = new Dictionary<RtEntityId, ulong>();
     }
 
     /// <summary>
@@ -39,10 +40,16 @@ public record EntityRuleEngineResult<TEntity> where TEntity : RtEntity
     ///     Validated and normalised atomic RecordArray item updates (AB#7445) keyed by entity id. Entries are present
     ///     only for entries in <paramref name="rtEntitiesToUpdate" /> whose update info carries item updates.
     /// </param>
+    /// <param name="expectedRtVersions">
+    ///     Expected stored versions (AB#7769) keyed by entity id. Entries are present for entries in
+    ///     <paramref name="rtEntitiesToUpdate" /> and <paramref name="rtEntitiesToReplace" /> whose update info
+    ///     carries an expected version.
+    /// </param>
     public EntityRuleEngineResult(List<TEntity> rtEntitiesToInsert, Dictionary<RtEntityId, TEntity> rtEntitiesToUpdate,
         Dictionary<RtEntityId, TEntity> rtEntitiesToReplace, List<RtEntityId> rtEntitiesToDelete,
         Dictionary<RtEntityId, AttributeNewerThanGuard>? updateGuards = null,
-        Dictionary<RtEntityId, IReadOnlyList<RtRecordArrayItemUpdate>>? recordArrayItemUpdates = null)
+        Dictionary<RtEntityId, IReadOnlyList<RtRecordArrayItemUpdate>>? recordArrayItemUpdates = null,
+        Dictionary<RtEntityId, ulong>? expectedRtVersions = null)
     {
         RtEntitiesToInsert = rtEntitiesToInsert;
         RtEntitiesToUpdate = rtEntitiesToUpdate;
@@ -51,6 +58,7 @@ public record EntityRuleEngineResult<TEntity> where TEntity : RtEntity
         UpdateGuards = updateGuards ?? new Dictionary<RtEntityId, AttributeNewerThanGuard>();
         RecordArrayItemUpdates = recordArrayItemUpdates ??
                                  new Dictionary<RtEntityId, IReadOnlyList<RtRecordArrayItemUpdate>>();
+        ExpectedRtVersions = expectedRtVersions ?? new Dictionary<RtEntityId, ulong>();
     }
 
     /// <summary>
@@ -87,4 +95,12 @@ public record EntityRuleEngineResult<TEntity> where TEntity : RtEntity
     ///     reading the stored entity. See <see cref="RtRecordArrayItemUpdate" />.
     /// </summary>
     public Dictionary<RtEntityId, IReadOnlyList<RtRecordArrayItemUpdate>> RecordArrayItemUpdates { get; }
+
+    /// <summary>
+    ///     Expected stored <see cref="RtEntity.RtVersion" /> keyed by entity id (AB#7769). An entry belongs to the
+    ///     corresponding update in <see cref="RtEntitiesToUpdate" /> or replace in <see cref="RtEntitiesToReplace" />
+    ///     and is written only if the stored entity still has that version; a mismatch throws
+    ///     <see cref="RtVersionConflictException" />. Entities without an entry are written unconditionally.
+    /// </summary>
+    public Dictionary<RtEntityId, ulong> ExpectedRtVersions { get; }
 }

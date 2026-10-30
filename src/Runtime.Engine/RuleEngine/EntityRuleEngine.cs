@@ -4,6 +4,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 using Meshmakers.Octo.Runtime.Engine.Messages;
@@ -26,6 +27,7 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
         var entitiesToDelete = new ConcurrentBag<RtEntityId>();
         var updateGuards = new ConcurrentDictionary<RtEntityId, AttributeNewerThanGuard>();
         var recordArrayItemUpdates = new ConcurrentDictionary<RtEntityId, IReadOnlyList<RtRecordArrayItemUpdate>>();
+        var expectedRtVersions = new ConcurrentDictionary<RtEntityId, ulong>();
 
         await Parallel.ForEachAsync(entityUpdateInfos, (info, token) =>
         {
@@ -133,6 +135,18 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                         updateGuards.TryAdd(info.GetRtEntityId(), info.UpdateGuard);
                     }
 
+                    if (info.ExpectedRtVersion.HasValue)
+                    {
+                        // AB#7769: one concurrency mechanism per write - the expected version cannot be combined with
+                        // the timestamp guard or with atomic item updates (which never read or compare a version).
+                        if (info.UpdateGuard != null || itemUpdates != null)
+                        {
+                            throw RuntimeRepositoryException.ExpectedRtVersionNotCombinable(info.GetRtEntityId());
+                        }
+
+                        expectedRtVersions.TryAdd(info.GetRtEntityId(), info.ExpectedRtVersion.Value);
+                    }
+
                     if (itemUpdates != null)
                     {
                         recordArrayItemUpdates.TryAdd(info.GetRtEntityId(), itemUpdates);
@@ -157,6 +171,11 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                         return ValueTask.CompletedTask;
                     }
 
+                    if (info.ExpectedRtVersion.HasValue)
+                    {
+                        expectedRtVersions.TryAdd(info.GetRtEntityId(), info.ExpectedRtVersion.Value);
+                    }
+
                     break;
                 case EntityModOptions.Delete:
                     entitiesToDelete.Add(info.GetRtEntityId());
@@ -174,7 +193,8 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                 entitiesToReplace.ToDictionary(k => k.Key, v => v.Value),
                 entitiesToDelete.ToList(),
                 updateGuards.ToDictionary(k => k.Key, v => v.Value),
-                recordArrayItemUpdates.ToDictionary(k => k.Key, v => v.Value));
+                recordArrayItemUpdates.ToDictionary(k => k.Key, v => v.Value),
+                expectedRtVersions.ToDictionary(k => k.Key, v => v.Value));
 
         return entityValidatorResult;
     }

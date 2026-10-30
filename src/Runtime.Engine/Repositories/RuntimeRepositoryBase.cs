@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
@@ -309,6 +309,49 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         where TEntity : RtEntity, new()
     {
         await ReplaceOneRtEntityByIdAsync(session, rtEntity.GetRtCkTypeId(), rtId, rtEntity).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task ReplaceOneRtEntityByIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId,
+        RtEntity rtEntity, ulong expectedRtVersion)
+    {
+        await ApplyVersionedChangeAsync(session, EntityUpdateInfo<RtEntity>.CreateReplace(
+            new RtEntityId(ckTypeId, rtId), rtEntity, expectedRtVersion)).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task ReplaceOneRtEntityByIdAsync<TEntity>(IOctoSession session, OctoObjectId rtId, TEntity rtEntity,
+        ulong expectedRtVersion)
+        where TEntity : RtEntity, new()
+    {
+        await ApplyVersionedChangeAsync(session, EntityUpdateInfo<TEntity>.CreateReplace(
+            new RtEntityId(rtEntity.GetRtCkTypeId(), rtId), rtEntity, expectedRtVersion)).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task UpdateOneRtEntityByIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId,
+        RtEntity rtEntity, ulong expectedRtVersion)
+    {
+        await ApplyVersionedChangeAsync(session, EntityUpdateInfo<RtEntity>.CreateUpdate(
+            new RtEntityId(ckTypeId, rtId), rtEntity, expectedRtVersion)).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task UpdateOneRtEntityByIdAsync<TEntity>(IOctoSession session, OctoObjectId rtId, TEntity rtEntity,
+        ulong expectedRtVersion)
+        where TEntity : RtEntity, new()
+    {
+        await ApplyVersionedChangeAsync(session, EntityUpdateInfo<TEntity>.CreateUpdate(
+            new RtEntityId(RtEntityExtensions.GetRtCkTypeId<TEntity>(), rtId), rtEntity, expectedRtVersion))
+            .ConfigureAwait(false);
+    }
+
+    private async Task ApplyVersionedChangeAsync<TEntity>(IOctoSession session, EntityUpdateInfo<TEntity> info)
+        where TEntity : RtEntity
+    {
+        var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
+        await ApplyChangesGuardedAsync(session, cacheService, [info], [], BulkRtMutationOptions.Default)
+            .ConfigureAwait(false);
     }
 
     /// <inheritdoc />

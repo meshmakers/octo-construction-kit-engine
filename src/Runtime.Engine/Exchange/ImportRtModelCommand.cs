@@ -18,6 +18,8 @@ using Meshmakers.Octo.Runtime.Engine.Secrets;
 using Microsoft.Extensions.Logging;
 using YamlDotNet.Core;
 
+using Meshmakers.Octo.Runtime.Engine.StreamData;
+
 namespace Meshmakers.Octo.Runtime.Engine.Exchange;
 
 internal class ImportRtModelCommand(
@@ -1254,6 +1256,14 @@ internal class ImportRtModelCommand(
                         "Seed {Reason} for attribute {AttributeName} of entity {RtId} (type {CkTypeId}): existing value {Outcome} (policy {Policy})",
                         entry.Reason, entry.AttributeName, entry.RtId, entry.CkTypeId,
                         entry.Applied ? "replaced" : "kept", _blankingPolicy);
+                }
+
+                // AB#7872: the import replaces the whole entity, and the table of an activated archive does not
+                // follow a changed definition. Refused before anything is written, for every Upsert caller. After
+                // the steps above: compared is what this import would store.
+                if (ArchiveDefinitionGuard.IsArchive(cacheService, runtimeRepository.TenantId, typeGroup.Key, out _))
+                {
+                    ArchiveDefinitionGuard.EnsureUnchanged(cacheService, runtimeRepository.TenantId, ckTypeGraph, existing, modelEntity);
                 }
 
                 if (preservedForEntity > 0)

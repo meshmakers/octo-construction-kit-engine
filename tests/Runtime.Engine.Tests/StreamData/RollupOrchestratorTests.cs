@@ -93,6 +93,20 @@ public class RollupOrchestratorTests
             .MustNotHaveHappened();
     }
 
+    // AB#7727: an existing rollup offers the platform columns right after the update, also with no bucket due.
+    [Fact]
+    public async Task Tick_ActivatedRollup_NoBucketDue_StillEnsuresThePlatformColumns()
+    {
+        StubRollups(Rollup(BaseTime));
+        StubActivatedSource();
+
+        var committed = await NewSut(BaseTime.AddMinutes(1)).TickAsync(CancellationToken.None);
+
+        Assert.Equal(0, committed);
+        A.CallTo(() => _repo.EnsureRollupPlatformColumnsAsync(RollupRt, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
     [Fact]
     public async Task Tick_ActivatedRollup_ClosedBuckets_AggregatesAndAdvances()
     {
@@ -591,5 +605,105 @@ public class RollupOrchestratorTests
                 A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
                 initialWatermark, initialWatermark + bucketSize, A<CancellationToken>._))
             .MustHaveHappenedOnceExactly();
+    }
+
+    // ---- AB#7872: a rollup that keeps failing shows it -----------------------------------------
+
+    private static RollupArchiveSnapshot Failing(int failures) => Rollup(BaseTime) with { ConsecutiveRunFailures = failures };
+
+    private void StubAFailingAggregation()
+    {
+        StubActivatedSource();
+        A.CallTo(() => _repo.AggregateBucketAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, A<DateTime>._, A<DateTime>._, A<CancellationToken>._))
+            .Throws(new InvalidOperationException("Column unknown: temperature_max"));
+    }
+
+    [Fact]
+    public async Task Tick_AFailedRun_RecordsTheReasonOnTheRollup_AndTheTickGoesOn()
+    {
+        StubRollups(Failing(0));
+        StubAFailingAggregation();
+        var now = BaseTime.AddHours(1);
+
+        await NewSut(now).TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _rollupStore.RecordRunFailureAsync(RollupRt, "Column unknown: temperature_max", now)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => _audit.RecordRollupRunFailingAsync(A<string>._, A<OctoObjectId>._, A<int>._, A<string>._)).MustNotHaveHappened();
+    }
+
+    [Theory]
+    [InlineData(RollupOrchestrator.FailuresBeforeAlert - 2, 0)]
+    [InlineData(RollupOrchestrator.FailuresBeforeAlert - 1, 1)]
+    [InlineData(RollupOrchestrator.FailuresBeforeAlert, 0)]
+    public async Task Tick_ARollupThatKeepsFailing_IsReportedOnce(int failuresSoFar, int reports)
+    {
+        StubRollups(Failing(failuresSoFar));
+        StubAFailingAggregation();
+
+        await NewSut(BaseTime.AddHours(1)).TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _audit.RecordRollupRunFailingAsync(TenantId, RollupRt, RollupOrchestrator.FailuresBeforeAlert, A<string>.That.Contains("Column unknown")))
+            .MustHaveHappened(reports, Times.Exactly);
+    }
+
+    [Fact]
+    public async Task Tick_ARunThatSucceedsAfterFailures_ClearsTheError()
+    {
+        StubRollups(Failing(4));
+        StubActivatedSource();
+
+        await NewSut(BaseTime.AddHours(1)).TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _rollupStore.ClearRunFailureAsync(RollupRt)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Tick_ARunThatStallsOnADisabledSource_KeepsTheError()
+    {
+        StubRollups(Failing(4));
+        A.CallTo(() => _archiveStore.GetAsync(SourceRt))
+            .Returns(ActivatedSource() with { Status = CkArchiveStatus.Disabled });
+
+        await NewSut(BaseTime.AddHours(1)).TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _rollupStore.ClearRunFailureAsync(A<OctoObjectId>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Tick_WhenTheErrorCannotBeCleared_TheRunStaysASuccess()
+    {
+        StubRollups(Failing(RollupOrchestrator.FailuresBeforeAlert - 1));
+        StubActivatedSource();
+        A.CallTo(() => _rollupStore.ClearRunFailureAsync(A<OctoObjectId>._))
+            .Throws(new InvalidOperationException("store down"));
+
+        await NewSut(BaseTime.AddHours(1)).TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _rollupStore.RecordRunFailureAsync(A<OctoObjectId>._, A<string>._, A<DateTime>._)).MustNotHaveHappened();
+        A.CallTo(() => _audit.RecordRollupRunFailingAsync(A<string>._, A<OctoObjectId>._, A<int>._, A<string>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Tick_AHealthyRollup_DoesNotTouchItsEntityForTheErrorState()
+    {
+        StubRollups(Failing(0));
+        StubActivatedSource();
+
+        await NewSut(BaseTime.AddHours(1)).TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _rollupStore.ClearRunFailureAsync(A<OctoObjectId>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Tick_WhenTheFailureCannotBeRecorded_TheTickStillGoesOn()
+    {
+        StubRollups(Failing(0), Failing(0) with { RtId = OctoObjectId.GenerateNewId() });
+        StubAFailingAggregation();
+        A.CallTo(() => _rollupStore.RecordRunFailureAsync(A<OctoObjectId>._, A<string>._, A<DateTime>._))
+            .Throws(new InvalidOperationException("store down"));
+
+        await NewSut(BaseTime.AddHours(1)).TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _rollupStore.RecordRunFailureAsync(A<OctoObjectId>._, A<string>._, A<DateTime>._)).MustHaveHappenedTwiceExactly();
     }
 }

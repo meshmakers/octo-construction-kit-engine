@@ -13,6 +13,7 @@ using Meshmakers.Octo.Runtime.Contracts.Exchange;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
+using Meshmakers.Octo.Runtime.Contracts.StreamData;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Microsoft.Extensions.Logging;
@@ -2382,7 +2383,9 @@ internal class BlueprintService : IBlueprintService
             {
                 _logger.LogError(ex, "Error importing blueprint entities for {BlueprintId}", targetVersion);
                 result.Errors.Add($"Failed to import blueprint entities: {ex.Message}");
-                if (!options.ContinueOnError)
+                // AB#7872: a refused change of an activated archive is no error to continue over; the update did not
+                // happen, and the blueprint must not report it as applied.
+                if (!options.ContinueOnError || ex is ArchiveSchemaImmutableException or RollupSchemaImmutableException)
                 {
                     result.Success = false;
                     return;

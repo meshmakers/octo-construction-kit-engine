@@ -103,6 +103,19 @@ public interface IRollupArchiveRuntimeStore
     Task SetFrozenUntilAsync(OctoObjectId rollupRtId, DateTime? frozenUntil);
 
     /// <summary>
+    /// Records a failed run of the rollup orchestrator on the entity, so that a rollup that keeps failing shows it
+    /// with the reason, not only in a log (AB#7872). Increments <c>ConsecutiveRunFailures</c>.
+    /// </summary>
+    /// <param name="rollupRtId">The rollup archive.</param>
+    /// <param name="reason">Why the run failed.</param>
+    /// <param name="failedAt">When the run failed.</param>
+    Task RecordRunFailureAsync(OctoObjectId rollupRtId, string reason, DateTime failedAt);
+
+    /// <summary>Clears what <see cref="RecordRunFailureAsync" /> recorded, after a run that succeeded.</summary>
+    /// <param name="rollupRtId">The rollup archive.</param>
+    Task ClearRunFailureAsync(OctoObjectId rollupRtId);
+
+    /// <summary>
     /// Enumerates every non-soft-deleted CkRollupArchive entity in the tenant. Used by the rollup
     /// orchestrator background worker on each tick to pick up rollups that are due for processing.
     /// Order is implementation-defined; callers must not rely on it.

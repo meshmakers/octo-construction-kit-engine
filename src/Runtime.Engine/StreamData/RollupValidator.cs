@@ -58,8 +58,8 @@ public static class RollupValidator
     /// <summary>
     /// Validates the structural invariants of a rollup snapshot that do not require any source
     /// archive — non-empty aggregations, no direct self-cycle, no duplicate
-    /// <c>(SourcePath, Function)</c> pairs, a <c>ComparisonValue</c> on every StateDuration.
-    /// Since AB#5157 this runs at create time as well as at activation.
+    /// <c>(SourcePath, Function)</c> pairs, a <c>ComparisonValue</c> on every StateDuration, no
+    /// aggregation column with a name the platform keeps for itself. Since AB#5157 this runs at create time as well as at activation.
     /// </summary>
     public static void ValidateForSave(RollupArchiveSnapshot rollup)
     {
@@ -87,6 +87,16 @@ public static class RollupValidator
             if (agg.Function == CkRollupFunction.StateDuration && string.IsNullOrWhiteSpace(agg.ComparisonValue))
             {
                 throw new RollupComparisonValueRequiredException(rollup.RtId, agg.SourcePath);
+            }
+
+            // AB#7727: every rollup carries these columns itself, a generated name counts as well
+            // (Count over an attribute 'Manual' is stored as manual_count).
+            foreach (var columnName in RollupColumnGenerator.TargetColumnNamesFor(agg))
+            {
+                if (ArchiveRowOriginFields.IsRollupField(columnName))
+                {
+                    throw new ArchiveReservedColumnNameException(rollup.RtId, columnName);
+                }
             }
         }
     }

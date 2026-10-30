@@ -43,6 +43,12 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
     /// <summary>Default upper bound on the number of buckets processed for a single rollup per tick.</summary>
     public const int DefaultMaxBucketsPerTick = 60;
 
+    /// <summary>Failed runs in a row after which a rollup is reported in the event log (AB#7872).</summary>
+    internal const int FailuresBeforeAlert = 3;
+
+    /// <summary>The part of an exception message kept as the reason on the entity.</summary>
+    private const int MaxFailureReasonLength = 2000;
+
     private readonly string _tenantId;
     private readonly IArchiveRuntimeStore _archiveStore;
     private readonly IRollupArchiveRuntimeStore _rollupStore;
@@ -119,9 +125,12 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
                 continue;
             }
 
+            bool completed;
             try
             {
-                total += await ProcessRollupSnapshotAsync(snapshot, cancellationToken);
+                var outcome = await ProcessRollupSnapshotAsync(snapshot, cancellationToken);
+                total += outcome.Committed;
+                completed = outcome.Completed;
             }
             catch (OperationCanceledException)
             {
@@ -129,16 +138,68 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
             }
             catch (Exception ex)
             {
-                // One rollup failing must not stop the tick — log + continue. Per-rollup failure
-                // tracking → CkArchiveStatus.Failed escalation lives in the lifecycle service
-                // (concept §8) and is invoked separately.
+                // One rollup failing must not stop the tick — log + continue.
                 _logger.LogError(ex,
                     "Rollup orchestrator: failed to process rollup {RollupRtId} for tenant {TenantId}",
                     snapshot.RtId, _tenantId);
+                await RecordRunFailureAsync(snapshot, ex);
+                completed = false;
+            }
+
+            if (completed && snapshot.ConsecutiveRunFailures > 0)
+            {
+                await ClearRunFailureAsync(snapshot);
             }
         }
 
         return total;
+    }
+
+    /// <summary>
+    /// AB#7872: what a run did. <paramref name="Committed"/> counts the buckets it wrote; <paramref name="Completed"/> is
+    /// false when it stopped short of its work, so a stalled rollup keeps its recorded failure.
+    /// </summary>
+    private readonly record struct RollupRunOutcome(int Committed, bool Completed);
+
+    /// <summary>
+    /// AB#7872: outside the run on purpose. A run that succeeded stays a success when the error state cannot be cleared;
+    /// the next successful run clears it.
+    /// </summary>
+    private async Task ClearRunFailureAsync(RollupArchiveSnapshot snapshot)
+    {
+        try
+        {
+            await _rollupStore.ClearRunFailureAsync(snapshot.RtId);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Rollup {RollupRtId}: failed to clear the recorded run failure.", snapshot.RtId);
+        }
+    }
+
+    /// <summary>
+    /// AB#7872: a rollup that keeps failing shows it, on its entity from the first failed run, in the event log once it
+    /// failed <see cref="FailuresBeforeAlert"/> runs in a row. Its status stays <c>Activated</c>: <c>Failed</c> would stop
+    /// the reads and the ingest of what is a passing problem more often than not (a CrateDB restart), and the next
+    /// tick retries anyway. A failure here must not stop the tick either.
+    /// </summary>
+    private async Task RecordRunFailureAsync(RollupArchiveSnapshot snapshot, Exception exception)
+    {
+        var reason = exception.Message.Length <= MaxFailureReasonLength
+            ? exception.Message
+            : exception.Message[..MaxFailureReasonLength];
+        try
+        {
+            await _rollupStore.RecordRunFailureAsync(snapshot.RtId, reason, _clock());
+            if (snapshot.ConsecutiveRunFailures + 1 == FailuresBeforeAlert)
+            {
+                await _audit.RecordRollupRunFailingAsync(_tenantId, snapshot.RtId, FailuresBeforeAlert, reason);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Rollup {RollupRtId}: failed to record the failed run.", snapshot.RtId);
+        }
     }
 
     /// <inheritdoc />
@@ -152,7 +213,7 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
                 rollupRtId, snapshot.Status);
             return 0;
         }
-        return await ProcessRollupSnapshotAsync(snapshot, cancellationToken);
+        return (await ProcessRollupSnapshotAsync(snapshot, cancellationToken)).Committed;
     }
 
     /// <inheritdoc />
@@ -174,15 +235,19 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
             rollupRtId, toBucketEnd);
     }
 
-    private async Task<int> ProcessRollupSnapshotAsync(
+    private async Task<RollupRunOutcome> ProcessRollupSnapshotAsync(
         RollupArchiveSnapshot rollup, CancellationToken cancellationToken)
     {
+        // AB#7727: before everything that can skip the rollup — a daily rollup may have no due bucket
+        // for a day, and a frozen or stalled one for much longer, while readers already ask for the columns.
+        await _repository.EnsureRollupPlatformColumnsAsync(rollup.RtId, cancellationToken);
+
         if (rollup.BucketSize <= TimeSpan.Zero)
         {
             _logger.LogWarning(
                 "Rollup {RollupRtId}: BucketSize is non-positive ({BucketSize}); skipping",
                 rollup.RtId, rollup.BucketSize);
-            return 0;
+            return new RollupRunOutcome(0, Completed: false);
         }
 
         if (rollup.LastAggregatedBucketEnd is null)
@@ -190,7 +255,7 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
             _logger.LogDebug(
                 "Rollup {RollupRtId}: watermark is null; initial-watermark logic is deferred to activation. Skipping until set.",
                 rollup.RtId);
-            return 0;
+            return new RollupRunOutcome(0, Completed: false);
         }
 
         // AB#5157: activation rejects a rollup without sources, but the generic CK mutation can
@@ -201,7 +266,7 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
             _logger.LogWarning(
                 "Rollup {RollupRtId}: declares no source archive; skipping until a source is declared",
                 rollup.RtId);
-            return 0;
+            return new RollupRunOutcome(0, Completed: false);
         }
 
         // AB#5157: every declared source is resolved once per tick; the bucket loop below picks
@@ -212,6 +277,7 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
         var now = _clock();
         var watermark = rollup.LastAggregatedBucketEnd.Value;
         var committed = 0;
+        var stalled = false;
         // Reference time-zone for calendar bucket boundaries (AB#4300 / O6); null ⇒ UTC.
         var zone = BucketBoundary.ResolveZone(rollup.ReferenceTimeZone);
 
@@ -259,6 +325,7 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
                 // Never skip past a bucket whose source will deliver its data later (a source that
                 // was disabled, or a chained rollup that is not activated yet): stop here and retry
                 // on the next tick. Buckets committed earlier in this tick stay committed.
+                stalled = true;
                 break;
             }
 
@@ -325,7 +392,7 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
                 rollup.RtId, committed, _tenantId);
         }
 
-        return committed;
+        return new RollupRunOutcome(committed, Completed: !stalled);
     }
 
     /// <summary>

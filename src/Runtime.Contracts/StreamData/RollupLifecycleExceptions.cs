@@ -84,16 +84,24 @@ public sealed class DuplicateRollupAggregationException : StreamDataException
 }
 
 /// <summary>
-/// A schema-relevant change (Sources, BucketSize, Aggregations) was attempted on a
-/// rollup that has already left <see cref="CkArchiveStatus.Created"/>. Mutate WatermarkLag /
-/// FrozenUntil instead; recreate the rollup for schema changes. Concept §7, §10.
-/// Reserved for a future guard: the rule is documented, not enforced (AB#5157 decision 9), so the
-/// engine does not throw this today.
+/// A change that an activated rollup cannot apply was attempted: its aggregations, bucket size, alignment, time
+/// zone, sources or target type (AB#7872). The table and the aggregated buckets do not follow such a change, the
+/// rollup would stop or compute something else than it stored. Mutable after activation: WatermarkLagMs,
+/// FrozenUntil, CarryLookbackMs. Concept §7, §10.
 /// </summary>
 public sealed class RollupSchemaImmutableException : StreamDataException
 {
-    public RollupSchemaImmutableException(OctoObjectId rollupArchiveRtId, CkArchiveStatus currentStatus)
-        : base($"Rollup archive {Describe(rollupArchiveRtId)} is in status {currentStatus}; Sources, BucketSize, and Aggregations are frozen.", rollupArchiveRtId) { }
+    /// <summary>The attribute that would have changed.</summary>
+    public string Field { get; }
+
+    public RollupSchemaImmutableException(OctoObjectId rollupArchiveRtId, string? wellKnownName, CkArchiveStatus currentStatus, string field)
+        : base(
+            $"Rollup archive {(string.IsNullOrEmpty(wellKnownName) ? Describe(rollupArchiveRtId) : $"{Describe(rollupArchiveRtId)} ('{wellKnownName}')")} " +
+            $"is {currentStatus}: its {field} cannot be changed, the table does not follow. Such a change needs a new archive.",
+            rollupArchiveRtId)
+    {
+        Field = field;
+    }
 }
 
 /// <summary>
@@ -437,6 +445,26 @@ public sealed class RollupSourcePathMissingException : StreamDataException
     {
         SourceArchiveRtId = sourceArchiveRtId;
         SourcePath = sourcePath;
+    }
+}
+
+/// <summary>
+/// A user-defined column takes one of the names the platform keeps for itself on every rollup
+/// (<see cref="ArchiveRowOriginFields.RollupFields" />), directly or as a generated aggregation column
+/// (<c>Count</c> over an attribute <c>Manual</c> is stored as <c>manual_count</c>). AB#7727.
+/// </summary>
+public sealed class ArchiveReservedColumnNameException : StreamDataException
+{
+    public string ColumnName { get; }
+
+    public ArchiveReservedColumnNameException(OctoObjectId archiveRtId, string columnName)
+        : base(
+            $"Archive {Describe(archiveRtId)}: the column name '{columnName}' is reserved. Every rollup reports " +
+            $"'{ArchiveRowOriginFields.ManualCount}' and '{ArchiveRowOriginFields.LastManualAt}' as platform columns; " +
+            "choose another name (for an aggregation: TargetColumnName).",
+            archiveRtId)
+    {
+        ColumnName = columnName;
     }
 }
 

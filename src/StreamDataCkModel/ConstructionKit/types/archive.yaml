@@ -15,6 +15,9 @@ types:
       - id: ${this}/Archive.RawRetentionMs
         name: RawRetentionMs
         isOptional: true
+      - id: ${this}/Archive.FirstActivatedAt
+        name: FirstActivatedAt
+        isOptional: true
       - id: ${this}/Archive.MaxRetroactiveReachMs
         name: MaxRetroactiveReachMs
         isOptional: true

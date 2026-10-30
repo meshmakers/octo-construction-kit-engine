@@ -72,7 +72,7 @@ Subtype of `CkArchive`. `CkArchive` must lose `isFinal: true` to allow this.
 
 | Attribute | Type | Notes |
 |---|---|---|
-| `Sources` | `RecordArray<CkRollupSourceReference>` | The source archives this rollup aggregates from (raw, time-range or themselves rollups), each with an optional half-open validity span `[ValidFrom, ValidTo)`. At least one entry required. Immutable after `Activated` (documented, not enforced). See [concept-multi-source-rollups.md](concept-multi-source-rollups.md) §2. |
+| `Sources` | `RecordArray<CkRollupSourceReference>` | The source archives this rollup aggregates from (raw, time-range or themselves rollups), each with an optional half-open validity span `[ValidFrom, ValidTo)`. At least one entry required. Immutable after `Activated`, enforced by `ArchiveDefinitionGuard` (see §10). See [concept-multi-source-rollups.md](concept-multi-source-rollups.md) §2. |
 | `SourceArchiveRtId` | `OctoObjectId?` | **Deprecated since 1.8.0**, optional. A set value is normalised into one unbounded `Sources` entry on read; the platform never writes it. |
 | `BucketSize` | `Duration` | Bucket width, e.g. `PT1M`, `PT1H`, `P1D`. Must be a positive interval supported by CrateDB's `date_trunc` or `date_bin`. Immutable after `Activated`. |
 | `WatermarkLag` | `Duration` | How far behind real-time the orchestrator stays to absorb late inserts. Default `PT5M`. Mutable. |
@@ -292,7 +292,7 @@ A new query `rollupsFor(archiveRtId): [RollupArchiveInfo]` returns the rollups a
 | Save `CkRollupArchive` (any state) | At least one source; no duplicate source; spans non-empty, pairwise disjoint, at most one open start / open end, every boundary on the rollup's bucket grid; no source-graph cycle. | see [concept-multi-source-rollups.md](concept-multi-source-rollups.md) §4 |
 | Save `CkRollupArchive` (any state) | `Aggregations.Count >= 1`. | `RollupAggregationsRequiredException` |
 | Save `CkRollupArchive` (any state) | No duplicate `(SourcePath, Function)` pairs. | `DuplicateRollupAggregationException` |
-| Save `CkRollupArchive` (`Activated`+) | `Sources`, `BucketSize`, `Aggregations` are treated as immutable — **documented, not enforced** (see [concept-multi-source-rollups.md](concept-multi-source-rollups.md) §8: the generic CK mutation can change any attribute the model allows). | `RollupSchemaImmutableException` is reserved for a future guard and is not thrown today. |
+| Save `CkRollupArchive` (`Activated`, or `Disabled` and activated before) through `ImportRt`, a blueprint or the entity API | `Sources`, `BucketSize`, `BucketAlignment`, `ReferenceTimeZone`, `Aggregations` and the target type do not change (`ArchiveDefinitionGuard`, AB#7872). The stream data stores and CK model migrations do not pass this check. | `RollupSchemaImmutableException` |
 | Activate | Every source archive in `Activated`. | `RollupSourceNotActivatedException` |
 | Activate | Each aggregation spec resolves on **every** source: a column the source captures **verbatim** (ingested `Path`, computed `Name`, or a rollup source's physical column name), else — on a rollup source — a child aggregation with the **same function** whose source path normalises to the same physical name (see [concept-multi-source-rollups.md](concept-multi-source-rollups.md) §4 rule 14 / §5; `RollupSourceColumnResolver`). | `RollupSourcePathMissingException` |
 | Source cycle (rollup-of-self) | Graph check at save. | `RollupCycleException` |

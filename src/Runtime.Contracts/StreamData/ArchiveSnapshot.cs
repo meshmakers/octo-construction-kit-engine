@@ -113,7 +113,15 @@ public enum ConflictKeyOrder
     /// where 1 is measured and 3 is estimated and a measurement must never be displaced by an
     /// estimate.
     /// </summary>
-    LowerWins = 1
+    LowerWins = 1,
+
+    /// <summary>
+    /// Only valid on the reserved key <see cref="ArchiveConflictKey.OriginKey" />: the archive opts out of
+    /// ranking by origin, so a manual value has no priority and the remaining keys (or the last write)
+    /// decide between every pair of writes. Without it, raw and time-range archives always rank by
+    /// origin first (AB#7656).
+    /// </summary>
+    Ignore = 2
 }
 
 /// <summary>
@@ -125,7 +133,33 @@ public enum ConflictKeyOrder
 /// layer maps it onto the physical column name.
 /// </param>
 /// <param name="Order">Which direction of the column counts as better.</param>
-public sealed record ArchiveConflictKey(string Column, ConflictKeyOrder Order);
+public sealed record ArchiveConflictKey(string Column, ConflictKeyOrder Order)
+{
+    /// <summary>
+    /// Reserved <see cref="Column" /> that ranks by the row's <see cref="ArchiveRowOrigin" /> instead of
+    /// a user column. The <c>$</c> prefix cannot occur in an attribute path, so it never collides with a
+    /// declared column.
+    /// </summary>
+    /// <remarks>
+    /// Raw and time-range archives rank by this key first even when it is not declared (AB#7656): it is
+    /// prepended to the configured keys, and an archive without keys ranks by origin alone. Declared
+    /// explicitly, it applies at the position the author gave it: <see cref="ConflictKeyOrder.HigherWins" />
+    /// (manual ranks above automated) or <see cref="ConflictKeyOrder.Ignore" /> (the archive opts out of
+    /// ranking by origin); <see cref="ConflictKeyOrder.LowerWins" /> is refused. Unlike a column key it does
+    /// not fall through to the next key when both writes are manual:
+    /// <list type="bullet">
+    /// <item>incoming manual, stored automated: the incoming write wins;</item>
+    /// <item>incoming automated, stored manual: the stored value stays — a manual value is permanent;</item>
+    /// <item>both manual: the later write wins, whatever the following keys say, so a wrong manual value
+    /// is fixed with another manual write;</item>
+    /// <item>both automated: the following keys decide, exactly as without this key.</item>
+    /// </list>
+    /// </remarks>
+    public const string OriginKey = "$Origin";
+
+    /// <summary>True when this key ranks by origin (<see cref="OriginKey" />) rather than by a column.</summary>
+    public bool IsOrigin => string.Equals(Column, OriginKey, System.StringComparison.OrdinalIgnoreCase);
+}
 
 /// <summary>
 /// Minimal projection of a <c>CkArchive.columns[]</c> entry — enough for the data-store provider

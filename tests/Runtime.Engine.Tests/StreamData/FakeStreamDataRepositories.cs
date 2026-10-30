@@ -38,12 +38,12 @@ internal class StreamDataRepositoryStub : IStreamDataRepository
     public Task BackfillComputedColumnAsync(ArchiveSnapshot snapshot, string columnName,
         CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-    public Task InsertAsync(OctoObjectId archiveRtId, StreamDataPoint datapoint) => throw new NotSupportedException();
+    public Task<StreamDataWriteResult> InsertAsync(OctoObjectId archiveRtId, StreamDataPoint datapoint) => throw new NotSupportedException();
 
-    public Task InsertAsync(OctoObjectId archiveRtId, IEnumerable<StreamDataPoint> datapoints) =>
+    public Task<StreamDataWriteResult> InsertAsync(OctoObjectId archiveRtId, IEnumerable<StreamDataPoint> datapoints) =>
         throw new NotSupportedException();
 
-    public Task InsertTimeRangeAsync(OctoObjectId archiveRtId, IEnumerable<TimeRangeStreamDataPoint> datapoints,
+    public Task<StreamDataWriteResult> InsertTimeRangeAsync(OctoObjectId archiveRtId, IEnumerable<TimeRangeStreamDataPoint> datapoints,
         CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
     public Task<StreamDataQueryResult> ExecuteQueryAsync(OctoObjectId archiveRtId, StreamDataQueryOptions options) =>
@@ -67,6 +67,9 @@ internal class StreamDataRepositoryStub : IStreamDataRepository
     public Task<int> AggregateBucketAsync(ArchiveSnapshot sourceArchive, RollupArchiveSnapshot rollup,
         DateTime bucketStart, DateTime bucketEnd, CancellationToken cancellationToken) =>
         throw new NotSupportedException();
+
+    public Task EnsureRollupPlatformColumnsAsync(OctoObjectId rollupRtId, CancellationToken cancellationToken) =>
+        Task.CompletedTask;
 
     public Task ClearRecomputeGenerationsAsync(OctoObjectId rollupRtId, DateTime fromBucketEnd,
         CancellationToken cancellationToken = default) => throw new NotSupportedException();

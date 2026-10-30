@@ -2,20 +2,20 @@
 attributes:
   # ---------- RollupArchive -----------------------------------------------------------------
   - id: RollupArchive.SourceArchiveRtId
-    description: "Runtime id of the source Archive this rollup aggregates from. May reference another RollupArchive to form a chain (e.g. raw → 1 min → 1 h). Immutable after the rollup is activated. DEPRECATED since 1.8.0: declare sources via Sources; a set value is normalised into one unbounded source when Sources is empty; the platform never writes it."
+    description: "Runtime id of the source Archive this rollup aggregates from. May reference another RollupArchive to form a chain (e.g. raw → 1 min → 1 h). Refused on an activated rollup (AB#7872): a change needs a new rollup. DEPRECATED since 1.8.0: declare sources via Sources; a set value is normalised into one unbounded source when Sources is empty; the platform never writes it."
     valueType: String
     ownership: SeedOwned
   - id: RollupArchive.Sources
-    description: "Source archives this rollup aggregates from, each with an optional validity span (AB#5157). The default way to declare sources since 1.8.0 and the successor of the deprecated SourceArchiveRtId. A non-empty list wins over SourceArchiveRtId; spans must be pairwise disjoint (abutting spans are disjoint, intervals are half-open), at most one entry may have an open start and at most one an open end, and every boundary must lie on a bucket boundary of the rollup in its reference time zone. All sources must target the same CK type. Immutable after the rollup is activated."
+    description: "Source archives this rollup aggregates from, each with an optional validity span (AB#5157). The default way to declare sources since 1.8.0 and the successor of the deprecated SourceArchiveRtId. A non-empty list wins over SourceArchiveRtId; spans must be pairwise disjoint (abutting spans are disjoint, intervals are half-open), at most one entry may have an open start and at most one an open end, and every boundary must lie on a bucket boundary of the rollup in its reference time zone. All sources must target the same CK type. A change is refused on an activated rollup (AB#7872): it needs a new rollup."
     valueType: RecordArray
     valueCkRecordId: ${this}/CkRollupSourceReference
     ownership: SeedOwned
   - id: RollupArchive.BucketSizeMs
-    description: "Width of the aggregation bucket in milliseconds. Each output row covers the half-open interval [bucketEnd - BucketSizeMs, bucketEnd). Must be positive and a multiple of the source rollup's bucket size when chaining. Immutable after activation. Int64 (AB#4281): calendar-month (2,419,200,000) and calendar-year (31,536,000,000) bucket widths exceed Int32.MaxValue (≈24.85 days), so the value type is 64-bit."
+    description: "Width of the aggregation bucket in milliseconds. Each output row covers the half-open interval [bucketEnd - BucketSizeMs, bucketEnd). Must be positive and a multiple of the source rollup's bucket size when chaining. A change is refused on an activated rollup (AB#7872): it needs a new rollup. Int64 (AB#4281): calendar-month (2,419,200,000) and calendar-year (31,536,000,000) bucket widths exceed Int32.MaxValue (≈24.85 days), so the value type is 64-bit."
     valueType: Int64
     ownership: SeedOwned
   - id: RollupArchive.WatermarkLagMs
-    description: "Lower bound on how far behind real-time the orchestrator stays before closing a bucket, in milliseconds. Absorbs late-arriving source inserts. Default 300000 (five minutes). Mutable. Int64 (AB#4281) for consistency with BucketSizeMs — a lag can legitimately be sized against a calendar bucket."
+    description: "Lower bound on how far behind real-time the orchestrator stays before closing a bucket, in milliseconds. Absorbs late-arriving source inserts. Default 300000 (five minutes). Can be changed on an activated rollup. Int64 (AB#4281) for consistency with BucketSizeMs — a lag can legitimately be sized against a calendar bucket."
     valueType: Int64
     ownership: SeedOwned
     defaultValues:
@@ -25,7 +25,7 @@ attributes:
     valueType: DateTime
     isRuntimeState: true
   - id: RollupArchive.Aggregations
-    description: "List of aggregation definitions. At least one entry is required at activation time. Immutable after activation; schema changes require creating a new rollup."
+    description: "List of aggregation definitions. At least one entry is required at activation time. A change is refused on an activated rollup (AB#7872): it needs a new rollup."
     valueType: RecordArray
     valueCkRecordId: ${this}/CkRollupAggregation
     ownership: SeedOwned
@@ -34,16 +34,28 @@ attributes:
     valueType: DateTime
     isRuntimeState: true
   - id: RollupArchive.BucketAlignment
-    description: "Bucket-boundary alignment. FixedSize (default, key 0) preserves the legacy 'LastAggregatedBucketEnd + BucketSizeMs' arithmetic. Calendar/Iso8601 values align bucket boundaries to wall-clock UTC boundaries so monthly / weekly / yearly rollups become expressible without forcing BucketSizeMs into a single TimeSpan. Pre-1.4.0 entities resolve to FixedSize at read time. Immutable after activation."
+    description: "Bucket-boundary alignment. FixedSize (default, key 0) preserves the legacy 'LastAggregatedBucketEnd + BucketSizeMs' arithmetic. Calendar/Iso8601 values align bucket boundaries to wall-clock UTC boundaries so monthly / weekly / yearly rollups become expressible without forcing BucketSizeMs into a single TimeSpan. Pre-1.4.0 entities resolve to FixedSize at read time. A change is refused on an activated rollup (AB#7872): it needs a new rollup."
     valueType: Enum
     valueCkEnumId: ${this}/BucketAlignment
     ownership: SeedOwned
     defaultValues:
       - 0
   - id: RollupArchive.ReferenceTimeZone
-    description: "Optional IANA time-zone id (e.g. 'Europe/Vienna') used to align calendar bucket boundaries (day / week / month / year) to local wall-clock time so they are DST-correct across countries. Null (the default) keeps UTC calendar boundaries — the pre-1.6.4 behaviour. Only meaningful for calendar BucketAlignment variants; ignored for FixedSize. AB#4290 / decision O6."
+    description: "Optional IANA time-zone id (e.g. 'Europe/Vienna') used to align calendar bucket boundaries (day / week / month / year) to local wall-clock time so they are DST-correct across countries. Null (the default) keeps UTC calendar boundaries — the pre-1.6.4 behaviour. Only meaningful for calendar BucketAlignment variants; ignored for FixedSize. AB#4290 / decision O6. A change is refused on an activated rollup (AB#7872): it needs a new rollup."
     valueType: String
     ownership: SeedOwned
+  - id: RollupArchive.LastRunError
+    description: "Why the last run of the rollup orchestrator failed (AB#7872). Null while the rollup runs. Set by the orchestrator together with LastRunErrorAt and ConsecutiveRunFailures, cleared by the next run that succeeds. The rollup keeps its status and is retried on every tick; a rollup that keeps failing does not advance."
+    valueType: String
+    isRuntimeState: true
+  - id: RollupArchive.LastRunErrorAt
+    description: "When the last failed run of the rollup orchestrator ended (AB#7872). Null while the rollup runs."
+    valueType: DateTime
+    isRuntimeState: true
+  - id: RollupArchive.ConsecutiveRunFailures
+    description: "Number of failed runs of the rollup orchestrator in a row (AB#7872). Null or 0 while the rollup runs."
+    valueType: Int
+    isRuntimeState: true
   - id: RollupArchive.CarryLookbackMs
     description: "How far before a bucket's start the TimeWeightedAvg carry-in scan (last observation carried forward) looks for the opening state, in milliseconds. Bounds the per-bucket source scan; a signal silent for longer than this loses its carry and the bucket becomes partially covered. Null (the default) uses the engine default of 35 days. Only consulted by TimeWeightedAvg aggregations; ignored otherwise. Mutable. AB#4336 / decision D1."
     valueType: Int64

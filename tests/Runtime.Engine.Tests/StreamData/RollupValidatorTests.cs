@@ -943,4 +943,31 @@ public class RollupValidatorTests
             () => RollupValidator.ValidateForActivation(rollup, new[] { hourly with { Rollup = null } }));
         Assert.Equal(SecondSourceRt, ex.SourceArchiveRtId);
     }
+
+    // ---- AB#7727: the platform columns of every rollup ----
+
+    [Theory]
+    [InlineData("Voltage", CkRollupFunction.Sum, "manual_count")]
+    [InlineData("Voltage", CkRollupFunction.Max, "LAST_MANUAL_AT")]
+    [InlineData("Manual", CkRollupFunction.Count, null)]          // generated: manual_count
+    [InlineData("Voltage", CkRollupFunction.Avg, "manual")]       // generated pair: manual_sum, manual_count
+    public void ValidateForSave_AColumnWithAReservedName_IsRefused(string path, CkRollupFunction function, string? target)
+    {
+        var rollup = Rollup(aggregations: new[] { new CkRollupAggregationSpec(path, function, target) });
+
+        var ex = Assert.Throws<ArchiveReservedColumnNameException>(() => RollupValidator.ValidateForSave(rollup));
+
+        Assert.Contains("is reserved", ex.Message);
+        Assert.True(ArchiveRowOriginFields.IsRollupField(ex.ColumnName));
+    }
+
+    [Fact]
+    public void ValidateForActivation_OriginFieldsCannotBeAggregatedByAConfiguration()
+    {
+        // They are reported by the platform on every rollup; a definition has no business naming them.
+        var rollup = Rollup(aggregations: new[] { new CkRollupAggregationSpec("manual_written_at", CkRollupFunction.Count, "corrections") });
+
+        Assert.Throws<RollupSourcePathMissingException>(
+            () => RollupValidator.ValidateForActivation(rollup, Activation(rollup, Source(paths: "voltage"))));
+    }
 }

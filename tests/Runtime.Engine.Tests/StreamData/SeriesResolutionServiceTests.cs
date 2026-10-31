@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using FakeItEasy;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.StreamData;
 using Meshmakers.Octo.Runtime.Engine.StreamData;
 using Xunit;
@@ -270,6 +271,69 @@ public class SeriesResolutionServiceTests
 
         Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
         Assert.Equal(daily.RtId, result.ArchiveRtId);
+    }
+
+    // ---- AB#7920: Integral is resolved on the ladder like TimeWeightedAverage ----
+
+    [Fact]
+    public async Task IntegralQuery_RoutesToTheTwaRollup_NotToAnAvgRollupOfTheSamePath()
+    {
+        // Hourly stores a sample AVG, daily a TWA of the same path: only the TWA rung holds an
+        // integral, so it is chosen for Integral although both are fine enough for the year window.
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        var hourlyAvg = Rollup(baseArchive.RtId, TimeSpan.FromHours(1), CkRollupFunction.Avg, "ActivePower");
+        var dailyTwa = Rollup(baseArchive.RtId, TimeSpan.FromDays(1), CkRollupFunction.TimeWeightedAvg, "ActivePower");
+        StubRollups(baseArchive.RtId, hourlyAvg, dailyTwa);
+
+        var request = SeriesResolutionRequest.ForQueryFunction(
+            baseArchive.RtId, YearFrom, YearTo, 300, AggregationFunction.Integral, "ActivePower");
+        var result = await NewSut().ResolveAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(CkRollupFunction.TimeWeightedAvg, request.RequiredAggregation);
+        Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
+        Assert.Equal(dailyTwa.RtId, result.ArchiveRtId);
+    }
+
+    [Fact]
+    public async Task IntegralQuery_WithOnlyAnAvgRollup_FallsBackToTheBaseArchive()
+    {
+        // A day at 15-min base grain is 96 points, under the target: the base answers, the AVG
+        // rollup is never a source for Integral.
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        StubRollups(baseArchive.RtId, Rollup(baseArchive.RtId, TimeSpan.FromHours(1), CkRollupFunction.Avg, "ActivePower"));
+
+        var request = SeriesResolutionRequest.ForQueryFunction(
+            baseArchive.RtId, DayFrom, DayTo, 300, AggregationFunction.Integral, "ActivePower");
+        var result = await NewSut().ResolveAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(baseArchive.RtId, result.ArchiveRtId);
+    }
+
+    [Fact]
+    public async Task IntegralQuery_MatchesACascadeTwaRung_LikeTimeWeightedAverage()
+    {
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        var hourly = Rollup(baseArchive.RtId, TimeSpan.FromHours(1), CkRollupFunction.TimeWeightedAvg, "ActivePower");
+        var daily = new RollupArchiveSnapshot(
+            OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, new[] { new RollupSourceReference(hourly.RtId) },
+            TimeSpan.FromDays(1), TimeSpan.FromMinutes(5), null,
+            new[]
+            {
+                new CkRollupAggregationSpec("activepower_twavg_integral", CkRollupFunction.Sum, "activepower_twavg_integral"),
+                new CkRollupAggregationSpec("activepower_twavg_duration", CkRollupFunction.Sum, "activepower_twavg_duration"),
+            }, null);
+        StubRollups(baseArchive.RtId, hourly, daily);
+
+        var integral = await NewSut().ResolveAsync(SeriesResolutionRequest.ForQueryFunction(
+            baseArchive.RtId, YearFrom, YearTo, 300, AggregationFunction.Integral, "ActivePower"), TestContext.Current.CancellationToken);
+        var twa = await NewSut().ResolveAsync(SeriesResolutionRequest.ForQueryFunction(
+            baseArchive.RtId, YearFrom, YearTo, 300, AggregationFunction.TimeWeightedAverage, "ActivePower"), TestContext.Current.CancellationToken);
+
+        Assert.Equal(daily.RtId, integral.ArchiveRtId);
+        Assert.Equal(twa.ArchiveRtId, integral.ArchiveRtId);
     }
 
     [Fact]

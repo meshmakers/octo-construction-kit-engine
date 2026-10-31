@@ -8,7 +8,8 @@ AB#4290 Phase-1 limitation). Live-validated on the energyiq `LuminaireArchive`: 
 aggregation and recompute reproduce a hand-computed interval sum bit-identically; the grouped
 query returns the recombined duty cycle. Open: CrateDB integration tests in CI, Studio UI,
 TWA in downsampling bins, linear interpolation. Fourth increment (AB#7918): `Integral` (energy over the
-query window, value × hours, step/LOCF) over raw archives — §6.5; rollup support AB#7920.
+query window, value × hours, step/LOCF) over raw archives — §6.5. Fifth increment (AB#7920): `Integral`
+over rollups that materialise a TimeWeightedAvg — §6.5 "Rollups", read from the stored integral.
 **Work item:** **AB#4336** (Stream data: time-weighted state-duration aggregation for event-based archives).
 **Related:**
 - [`concept-rollup-archives.md`](concept-rollup-archives.md) — the rollup orchestrator + SQL-per-bucket model this concept extends; the AVG `_sum`/`_count` two-column materialisation is the precedent for the new integral/duration pair.
@@ -259,6 +260,8 @@ Because the carry is a pure function of source rows (§5.3 A), no new mechanics 
 | target function | source spec | SQL |
 |---|---|---|
 | `TimeWeightedAvg` over `TimeWeightedAvg` | `SUM(_integral) / NULLIF(SUM(_duration), 0)` — alias `{path}_twavg` |
+| `Integral` over `TimeWeightedAvg` (AB#7920) | `SUM(_integral) / 3600000.0` — alias `{path}_integral`, value × hours |
+| `Integral` over `Avg` / `Sum` / anything else | not resolvable → structured error naming the missing TimeWeightedAvg |
 | `Sum` over `TimeWeightedAvg` | not resolvable (integral is value·ms, not a value sum) → null |
 | others over `TimeWeightedAvg` | null (information discarded) |
 
@@ -283,6 +286,15 @@ No change needed: since the AB#4336 matching fix, `SeriesResolutionService` repo
 functions of a source path (`ResolutionRung.StoredFunctionsForSeries`), so a widget requesting
 `requiredAggregation = TimeWeightedAvg` matches a TWA (or AVG+TWA multi-aggregation) rollup
 automatically.
+
+**Integral (AB#7920).** `requiredAggregation` is a stored rollup function, and Integral is not one: it
+is read from the integral half of a TWA pair. `RollupQueryFunction.RequiredStoredFunction` maps a query
+function to the stored function a rung must carry (Integral → `TimeWeightedAvg`, every other function →
+itself), and `SeriesResolutionRequest.ForQueryFunction(..., AggregationFunction.Integral, path)` builds
+the request with it. Integral is therefore routed to exactly the rungs a TimeWeightedAverage query uses
+and never to an AVG/SUM rung of the same path; with no such rung it falls back to the base archive. The
+caller still runs Integral on the chosen archive. Conservative on purpose: a cascade rung that summed only
+the integral half (no duration) could answer Integral but stays excluded, as for TWA.
 
 ### §6.4 Frontend
 
@@ -321,7 +333,25 @@ Semantics (normative, decided on AB#7880/AB#7918):
 | Only NULL values | Rows (and carry) exist but none carries a value: `null` — no measured energy is not zero energy. As soon as one interval has a value, the NULL intervals count 0. |
 | `from` / `to` | Both required; a missing one is `StreamDataException.InvalidQueryParameters` (structured 400). |
 | Plain columns | Ride along in the same statement and still exclude the carry row. |
-| Archive kinds | Raw (event-based) archives only. Rollup and time-range archives are refused with `InvalidQueryParameters`; rollup support (re-aggregating the stored `_integral` of a TimeWeightedAvg rollup) is AB#7920. |
+| Archive kinds | Raw (event-based) archives (query-time LOCF) and rollups with a TimeWeightedAvg aggregation on the column (AB#7920, below). Time-range archives are refused with a structured error. |
+
+**Rollups (AB#7920).** A TimeWeightedAvg rollup already stores `{base}_integral` (Σ value × Δt in
+value·ms) per bucket, computed by the same LOCF rule (carry-in per bucket, last interval capped at the
+bucket end). Integral over the rollup is `SUM(_integral) / 3600000.0` — no new materialisation, no rollup
+schema change; for a cascade (rollup on rollup) the SUM-chained integral column is read the same way
+(`RollupQueryAggregationResolver`, `RollupChainAggregationResolver`). Over bucket-aligned windows the
+result equals the raw Integral of the same rows (integration test with the recorded meter rows). It
+works in aggregation, grouped and downsampling queries (one integral per bin — daily kWh from an hourly
+rollup).
+
+| Case | Rollup result |
+|---|---|
+| Window aligned to the bucket grain | Equals the raw Integral of the same source rows. |
+| **Unaligned window (edge buckets)** | Every bucket that **overlaps** `[from, to)` is read **in full** — the rule of every rollup aggregation (`window_start < to AND window_end > from`). `[10:07, 11:00)` on a 5-minute rollup answers `[10:05, 11:00)`. Align the window to the grain, or query the raw archive (or a finer rollup) for exact edges. |
+| Window without buckets | `null`, as on the raw archive (SUM over no rows). |
+| Open (current) bucket | Read as far as the open-bucket refresh has aggregated it (AB#4306); a bucket not yet aggregated contributes nothing. |
+| Column without a TimeWeightedAvg in the rollup (only AVG, SUM, …) | Refused with a structured error that names the missing TimeWeightedAvg — a sample average has no time weighting. |
+| Downsampling over a raw archive | Refused with a structured error (no per-bin LOCF); use an aggregation query per window or a TWA rollup. |
 
 **Sign split — use a computed column, never a field filter.** Field filters select the event set
 the LOCF weighting runs over (§6.2). A filter `ActivePower > 0` would therefore carry the last
@@ -340,7 +370,9 @@ archive computed column (AB#4189, mXparser) and integrate that column:
 0.9297 kWh against the `ImportedEnergy` register delta of 0.924 kWh (+0.6 %, within 1 %); the old
 board formula `SUM(kW) × 10/3600` over the same rows gives 1.862 kWh (+101 %). A fresh 47.6-min window bounded by two register reads (2026-10-30 18:44:01Z–19:31:39Z, 571 rows, register delta
 0.197 kWh) integrates to 0.1976 kWh (+0.3 %). Integration test
-`StreamDataIntegralIntegrationTests` in `octo-construction-kit-engine-mongodb`.
+`StreamDataIntegralIntegrationTests` in `octo-construction-kit-engine-mongodb`; the rollup path
+(5-minute TWA rollup and an hourly rollup over it, aligned and unaligned windows, grouped, downsampling,
+the recorded meter rows) in `StreamDataRollupIntegralIntegrationTests`.
 
 ## §7 Acceptance (from AB#4336)
 
@@ -428,6 +460,7 @@ CLR types swapped (`long?`/`int?`) — corrected, first surfaced by `CarryLookba
 | **Query surface StateDuration** (`AggregationTypes.StateDuration` = 6, `AggregationQueryColumn.ComparisonValue`) | SystemCkModel 2.2.1 → **2.2.2**; `AggregationColumn.ComparisonValue`; SDK `AggregationTypesDto.StateDuration` (=7); `StreamDataQueryColumnInput.comparisonValue`; raw + rollup grouped/aggregation queries; wire suffix `_stateduration` |
 | **Direct raw TWA/StateDuration query** (§6.2) | `TimeWeightedQuerySqlBuilder` (`TwaColumn`/`StateColumn`/`PlainColumn`, field-filter pass-through) + `ExecuteRawTimeWeightedAggregationAsync` |
 | **Integral** (AB#7918, §6.5) | SystemCkModel 2.7.0 → **2.8.0** (`AggregationTypes.Integral` = 7, additive); `AggregationFunction.Integral` = 7; SDK `AggregationTypesDto.Integral` = 8; `TimeWeightedQuerySqlBuilder.IntegralColumn` + routing in `CrateDbStreamDataRepository` (raw only, windowed refused); tests `TimeWeightedQuerySqlBuilderTests`, `StreamDataIntegralIntegrationTests` (Testcontainer CrateDB, Fusch meter fixture) |
+| **Integral over rollups** (AB#7920, §6.5) | `RollupQueryAggregationResolver` / `RollupChainAggregationResolver` (`SUM(_integral)/3600000.0`, TWA numerator only); `CrateDbStreamDataRepository` (`RejectUnresolvedRollupIntegral`, `RejectIntegralOnTimeRangeArchive`, `RejectIntegralDownsamplingWithoutRollup`); series routing `RollupQueryFunction.RequiredStoredFunction` + `SeriesResolutionRequest.ForQueryFunction`; tests `RollupQueryAggregationResolverTests`, `RollupChainAggregationResolverTests`, `CrateDbStreamDataIntegralRoutingTests`, `StreamDataRollupIntegralIntegrationTests`, `RollupQueryFunctionTests`, `SeriesResolutionServiceTests`, `RollupLadderFunctionResolverTests` |
 | **Cascade series matching** | `RollupLadderFunctionResolver` (DB-neutral chain walk; incomplete pair excluded) |
 | Bar-chart `valueScale` (ms → h etc.) | `octo-frontend-libraries` bar-chart widget config |
 | Unit tests | `RollupColumnGeneratorTests` (engine); `RollupAggregationSqlBuilderTests`, `RollupColumnTypeResolverTests`, `RollupQueryAggregationResolverTests`, `RollupChainAggregationResolverTests`, `TimeWeightedQuerySqlBuilderTests` (mongodb) |

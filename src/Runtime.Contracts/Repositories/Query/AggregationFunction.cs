@@ -46,8 +46,9 @@ public enum AggregationFunction
     /// back (engine default lookback), an older row is not carried. Several rtIds in scope are summed.
     /// An empty window (no row in the window and no carry-in row) yields <c>null</c>, and so does a
     /// window whose rows all carry no value (only NULL observations: no measured energy, not zero). Requires both
-    /// <c>from</c> and <c>to</c>. Served over raw event archives at query time; rollup support is
-    /// AB#7920. AB#7918.
+    /// <c>from</c> and <c>to</c>. Served over raw event archives at query time (AB#7918) and over
+    /// rollup archives that materialise a <c>TimeWeightedAvg</c> aggregation on the column, read as
+    /// the sum of the stored per-bucket integrals over the buckets that overlap the window (AB#7920).
     /// </summary>
     Integral = 7
 }

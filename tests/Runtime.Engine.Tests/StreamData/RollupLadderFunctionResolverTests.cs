@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.StreamData;
 using Meshmakers.Octo.Runtime.Engine.StreamData;
 using Xunit;
@@ -344,5 +345,36 @@ public class RollupLadderFunctionResolverTests
             ladder[^1], BaseRt, Path, Ladder(ladder.ToArray()));
 
         Assert.Equal(new[] { CkRollupFunction.Sum }, functions.ToArray());
+    }
+    // ---- AB#7920: Integral is resolvable on the ladder like TimeWeightedAverage ----
+
+    [Theory]
+    [InlineData(CkRollupFunction.TimeWeightedAvg, true)]
+    [InlineData(CkRollupFunction.Avg, false)]
+    [InlineData(CkRollupFunction.Sum, false)]
+    public void IntegralIsServed_ExactlyByARungThatStoresTimeWeightedAvg(CkRollupFunction stored, bool serves)
+    {
+        var rollup = Rollup(OctoObjectId.GenerateNewId(), From(BaseRt), new CkRollupAggregationSpec(Path, stored, null));
+
+        var functions = RollupLadderFunctionResolver.StoredFunctionsFor(rollup, BaseRt, Path, Ladder(rollup));
+
+        Assert.Equal(serves, functions.Contains(RollupQueryFunction.RequiredStoredFunction(AggregationFunction.Integral)));
+        Assert.Equal(
+            functions.Contains(RollupQueryFunction.RequiredStoredFunction(AggregationFunction.TimeWeightedAverage)),
+            functions.Contains(RollupQueryFunction.RequiredStoredFunction(AggregationFunction.Integral)));
+    }
+
+    [Fact]
+    public void IntegralIsServed_ByACascadeRungThatSumsTheTwaPair()
+    {
+        var hourly = Rollup(OctoObjectId.GenerateNewId(), From(BaseRt),
+            new CkRollupAggregationSpec(Path, CkRollupFunction.TimeWeightedAvg, null));
+        var daily = Rollup(OctoObjectId.GenerateNewId(), From(hourly.RtId),
+            new CkRollupAggregationSpec("dimminglevel_twavg_integral", CkRollupFunction.Sum, "dimminglevel_twavg_integral"),
+            new CkRollupAggregationSpec("dimminglevel_twavg_duration", CkRollupFunction.Sum, "dimminglevel_twavg_duration"));
+
+        var functions = RollupLadderFunctionResolver.StoredFunctionsFor(daily, BaseRt, Path, Ladder(hourly, daily));
+
+        Assert.Contains(RollupQueryFunction.RequiredStoredFunction(AggregationFunction.Integral), functions);
     }
 }

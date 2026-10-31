@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 
 namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 
@@ -66,4 +67,26 @@ public sealed record SeriesResolutionRequest(
     /// (AB#4190, decision T2). Defaults to <see cref="SeriesComparisonPolicy.PerQuery"/>.
     /// </summary>
     public SeriesComparisonPolicy ComparisonPolicy { get; init; } = SeriesComparisonPolicy.PerQuery;
+
+    /// <summary>
+    /// Builds a request for the aggregation function the caller will run on the chosen archive. The
+    /// stored rollup function a rung must carry is derived with
+    /// <see cref="RollupQueryFunction.RequiredStoredFunction"/> — for
+    /// <see cref="AggregationFunction.Integral"/> that is <see cref="CkRollupFunction.TimeWeightedAvg"/>,
+    /// so Integral is routed to exactly the rungs a TimeWeightedAverage query would use (AB#7920). Without
+    /// such a rung the base archive is handled as for any other function: chosen when it fits the target
+    /// points, otherwise named with a refusal signal (<see cref="SeriesResolutionSignal.NoSuitableRollup"/>,
+    /// or <see cref="SeriesResolutionSignal.UnknownBaseGrain"/> when its grain is undeclared). The result's
+    /// reducer names the stored function; the caller still runs <paramref name="queryFunction"/> against
+    /// the chosen archive.
+    /// </summary>
+    public static SeriesResolutionRequest ForQueryFunction(
+        OctoObjectId baseArchiveRtId,
+        DateTime from,
+        DateTime to,
+        int targetPoints,
+        AggregationFunction queryFunction,
+        string sourcePath) =>
+        new(baseArchiveRtId, TargetCkTypeId: null, from, to, targetPoints,
+            RollupQueryFunction.RequiredStoredFunction(queryFunction), sourcePath);
 }

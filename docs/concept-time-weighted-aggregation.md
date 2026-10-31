@@ -257,8 +257,8 @@ Because the carry is a pure function of source rows (§5.3 A), no new mechanics 
 
 `RollupQueryAggregationResolver` gains:
 
-| target function | source spec | SQL |
-|---|---|---|
+| target function over source spec | SQL |
+|---|---|
 | `TimeWeightedAvg` over `TimeWeightedAvg` | `SUM(_integral) / NULLIF(SUM(_duration), 0)` — alias `{path}_twavg` |
 | `Integral` over `TimeWeightedAvg` (AB#7920) | `SUM(_integral) / 3600000.0` — alias `{path}_integral`, value × hours |
 | `Integral` over `Avg` / `Sum` / anything else | not resolvable → structured error naming the missing TimeWeightedAvg |
@@ -292,7 +292,9 @@ is read from the integral half of a TWA pair. `RollupQueryFunction.RequiredStore
 function to the stored function a rung must carry (Integral → `TimeWeightedAvg`, every other function →
 itself), and `SeriesResolutionRequest.ForQueryFunction(..., AggregationFunction.Integral, path)` builds
 the request with it. Integral is therefore routed to exactly the rungs a TimeWeightedAverage query uses
-and never to an AVG/SUM rung of the same path; with no such rung it falls back to the base archive. The
+and never to an AVG/SUM rung of the same path. With no such rung the planner treats the base archive
+as for any other function: it is chosen when it fits `TargetPoints`, otherwise the result names the base
+with a refusal signal (`NoSuitableRollup`, or `UnknownBaseGrain` when the base grain is undeclared). The
 caller still runs Integral on the chosen archive. Conservative on purpose: a cascade rung that summed only
 the integral half (no duration) could answer Integral but stays excluded, as for TWA.
 

@@ -24,12 +24,16 @@ public class ArchiveLifecycleServiceComputedColumnTests
     private static readonly OctoObjectId Rt = OctoObjectId.GenerateNewId();
     private static readonly RtCkId<CkTypeId> TargetType = new("Test", new CkTypeId("EnergyMeter"));
 
-    private readonly IArchiveRuntimeStore _store = A.Fake<IArchiveRuntimeStore>();
+    // A stateful store behind the fake (AB#8002): the backfill job re-reads the archive the lifecycle
+    // wrote, and the fake still records the calls for the order assertions.
+    private readonly InMemoryArchiveRuntimeStore _inner = new();
+    private readonly IArchiveRuntimeStore _store;
     private readonly IStreamDataRepository _repo = A.Fake<IStreamDataRepository>();
     private readonly IArchiveAuditTrail _audit = A.Fake<IArchiveAuditTrail>();
 
     public ArchiveLifecycleServiceComputedColumnTests()
     {
+        _store = A.Fake<IArchiveRuntimeStore>(o => o.Wrapping(_inner));
         // These tests are about the orchestration, not the logical→physical rewrite (AB#4779), and
         // their formulas are already physical. Model the real contract's identity case: a formula
         // that names no logical column comes back unchanged. Without this the fake would hand back a
@@ -54,8 +58,7 @@ public class ArchiveLifecycleServiceComputedColumnTests
         };
 
     private void Stub(CkArchiveStatus status, params CkArchiveColumnSpec[] columns) =>
-        A.CallTo(() => _store.GetAsync(Rt))
-            .Returns(new ArchiveSnapshot(Rt, TargetType, status, "energy", columns));
+        _inner.Put(new ArchiveSnapshot(Rt, TargetType, status, "energy", columns));
 
     [Fact]
     public async Task Add_ToActiveArchive_RunsValidateAddBackfillThenFlipsActive_InOrder()
@@ -80,7 +83,7 @@ public class ArchiveLifecycleServiceComputedColumnTests
                 .MustHaveHappenedOnceExactly())
             .Then(A.CallTo(() => _store.SetComputedColumnStateAsync(Rt, "powerFactor", ComputedColumnState.Backfilling))
                 .MustHaveHappenedOnceExactly())
-            .Then(A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "powerFactor", A<CancellationToken>._))
+            .Then(A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "powerFactor", A<IProgress<long>?>._, A<CancellationToken>._))
                 .MustHaveHappenedOnceExactly())
             .Then(A.CallTo(() => _store.SetComputedColumnStateAsync(Rt, "powerFactor", ComputedColumnState.Active))
                 .MustHaveHappenedOnceExactly());
@@ -93,7 +96,7 @@ public class ArchiveLifecycleServiceComputedColumnTests
     public async Task Add_BackfillFails_MarksColumnFailed_AndRethrows()
     {
         Stub(CkArchiveStatus.Activated);
-        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "powerFactor", A<CancellationToken>._))
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "powerFactor", A<IProgress<long>?>._, A<CancellationToken>._))
             .Throws(new InvalidOperationException("crate down"));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -182,7 +185,7 @@ public class ArchiveLifecycleServiceComputedColumnTests
                 .MustHaveHappenedOnceExactly())
             .Then(A.CallTo(() => _store.SetPendingFormulaAsync(Rt, "powerFactor", NewFormula))
                 .MustHaveHappenedOnceExactly())
-            .Then(A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "powerFactor", A<CancellationToken>._))
+            .Then(A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "powerFactor", A<IProgress<long>?>._, A<CancellationToken>._))
                 .MustHaveHappenedOnceExactly())
             // version 0 -> 1 swap is the atomic commit.
             .Then(A.CallTo(() => _store.SwapComputedColumnFormulaAsync(Rt, "powerFactor", NewFormula, 1))
@@ -195,7 +198,7 @@ public class ArchiveLifecycleServiceComputedColumnTests
     public async Task UpdateFormula_BackfillFails_ClearsPendingFormula_AndRethrows()
     {
         Stub(CkArchiveStatus.Activated, Comp("powerFactor"));
-        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "powerFactor", A<CancellationToken>._))
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "powerFactor", A<IProgress<long>?>._, A<CancellationToken>._))
             .Throws(new InvalidOperationException("crate down"));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>

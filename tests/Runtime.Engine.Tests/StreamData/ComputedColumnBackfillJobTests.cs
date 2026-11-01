@@ -362,6 +362,39 @@ public class ComputedColumnBackfillJobTests
     }
 
     [Fact]
+    public async Task StaleRun_OfAnAlreadyActiveColumn_FailsOnlyTheJob_AndLeavesTheColumnActive()
+    {
+        // A stale queue entry (another process finished the column meanwhile) must not demote a healthy column.
+        AddColumn(Active("ExportPower"));
+        var runner = new ComputedColumnBackfillRunner(_store, _repo, _jobs, NullLogger.Instance, () => _now);
+        var stale = await runner.CreateJobAsync(_rt, "ExportPower", RecomputeJobState.Pending, RecomputeTrigger.Periodic);
+
+        var ended = await runner.RunAsync(_rt, "ExportPower", stale, rethrowFailure: false, Ct);
+
+        Assert.Equal(ComputedColumnState.Active, _store.Column(_rt, "ExportPower")!.ComputedState);
+        Assert.Equal(RecomputeJobState.Failed, ended!.State);
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<IProgress<long>?>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Drain_SkipsAColumnThatWasStartedElsewhere_AfterTheQueueWasBuilt()
+    {
+        var sut = NewSut();
+        await EnqueueAdd(sut, "ExportPower");
+        var second = await EnqueueAdd(sut, "ImportPower");
+
+        // While ExportPower runs, another process starts ImportPower (Running, fresh heartbeat).
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "ExportPower", A<IProgress<long>?>._, A<CancellationToken>._))
+            .Invokes(() => _jobs.UpdateAsync(second! with { State = RecomputeJobState.Running, StartedAt = _now, LastProgressAt = _now })
+                .GetAwaiter().GetResult());
+
+        Assert.Equal(1, await sut.RunPendingComputedColumnBackfillsAsync(Ct));
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "ImportPower", A<IProgress<long>?>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
     public void JobMarker_TellsABackfillJobFromARollupJob()
     {
         var backfill = RecomputeJobSnapshot.ForComputedColumn(_rt, "ExportPower", RecomputeJobState.Pending, RecomputeTrigger.Manual, _now);

@@ -192,7 +192,22 @@ public sealed class ComputedColumnBackfillRunner
         foreach (var (archiveRtId, column, job) in ordered)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var adopted = job ?? await CreateJobAsync(archiveRtId, column, RecomputeJobState.Pending, RecomputeTrigger.Periodic);
+            // Re-check right before running: the queue was built before the earlier backfills of this
+            // drain ran, so another process (or an inline add) may have started this column meanwhile.
+            var current = await GetActiveJobsAsync(archiveRtId, column);
+            if (current.Any(IsLive))
+            {
+                continue;
+            }
+
+            if (current.Count == 0 && job is not null && !await StillQueuedAsync(archiveRtId, column))
+            {
+                continue; // finished by someone else since the queue was built
+            }
+
+            var adopted = current.Count > 0
+                ? current[0]
+                : await CreateJobAsync(archiveRtId, column, RecomputeJobState.Pending, RecomputeTrigger.Periodic);
             var result = await RunAsync(archiveRtId, column, adopted, rethrowFailure: false, cancellationToken);
             if (result?.State == RecomputeJobState.Completed || (result is null && _jobStore is null))
             {
@@ -234,6 +249,10 @@ public sealed class ComputedColumnBackfillRunner
         using var heartbeatStop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var heartbeat = RunHeartbeatAsync(job, progress, heartbeatStop.Token);
         var formulaChange = false;
+        // Only a run that got as far as writing rows changes the column on failure. A precondition that
+        // fails before (column already Active, removed, archive not activated) must never demote a
+        // healthy column to Failed; it only fails the job.
+        var backfillStarted = false;
 
         try
         {
@@ -256,6 +275,7 @@ public sealed class ComputedColumnBackfillRunner
 
             // The physical column exists: the add (and the retry) provision it before the column is
             // queued, a formula change provisions the pending column before it marks the formula.
+            backfillStarted = true;
             await _repository.BackfillComputedColumnAsync(snapshot, columnName, progress, cancellationToken);
 
             // The column may have been removed or re-formulated while the rows were written.
@@ -320,7 +340,10 @@ public sealed class ComputedColumnBackfillRunner
         catch (Exception ex)
         {
             await StopHeartbeatAsync(heartbeatStop, heartbeat);
-            await RecordColumnFailureAsync(archiveRtId, columnName, formulaChange);
+            if (backfillStarted)
+            {
+                await RecordColumnFailureAsync(archiveRtId, columnName, formulaChange);
+            }
 
             var finishedAt = _clock();
             var reason = $"Backfill of computed column '{columnName}' failed: {ex.Message}";
@@ -355,6 +378,14 @@ public sealed class ComputedColumnBackfillRunner
     /// </summary>
     public static bool NeedsBackfill(CkArchiveColumnSpec column) =>
         column.IsComputed && (column.HasPendingFormula || column.ComputedState == ComputedColumnState.Backfilling);
+
+    private async Task<bool> StillQueuedAsync(OctoObjectId archiveRtId, string columnName)
+    {
+        var snapshot = await _store.GetAsync(archiveRtId);
+        return snapshot is { Status: CkArchiveStatus.Activated }
+               && FindComputed(snapshot, columnName) is { } column
+               && NeedsBackfill(column);
+    }
 
     private async Task RecordColumnFailureAsync(OctoObjectId archiveRtId, string columnName, bool formulaChange)
     {

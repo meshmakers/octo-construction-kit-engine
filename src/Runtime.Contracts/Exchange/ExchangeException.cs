@@ -114,6 +114,28 @@ public class ExchangeException : PersistenceException
         };
     }
 
+    /// <summary>
+    /// AB#8042: a user-initiated import sets an identity-owned User field or an identity association
+    /// (<c>IdentityOwnedWrites</c>), which only the identity service writes. Raised before anything is written; one failure that
+    /// lists every offender with its parameters (rtId, ckTypeId, path).
+    /// </summary>
+    internal static Exception IdentityOwnedWriteRestricted(IReadOnlyList<OperationMessage> offenders)
+    {
+        var first = offenders[0];
+        return new ExchangeException(
+            $"Import rejected [{first.MessageNumber}]: {offenders.Count} value" +
+            (offenders.Count == 1 ? "" : "s") +
+            " cannot be written by a user-initiated import because only the identity service writes them " +
+            "(use the identity REST API or the identity methods). " +
+            $"Nothing was written. {string.Join("; ", offenders.Take(MaxOffendersInMessage).Select(o => o.MessageText))}" +
+            (offenders.Count > MaxOffendersInMessage
+                ? $"; and {offenders.Count - MaxOffendersInMessage} more (see Messages)"
+                : string.Empty), first.MessageNumber)
+        {
+            Messages = offenders
+        };
+    }
+
     internal static Exception AttributeNotFound<TKey>(RtCkId<CkAttributeId> modelAttributeId, string elementType, CkId<TKey> ckId)
         where TKey : IComparable<TKey>, ICkElementId
     {

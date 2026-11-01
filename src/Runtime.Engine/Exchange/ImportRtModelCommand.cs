@@ -220,6 +220,7 @@ internal class ImportRtModelCommand(
                         .ConfigureAwait(false);
                     ValidateCkModels(runtimeRepository.TenantId, rtModelRootDto.Dependencies);
                     PreflightAttributeAccess(runtimeRepository.TenantId, rtModelRootDto.Entities);
+                    PreflightIdentityOwnedWrites(runtimeRepository.TenantId, caller, rtModelRootDto.Entities);
                     await PreflightGenericCreateAsync(session, runtimeRepository, caller,
                         rtModelRootDto.Entities.Select(e => (e.CkTypeId, e.RtId))).ConfigureAwait(false);
                     await PreflightBlueprintLockAsync(session, runtimeRepository, importStrategy,
@@ -241,13 +242,20 @@ internal class ImportRtModelCommand(
                     // pass is skipped on tenants without a Hidden or MethodOnly attribute.
                     var checkAttributeAccess =
                         RtAttributeAccessCheck.TenantHasRestrictedAttribute(cacheService, runtimeRepository.TenantId);
-                    if (checkGenericCreate || checkBlueprintLock || checkAttributeAccess)
+                    // AB#8042: identity-owned User fields and identity associations, caller path only.
+                    var checkIdentityOwned = caller != null &&
+                                             RtIdentityOwnedWriteCheck.TenantHasIdentityModel(cacheService,
+                                                 runtimeRepository.TenantId);
+                    if (checkGenericCreate || checkBlueprintLock || checkAttributeAccess || checkIdentityOwned)
                     {
                         var restrictedWrites = new List<RestrictedAttributeWrite>();
+                        var identityOwnedWrites = new List<IdentityOwnedWrite>();
                         var entityIds = await CollectEntityIdsAsync(filePath, cancellationToken,
-                                checkAttributeAccess ? runtimeRepository.TenantId : null, restrictedWrites)
+                                checkAttributeAccess ? runtimeRepository.TenantId : null, restrictedWrites,
+                                checkIdentityOwned ? identityOwnedWrites : null, runtimeRepository.TenantId)
                             .ConfigureAwait(false);
                         ThrowIfAttributeAccessRefused(runtimeRepository.TenantId, restrictedWrites);
+                        ThrowIfIdentityOwnedWritesRefused(runtimeRepository.TenantId, caller, identityOwnedWrites);
                         await PreflightGenericCreateAsync(session, runtimeRepository, caller, entityIds)
                             .ConfigureAwait(false);
                         await PreflightBlueprintLockAsync(session, runtimeRepository, importStrategy, entityIds)
@@ -352,6 +360,39 @@ internal class ImportRtModelCommand(
         ThrowIfAttributeAccessRefused(tenantId, RtAttributeAccessCheck.Find(cacheService, tenantId, entities));
     }
 
+    /// <summary>
+    /// AB#8042: a user-initiated import (caller path only) cannot set an identity-owned User field or an identity association
+    /// (<see cref="IdentityOwnedWrites" />): only the identity service writes them, through its REST API and methods. Runs over
+    /// the whole entity list before the first write and fails the whole file with one <see cref="ExchangeException"/>
+    /// (message 140) that lists every offender. The system path (no caller: blueprint seed, <c>ImportModelAsync</c>,
+    /// <c>ImportTextAsync</c>) is not checked.
+    /// </summary>
+    private void PreflightIdentityOwnedWrites(string tenantId, RtImportCallerContext? caller,
+        IReadOnlyCollection<RtEntityTcDto> entities)
+    {
+        if (caller == null || !RtIdentityOwnedWriteCheck.TenantHasIdentityModel(cacheService, tenantId))
+        {
+            return;
+        }
+
+        ThrowIfIdentityOwnedWritesRefused(tenantId, caller, RtIdentityOwnedWriteCheck.Find(cacheService, tenantId, entities));
+    }
+
+    private void ThrowIfIdentityOwnedWritesRefused(string tenantId, RtImportCallerContext? caller,
+        IReadOnlyList<IdentityOwnedWrite> offenders)
+    {
+        if (offenders.Count == 0)
+        {
+            return;
+        }
+
+        logger.LogWarning(
+            "Import into '{TenantId}' rejected: {Count} value(s) for identity-owned User fields or identity associations, which only the identity service writes (subject '{SubjectId}')",
+            tenantId, offenders.Count, caller?.SubjectId);
+        throw ExchangeException.IdentityOwnedWriteRestricted(
+            offenders.Select(RtIdentityOwnedWriteCheck.ToMessage).ToList());
+    }
+
     private void ThrowIfAttributeAccessRefused(string tenantId, IReadOnlyList<RestrictedAttributeWrite> offenders)
     {
         if (offenders.Count == 0)
@@ -368,7 +409,8 @@ internal class ImportRtModelCommand(
 
     private async Task<List<(RtCkId<CkTypeId> CkTypeId, OctoObjectId RtId)>> CollectEntityIdsAsync(string filePath,
         CancellationToken? cancellationToken, string? accessCheckTenantId = null,
-        List<RestrictedAttributeWrite>? restrictedWrites = null)
+        List<RestrictedAttributeWrite>? restrictedWrites = null, List<IdentityOwnedWrite>? identityOwnedWrites = null,
+        string? tenantId = null)
     {
         var ids = new List<(RtCkId<CkTypeId> CkTypeId, OctoObjectId RtId)>();
         await using var stream = File.OpenRead(filePath);
@@ -380,6 +422,12 @@ internal class ImportRtModelCommand(
             if (accessCheckTenantId != null && restrictedWrites != null)
             {
                 restrictedWrites.AddRange(RtAttributeAccessCheck.Find(cacheService, accessCheckTenantId,
+                    args.DeserializedEntities));
+            }
+
+            if (identityOwnedWrites != null && tenantId != null)
+            {
+                identityOwnedWrites.AddRange(RtIdentityOwnedWriteCheck.Find(cacheService, tenantId,
                     args.DeserializedEntities));
             }
 

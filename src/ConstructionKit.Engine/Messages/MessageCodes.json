@@ -731,6 +731,12 @@
       "number": 139,
       "level": "ERROR",
       "text": "Write refused: the entity '{rtId}' of type '{ckTypeId}' sets attribute '{attributePath}', which only a CK method may write (access Hidden or MethodOnly); an import, blueprint seed, blueprint update or migration step cannot set it"
+    },
+    {
+      "key": "RtIdentityOwnedWriteRestricted",
+      "number": 140,
+      "level": "ERROR",
+      "text": "Write refused: the entity '{rtId}' of type '{ckTypeId}' sets '{path}', which only the identity service writes (identity REST API or identity methods); a user-initiated import cannot set it"
     }
   ]
 }

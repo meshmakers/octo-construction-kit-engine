@@ -358,6 +358,34 @@ testing the enum inline.
 - Tests: `RtAttributeAccessCheckTests`, `RtEntityToTcDtoConverterAccessTests`, `ImportRtModelCommandAttributeAccessTests`,
   `BlueprintAttributeAccessRefusalTests` (synthetic graph `Access/AccessTestModel.cs`).
 
+#### Identity-owned User fields and identity associations (AB#8042, F4.2)
+
+`IdentityOwnedWrites` (`ConstructionKit.Contracts`, public) is the one list of what only the identity service writes: the
+`System.Identity/User` attributes `NormalizedUserName`, `NormalizedEmail`, `EmailConfirmed`, `PhoneNumberConfirmed`,
+`TwoFactorEnabled`, `LockoutEnabled`, `ResetPasswordOnLogin`, `Claims` (`UserClaims`), `UserLogins`, `PreferredChannelBindingId`,
+and the association roles `System.Identity/AssignedRole`, `GroupMember`, `ChildGroup`, `MayActAs`, `GrantsPermission` (both
+directions). Matching is version-less (`System.Identity-2.30.0/User`, `System.Identity@2/User` and `System.Identity/User` are the
+same type) and case-insensitive on the attribute name. Consumers: asset-repo GraphQL (generic and typed create/update, query-row
+update) and the **caller path** of `ImportRt`: `ImportRtModelCommand.PreflightIdentityOwnedWrites` (YAML) and the first pass of
+the JSON stream (`RtIdentityOwnedWriteCheck`, made only for a caller import on a tenant that has System.Identity) refuse the whole
+file before the first write with one `ExchangeException`, **message 140** `RtIdentityOwnedWriteRestricted` (parameters `rtId`,
+`ckTypeId`, `path` = the attribute name or `association <roleId> -> <targetRtId>`; the association is caught on whichever entity of
+the file declares it). The system path (no caller: blueprint seed and update, `ImportModelAsync`, `ImportTextAsync`, CK
+migrations) is **not** checked: the System.Identity.Bootstrap seed writes the `TenantOwners` role edges through it. Repository writes
+(`ApplyChangesAsync`, insert/replace) are not checked either: the identity service writes these fields and edges through its own
+repository.
+- **Why a list and not CK `access` (decision Gerald 2026-11-01, option B):** none of these attributes was `securitySensitive` in an
+  earlier 2.x System.Identity, so tightening their access is a Major (row T7, AB#6585) and System.Identity 3.0.0 would leave every
+  blueprint range `[2.x,3.0)` unsatisfied; association writes cannot be expressed in the CK access model at all. **Move the
+  attributes into the model's `access` (MethodOnly) with the next System.Identity major, together with AB#7777**, and delete
+  `UserAttributeNames` then; the association list stays until the CK model can restrict association writes.
+- Scope (decision Gerald 2026-11-01, AB#8042): the list is enforced by `ImportRt` (caller path) and asset-repo GraphQL only. The
+  mesh-adapter load nodes judge CK `access` alone (`RtAttributeAccessGuard`); the association roles `PolicyPermission` and
+  `IdentifiesUser` are deliberately not in the list.
+- Tests: `ImportRtModelCommandIdentityOwnedTests` (every attribute and role on the caller path, YAML and JSON stream, several
+  offenders, other User attributes and the system path import as before, tenant without System.Identity reads the file once,
+  version-less matching).
+
 #### Runtime-State Preservation on Re-Import (Upsert)
 
 Any `ImportStrategy.Upsert` import maps to a full `ReplaceOne` in the
@@ -1275,7 +1303,7 @@ Notes:
   `ReadWrite`, visibility `Public`, derivable `Any`) through a `JsonTypeInfo` modifier in `CkCache` (`OmitCkV2Defaults`), so v1 caches stay
   byte-identical; reading tolerates the missing keys (trailing defaulted `[JsonConstructor]` parameters on
   `CkTypeGraph`, init setter on `CkTypeAttributeGraph.Access`).
-- Message codes for CK v2: 90–113 and 118–138 are in use (table below); **spare: 111, 114–117, 139**. Range
+- Message codes for CK v2: 90–113 and 118–140 are in use (table below); **spare: 111, 114–117**. Range
   retention (F0.2) has no message codes of its own — its failures are `ModelValidationException`s and the
   unbound-reference diagnostic is the source-generator diagnostic OM1004.
   Warnings (e.g. 110, 124) of a successful compile are printed by `octo-ckc -c compile` (to **stderr**, also with
@@ -1350,6 +1378,7 @@ exists in Industry.Basic-2.6.0. Check the model prefix of the reference."). `OCT
 | 137 | `ImportRtCreateReplacedByMethod` | `ImportRtModelCommand.PreflightGenericCreateAsync` (Runtime.Engine, raised by a user-initiated `ImportRt`, not by the compiler) | AB#7107: the import file would create a **new** entity of a type whose static method declares `replacesGenericCreate` (own or inherited). Message parameters `rtId`, `ckTypeId`, `methodId` and `reason` (`GENERIC_CREATE_REPLACED_BY_METHOD`); one message per entity, carried by one `ExchangeException` (`MessageNumber` 137, `Messages`). See "`ImportRt` and `replacesGenericCreate`" above |
 | 138 | `ExportedRecordDropsRequiredMember` | `ExportedRecordMemberValidator` (from `CatalogModelResolver.CompileAsync`, after `SecretAttributeValidator`) | AB#7467 (follow-up of AB#7446), **warning**: an attribute assignment declared in the compiled model (type or record; interfaces are not walked) whose value type is `Record`/`RecordArray` and whose effective ownership is exported (`SeedOwned`/`TenantOwned`; assignment override over definition) reaches - through the referenced record, also from a dependency model, and nested exported record members - a member that is required (`isOptional` false), has no default value and whose effective ownership `IsExcludedFromExport()` (`RuntimeState`, `Secret`). This is the shape `RtEntityToTcDtoConverter.ConvertAttributes` drops (it evaluates record members individually). One message per member; parameters `ckElementId` (declaring type/record, versioned id), `attributeName`, `ckRecordId` (record that contains the member), `memberPath` (e.g. `States.ExternalId`), `memberOwnership`. Not reported: optional or defaulted members, anything below a record-valued attribute/member that is itself excluded (dropped as one unit, e.g. `MappingTargets`), records not reachable from an assignment of the compiled model (reported where they are used). A warning only, so existing models compile unchanged; no generated code, cache or catalog change. Tests: `ExportedRecordMemberValidatorTests`, `CkExportedRecordMemberCompileTests`. Rules: `docs/ck-semver-rules.md` "Record members and export" |
 | 139 | `RtAttributeWriteRestricted` | `RtAttributeAccessCheck` (Runtime.Engine/Exchange; raised by `ImportRtModelCommand` on every RT import path and by `BlueprintGenericCreateGuard` / `BlueprintMigrationExecutor`, not by the compiler) | AB#7767 (H3): an RT import, blueprint seed, blueprint update diff or migration step sets an attribute with `access: Hidden` or `MethodOnly` (also a record member). Parameters `rtId`, `ckTypeId`, `attributePath`; one message per value, refused before anything is written. `ReadOnly` stays importable. See "RT export and import honour `access`" above |
+| 140 | `RtIdentityOwnedWriteRestricted` | `RtIdentityOwnedWriteCheck` (Runtime.Engine/Exchange; raised by `ImportRtModelCommand` on the caller path of `ImportRt` only, not by the compiler) | AB#8042: a user-initiated import sets an identity-owned `System.Identity/User` attribute or an edge of an identity association role (`IdentityOwnedWrites`). Parameters `rtId`, `ckTypeId`, `path`; one message per value, refused before anything is written. See "Identity-owned User fields and identity associations" above |
 
 `InheritanceResolver.ResolveInterfacesAndMethods` also completes `AllImplementedInterfaces` (own ∪ every base
 type's declared interfaces), `AllMethods` (nearest declaration wins; `CkMethodGraph.DeclaringCkTypeId` is the

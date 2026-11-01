@@ -367,9 +367,10 @@ rules the classifier enforces today. The latest release of each of the 12 `octo-
 ## Intermediate versions across catalogs (AB#7974)
 
 An acknowledgement belongs to the version that introduces the change (see "Acknowledge" below): `System.Identity`
-2.28.0 acknowledges the seven access tightenings of its first ckLanguage 2 release, 2.29.0 does not repeat them. Every
-gate judges the declared version against its **baseline** - the newest version of the same major *in the catalogs it
-reads* below the declared version. When a catalog misses the intermediate versions, the baseline falls back to an older
+2.28.0 acknowledges the seven access tightenings of its first ckLanguage 2 release, 2.29.0 does not repeat them. In the
+two cases below the baseline is the newest version of the declared major below the declared version in the catalog the
+gate reads (the general rules, including equal published versions, ignored local entries and the lower-major fallback,
+are in "Baseline" above). When that catalog misses the intermediate versions, the baseline falls back to an older
 version, the diff spans several releases and the acknowledgements of the skipped versions are not part of the declared
 model: `OCTO-CK203` for changes that were acknowledged long ago.
 
@@ -382,8 +383,10 @@ Two places hit this:
 
 **Rule (one, used by both fixes).** For a model with declared version `D`:
 `baseline` = newest version of `D`'s major in the target catalog strictly below `D`; the versions to bring in are the
-source catalog's versions of that major with `baseline < v < D`, in ascending order. No baseline in the target = nothing to
-bring in (a lower-major baseline or a first publication cannot raise `OCTO-CK203` for them). Both catalog roots
+source catalog's versions of that major with `baseline < v < D`, in ascending order. No baseline of that major in the
+target = nothing is brought in. That is a limitation of the sync, not a guarantee: a lower-major baseline can still raise
+`OCTO-CK203` (an acknowledgement-required change introduced in `2.0.0` and kept in `2.1.0` is judged against `1.x`); such a
+target needs the missing major line published first. Both catalog roots
 (`ck-models/v3/`, `ck-models/v2/`) count, names compare case-insensitively, like the baseline resolver.
 
 **The fixes are pipeline and tooling, not engine changes.** The engine's rules stay as they are: a gate must judge against
@@ -400,7 +403,7 @@ updated:
   before each repository) publishes them from the private catalog's Pages mirror into `<lane>/.octo/local-catalog`
   (`-c LocalFileSystemCatalog -lcr <lane>/.octo/local-catalog`; the local catalog has no publish gate).
 
-Manual equivalent for one version (what unblocked both cases on 2026-10-31 / 2026-11-01):
+Manual equivalent for one version:
 `octo-ckc -c Publish -f ck-system.identity-2.28.0.json -c <PublicGitHubCatalog | LocalFileSystemCatalog> -lcr <empty dir | <lane>/.octo/local-catalog>`,
 with the file taken byte for byte from the private catalog.
 

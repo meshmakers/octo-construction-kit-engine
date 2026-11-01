@@ -310,6 +310,25 @@ flag (`ImportRt` has its own check, next section). The lookup itself is public: 
 table of `ConstructionKit.Engine` is `internal`; the assembly makes it visible to `Meshmakers.Octo.Runtime.Engine` for this
 message. Tests: `BlueprintGenericCreateRefusalTests` (type graphs are built in the test, no System version involved).
 
+#### `System.Identity/User` is created only through `User.CreateUser-1` (AB#7777, runtime rule)
+
+`GenericCreateReplacement.FindReplacingMethod` (and so `TryGetReplacingMethod`) answers the static `User.CreateUser-1` for
+`System.Identity/User` when no method of the type carries `replacesGenericCreate` and the tenant's System.Identity declares that
+static method (2.29.0 and later; version-less match through `IdentityOwnedWrites.IsUserType`, constant
+`GenericCreateReplacement.IdentityUserCreateMethodId`). A user is created only by the identity service (REST or the method), which
+runs the user manager (normalised name and e-mail, password policy, security stamp). The model cannot say so in 2.x: the flag on
+the existing type is a Major (row M16), planned for the next System.Identity major (AB#8053). Because every generic writer asks
+this one helper, a **new** user is refused everywhere with `GENERIC_CREATE_REPLACED_BY_METHOD` and the method id
+`System.Identity/User.CreateUser-1`: asset-repo generic, typed and query-row create, MCP create, the mesh-adapter insert pre-check
+(`GenericCreateGuard`), the caller path of `ImportRt` (137) and blueprint seed data, update diff and migration `Add` (136). An
+existing user (rtId stored) is updated as before. Not affected: the identity service's repository writes, the system import path
+of `ImportRt` without a caller (no blueprint guard there), a tenant restore, a tenant whose System.Identity predates the method.
+The returned method's `ReplacesGenericCreate` stays `false` (CK meta and docs show the model as it is). **Remove the rule** when
+the next System.Identity major sets the flag (the model's flagged method already wins over it). Note for a blueprint seed: the
+`access` preflight (139) runs first, so a seeded user that carries `UserName`/`Email` reports 139, one without them 136; both write
+nothing. Tests: `GenericCreateReplacementIdentityUserTests`, `ImportRtModelCommandGenericCreateTests` (`*IdentityUser*`),
+`BlueprintGenericCreateRefusalTests` (`*IdentityUser*`).
+
 #### `ImportRt` and `replacesGenericCreate` (AB#7107, F3.7)
 
 A user-initiated `ImportRt` (`ImportAsCallerAsync`, the `caller != null` path that bot-services uses) cannot create a **new**

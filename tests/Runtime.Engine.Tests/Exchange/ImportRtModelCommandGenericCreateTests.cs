@@ -83,9 +83,25 @@ public class ImportRtModelCommandGenericCreateTests : IDisposable
             allMethods: withMethod ? new Dictionary<string, CkMethodGraph> { [MethodName] = method } : null);
     }
 
+    private const string IdentityUserType = "System.Identity/User";
+
+    private static CkTypeGraph IdentityUserGraph()
+    {
+        var name = NameAttr();
+        var create = new CkMethodGraph(new CkId<CkTypeId>("System.Identity-2.30.0/User"),
+            new CkMethodDto { MethodId = "CreateUser-1", Kind = CkMethodKindDto.Static });
+        return new CkTypeGraph(new CkId<CkTypeId>("System.Identity-2.30.0/User"),
+            isAbstract: false, isFinal: true, isCollectionRoot: false, baseTypes: [],
+            derivedFromCkTypeId: null, definingCollectionRootCkTypeId: null, derivedTypes: [], definedAttributes: [],
+            allAttributes: new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> { [name.CkAttributeId] = name },
+            indexes: [], associations: new CkGraphDirectedAssociations([]), description: "test",
+            enableChangeStreamPreAndPostImages: false,
+            allMethods: new Dictionary<string, CkMethodGraph> { ["CreateUser-1"] = create });
+    }
+
     private sealed class Harness
     {
-        public Harness(bool tenantHasFlaggedType = true)
+        public Harness(bool tenantHasFlaggedType = true, bool withIdentityUser = false)
         {
             A.CallTo(() => Repository.TenantId).Returns(Tenant);
             A.CallTo(() => Repository.GetSessionAsync()).Returns(Task.FromResult(Session));
@@ -106,6 +122,17 @@ public class ImportRtModelCommandGenericCreateTests : IDisposable
                 A.CallTo(() => CkCache.GetRtCkType(Tenant, Rt(type))).Returns(graph);
                 A.CallTo(() => CkCache.TryGetRtCkType(Tenant, Rt(type), out graphOut)).Returns(true)
                     .AssignsOutAndRefParameters(graph);
+            }
+
+            if (withIdentityUser)
+            {
+                // AB#7777: System.Identity/User with its static, unflagged CreateUser-1 (System.Identity 2.x).
+                var user = IdentityUserGraph();
+                graphs.Add(user);
+                var userOut = (CkTypeGraph?)user;
+                A.CallTo(() => CkCache.GetRtCkType(Tenant, Rt(IdentityUserType))).Returns(user);
+                A.CallTo(() => CkCache.TryGetRtCkType(Tenant, Rt(IdentityUserType), out userOut)).Returns(true)
+                    .AssignsOutAndRefParameters(user);
             }
 
             A.CallTo(() => CkCache.GetCkTypes(Tenant)).Returns(graphs);
@@ -383,5 +410,56 @@ public class ImportRtModelCommandGenericCreateTests : IDisposable
             new RtModelRootTcDto { Entities = [Dto(AccountType)] }, ImportStrategy.Upsert);
 
         Assert.Single(h.Written);
+    }
+
+    // ---- AB#7777: System.Identity/User is created only through User.CreateUser-1 -------------------
+
+    [Theory]
+    [InlineData(ImportStrategy.Insert)]
+    [InlineData(ImportStrategy.Upsert)]
+    public async Task NewIdentityUser_IsRefused_WithUserCreateUser_AndNothingIsWritten(ImportStrategy strategy)
+    {
+        var h = new Harness(tenantHasFlaggedType: false, withIdentityUser: true);
+        var user = Dto(IdentityUserType);
+        h.YamlReturns(Dto(PlainType), user);
+
+        var ex = await Assert.ThrowsAsync<ExchangeException>(() => h.CreateCommand()
+            .ImportAsCallerAsync(h.Repository, TempFile(), ExchangeMimeTypes.MimeTypeYaml, strategy, User));
+
+        Assert.Equal(137, ex.MessageNumber);
+        var message = Assert.Single(ex.Messages);
+        Assert.Equal(user.RtId.ToString(), message.Parameters["rtId"]);
+        Assert.Equal(IdentityUserType, message.Parameters["ckTypeId"]);
+        Assert.Equal("System.Identity/User.CreateUser-1", message.Parameters["methodId"]);
+        Assert.Equal(GenericCreateReplacement.ReasonToken, message.Parameters["reason"]);
+        Assert.Empty(h.Written);
+        h.NothingMayBeWritten();
+    }
+
+    [Fact]
+    public async Task ExistingIdentityUser_Upsert_IsUpdatedAsBefore()
+    {
+        var h = new Harness(tenantHasFlaggedType: false, withIdentityUser: true);
+        var stored = h.AddStored(IdentityUserType);
+        h.YamlReturns(Dto(IdentityUserType, stored.RtId, "changed"));
+
+        await h.CreateCommand().ImportAsCallerAsync(h.Repository, TempFile(), ExchangeMimeTypes.MimeTypeYaml,
+            ImportStrategy.Upsert, User);
+
+        Assert.Equal("changed", Assert.Single(h.Written).GetAttributeValueOrDefault("Name"));
+    }
+
+    [Fact]
+    public async Task NewIdentityUser_OnTheSystemPath_IsNotCheckedByTheImportCommand()
+    {
+        // The system import (no caller) is unchanged; blueprint writers run their own guard before they call it.
+        var h = new Harness(tenantHasFlaggedType: false, withIdentityUser: true);
+        var user = Dto(IdentityUserType);
+        h.YamlReturns(user);
+
+        await h.CreateCommand().ImportAsync(h.Repository, TempFile(), ExchangeMimeTypes.MimeTypeYaml,
+            ImportStrategy.Upsert);
+
+        Assert.Contains(h.Written, e => e.RtId == user.RtId);
     }
 }

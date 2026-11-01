@@ -37,6 +37,7 @@ public class BlueprintGenericCreateRefusalTests
     private static readonly RtCkId<CkTypeId> AccountType = new("Test-1.0.0/Account");
     private static readonly RtCkId<CkTypeId> SpecialAccountType = new("Test-1.0.0/SpecialAccount");
     private static readonly RtCkId<CkTypeId> PlainType = new("Test-1.0.0/Plain");
+    private static readonly RtCkId<CkTypeId> IdentityUserType = new("System.Identity-2.30.0/User");
     private static readonly RtCkId<CkAttributeId> LockedAttr = new("System/RtBlueprintLocked");
     private static readonly RtCkId<CkAttributeId> ThresholdAttr = new("Test-1.0.0/Threshold");
 
@@ -63,6 +64,9 @@ public class BlueprintGenericCreateRefusalTests
         Cache(AccountType, method);
         Cache(SpecialAccountType, method);
         Cache(PlainType);
+        // AB#7777: System.Identity/User declares the static CreateUser-1 WITHOUT the flag (System.Identity 2.x).
+        Cache(IdentityUserType, new CkMethodGraph(new CkId<CkTypeId>("System.Identity-2.30.0/User"),
+            new CkMethodDto { MethodId = "CreateUser-1", Kind = CkMethodKindDto.Static }));
 
         A.CallTo(() => _catalog.IsExistingAsync(A<BlueprintId>._, A<object?>._)).Returns(true);
         A.CallTo(() => _catalog.GetAsync(A<BlueprintId>._, A<OperationResult>._, A<object?>._, A<CancellationToken?>._))
@@ -398,6 +402,40 @@ public class BlueprintGenericCreateRefusalTests
 
         Assert.True(result.Success, string.Join("; ", result.Errors));
         Assert.Single(_imported);
+    }
+    // ---- AB#7777: a blueprint cannot create a System.Identity/User -------------------------------
+
+    [Fact]
+    public async Task Install_NewIdentityUser_IsRefusedWithUserCreateUser_BeforeAnythingIsWritten()
+    {
+        GivenSeed(V1, SeedEntity(PlainType, Id(3), "plain"), SeedEntity(IdentityUserType, Id(7), "seed-user"));
+        GivenResolution(V1);
+
+        var result = await CreateService().ApplyBlueprintAsync(TenantId, V1, false, TestContext.Current.CancellationToken);
+
+        Assert.False(result.IsSuccess);
+        Assert.Empty(_imported);
+        A.CallTo(() => _installations.UpsertAsync(A<string>._, A<BlueprintInstallation>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+        var refusal = Assert.Single(result.OperationResult.Messages,
+            m => m.MessageNumber == BlueprintGenericCreateGuard.MessageNumber);
+        Assert.Equal(Id(7), refusal.Parameters["rtId"]);
+        Assert.Equal("System.Identity-2.30.0/User", refusal.Parameters["ckTypeId"]);
+        Assert.Equal("System.Identity/User.CreateUser-1", refusal.Parameters["methodId"]);
+        Assert.Equal(GenericCreateReplacement.ReasonToken, refusal.Parameters["reason"]);
+    }
+
+    [Fact]
+    public async Task Install_IdentityUserWhoseRtIdExists_IsUpsertedAsBefore()
+    {
+        GivenTenantEntity(IdentityUserType, Id(7), "seed-user", V1);
+        GivenSeed(V1, SeedEntity(IdentityUserType, Id(7), "seed-user", threshold: 5));
+        GivenResolution(V1);
+
+        var result = await CreateService().ApplyBlueprintAsync(TenantId, V1, false, TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsSuccess, string.Join("; ", result.OperationResult.Messages.Select(m => m.MessageText)));
+        Assert.Equal("seed-user", Assert.Single(_imported).RtWellKnownName);
     }
 }
 

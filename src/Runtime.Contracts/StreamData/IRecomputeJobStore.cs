@@ -35,9 +35,12 @@ public interface IRecomputeJobStore
     Task<IReadOnlyList<RecomputeJobSnapshot>> GetForArchiveAsync(OctoObjectId archiveRtId, int limit);
 
     /// <summary>
-    /// Returns the single non-terminal job (Pending / Running / Swapping) for an archive, or
+    /// Returns the single non-terminal rollup recompute job (Pending / Running / Swapping) for an
+    /// archive, or
     /// <c>null</c> if none is active. Used by the coalesce policy to fold a new trigger into an
-    /// already-running job instead of starting a second one.
+    /// already-running job instead of starting a second one. Computed-column backfill jobs
+    /// (<see cref="RecomputeJobSnapshot.IsComputedColumnBackfill"/>, AB#8002) are not returned: they
+    /// run per column, beside a rollup recompute, and must never be adopted or coalesced into by it.
     /// </summary>
     Task<RecomputeJobSnapshot?> GetActiveForArchiveAsync(OctoObjectId archiveRtId);
 }

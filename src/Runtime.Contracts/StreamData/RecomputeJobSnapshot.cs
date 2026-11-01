@@ -46,4 +46,39 @@ public sealed record RecomputeJobSnapshot(
     int? DurationMs,
     string? ErrorReason,
     string? StagingTableName,
-    DateTime? LastProgressAt = null);
+    DateTime? LastProgressAt = null)
+{
+    /// <summary>
+    /// Prefix of <see cref="StagingTableName"/> that marks a computed-column backfill job (AB#8002).
+    /// A computed-column backfill has no staging table; its target is the hidden physical column the
+    /// backfill writes before the column is switched on. The marker lets such a job live in the same
+    /// <c>RecomputeJob</c> history as the rollup recomputes — so it shows up in the recompute-jobs
+    /// query — without a model change, and keeps the rollup orchestrator from adopting it.
+    /// </summary>
+    public const string ComputedColumnMarkerPrefix = "computed-column:";
+
+    /// <summary>
+    /// The computed column a backfill job works on, or <c>null</c> for a rollup recompute job.
+    /// </summary>
+    public string? ComputedColumnName =>
+        StagingTableName is { } marker && marker.StartsWith(ComputedColumnMarkerPrefix, StringComparison.Ordinal)
+            ? marker.Substring(ComputedColumnMarkerPrefix.Length)
+            : null;
+
+    /// <summary>Whether this job is a computed-column backfill rather than a rollup recompute.</summary>
+    public bool IsComputedColumnBackfill => ComputedColumnName is not null;
+
+    /// <summary>Whether the job is still waiting or running (Pending / Running / Swapping).</summary>
+    public bool IsActive => State is RecomputeJobState.Pending or RecomputeJobState.Running or RecomputeJobState.Swapping;
+
+    /// <summary>
+    /// A new, not yet persisted computed-column backfill job (AB#8002). The range is
+    /// <c>[UnixEpoch, createdAt)</c>: the backfill covers every row the archive held when it was queued.
+    /// </summary>
+    public static RecomputeJobSnapshot ForComputedColumn(
+        OctoObjectId archiveRtId, string columnName, RecomputeJobState state, RecomputeTrigger trigger,
+        DateTime createdAt) =>
+        new(OctoObjectId.Empty, archiveRtId, state, trigger, DateTime.UnixEpoch, createdAt, null,
+            null, null, state == RecomputeJobState.Running ? createdAt : null, null, null, null,
+            ComputedColumnMarkerPrefix + columnName, createdAt);
+}

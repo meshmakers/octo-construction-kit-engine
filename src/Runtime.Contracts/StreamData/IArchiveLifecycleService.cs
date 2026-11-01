@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Formulas;
@@ -94,4 +95,46 @@ public interface IArchiveLifecycleService
     /// the formula is unchanged.
     /// </summary>
     Task UpdateComputedColumnFormulaAsync(OctoObjectId archiveRtId, string name, string formula);
+
+    /// <summary>
+    /// Adds a computed column like <see cref="AddComputedColumnAsync"/>, but does not backfill inside
+    /// the call (AB#8002): it validates the column, persists it, adds the physical column, queues a
+    /// backfill job and returns with the column in <c>Backfilling</c>. The background backfill drain
+    /// (<see cref="RunPendingComputedColumnBackfillsAsync"/>) runs the job and ends the column
+    /// <c>Active</c> or <c>Failed</c>. Validation and DDL errors are thrown to the caller. Returns the
+    /// queued job, or <c>null</c> when no job store is wired.
+    /// </summary>
+    Task<RecomputeJobSnapshot?> EnqueueAddComputedColumnAsync(
+        OctoObjectId archiveRtId, string name, string formula, FormulaResultType resultType, bool indexed,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Changes a computed column's formula like <see cref="UpdateComputedColumnFormulaAsync"/>, but
+    /// queues the backfill of the new formula as a background job instead of running it inside the
+    /// call (AB#8002). Readers keep seeing the previous formula until the job swaps the column version;
+    /// a failed job reverts to the previous formula. Rejected while a backfill of the column is still
+    /// queued or running. Returns the queued job, or <c>null</c> when the formula is unchanged (no-op)
+    /// or no job store is wired.
+    /// </summary>
+    Task<RecomputeJobSnapshot?> EnqueueUpdateComputedColumnFormulaAsync(
+        OctoObjectId archiveRtId, string name, string formula, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Queues the backfill of a computed column again (AB#8002), for a column that ended
+    /// <c>Failed</c>, was left <c>Pending</c> by an interrupted add, or sits in <c>Backfilling</c>
+    /// without a live job. Sets the column <c>Backfilling</c> and returns the queued job (an already
+    /// queued job of the column is returned as is). Throws when the column is <c>Active</c> and has no
+    /// formula change in progress — there is nothing to retry.
+    /// </summary>
+    Task<RecomputeJobSnapshot?> RetryComputedColumnBackfillAsync(
+        OctoObjectId archiveRtId, string name, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Runs the queued computed-column backfills of this tenant one after the other (AB#8002): every
+    /// computed column in <c>Backfilling</c> or with a formula change in progress on an
+    /// <c>Activated</c> archive, oldest job first. Called by the background service, never by a
+    /// request, so a client disconnect cannot cancel a backfill. Returns the number of backfills that
+    /// completed.
+    /// </summary>
+    Task<int> RunPendingComputedColumnBackfillsAsync(CancellationToken cancellationToken);
 }

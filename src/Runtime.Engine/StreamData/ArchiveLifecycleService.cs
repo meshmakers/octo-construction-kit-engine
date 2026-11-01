@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
@@ -45,6 +46,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
     private readonly Func<DateTime> _clock;
     private readonly IArchiveCoverageInvalidator? _coverageInvalidator;
     private readonly ICkCacheService? _ckCacheService;
+    private readonly ComputedColumnBackfillRunner _backfillRunner;
 
     /// <summary>
     /// Constructs the lifecycle service. The store and stream-data repository must be
@@ -81,6 +83,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         _clock = clock ?? (() => DateTime.UtcNow);
         _coverageInvalidator = coverageInvalidator;
         _ckCacheService = ckCacheService;
+        _backfillRunner = new ComputedColumnBackfillRunner(store, repository, recomputeJobStore, logger, _clock);
     }
 
     /// <inheritdoc />
@@ -271,13 +274,27 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
             return;
         }
 
+        // AB#8002: queued computed-column backfills of the archive end too. The columns keep their
+        // queued state, so re-activating the archive queues them again with a fresh job.
+        var now = _clock();
+        var jobs = await _recomputeJobStore.GetForArchiveAsync(archiveRtId, 200);
+        foreach (var backfill in jobs.Where(j => j.IsComputedColumnBackfill && j.IsActive))
+        {
+            await _recomputeJobStore.UpdateAsync(backfill with
+            {
+                State = RecomputeJobState.Failed,
+                FinishedAt = now,
+                DurationMs = backfill.StartedAt is { } backfillStart ? (int)(now - backfillStart).TotalMilliseconds : 0,
+                ErrorReason = reason,
+            });
+        }
+
         var active = await _recomputeJobStore.GetActiveForArchiveAsync(archiveRtId);
-        if (active is null)
+        if (active is null || active.IsComputedColumnBackfill)
         {
             return;
         }
 
-        var now = _clock();
         await _recomputeJobStore.UpdateAsync(active with
         {
             State = RecomputeJobState.Failed,
@@ -297,6 +314,30 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
     public async Task AddComputedColumnAsync(
         OctoObjectId archiveRtId, string name, string formula, FormulaResultType resultType, bool indexed)
     {
+        // Inline variant (tests, fixtures, seeds): prepare like the queued add, then run the backfill in
+        // this call. The job is created Running so the background drain leaves the column alone.
+        var job = await PrepareAddComputedColumnAsync(
+            archiveRtId, name, formula, resultType, indexed, RecomputeJobState.Running, CancellationToken.None);
+        await _backfillRunner.RunAsync(archiveRtId, name, job, rethrowFailure: true, CancellationToken.None);
+    }
+
+    /// <inheritdoc />
+    public Task<RecomputeJobSnapshot?> EnqueueAddComputedColumnAsync(
+        OctoObjectId archiveRtId, string name, string formula, FormulaResultType resultType, bool indexed,
+        CancellationToken cancellationToken = default) =>
+        PrepareAddComputedColumnAsync(
+            archiveRtId, name, formula, resultType, indexed, RecomputeJobState.Pending, cancellationToken);
+
+    /// <summary>
+    /// Validates the new column, persists it <c>Pending</c>, adds the physical column, creates the
+    /// backfill job and only then sets the column <c>Backfilling</c> — the state the drain looks for —
+    /// so the drain always finds the job the caller was handed (AB#8002). Validation and DDL errors are
+    /// thrown; a DDL failure leaves the column <c>Failed</c>.
+    /// </summary>
+    private async Task<RecomputeJobSnapshot?> PrepareAddComputedColumnAsync(
+        OctoObjectId archiveRtId, string name, string formula, FormulaResultType resultType, bool indexed,
+        RecomputeJobState jobState, CancellationToken cancellationToken)
+    {
         var snapshot = await LoadAsync(archiveRtId);
         if (snapshot.Status != CkArchiveStatus.Activated)
         {
@@ -307,7 +348,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         // which is what the Studio lists; the evaluator binds the physical form (amountvalue). Rewrite
         // first, so everything from validation onwards deals with the physical form only (AB#4779).
         var physicalFormula = await _repository.NormalizeComputedFormulaAsync(
-            archiveRtId, snapshot.Columns, formula);
+            archiveRtId, snapshot.Columns, formula, cancellationToken);
 
         var newColumn = new CkArchiveColumnSpec(string.Empty, indexed, Required: false)
         {
@@ -320,35 +361,45 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
 
         // Validate the prospective full set (existing + new) before any persistence or DDL.
         var prospective = snapshot.Columns.Append(newColumn).ToList();
-        await _repository.ValidateComputedColumnsAsync(archiveRtId, prospective);
+        await _repository.ValidateComputedColumnsAsync(archiveRtId, prospective, cancellationToken);
 
         using var activity = StreamDataDiagnostics.ActivitySource.StartActivity("archive.addComputedColumn");
         activity?.SetTag("streamdata.archive.rtid", archiveRtId.ToString());
         activity?.SetTag("streamdata.computedcolumn.name", name);
 
-        // Persist Pending, add the physical column, backfill while the column stays hidden, then flip
-        // to Active — the single SetComputedColumnStateAsync(Active) is the atomic switch (§8).
+        // Persist Pending, add the physical column, then hand over to the backfill job, which flips the
+        // column to Active — that single state write is the atomic switch (§8).
         await _store.AddComputedColumnAsync(archiveRtId, newColumn);
         var withColumn = await LoadAsync(archiveRtId);
 
         try
         {
-            await _repository.AddComputedColumnStorageAsync(withColumn, name);
-            await _store.SetComputedColumnStateAsync(archiveRtId, name, ComputedColumnState.Backfilling);
-            await _repository.BackfillComputedColumnAsync(withColumn, name);
-            await _store.SetComputedColumnStateAsync(archiveRtId, name, ComputedColumnState.Active);
-            _logger.LogInformation(
-                "Computed column '{Column}' added to archive {Archive} and backfilled (now Active).",
-                name, archiveRtId);
+            await _repository.AddComputedColumnStorageAsync(withColumn, name, cancellationToken);
         }
         catch (Exception ex)
         {
             await _store.SetComputedColumnStateAsync(archiveRtId, name, ComputedColumnState.Failed);
             _logger.LogError(ex,
-                "Backfill of computed column '{Column}' on archive {Archive} failed; column marked Failed.",
+                "Adding the physical column of computed column '{Column}' on archive {Archive} failed; column marked Failed.",
                 name, archiveRtId);
             throw;
         }
+
+        var job = await _backfillRunner.CreateJobAsync(archiveRtId, name, jobState, RecomputeTrigger.Manual);
+        try
+        {
+            await _store.SetComputedColumnStateAsync(archiveRtId, name, ComputedColumnState.Backfilling);
+        }
+        catch (Exception ex)
+        {
+            await _backfillRunner.FailUnstartedJobAsync(job, $"Queuing the backfill failed: {ex.Message}");
+            throw;
+        }
+
+        _logger.LogInformation(
+            "Computed column '{Column}' added to archive {Archive}; backfill queued as job {JobId}.",
+            name, archiveRtId, job?.RtId);
+        return job;
     }
 
     /// <inheritdoc />
@@ -377,6 +428,35 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
     /// <inheritdoc />
     public async Task UpdateComputedColumnFormulaAsync(OctoObjectId archiveRtId, string name, string formula)
     {
+        // Inline variant: prepare like the queued change, then run the backfill in this call.
+        var prepared = await PrepareFormulaChangeAsync(
+            archiveRtId, name, formula, RecomputeJobState.Running, CancellationToken.None);
+        if (prepared.NoOp)
+        {
+            return;
+        }
+
+        await _backfillRunner.RunAsync(archiveRtId, name, prepared.Job, rethrowFailure: true, CancellationToken.None);
+    }
+
+    /// <inheritdoc />
+    public async Task<RecomputeJobSnapshot?> EnqueueUpdateComputedColumnFormulaAsync(
+        OctoObjectId archiveRtId, string name, string formula, CancellationToken cancellationToken = default)
+    {
+        var prepared = await PrepareFormulaChangeAsync(
+            archiveRtId, name, formula, RecomputeJobState.Pending, cancellationToken);
+        return prepared.Job;
+    }
+
+    /// <summary>
+    /// Validates a formula change, adds the pending physical column, creates the backfill job and only
+    /// then marks the pending formula — the marker the drain and ingest's dual-write look for
+    /// (AB#8002). Rejected while a backfill of the column is still queued or running.
+    /// </summary>
+    private async Task<(bool NoOp, RecomputeJobSnapshot? Job)> PrepareFormulaChangeAsync(
+        OctoObjectId archiveRtId, string name, string formula, RecomputeJobState jobState,
+        CancellationToken cancellationToken)
+    {
         var snapshot = await LoadAsync(archiveRtId);
         if (snapshot.Status != CkArchiveStatus.Activated)
         {
@@ -397,11 +477,20 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         // change: re-saving the identical formula from the UI would version the column
         // (power → power__v1 → __v2 …), backfill it and swap the pointer, all for nothing.
         var physicalFormula = await _repository.NormalizeComputedFormulaAsync(
-            archiveRtId, snapshot.Columns, formula);
+            archiveRtId, snapshot.Columns, formula, cancellationToken);
 
         if (string.Equals(target.Formula, physicalFormula, StringComparison.Ordinal))
         {
-            return; // no-op: formula unchanged
+            return (true, null); // no-op: formula unchanged
+        }
+
+        // AB#8002: one backfill per column at a time. A second change while the first is still queued
+        // or running would race it for the same pending physical column.
+        if (target.HasPendingFormula || target.ComputedState is ComputedColumnState.Backfilling or ComputedColumnState.Pending)
+        {
+            throw new ComputedColumnInvalidException(archiveRtId, name,
+                $"a backfill of computed column '{name}' is still queued or running; wait until it has finished " +
+                "(see the recompute jobs of the archive) before changing the formula again.");
         }
 
         // Validate the prospective set with the target's formula replaced (catches a now-cyclic or
@@ -411,7 +500,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
                 ? c with { Formula = physicalFormula }
                 : c)
             .ToList();
-        await _repository.ValidateComputedColumnsAsync(archiveRtId, prospective);
+        await _repository.ValidateComputedColumnsAsync(archiveRtId, prospective, cancellationToken);
 
         using var activity = StreamDataDiagnostics.ActivitySource.StartActivity("archive.updateComputedColumnFormula");
         activity?.SetTag("streamdata.archive.rtid", archiveRtId.ToString());
@@ -419,34 +508,74 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
 
         // Order matters: add the pending physical column BEFORE marking PendingFormula, so ingest's
         // dual-write (which starts the moment the marker is persisted) never targets a missing column.
-        await _repository.AddPendingComputedColumnStorageAsync(snapshot, name);
-        await _store.SetPendingFormulaAsync(archiveRtId, name, physicalFormula);
-        var withPending = await LoadAsync(archiveRtId);
-
+        // The job writes the physical form into the column's Formula on the swap — the ingest path
+        // evaluates it on every new row (writing the logical spelling there made every later row NULL).
+        await _repository.AddPendingComputedColumnStorageAsync(snapshot, name, cancellationToken);
+        var job = await _backfillRunner.CreateJobAsync(archiveRtId, name, jobState, RecomputeTrigger.Manual);
         try
         {
-            await _repository.BackfillComputedColumnAsync(withPending, name);
-            // Atomic swap: the version pointer flip is the commit — readers move from the previous
-            // formula's values to the new ones in a single store write. The physical form, like the
-            // pending marker above: this is what becomes the column's stored Formula, and the ingest
-            // path evaluates it on every new row. Writing the caller's logical spelling here left the
-            // backfilled rows correct (they came from the pending formula) while every row ingested
-            // afterwards silently evaluated to NULL — a column that looks right and goes blank.
-            await _store.SwapComputedColumnFormulaAsync(
-                archiveRtId, name, physicalFormula, target.ComputedVersion + 1);
-            _logger.LogInformation(
-                "Computed column '{Column}' on archive {Archive} re-formulated and backfilled (version {Version}).",
-                name, archiveRtId, target.ComputedVersion + 1);
+            await _store.SetPendingFormulaAsync(archiveRtId, name, physicalFormula);
         }
         catch (Exception ex)
         {
-            await _store.ClearPendingFormulaAsync(archiveRtId, name);
-            _logger.LogError(ex,
-                "Formula-change backfill of computed column '{Column}' on archive {Archive} failed; reverted to the previous formula.",
-                name, archiveRtId);
+            await _backfillRunner.FailUnstartedJobAsync(job, $"Queuing the backfill failed: {ex.Message}");
             throw;
         }
+
+        _logger.LogInformation(
+            "Formula change of computed column '{Column}' on archive {Archive} queued as job {JobId}.",
+            name, archiveRtId, job?.RtId);
+        return (false, job);
     }
+
+    /// <inheritdoc />
+    public async Task<RecomputeJobSnapshot?> RetryComputedColumnBackfillAsync(
+        OctoObjectId archiveRtId, string name, CancellationToken cancellationToken = default)
+    {
+        var snapshot = await LoadAsync(archiveRtId);
+        if (snapshot.Status != CkArchiveStatus.Activated)
+        {
+            throw new InvalidArchiveStateTransitionException(archiveRtId, snapshot.Status,
+                "retry a computed column backfill on");
+        }
+
+        var target = snapshot.Columns.FirstOrDefault(
+            c => c.IsComputed && string.Equals(c.Name, name, StringComparison.Ordinal))
+            ?? throw new InvalidOperationException(
+                $"Computed column '{name}' does not exist on archive {archiveRtId}.");
+
+        var active = await _backfillRunner.GetActiveJobAsync(archiveRtId, name);
+        if (target.HasPendingFormula || target.ComputedState == ComputedColumnState.Backfilling)
+        {
+            // Already queued: hand back the queued job, or queue one if it got lost. A live job keeps
+            // running; a stale one is adopted by the next drain.
+            return active ?? await _backfillRunner.CreateJobAsync(
+                archiveRtId, name, RecomputeJobState.Pending, RecomputeTrigger.Manual);
+        }
+
+        if (target.ComputedState == ComputedColumnState.Active)
+        {
+            throw new ComputedColumnInvalidException(archiveRtId, name,
+                $"computed column '{name}' is Active; there is no failed backfill to retry. " +
+                "To recompute it with another formula, change the formula.");
+        }
+
+        // Failed, or Pending left behind by an interrupted add: make sure the physical column exists
+        // (idempotent), queue the job, then put the column back into the queue.
+        await _repository.AddComputedColumnStorageAsync(snapshot, name, cancellationToken);
+        var job = active ?? await _backfillRunner.CreateJobAsync(
+            archiveRtId, name, RecomputeJobState.Pending, RecomputeTrigger.Manual);
+        await _store.SetComputedColumnStateAsync(archiveRtId, name, ComputedColumnState.Backfilling);
+
+        _logger.LogInformation(
+            "Backfill of computed column '{Column}' on archive {Archive} retried from {State} as job {JobId}.",
+            name, archiveRtId, target.ComputedState, job?.RtId);
+        return job;
+    }
+
+    /// <inheritdoc />
+    public Task<int> RunPendingComputedColumnBackfillsAsync(CancellationToken cancellationToken) =>
+        _backfillRunner.DrainAsync(cancellationToken);
 
     private async Task<ArchiveSnapshot> LoadAsync(OctoObjectId archiveRtId)
     {

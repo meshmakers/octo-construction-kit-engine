@@ -110,6 +110,18 @@ public interface IStreamDataRepository
     Task BackfillComputedColumnAsync(
         ArchiveSnapshot snapshot, string columnName, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Same as <see cref="BackfillComputedColumnAsync(ArchiveSnapshot, string, CancellationToken)"/>,
+    /// and reports the running number of rows written to <paramref name="progress"/> after every
+    /// committed chunk (AB#8002). The background backfill job uses it as its heartbeat and to show
+    /// progress on the recompute job. The default implementation reports nothing; a repository that
+    /// can count its chunks overrides it.
+    /// </summary>
+    Task BackfillComputedColumnAsync(
+        ArchiveSnapshot snapshot, string columnName, IProgress<long>? progress,
+        CancellationToken cancellationToken) =>
+        BackfillComputedColumnAsync(snapshot, columnName, cancellationToken);
+
     // --- Data plane ---------------------------------------------------------------------------
 
     /// <summary>

@@ -369,8 +369,8 @@ logical→physical name pointer atomically on completion.
 
 ### §8.3 Triggers, reader contract, removal
 
-- **Triggers:** implicit (column added / formula changed), manual (API + Studio), periodic
-  (the AB#4184 hosted-service tick also drains pending computed-column backfills). Concurrency /
+- **Triggers:** implicit (column added / formula changed), manual (retry via API / octo-cli),
+  periodic (the computed-column backfill service drains queued backfills, §8.3a). Concurrency /
   coalescing / idempotency semantics follow AB#4184's job model.
 - **Reader contract during backfill:** a query returns either the previous state (new column
   absent from the projection, or the previous formula's values via the still-active physical
@@ -378,6 +378,52 @@ logical→physical name pointer atomically on completion.
   active-physical-name (D-7.2), not the generation pointer.
 - **Removing** a computed column: drop from the logical projection (flip first), then drop the
   physical column. Dependent rollups (§10) must be revalidated.
+
+### §8.3a Backfill as a background job (AB#8002)
+
+> **Status: implemented 2026-11-01.** Until then the add and the formula change ran the backfill
+> **inside** the GraphQL / REST request. On test-2 (energyiq, archives with ~750k–950k rows) the
+> backfill outlived the client timeout and the CrateDB driver's 30 s default command timeout; CrateDB
+> killed the statements (`XX000: Job killed. Cancellation request by: octo-system`), the columns ended
+> `Failed`, and four parallel backfills starved the shared asset-repo until its probes failed.
+
+- **Queue = archive state.** `EnqueueAddComputedColumnAsync` validates, persists the column, adds
+  the physical column, creates a `RecomputeJob` (`Pending`) and only then sets the column
+  `Backfilling`; `EnqueueUpdateComputedColumnFormulaAsync` adds the pending physical column, creates
+  the job and only then marks `PendingFormula`. Both return at once. A column waits for its backfill
+  while it is `Backfilling` or carries a `PendingFormula` — persisted on the archive, so the queue
+  survives a restart. The GraphQL mutations and REST endpoints call these; the old
+  `AddComputedColumnAsync` / `UpdateComputedColumnFormulaAsync` stay as *inline* variants (prepare,
+  then run the job in the call) for tests, fixtures and seeds.
+- **Job record.** The backfill job is a `RecomputeJob` (no model change): `StagingTableName` carries
+  the marker `computed-column:<name>` (`RecomputeJobSnapshot.ComputedColumnName`), the range is
+  `[UnixEpoch, queuedAt)`, `RowsProcessed` and `LastProgressAt` are updated every 30 s while it runs.
+  It shows up in `recomputeJobsFor` / `list_recompute_jobs` / `ListRecomputeJobs`. The rollup
+  orchestrator never sees it: `IRecomputeJobStore.GetActiveForArchiveAsync` returns rollup jobs only.
+- **Runner.** `ComputedColumnBackfillRunner` (Runtime.Engine) runs a job: `Running` → backfill →
+  re-read the archive → `SetComputedColumnState(Active)` (add) or `SwapComputedColumnFormula`
+  (formula change) → `Completed`. A failure marks the added column `Failed` (or clears the pending
+  formula) and the job `Failed` with the reason. A column removed or re-formulated during the run
+  fails the job instead of resurrecting the column. Shutdown hands the job back as `Pending` and
+  leaves the column queued (not a failure). A `Running` job whose heartbeat is older than 5 min
+  belongs to a dead process and is run again; a live one is left alone.
+- **One at a time.** `RunPendingComputedColumnBackfillsAsync` drains a tenant's queue sequentially,
+  oldest job first; the background service `ComputedColumnBackfillHostedService` (engine-mongodb,
+  registered by `AddComputedColumnBackfillBackgroundService`, options `StreamData:ComputedColumnBackfill`,
+  15 s tick) drains the tenants one after the other under the host's stopping token. So at most one
+  backfill per asset-repo process loads CrateDB, and no request thread is ever held by one. It is a
+  service of its own, so a long backfill does not delay the rollup recompute tick.
+- **Retry.** `RetryComputedColumnBackfillAsync` puts a `Failed` (or interrupted `Pending`) column back
+  to `Backfilling` with a new job; a column that is already queued returns its job (or gets one if it
+  was lost, e.g. a column left `Backfilling` by the old in-request path). `Active` is refused. A
+  formula change is refused while a backfill of the column is queued or running.
+- **CrateDB side.** `BackfillComputedColumnAsync` walks the archive in time slices
+  (`StreamData:ComputedColumnBackfillSlice`, default one day) and bounds every page query to its slice;
+  within a slice the keyset cursor pages 1000 rows, an empty slice is skipped with one
+  `min(time) >= …` lookup. Every statement runs under the maintenance command timeout
+  (`StreamData:Recompute:CommandTimeout`, default 2 min) instead of the driver default of 30 s.
+- **Disable / delete** fail the archive's queued backfill jobs; the columns stay queued and get a new
+  job once the archive is activated again.
 
 ### §8.4 Open items to verify during implementation
 

@@ -216,6 +216,16 @@ the root `System/Entity` type allocated >60 GB and killed the asset-repo service
   records on the current descent path and throws a `DependencyGraphException` on a cycle
   (a record containing itself directly or transitively) instead of recursing to stack
   overflow.
+- **No Secret or Hidden columns**: the collector never emits a column for a `Secret` attribute
+  (not filterable, sortable or projectable) or for an attribute whose effective `access` is `Hidden`
+  (`CkTypeAttributeGraph.IsReadableOutsideMethod == false`). The skip applies on every level - type
+  attributes, record and record-array members (a Hidden member drops out of the record's columns, a Hidden
+  record attribute drops the whole record) and attributes reached through navigation. `ReadOnly` and
+  `MethodOnly` attributes stay default columns (both are readable). This only shapes the **default** column
+  set; an explicit request for a Hidden path (filter, sort, column, stored query) is still refused by the
+  consumers' access guards (`AccessQueryGuard` in asset-repo, `ReportColumnAccessGuard` in report-services,
+  the stored-query guards of bot-services and mesh-adapter). Tests: `CkTypeQueryColumnCollectorTests`
+  (`HiddenAndSecret_*`).
 
 ## Repository Structure
 

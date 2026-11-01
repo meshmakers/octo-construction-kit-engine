@@ -318,6 +318,18 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
     {
         foreach (var attribute in current.AllAttributes.Values)
         {
+            // A Hidden attribute (CK v2 access) is never readable outside a CK method, so it is never a
+            // default query column either - like a Secret one below. Skipping it here keeps it out of the
+            // default column set of every consumer (GraphQL query columns and rows, reports, exports,
+            // pipelines). This applies on every level: type attributes, record members (a Hidden member
+            // drops out of the record's columns, a Hidden record attribute drops the whole record) and
+            // attributes reached through navigation. An explicit request for a Hidden path is still
+            // refused by the access guards of the consumers; this only changes the default set.
+            if (!attribute.IsReadableOutsideMethod)
+            {
+                continue;
+            }
+
             if (!ckModelGraph.Attributes.TryGetValue(attribute.CkAttributeId, out var attributeGraph))
             {
                 throw DependencyGraphException.AttributeNotFound(attribute.CkAttributeId);

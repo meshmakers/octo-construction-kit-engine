@@ -379,8 +379,9 @@ repository.
   blueprint range `[2.x,3.0)` unsatisfied; association writes cannot be expressed in the CK access model at all. **Move the
   attributes into the model's `access` (MethodOnly) with the next System.Identity major, together with AB#7777**, and delete
   `UserAttributeNames` then; the association list stays until the CK model can restrict association writes.
-- Not covered (follow-ups): the mesh-adapter load nodes (`RtAttributeAccessGuard` judges CK `access` only), the MCP service generic
-  CRUD if it does not go through asset-repo GraphQL, `PolicyPermission` and `IdentifiesUser`.
+- Scope (decision Gerald 2026-11-01, AB#8042): the list is enforced by `ImportRt` (caller path) and asset-repo GraphQL only. The
+  mesh-adapter load nodes judge CK `access` alone (`RtAttributeAccessGuard`); the association roles `PolicyPermission` and
+  `IdentifiesUser` are deliberately not in the list.
 - Tests: `ImportRtModelCommandIdentityOwnedTests` (every attribute and role on the caller path, YAML and JSON stream, several
   offenders, other User attributes and the system path import as before, tenant without System.Identity reads the file once,
   version-less matching).

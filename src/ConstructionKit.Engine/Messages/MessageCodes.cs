@@ -391,6 +391,9 @@ internal static class MessageCodes
     internal static OperationMessage RtAttributeWriteRestricted(string? location, object rtId, object ckTypeId, object attributePath) =>
         GetMessage("RtAttributeWriteRestricted", location, rtId, ckTypeId, attributePath);
 
+    internal static OperationMessage RtIdentityOwnedWriteRestricted(string? location, object rtId, object ckTypeId, object path) =>
+        GetMessage("RtIdentityOwnedWriteRestricted", location, rtId, ckTypeId, path);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1124,6 +1127,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  139, "Write refused: the entity '{rtId}' of type '{ckTypeId}' sets attribute '{attributePath}', which only a CK method may write (access Hidden or MethodOnly); an import, blueprint seed, blueprint update or migration step cannot set it",
                  new [] {"rtId", "ckTypeId", "attributePath"})
+        },
+        {
+            "RtIdentityOwnedWriteRestricted",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 140, "Write refused: the entity '{rtId}' of type '{ckTypeId}' sets '{path}', which only the identity service writes (identity REST API or identity methods); a user-initiated import cannot set it",
+                 new [] {"rtId", "ckTypeId", "path"})
         },
     };
 }

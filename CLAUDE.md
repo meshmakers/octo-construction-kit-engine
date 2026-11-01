@@ -375,6 +375,12 @@ the file declares it). The system path (no caller: blueprint seed and update, `I
 migrations) is **not** checked: the System.Identity.Bootstrap seed writes the `TenantOwners` role edges through it. Repository writes
 (`ApplyChangesAsync`, insert/replace) are not checked either: the identity service writes these fields and edges through its own
 repository.
+- **Not by omission either (AB#8059):** a caller `Upsert` is a full replace, and these attributes are SeedOwned, so the
+  blanking guard alone would let an omitted value go under `RtImportBlankingPolicy.Allow` or a confirmation (a lockout reset by
+  leaving `LockoutEnd` out). On the caller path `PreserveRuntimeStateAttributesAsync` therefore treats the identity-owned User
+  attributes like runtime state (existing value carried over, whatever the policy; flag `_callerImport`, set by `ImportFileAsync`
+  only). The system path keeps the blanking semantics. Tests: `ImportRtModelCommandIdentityOwnedTests` (`CallerUpsert_*`,
+  `SystemUpsert_*`).
 - **Why a list and not CK `access` (decision Gerald 2026-11-01, option B):** none of these attributes was `securitySensitive` in an
   earlier 2.x System.Identity, so tightening their access is a Major (row T7, AB#6585) and System.Identity 3.0.0 would leave every
   blueprint range `[2.x,3.0)` unsatisfied; association writes cannot be expressed in the CK access model at all. **Move the

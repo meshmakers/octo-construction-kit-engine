@@ -9,10 +9,12 @@ using Meshmakers.Octo.Runtime.Contracts.AuditTrails;
 using Meshmakers.Octo.Runtime.Contracts.DataPermissions;
 using Meshmakers.Octo.Runtime.Contracts.Exchange;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
+using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Meshmakers.Octo.Runtime.Engine.Exchange;
+using Meshmakers.Octo.Runtime.Engine.Repositories.Query;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -203,6 +205,85 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
         Assert.Single(h.Written);
     }
 
+    // AB#8059: a caller Upsert that OMITS an identity-owned attribute must not clear it either (the Upsert is a full
+    // replace; the blanking guard alone lets an omitted SeedOwned value go under Allow or a confirmation).
+    private static readonly string[] OmittedOwned = ["LockoutEnd", "AccessFailedCount", "TwoFactorEnabled"];
+
+    [Fact]
+    public async Task CallerUpsert_OmittedIdentityOwnedValues_ArePreserved_UnderBlankingPolicyAllow()
+    {
+        var h = new Harness();
+        var stored = h.StoreUser();
+        h.YamlReturns(DtoWithId(stored.RtId, UserType, ("FirstName", "changed")));
+
+        await h.CreateCommand().ImportAsCallerAsync(h.Repository, TempFile(), ExchangeMimeTypes.MimeTypeYaml,
+            ImportStrategy.Upsert, Caller, blankingPolicy: RtImportBlankingPolicy.Allow);
+
+        AssertStoredValuesKept(Assert.Single(h.Written), stored);
+    }
+
+    [Fact]
+    public async Task CallerUpsert_OmittedIdentityOwnedValues_ArePreserved_EvenWhenTheBlankingIsConfirmed()
+    {
+        var h = new Harness();
+        var stored = h.StoreUser();
+        h.YamlReturns(DtoWithId(stored.RtId, UserType, ("FirstName", "changed")));
+
+        await h.CreateCommand().ImportAsCallerAsync(h.Repository, TempFile(), ExchangeMimeTypes.MimeTypeYaml,
+            ImportStrategy.Upsert, Caller, confirmedBlankings:
+            OmittedOwned.Select(a => new RtImportBlankingConfirmation(stored.RtId, a)).ToList());
+
+        AssertStoredValuesKept(Assert.Single(h.Written), stored);
+    }
+
+    [Fact]
+    public async Task CallerUpsert_Json_OmittedIdentityOwnedValues_ArePreserved_UnderBlankingPolicyAllow()
+    {
+        var h = new Harness();
+        var stored = h.StoreUser();
+        h.JsonReturnsBulks([DtoWithId(stored.RtId, UserType, ("FirstName", "changed"))]);
+
+        await h.CreateCommand().ImportAsCallerAsync(h.Repository, TempFile(), "application/json",
+            ImportStrategy.Upsert, Caller, blankingPolicy: RtImportBlankingPolicy.Allow);
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (h.Written.ToArray().Length < 1 && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(20, TestContext.Current.CancellationToken);
+        }
+
+        AssertStoredValuesKept(Assert.Single(h.Written.ToArray()), stored);
+    }
+
+    [Fact]
+    public async Task SystemUpsert_UnderBlankingPolicyAllow_BehavesAsBefore_AndClearsOmittedValues()
+    {
+        // Positive control: the system path (blueprint seed, restore of a file) keeps the blanking semantics.
+        var h = new Harness();
+        var stored = h.StoreUser();
+        h.YamlReturns(DtoWithId(stored.RtId, UserType, ("FirstName", "changed")));
+
+        await h.CreateCommand().ImportAsync(h.Repository, TempFile(), ExchangeMimeTypes.MimeTypeYaml,
+            ImportStrategy.Upsert, blankingPolicy: RtImportBlankingPolicy.Allow);
+
+        var written = Assert.Single(h.Written);
+        foreach (var attribute in OmittedOwned)
+        {
+            Assert.False(written.Attributes.TryGetValue(attribute, out var value) && value != null,
+                $"{attribute} is cleared on the system path under Allow");
+        }
+    }
+
+    private static void AssertStoredValuesKept(RtEntity written, RtEntity stored)
+    {
+        Assert.Equal("changed", written.Attributes["FirstName"]);
+        foreach (var attribute in OmittedOwned)
+        {
+            Assert.True(written.Attributes.TryGetValue(attribute, out var value), $"{attribute} must be carried over");
+            Assert.Equal(stored.Attributes[attribute]?.ToString(), value?.ToString());
+        }
+    }
+
     [Fact]
     public void TheList_HoldsTheLockoutFields_OnlyForTheUserType()
     {
@@ -251,9 +332,13 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
         Assert.Contains("only the identity service writes", ex.Message);
     }
 
-    private static RtEntityTcDto Dto(RtCkId<CkTypeId> type, params (string Name, object? Value)[] attributes)
+    private static RtEntityTcDto Dto(RtCkId<CkTypeId> type, params (string Name, object? Value)[] attributes) =>
+        DtoWithId(OctoObjectId.GenerateNewId(), type, attributes);
+
+    private static RtEntityTcDto DtoWithId(OctoObjectId rtId, RtCkId<CkTypeId> type,
+        params (string Name, object? Value)[] attributes)
     {
-        var dto = new RtEntityTcDto { RtId = OctoObjectId.GenerateNewId(), CkTypeId = type };
+        var dto = new RtEntityTcDto { RtId = rtId, CkTypeId = type };
         foreach (var (name, value) in attributes)
         {
             dto.Attributes.Add(new RtAttributeTcDto
@@ -319,6 +404,29 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
             A.CallTo(() => Repository.BulkInsertRtEntitiesAsync(A<IOctoSession>._, A<IEnumerable<RtEntity>>._,
                     A<BulkOperationOptions>._))
                 .Invokes(call => Written.AddRange(call.GetArgument<IEnumerable<RtEntity>>(1)!));
+            A.CallTo(() => Repository.GetRtEntitiesByIdAsync(A<IOctoSession>._, A<RtCkId<CkTypeId>>._,
+                    A<IReadOnlyList<OctoObjectId>>._, A<RtEntityQueryOptions>._, A<int?>._, A<int?>._))
+                .ReturnsLazily(call =>
+                {
+                    var ids = call.GetArgument<IReadOnlyList<OctoObjectId>>(2)!;
+                    var items = ids.Where(Stored.ContainsKey).Select(id => Stored[id]).ToList();
+                    return Task.FromResult<IResultSet<RtEntity>>(new ResultSet<RtEntity>(items, items.Count, null,
+                        null));
+                });
+        }
+
+        public Dictionary<OctoObjectId, RtEntity> Stored { get; } = [];
+
+        /// <summary>A stored user that is locked out, with failed attempts and 2FA on (identity service state).</summary>
+        public RtEntity StoreUser()
+        {
+            var user = new RtEntity(UserType, OctoObjectId.GenerateNewId());
+            user.SetAttributeRawValue("FirstName", "stored");
+            user.SetAttributeRawValue("LockoutEnd", "2099-01-01T00:00:00Z");
+            user.SetAttributeRawValue("AccessFailedCount", "5");
+            user.SetAttributeRawValue("TwoFactorEnabled", "true");
+            Stored[user.RtId] = user;
+            return user;
         }
 
         public ICkCacheService CkCache { get; } = A.Fake<ICkCacheService>();

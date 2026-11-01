@@ -513,6 +513,49 @@ public class ComputedColumnBackfillJobTests
     }
 
     [Fact]
+    public async Task ShutdownThatKillsTheRunningStatement_IsAnInterruption_NotAFailure()
+    {
+        // test-2, 2026-11-01: a rollout cancelled the host token while a CrateDB statement ran; CrateDB answered
+        // "XX000: Job killed" (a PostgresException, not an OperationCanceledException) and the column ended Failed.
+        var sut = NewSut();
+        var queued = await EnqueueAdd(sut, "DischargePower");
+        using var rollout = new CancellationTokenSource();
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "DischargePower", A<DateTime?>._,
+                A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
+            .Invokes((ArchiveSnapshot _, string _, DateTime? _, IProgress<ComputedColumnBackfillProgress>? progress, CancellationToken _) =>
+            {
+                progress!.Report(new ComputedColumnBackfillProgress(254_000, SliceTwo));
+                rollout.Cancel();
+            })
+            .Throws(() => new InvalidOperationException("XX000: Job killed. Cancellation request by: octo-system"));
+
+        var thrown = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => sut.RunPendingComputedColumnBackfillsAsync(rollout.Token));
+
+        Assert.IsType<InvalidOperationException>(thrown.InnerException);
+        Assert.Equal(ComputedColumnState.Backfilling, _store.Column(_rt, "DischargePower")!.ComputedState);
+        var handedBack = await _jobs.GetAsync(queued!.RtId);
+        Assert.Equal(RecomputeJobState.Pending, handedBack!.State);
+        Assert.Equal(SliceTwo, handedBack.RangeStart);
+        Assert.Equal(254_000, handedBack.RowsProcessed);
+    }
+
+    [Fact]
+    public async Task TheSameErrorWithoutAShutdown_IsStillAFailure()
+    {
+        var sut = NewSut();
+        var queued = await EnqueueAdd(sut, "DischargePower");
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "DischargePower", A<DateTime?>._,
+                A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
+            .Throws(() => new InvalidOperationException("XX000: Job killed"));
+
+        await sut.RunPendingComputedColumnBackfillsAsync(Ct);
+
+        Assert.Equal(ComputedColumnState.Failed, _store.Column(_rt, "DischargePower")!.ComputedState);
+        Assert.Equal(RecomputeJobState.Failed, (await _jobs.GetAsync(queued!.RtId))!.State);
+    }
+
+    [Fact]
     public void JobMarker_TellsABackfillJobFromARollupJob()
     {
         var backfill = RecomputeJobSnapshot.ForComputedColumn(_rt, "ExportPower", RecomputeJobState.Pending, RecomputeTrigger.Manual, _now);

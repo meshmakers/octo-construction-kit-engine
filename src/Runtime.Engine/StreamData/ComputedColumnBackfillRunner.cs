@@ -333,7 +333,10 @@ public sealed class ComputedColumnBackfillRunner
                 formulaChange ? $"; formula version {column.ComputedVersion + 1} is live" : "; now Active");
             return job;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        // Any exception while the run's token is cancelled is the shutdown, not a failure: cancelling a running
+        // CrateDB statement surfaces as the server's "XX000: Job killed" (a PostgresException), not as an
+        // OperationCanceledException (test-2, 2026-11-01: a rollout failed DischargePower this way).
+        catch (Exception interruption) when (cancellationToken.IsCancellationRequested)
         {
             await StopHeartbeatAsync(heartbeatStop, heartbeat);
             // Shutdown: the column stays queued and the job goes back to Pending, so the next drain
@@ -351,7 +354,14 @@ public sealed class ComputedColumnBackfillRunner
             _logger.LogInformation(
                 "Backfill of computed column '{Column}' on archive {Archive} interrupted by shutdown; it is queued again.",
                 columnName, archiveRtId);
-            throw;
+            if (interruption is OperationCanceledException)
+            {
+                throw;
+            }
+
+            // Callers (the drain, the hosted service) treat cancellation as a shutdown; give them one.
+            throw new OperationCanceledException(
+                $"Backfill of computed column '{columnName}' interrupted by shutdown.", interruption, cancellationToken);
         }
         catch (Exception ex)
         {

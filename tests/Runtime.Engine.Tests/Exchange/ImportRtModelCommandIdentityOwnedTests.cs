@@ -33,6 +33,9 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
     private static readonly RtCkId<CkTypeId> OtherType = new("Test-1.0.0/Plain");
     private static readonly RtImportCallerContext Caller = RtImportCallerContext.UserInitiated("user-1");
 
+    // AB#8059: ReadOnly in System.Identity; the general rule imports ReadOnly values, the identity-owned list refuses these two.
+    private static readonly HashSet<string> ReadOnlyInSystemIdentity = ["LockoutEnd", "AccessFailedCount"];
+
     private readonly List<string> _tempFiles = [];
 
     public void Dispose()
@@ -57,6 +60,8 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
     [InlineData("Claims")]
     [InlineData("UserLogins")]
     [InlineData("PreferredChannelBindingId")]
+    [InlineData("LockoutEnd")]
+    [InlineData("AccessFailedCount")]
     public async Task Yaml_CallerSetsAnIdentityOwnedUserAttribute_IsRefused_AndWritesNothing(string attribute)
     {
         var h = new Harness();
@@ -167,6 +172,50 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
             .MustHaveHappenedOnceExactly();
     }
 
+    [Theory]
+    [InlineData("LockoutEnd", "2000-01-01T00:00:00Z")]
+    [InlineData("AccessFailedCount", 0)]
+    public async Task Json_CallerResetsALockout_IsRefused_AndWritesNothing(string attribute, object value)
+    {
+        // AB#8059: a user-started import cannot reset a lockout (ReadOnly alone would import the value).
+        var h = new Harness();
+        var bad = Dto(UserType, ("FirstName", "f"), (attribute, value));
+        h.JsonReturnsBulks([bad]);
+
+        var ex = await Assert.ThrowsAsync<ExchangeException>(() => h.CreateCommand().ImportAsCallerAsync(h.Repository,
+            TempFile(), "application/json", ImportStrategy.Upsert, Caller));
+
+        AssertRefusal(ex, (bad.RtId, Model + "/User", attribute));
+        h.NothingWritten();
+    }
+
+    [Fact]
+    public async Task SystemPath_LockoutValues_ImportAsBefore()
+    {
+        // AB#8059: blueprint seeds and restores (system path) keep importing the ReadOnly lockout values.
+        var h = new Harness();
+        h.YamlReturns(Dto(UserType, ("FirstName", "f"), ("LockoutEnd", "2000-01-01T00:00:00Z"),
+            ("AccessFailedCount", "0")));
+
+        await h.CreateCommand().ImportAsync(h.Repository, TempFile(), ExchangeMimeTypes.MimeTypeYaml,
+            ImportStrategy.Insert);
+
+        Assert.Single(h.Written);
+    }
+
+    [Fact]
+    public void TheList_HoldsTheLockoutFields_OnlyForTheUserType()
+    {
+        var user = new RtCkId<CkTypeId>("System.Identity-2.30.0/User");
+        Assert.True(IdentityOwnedWrites.IsIdentityOwnedAttribute(user, "LockoutEnd"));
+        Assert.True(IdentityOwnedWrites.IsIdentityOwnedAttribute(user, "accessFailedCount"));
+        Assert.Contains("LockoutEnd", IdentityOwnedWrites.UserAttributeNames);
+        Assert.Contains("AccessFailedCount", IdentityOwnedWrites.UserAttributeNames);
+        Assert.False(IdentityOwnedWrites.IsIdentityOwnedAttribute(new RtCkId<CkTypeId>("Test-1.0.0/User"), "LockoutEnd"));
+        Assert.False(IdentityOwnedWrites.IsIdentityOwnedAttribute(new RtCkId<CkTypeId>("System.Identity/Client"),
+            "AccessFailedCount"));
+    }
+
     [Fact]
     public void TheList_MatchesVersionLess_AndIgnoresCase()
     {
@@ -224,7 +273,11 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
             var definition = new CkAttributeGraph(attrId,
                 new CkAttributeDto { AttributeId = a, ValueType = AttributeValueTypesDto.String });
             return new CkTypeAttributeGraph(attrId,
-                new CkTypeAttributeDto { CkAttributeId = attrId, AttributeName = a, IsOptional = true }, definition);
+                new CkTypeAttributeDto
+                {
+                    CkAttributeId = attrId, AttributeName = a, IsOptional = true,
+                    Access = ReadOnlyInSystemIdentity.Contains(a) ? CkAttributeAccessDto.ReadOnly : null
+                }, definition);
         }).ToArray();
         return new CkTypeGraph(new CkId<CkTypeId>($"{model}/{name}"), isAbstract: false, isFinal: true,
             isCollectionRoot: false, baseTypes: [], derivedFromCkTypeId: null, definingCollectionRootCkTypeId: null,
@@ -239,7 +292,7 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
         {
             var user = TypeGraph(Model, "User", "FirstName", "LastName", "NormalizedUserName", "NormalizedEmail",
                 "EmailConfirmed", "PhoneNumberConfirmed", "TwoFactorEnabled", "LockoutEnabled", "ResetPasswordOnLogin",
-                "Claims", "UserLogins", "PreferredChannelBindingId");
+                "Claims", "UserLogins", "PreferredChannelBindingId", "LockoutEnd", "AccessFailedCount");
             var other = TypeGraph("Test-1.0.0", "Plain", "Name");
             var userOut = (CkTypeGraph?)user;
             var otherOut = (CkTypeGraph?)other;

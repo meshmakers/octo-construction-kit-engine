@@ -363,7 +363,8 @@ testing the enum inline.
 `IdentityOwnedWrites` (`ConstructionKit.Contracts`, public) is the one list of what only the identity service writes: the
 `System.Identity/User` attributes `NormalizedUserName`, `NormalizedEmail`, `EmailConfirmed`, `PhoneNumberConfirmed`,
 `TwoFactorEnabled`, `LockoutEnabled`, `ResetPasswordOnLogin`, `Claims` (`UserClaims`), `UserLogins`, `PreferredChannelBindingId`,
-and the association roles `System.Identity/AssignedRole`, `GroupMember`, `ChildGroup`, `MayActAs`, `GrantsPermission` (both
+`LockoutEnd`, `AccessFailedCount` (AB#8059: both are `ReadOnly` in the model, which a user-started import accepts under the general
+rule; listed so that such an import cannot reset a lockout - the general rule stays for every other model), and the association roles `System.Identity/AssignedRole`, `GroupMember`, `ChildGroup`, `MayActAs`, `GrantsPermission` (both
 directions). Matching is version-less (`System.Identity-2.30.0/User`, `System.Identity@2/User` and `System.Identity/User` are the
 same type) and case-insensitive on the attribute name. Consumers: asset-repo GraphQL (generic and typed create/update, query-row
 update) and the **caller path** of `ImportRt`: `ImportRtModelCommand.PreflightIdentityOwnedWrites` (YAML) and the first pass of

@@ -34,7 +34,9 @@ public static class IdentityOwnedWrites
     /// <summary>
     ///     User attributes (assignment names) that only the identity service writes. Already restricted by the model and
     ///     therefore not listed: <c>UserName</c>, <c>Email</c> (MethodOnly), <c>PasswordHash</c>, <c>SecurityStamp</c>,
-    ///     <c>UserTokens</c> (Hidden), <c>LockoutEnd</c>, <c>AccessFailedCount</c> (ReadOnly).
+    ///     <c>UserTokens</c> (Hidden). <c>LockoutEnd</c> and <c>AccessFailedCount</c> are <c>ReadOnly</c> in the model, which
+    ///     the generic write paths refuse but a user-started import accepts (the general rule: ReadOnly is importable); they are
+    ///     listed so that such an import cannot reset a lockout (AB#8059, decision Gerald 2026-11-01).
     /// </summary>
     public static IReadOnlyCollection<string> UserAttributeNames => UserAttributeNameSet;
 
@@ -46,6 +48,8 @@ public static class IdentityOwnedWrites
         "PhoneNumberConfirmed",
         "TwoFactorEnabled",
         "LockoutEnabled",
+        "LockoutEnd",
+        "AccessFailedCount",
         "ResetPasswordOnLogin",
         "Claims",
         "UserLogins",

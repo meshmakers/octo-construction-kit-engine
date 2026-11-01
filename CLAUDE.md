@@ -363,7 +363,8 @@ testing the enum inline.
 `IdentityOwnedWrites` (`ConstructionKit.Contracts`, public) is the one list of what only the identity service writes: the
 `System.Identity/User` attributes `NormalizedUserName`, `NormalizedEmail`, `EmailConfirmed`, `PhoneNumberConfirmed`,
 `TwoFactorEnabled`, `LockoutEnabled`, `ResetPasswordOnLogin`, `Claims` (`UserClaims`), `UserLogins`, `PreferredChannelBindingId`,
-and the association roles `System.Identity/AssignedRole`, `GroupMember`, `ChildGroup`, `MayActAs`, `GrantsPermission` (both
+`LockoutEnd`, `AccessFailedCount` (AB#8059: both are `ReadOnly` in the model, which a user-started import accepts under the general
+rule; listed so that such an import cannot reset a lockout - the general rule stays for every other model), and the association roles `System.Identity/AssignedRole`, `GroupMember`, `ChildGroup`, `MayActAs`, `GrantsPermission` (both
 directions). Matching is version-less (`System.Identity-2.30.0/User`, `System.Identity@2/User` and `System.Identity/User` are the
 same type) and case-insensitive on the attribute name. Consumers: asset-repo GraphQL (generic and typed create/update, query-row
 update) and the **caller path** of `ImportRt`: `ImportRtModelCommand.PreflightIdentityOwnedWrites` (YAML) and the first pass of
@@ -374,6 +375,12 @@ the file declares it). The system path (no caller: blueprint seed and update, `I
 migrations) is **not** checked: the System.Identity.Bootstrap seed writes the `TenantOwners` role edges through it. Repository writes
 (`ApplyChangesAsync`, insert/replace) are not checked either: the identity service writes these fields and edges through its own
 repository.
+- **Not by omission either (AB#8059):** a caller `Upsert` is a full replace, and these attributes are SeedOwned, so the
+  blanking guard alone would let an omitted value go under `RtImportBlankingPolicy.Allow` or a confirmation (a lockout reset by
+  leaving `LockoutEnd` out). On the caller path `PreserveRuntimeStateAttributesAsync` therefore treats the identity-owned User
+  attributes like runtime state (existing value carried over, whatever the policy; flag `_callerImport`, set by `ImportFileAsync`
+  only). The system path keeps the blanking semantics. Tests: `ImportRtModelCommandIdentityOwnedTests` (`CallerUpsert_*`,
+  `SystemUpsert_*`).
 - **Why a list and not CK `access` (decision Gerald 2026-11-01, option B):** none of these attributes was `securitySensitive` in an
   earlier 2.x System.Identity, so tightening their access is a Major (row T7, AB#6585) and System.Identity 3.0.0 would leave every
   blueprint range `[2.x,3.0)` unsatisfied; association writes cannot be expressed in the CK access model at all. **Move the

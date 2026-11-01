@@ -9,10 +9,12 @@ using Meshmakers.Octo.Runtime.Contracts.AuditTrails;
 using Meshmakers.Octo.Runtime.Contracts.DataPermissions;
 using Meshmakers.Octo.Runtime.Contracts.Exchange;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
+using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Meshmakers.Octo.Runtime.Engine.Exchange;
+using Meshmakers.Octo.Runtime.Engine.Repositories.Query;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -32,6 +34,9 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
     private static readonly RtCkId<CkTypeId> UserType = new($"{Model}/User");
     private static readonly RtCkId<CkTypeId> OtherType = new("Test-1.0.0/Plain");
     private static readonly RtImportCallerContext Caller = RtImportCallerContext.UserInitiated("user-1");
+
+    // AB#8059: ReadOnly in System.Identity; the general rule imports ReadOnly values, the identity-owned list refuses these two.
+    private static readonly HashSet<string> ReadOnlyInSystemIdentity = ["LockoutEnd", "AccessFailedCount"];
 
     private readonly List<string> _tempFiles = [];
 
@@ -57,6 +62,8 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
     [InlineData("Claims")]
     [InlineData("UserLogins")]
     [InlineData("PreferredChannelBindingId")]
+    [InlineData("LockoutEnd")]
+    [InlineData("AccessFailedCount")]
     public async Task Yaml_CallerSetsAnIdentityOwnedUserAttribute_IsRefused_AndWritesNothing(string attribute)
     {
         var h = new Harness();
@@ -167,6 +174,129 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
             .MustHaveHappenedOnceExactly();
     }
 
+    [Theory]
+    [InlineData("LockoutEnd", "2000-01-01T00:00:00Z")]
+    [InlineData("AccessFailedCount", 0)]
+    public async Task Json_CallerResetsALockout_IsRefused_AndWritesNothing(string attribute, object value)
+    {
+        // AB#8059: a user-started import cannot reset a lockout (ReadOnly alone would import the value).
+        var h = new Harness();
+        var bad = Dto(UserType, ("FirstName", "f"), (attribute, value));
+        h.JsonReturnsBulks([bad]);
+
+        var ex = await Assert.ThrowsAsync<ExchangeException>(() => h.CreateCommand().ImportAsCallerAsync(h.Repository,
+            TempFile(), "application/json", ImportStrategy.Upsert, Caller));
+
+        AssertRefusal(ex, (bad.RtId, Model + "/User", attribute));
+        h.NothingWritten();
+    }
+
+    [Fact]
+    public async Task SystemPath_LockoutValues_ImportAsBefore()
+    {
+        // AB#8059: blueprint seeds and restores (system path) keep importing the ReadOnly lockout values.
+        var h = new Harness();
+        h.YamlReturns(Dto(UserType, ("FirstName", "f"), ("LockoutEnd", "2000-01-01T00:00:00Z"),
+            ("AccessFailedCount", "0")));
+
+        await h.CreateCommand().ImportAsync(h.Repository, TempFile(), ExchangeMimeTypes.MimeTypeYaml,
+            ImportStrategy.Insert);
+
+        Assert.Single(h.Written);
+    }
+
+    // AB#8059: a caller Upsert that OMITS an identity-owned attribute must not clear it either (the Upsert is a full
+    // replace; the blanking guard alone lets an omitted SeedOwned value go under Allow or a confirmation).
+    private static readonly string[] OmittedOwned = ["LockoutEnd", "AccessFailedCount", "TwoFactorEnabled"];
+
+    [Fact]
+    public async Task CallerUpsert_OmittedIdentityOwnedValues_ArePreserved_UnderBlankingPolicyAllow()
+    {
+        var h = new Harness();
+        var stored = h.StoreUser();
+        h.YamlReturns(DtoWithId(stored.RtId, UserType, ("FirstName", "changed")));
+
+        await h.CreateCommand().ImportAsCallerAsync(h.Repository, TempFile(), ExchangeMimeTypes.MimeTypeYaml,
+            ImportStrategy.Upsert, Caller, blankingPolicy: RtImportBlankingPolicy.Allow);
+
+        AssertStoredValuesKept(Assert.Single(h.Written), stored);
+    }
+
+    [Fact]
+    public async Task CallerUpsert_OmittedIdentityOwnedValues_ArePreserved_EvenWhenTheBlankingIsConfirmed()
+    {
+        var h = new Harness();
+        var stored = h.StoreUser();
+        h.YamlReturns(DtoWithId(stored.RtId, UserType, ("FirstName", "changed")));
+
+        await h.CreateCommand().ImportAsCallerAsync(h.Repository, TempFile(), ExchangeMimeTypes.MimeTypeYaml,
+            ImportStrategy.Upsert, Caller, confirmedBlankings:
+            OmittedOwned.Select(a => new RtImportBlankingConfirmation(stored.RtId, a)).ToList());
+
+        AssertStoredValuesKept(Assert.Single(h.Written), stored);
+    }
+
+    [Fact]
+    public async Task CallerUpsert_Json_OmittedIdentityOwnedValues_ArePreserved_UnderBlankingPolicyAllow()
+    {
+        var h = new Harness();
+        var stored = h.StoreUser();
+        h.JsonReturnsBulks([DtoWithId(stored.RtId, UserType, ("FirstName", "changed"))]);
+
+        await h.CreateCommand().ImportAsCallerAsync(h.Repository, TempFile(), "application/json",
+            ImportStrategy.Upsert, Caller, blankingPolicy: RtImportBlankingPolicy.Allow);
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (h.Written.ToArray().Length < 1 && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(20, TestContext.Current.CancellationToken);
+        }
+
+        AssertStoredValuesKept(Assert.Single(h.Written.ToArray()), stored);
+    }
+
+    [Fact]
+    public async Task SystemUpsert_UnderBlankingPolicyAllow_BehavesAsBefore_AndClearsOmittedValues()
+    {
+        // Positive control: the system path (blueprint seed, restore of a file) keeps the blanking semantics.
+        var h = new Harness();
+        var stored = h.StoreUser();
+        h.YamlReturns(DtoWithId(stored.RtId, UserType, ("FirstName", "changed")));
+
+        await h.CreateCommand().ImportAsync(h.Repository, TempFile(), ExchangeMimeTypes.MimeTypeYaml,
+            ImportStrategy.Upsert, blankingPolicy: RtImportBlankingPolicy.Allow);
+
+        var written = Assert.Single(h.Written);
+        foreach (var attribute in OmittedOwned)
+        {
+            Assert.False(written.Attributes.TryGetValue(attribute, out var value) && value != null,
+                $"{attribute} is cleared on the system path under Allow");
+        }
+    }
+
+    private static void AssertStoredValuesKept(RtEntity written, RtEntity stored)
+    {
+        Assert.Equal("changed", written.Attributes["FirstName"]);
+        foreach (var attribute in OmittedOwned)
+        {
+            Assert.True(written.Attributes.TryGetValue(attribute, out var value), $"{attribute} must be carried over");
+            Assert.Equal(stored.Attributes[attribute]?.ToString(), value?.ToString());
+        }
+    }
+
+    [Fact]
+    public void TheList_HoldsTheLockoutFields_OnlyForTheUserType()
+    {
+        var user = new RtCkId<CkTypeId>("System.Identity-2.30.0/User");
+        Assert.True(IdentityOwnedWrites.IsIdentityOwnedAttribute(user, "LockoutEnd"));
+        Assert.True(IdentityOwnedWrites.IsIdentityOwnedAttribute(user, "accessFailedCount"));
+        Assert.Contains("LockoutEnd", IdentityOwnedWrites.UserAttributeNames);
+        Assert.Contains("AccessFailedCount", IdentityOwnedWrites.UserAttributeNames);
+        Assert.False(IdentityOwnedWrites.IsIdentityOwnedAttribute(new RtCkId<CkTypeId>("Test-1.0.0/User"), "LockoutEnd"));
+        Assert.False(IdentityOwnedWrites.IsIdentityOwnedAttribute(new RtCkId<CkTypeId>("System.Identity/Client"),
+            "AccessFailedCount"));
+    }
+
     [Fact]
     public void TheList_MatchesVersionLess_AndIgnoresCase()
     {
@@ -202,9 +332,13 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
         Assert.Contains("only the identity service writes", ex.Message);
     }
 
-    private static RtEntityTcDto Dto(RtCkId<CkTypeId> type, params (string Name, object? Value)[] attributes)
+    private static RtEntityTcDto Dto(RtCkId<CkTypeId> type, params (string Name, object? Value)[] attributes) =>
+        DtoWithId(OctoObjectId.GenerateNewId(), type, attributes);
+
+    private static RtEntityTcDto DtoWithId(OctoObjectId rtId, RtCkId<CkTypeId> type,
+        params (string Name, object? Value)[] attributes)
     {
-        var dto = new RtEntityTcDto { RtId = OctoObjectId.GenerateNewId(), CkTypeId = type };
+        var dto = new RtEntityTcDto { RtId = rtId, CkTypeId = type };
         foreach (var (name, value) in attributes)
         {
             dto.Attributes.Add(new RtAttributeTcDto
@@ -224,7 +358,11 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
             var definition = new CkAttributeGraph(attrId,
                 new CkAttributeDto { AttributeId = a, ValueType = AttributeValueTypesDto.String });
             return new CkTypeAttributeGraph(attrId,
-                new CkTypeAttributeDto { CkAttributeId = attrId, AttributeName = a, IsOptional = true }, definition);
+                new CkTypeAttributeDto
+                {
+                    CkAttributeId = attrId, AttributeName = a, IsOptional = true,
+                    Access = ReadOnlyInSystemIdentity.Contains(a) ? CkAttributeAccessDto.ReadOnly : null
+                }, definition);
         }).ToArray();
         return new CkTypeGraph(new CkId<CkTypeId>($"{model}/{name}"), isAbstract: false, isFinal: true,
             isCollectionRoot: false, baseTypes: [], derivedFromCkTypeId: null, definingCollectionRootCkTypeId: null,
@@ -239,7 +377,7 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
         {
             var user = TypeGraph(Model, "User", "FirstName", "LastName", "NormalizedUserName", "NormalizedEmail",
                 "EmailConfirmed", "PhoneNumberConfirmed", "TwoFactorEnabled", "LockoutEnabled", "ResetPasswordOnLogin",
-                "Claims", "UserLogins", "PreferredChannelBindingId");
+                "Claims", "UserLogins", "PreferredChannelBindingId", "LockoutEnd", "AccessFailedCount");
             var other = TypeGraph("Test-1.0.0", "Plain", "Name");
             var userOut = (CkTypeGraph?)user;
             var otherOut = (CkTypeGraph?)other;
@@ -266,6 +404,29 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
             A.CallTo(() => Repository.BulkInsertRtEntitiesAsync(A<IOctoSession>._, A<IEnumerable<RtEntity>>._,
                     A<BulkOperationOptions>._))
                 .Invokes(call => Written.AddRange(call.GetArgument<IEnumerable<RtEntity>>(1)!));
+            A.CallTo(() => Repository.GetRtEntitiesByIdAsync(A<IOctoSession>._, A<RtCkId<CkTypeId>>._,
+                    A<IReadOnlyList<OctoObjectId>>._, A<RtEntityQueryOptions>._, A<int?>._, A<int?>._))
+                .ReturnsLazily(call =>
+                {
+                    var ids = call.GetArgument<IReadOnlyList<OctoObjectId>>(2)!;
+                    var items = ids.Where(Stored.ContainsKey).Select(id => Stored[id]).ToList();
+                    return Task.FromResult<IResultSet<RtEntity>>(new ResultSet<RtEntity>(items, items.Count, null,
+                        null));
+                });
+        }
+
+        public Dictionary<OctoObjectId, RtEntity> Stored { get; } = [];
+
+        /// <summary>A stored user that is locked out, with failed attempts and 2FA on (identity service state).</summary>
+        public RtEntity StoreUser()
+        {
+            var user = new RtEntity(UserType, OctoObjectId.GenerateNewId());
+            user.SetAttributeRawValue("FirstName", "stored");
+            user.SetAttributeRawValue("LockoutEnd", "2099-01-01T00:00:00Z");
+            user.SetAttributeRawValue("AccessFailedCount", "5");
+            user.SetAttributeRawValue("TwoFactorEnabled", "true");
+            Stored[user.RtId] = user;
+            return user;
         }
 
         public ICkCacheService CkCache { get; } = A.Fake<ICkCacheService>();

@@ -47,6 +47,10 @@ internal class ImportRtModelCommand(
     private readonly ConcurrentQueue<RtImportGuardEntry> _guardEntries = new();
     private RtImportBlankingPolicy _blankingPolicy = RtImportBlankingPolicy.Keep;
     private IReadOnlyCollection<RtImportBlankingConfirmation>? _confirmedBlankings;
+
+    // AB#8059: true while a user-initiated import (caller path of ImportRt) runs; identity-owned User attributes are then
+    // preserved on Upsert like runtime state, independent of the blanking policy.
+    private bool _callerImport;
     private int _associationsCount;
 
     // AB#7997: columns the seed adds to activated archives, taken out of the import and added through the archive
@@ -81,6 +85,7 @@ internal class ImportRtModelCommand(
         _archiveColumnAdditions.Clear();
         _archiveLifecycle = null;
         _lockEnforcer = null;
+        _callerImport = false;
         _blueprintLockSummary = RtImportBlueprintLockSummary.Empty;
     }
 
@@ -195,6 +200,7 @@ internal class ImportRtModelCommand(
         ResetImportState();
         _blankingPolicy = blankingPolicy;
         _confirmedBlankings = confirmedBlankings;
+        _callerImport = caller != null;
         logger.LogInformation("Importing RT entities using file started");
 
         if (!cacheService.IsTenantLoaded(runtimeRepository.TenantId))
@@ -1262,6 +1268,18 @@ internal class ImportRtModelCommand(
             // AB#6313: the seed-owned attributes are guarded against blanking, so a type needs the
             // existing-entity lookup unless it has no attributes at all.
             var seedOwnedAttributes = SelectGuardedAttributes(ckTypeGraph);
+
+            // AB#8059: a user-initiated import must not change an identity-owned User attribute - not by a value (refused by
+            // the preflight, message 140) and not by omission: the Upsert is a full replace, and under the blanking policy
+            // Allow (or a confirmation) an omitted SeedOwned value would be cleared, e.g. a lockout reset. On the caller path
+            // these attributes are therefore preserved like runtime state, whatever the policy. The system path is unchanged.
+            if (_callerImport && IdentityOwnedWrites.IsUserType(typeGroup.Key))
+            {
+                var identityOwned = seedOwnedAttributes
+                    .Where(a => IdentityOwnedWrites.IsIdentityOwnedAttribute(typeGroup.Key, a.AttributeName)).ToList();
+                flaggedAttributes.AddRange(identityOwned);
+                seedOwnedAttributes = seedOwnedAttributes.Except(identityOwned).ToList();
+            }
 
             if (flaggedAttributes.Count == 0 && secretRecordAttributes.Count == 0 && seedOwnedAttributes.Count == 0)
             {

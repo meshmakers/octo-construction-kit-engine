@@ -422,6 +422,14 @@ logical→physical name pointer atomically on completion.
   within a slice the keyset cursor pages 1000 rows, an empty slice is skipped with one
   `min(time) >= …` lookup. Every statement runs under the maintenance command timeout
   (`StreamData:Recompute:CommandTimeout`, default 2 min) instead of the driver default of 30 s.
+- **Checkpoint / resume.** Every asset-repo rollout restarts the pod, and a large archive takes longer
+  than the gap between two test-2 deploys (2026-11-01: ExportPower on ~750k rows restarted from row 0
+  twice). The repository reports `ComputedColumnBackfillProgress(Rows, CompletedThrough)` after every
+  chunk; the heartbeat stores `CompletedThrough` in the job's `RangeStart` and the running row count in
+  `RowsProcessed` (every 30 s), the shutdown hand-back stores both at once. A job adopted later (handed
+  back, or Running with a dead heartbeat) resumes at `RangeStart` and counts on from `RowsProcessed`; a new
+  job starts at `UnixEpoch`. Skipping the rows before the checkpoint is safe because ingest evaluates every
+  computed column, so rows that arrive behind it during the backfill get their value anyway.
 - **Disable / delete** fail the archive's queued backfill jobs; the columns stay queued and get a new
   job once the archive is activated again.
 

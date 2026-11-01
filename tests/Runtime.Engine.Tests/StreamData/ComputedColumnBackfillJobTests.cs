@@ -56,8 +56,8 @@ public class ComputedColumnBackfillJobTests
         sut.EnqueueAddComputedColumnAsync(_rt, name, "activepower * -1", FormulaResultType.Double, indexed: true, token ?? Ct);
 
     private void BackfillReports(long rows) =>
-        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<IProgress<long>?>._, A<CancellationToken>._))
-            .Invokes((ArchiveSnapshot _, string _, IProgress<long>? progress, CancellationToken _) => progress?.Report(rows));
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<DateTime?>._, A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
+            .Invokes((ArchiveSnapshot _, string _, DateTime? _, IProgress<ComputedColumnBackfillProgress>? progress, CancellationToken _) => progress?.Report(new ComputedColumnBackfillProgress(rows, null)));
 
     [Fact]
     public async Task EnqueueAdd_ReturnsAtOnce_ColumnBackfilling_JobPending_NoBackfillInTheCall()
@@ -72,7 +72,7 @@ public class ComputedColumnBackfillJobTests
         Assert.Equal(ComputedColumnState.Backfilling, _store.Column(_rt, "ExportPower")!.ComputedState);
         A.CallTo(() => _repo.AddComputedColumnStorageAsync(A<ArchiveSnapshot>._, "ExportPower", A<CancellationToken>._))
             .MustHaveHappenedOnceExactly();
-        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<IProgress<long>?>._, A<CancellationToken>._))
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<DateTime?>._, A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
             .MustNotHaveHappened();
         A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<CancellationToken>._))
             .MustNotHaveHappened();
@@ -109,8 +109,8 @@ public class ComputedColumnBackfillJobTests
         // The client gives up (timeout, disconnect) right after the call returned.
         await request.CancelAsync();
         CancellationToken seen = default;
-        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<IProgress<long>?>._, A<CancellationToken>._))
-            .Invokes((ArchiveSnapshot _, string _, IProgress<long>? _, CancellationToken token) => seen = token);
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<DateTime?>._, A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
+            .Invokes((ArchiveSnapshot _, string _, DateTime? _, IProgress<ComputedColumnBackfillProgress>? _, CancellationToken token) => seen = token);
 
         using var host = new CancellationTokenSource();
         await sut.RunPendingComputedColumnBackfillsAsync(host.Token);
@@ -130,8 +130,8 @@ public class ComputedColumnBackfillJobTests
         var running = 0;
         var maxParallel = 0;
         var order = new List<string>();
-        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<IProgress<long>?>._, A<CancellationToken>._))
-            .ReturnsLazily(async (ArchiveSnapshot _, string column, IProgress<long>? _, CancellationToken _) =>
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<DateTime?>._, A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
+            .ReturnsLazily(async (ArchiveSnapshot _, string column, DateTime? _, IProgress<ComputedColumnBackfillProgress>? _, CancellationToken _) =>
             {
                 maxParallel = Math.Max(maxParallel, Interlocked.Increment(ref running));
                 order.Add(column);
@@ -155,7 +155,7 @@ public class ComputedColumnBackfillJobTests
     {
         var sut = NewSut();
         var queued = await EnqueueAdd(sut, "ExportPower");
-        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<IProgress<long>?>._, A<CancellationToken>._))
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<DateTime?>._, A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
             .Throws(new InvalidOperationException("XX000: Job killed"));
 
         await sut.RunPendingComputedColumnBackfillsAsync(Ct);
@@ -167,7 +167,7 @@ public class ComputedColumnBackfillJobTests
         Assert.Contains("XX000: Job killed", failed.ErrorReason);
 
         // Retry: one call, no remove + add.
-        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<IProgress<long>?>._, A<CancellationToken>._))
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<DateTime?>._, A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
             .Returns(Task.CompletedTask);
         var retry = await sut.RetryComputedColumnBackfillAsync(_rt, "ExportPower", Ct);
 
@@ -221,7 +221,7 @@ public class ComputedColumnBackfillJobTests
         var sut = NewSut();
         var queued = await EnqueueAdd(sut, "ExportPower");
         using var shutdown = new CancellationTokenSource();
-        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<IProgress<long>?>._, A<CancellationToken>._))
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<DateTime?>._, A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
             .Invokes(() => shutdown.Cancel())
             .Throws(() => new OperationCanceledException(shutdown.Token));
 
@@ -230,7 +230,7 @@ public class ComputedColumnBackfillJobTests
         Assert.Equal(ComputedColumnState.Backfilling, _store.Column(_rt, "ExportPower")!.ComputedState);
         Assert.Equal(RecomputeJobState.Pending, (await _jobs.GetAsync(queued!.RtId))!.State);
 
-        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<IProgress<long>?>._, A<CancellationToken>._))
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<DateTime?>._, A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
             .Returns(Task.CompletedTask);
         await sut.RunPendingComputedColumnBackfillsAsync(Ct);
 
@@ -248,7 +248,7 @@ public class ComputedColumnBackfillJobTests
 
         // Another process heartbeats it: leave it alone.
         Assert.Equal(0, await sut.RunPendingComputedColumnBackfillsAsync(Ct));
-        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<IProgress<long>?>._, A<CancellationToken>._))
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<DateTime?>._, A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
             .MustNotHaveHappened();
 
         // Its process died: no heartbeat for longer than the stale timeout — the drain runs it again.
@@ -286,7 +286,7 @@ public class ComputedColumnBackfillJobTests
     {
         var sut = NewSut();
         var queued = await EnqueueAdd(sut, "ExportPower");
-        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<IProgress<long>?>._, A<CancellationToken>._))
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<DateTime?>._, A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
             .Invokes(() => _store.RemoveComputedColumnAsync(_rt, "ExportPower").GetAwaiter().GetResult());
 
         await sut.RunPendingComputedColumnBackfillsAsync(Ct);
@@ -309,7 +309,7 @@ public class ComputedColumnBackfillJobTests
         Assert.Equal("activepower * -1", queuedColumn.Formula);
         Assert.Equal("activepower * -2", queuedColumn.PendingFormula);
         Assert.Equal(RecomputeJobState.Pending, job!.State);
-        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<IProgress<long>?>._, A<CancellationToken>._))
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<DateTime?>._, A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
             .MustNotHaveHappened();
 
         await sut.RunPendingComputedColumnBackfillsAsync(Ct);
@@ -327,7 +327,7 @@ public class ComputedColumnBackfillJobTests
         AddColumn(Active("ExportPower"));
         var sut = NewSut();
         var job = await sut.EnqueueUpdateComputedColumnFormulaAsync(_rt, "ExportPower", "activepower * -2", Ct);
-        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<IProgress<long>?>._, A<CancellationToken>._))
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<DateTime?>._, A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
             .Throws(new InvalidOperationException("crate down"));
 
         await sut.RunPendingComputedColumnBackfillsAsync(Ct);
@@ -373,7 +373,7 @@ public class ComputedColumnBackfillJobTests
 
         Assert.Equal(ComputedColumnState.Active, _store.Column(_rt, "ExportPower")!.ComputedState);
         Assert.Equal(RecomputeJobState.Failed, ended!.State);
-        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<IProgress<long>?>._, A<CancellationToken>._))
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<DateTime?>._, A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
             .MustNotHaveHappened();
     }
 
@@ -385,13 +385,131 @@ public class ComputedColumnBackfillJobTests
         var second = await EnqueueAdd(sut, "ImportPower");
 
         // While ExportPower runs, another process starts ImportPower (Running, fresh heartbeat).
-        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "ExportPower", A<IProgress<long>?>._, A<CancellationToken>._))
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "ExportPower", A<DateTime?>._, A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
             .Invokes(() => _jobs.UpdateAsync(second! with { State = RecomputeJobState.Running, StartedAt = _now, LastProgressAt = _now })
                 .GetAwaiter().GetResult());
 
         Assert.Equal(1, await sut.RunPendingComputedColumnBackfillsAsync(Ct));
-        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "ImportPower", A<IProgress<long>?>._, A<CancellationToken>._))
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "ImportPower", A<DateTime?>._, A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
             .MustNotHaveHappened();
+    }
+
+    // ---------------------------------------------------------------- checkpoint / resume
+
+    private static readonly DateTime SliceOne = new(2026, 7, 2, 0, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime SliceTwo = new(2026, 7, 3, 0, 0, 0, DateTimeKind.Utc);
+
+    [Fact]
+    public async Task InterruptedRun_KeepsCheckpointAndRows_AndTheNextRunResumesThere()
+    {
+        var sut = NewSut();
+        var queued = await EnqueueAdd(sut, "ExportPower");
+        using var rollout = new CancellationTokenSource();
+        // First run: two slices committed, then the pod is rolled.
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "ExportPower", A<DateTime?>._,
+                A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
+            .Invokes((ArchiveSnapshot _, string _, DateTime? _, IProgress<ComputedColumnBackfillProgress>? progress, CancellationToken _) =>
+            {
+                progress!.Report(new ComputedColumnBackfillProgress(1000, SliceOne));
+                progress.Report(new ComputedColumnBackfillProgress(2500, SliceTwo));
+                rollout.Cancel();
+            })
+            .Throws(() => new OperationCanceledException(rollout.Token));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => sut.RunPendingComputedColumnBackfillsAsync(rollout.Token));
+
+        var handedBack = await _jobs.GetAsync(queued!.RtId);
+        Assert.Equal(RecomputeJobState.Pending, handedBack!.State);
+        Assert.Equal(SliceTwo, handedBack.RangeStart);
+        Assert.Equal(2500, handedBack.RowsProcessed);
+
+        // Second run (new pod): resumes at the checkpoint and counts on.
+        DateTime? resumedAt = null;
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "ExportPower", A<DateTime?>._,
+                A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
+            .Invokes((ArchiveSnapshot _, string _, DateTime? resume, IProgress<ComputedColumnBackfillProgress>? progress, CancellationToken _) =>
+            {
+                resumedAt = resume;
+                progress!.Report(new ComputedColumnBackfillProgress(500, SliceTwo.AddDays(1)));
+            })
+            .DoesNothing();
+
+        Assert.Equal(1, await NewSut().RunPendingComputedColumnBackfillsAsync(Ct));
+
+        Assert.Equal(SliceTwo, resumedAt);
+        var done = await _jobs.GetAsync(queued.RtId);
+        Assert.Equal(RecomputeJobState.Completed, done!.State);
+        Assert.Equal(3000, done.RowsProcessed);
+        Assert.Equal(ComputedColumnState.Active, _store.Column(_rt, "ExportPower")!.ComputedState);
+    }
+
+    [Fact]
+    public async Task NewJob_StartsFromTheFirstRow()
+    {
+        var sut = NewSut();
+        await EnqueueAdd(sut, "ExportPower");
+        DateTime? resumedAt = SliceOne;
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, A<string>._, A<DateTime?>._,
+                A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
+            .Invokes((ArchiveSnapshot _, string _, DateTime? resume, IProgress<ComputedColumnBackfillProgress>? _, CancellationToken _) =>
+                resumedAt = resume);
+
+        await sut.RunPendingComputedColumnBackfillsAsync(Ct);
+
+        Assert.Null(resumedAt);
+    }
+
+    [Fact]
+    public async Task HeartbeatPersistsTheCheckpoint_SoADeadProcessIsResumedToo()
+    {
+        // A process that dies without a hand-back leaves only what the heartbeat stored.
+        var sut = NewSut();
+        var queued = await EnqueueAdd(sut, "ExportPower");
+        var runner = new ComputedColumnBackfillRunner(_store, _repo, _jobs, NullLogger.Instance, () => _now,
+            heartbeatInterval: TimeSpan.FromMilliseconds(10));
+        var release = new TaskCompletionSource();
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "ExportPower", A<DateTime?>._,
+                A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
+            .ReturnsLazily(async (ArchiveSnapshot _, string _, DateTime? _, IProgress<ComputedColumnBackfillProgress>? progress, CancellationToken _) =>
+            {
+                progress!.Report(new ComputedColumnBackfillProgress(4000, SliceOne));
+                // Hold the run until the heartbeat has written the checkpoint.
+                while ((await _jobs.GetAsync(queued!.RtId))!.RangeStart != SliceOne)
+                {
+                    await Task.Delay(5, Ct);
+                }
+
+                release.SetResult();
+            });
+
+        await runner.RunAsync(_rt, "ExportPower", queued, rethrowFailure: false, Ct);
+        await release.Task;
+
+        Assert.Contains(_jobs.History, h => h.RtId == queued!.RtId && h.State == RecomputeJobState.Running
+                                            && h.RangeStart == SliceOne && h.RowsProcessed == 4000);
+    }
+
+    [Fact]
+    public async Task StaleRunningJobWithACheckpoint_IsAdoptedAndResumed()
+    {
+        AddColumn(Active("ExportPower") with { ComputedState = ComputedColumnState.Backfilling });
+        var dead = RecomputeJobSnapshot.ForComputedColumn(_rt, "ExportPower", RecomputeJobState.Running,
+            RecomputeTrigger.Manual, _now) with { RangeStart = SliceTwo, RowsProcessed = 600_000 };
+        var deadId = await _jobs.CreateAsync(dead);
+        _now += ComputedColumnBackfillRunner.DefaultStaleJobTimeout + TimeSpan.FromMinutes(1);
+        DateTime? resumedAt = null;
+        A.CallTo(() => _repo.BackfillComputedColumnAsync(A<ArchiveSnapshot>._, "ExportPower", A<DateTime?>._,
+                A<IProgress<ComputedColumnBackfillProgress>?>._, A<CancellationToken>._))
+            .Invokes((ArchiveSnapshot _, string _, DateTime? resume, IProgress<ComputedColumnBackfillProgress>? progress, CancellationToken _) =>
+            {
+                resumedAt = resume;
+                progress!.Report(new ComputedColumnBackfillProgress(150_000, null));
+            });
+
+        Assert.Equal(1, await NewSut().RunPendingComputedColumnBackfillsAsync(Ct));
+
+        Assert.Equal(SliceTwo, resumedAt);
+        Assert.Equal(750_000, (await _jobs.GetAsync(deadId))!.RowsProcessed);
     }
 
     [Fact]

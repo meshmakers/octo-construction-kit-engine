@@ -74,6 +74,8 @@ public sealed record RecomputeJobSnapshot(
     /// <summary>
     /// A new, not yet persisted computed-column backfill job (AB#8002). The range is
     /// <c>[UnixEpoch, createdAt)</c>: the backfill covers every row the archive held when it was queued.
+    /// While the job runs, <see cref="RangeStart"/> advances to the backfill's checkpoint (the end of the
+    /// last completed time slice), so a run cut short by a restart resumes there instead of starting over.
     /// </summary>
     public static RecomputeJobSnapshot ForComputedColumn(
         OctoObjectId archiveRtId, string columnName, RecomputeJobState state, RecomputeTrigger trigger,

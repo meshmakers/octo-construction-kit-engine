@@ -122,6 +122,28 @@ public interface IStreamDataRepository
         CancellationToken cancellationToken) =>
         BackfillComputedColumnAsync(snapshot, columnName, cancellationToken);
 
+    /// <summary>
+    /// Resumable form of the backfill (AB#8002): rows whose time key is before
+    /// <paramref name="resumeFrom"/> are skipped — an earlier run of the same job already wrote them —
+    /// and <paramref name="progress"/> receives the running row count and the checkpoint after every
+    /// committed chunk, which the job stores so a run cut short by a restart resumes there instead of
+    /// starting over. Rows that arrive behind the checkpoint during the backfill are written by ingest,
+    /// which evaluates every computed column. The default implementation ignores
+    /// <paramref name="resumeFrom"/> (a full backfill is always correct, only slower) and reports rows
+    /// without a checkpoint.
+    /// </summary>
+    Task BackfillComputedColumnAsync(
+        ArchiveSnapshot snapshot, string columnName, DateTime? resumeFrom,
+        IProgress<ComputedColumnBackfillProgress>? progress, CancellationToken cancellationToken) =>
+        BackfillComputedColumnAsync(snapshot, columnName,
+            progress is null ? null : new RowsOnlyProgress(progress), cancellationToken);
+
+    /// <summary>Adapts a row count to <see cref="ComputedColumnBackfillProgress"/> without a checkpoint.</summary>
+    private sealed class RowsOnlyProgress(IProgress<ComputedColumnBackfillProgress> inner) : IProgress<long>
+    {
+        public void Report(long value) => inner.Report(new ComputedColumnBackfillProgress(value, null));
+    }
+
     // --- Data plane ---------------------------------------------------------------------------
 
     /// <summary>

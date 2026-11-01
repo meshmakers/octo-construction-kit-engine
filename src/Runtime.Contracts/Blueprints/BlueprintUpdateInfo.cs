@@ -488,6 +488,13 @@ public class BlueprintUpdateResult
     public List<BlueprintTenantOwnedEntity> TenantOwnedStaysDeleted { get; set; } = [];
 
     /// <summary>
+    /// AB#7997: the columns the update added to activated archives (ingested columns through <c>ADD COLUMN</c>,
+    /// computed columns with a queued backfill job), with the outcome of each. A failed addition is also listed in
+    /// <see cref="Errors" />.
+    /// </summary>
+    public List<Exchange.RtImportArchiveColumnAddition> ArchiveColumnsAdded { get; set; } = [];
+
+    /// <summary>
     /// Errors that occurred during the update
     /// </summary>
     public List<string> Errors { get; set; } = [];

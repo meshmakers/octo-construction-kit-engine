@@ -49,6 +49,15 @@ public interface IArchiveRuntimeStore
     Task AddComputedColumnAsync(OctoObjectId archiveRtId, CkArchiveColumnSpec column);
 
     /// <summary>
+    /// Appends an <em>ingested</em> column (a CK attribute path, no formula) to the archive's column set (AB#7997).
+    /// Called by <see cref="IArchiveLifecycleService.AddArchiveColumnAsync"/> only after the physical column exists,
+    /// so the definition never names a column the table lacks. The default appends through
+    /// <see cref="AddComputedColumnAsync"/>, which stores the column as given.
+    /// </summary>
+    Task AddIngestedColumnAsync(OctoObjectId archiveRtId, CkArchiveColumnSpec column) =>
+        AddComputedColumnAsync(archiveRtId, column);
+
+    /// <summary>
     /// Sets the engine-managed lifecycle <see cref="ComputedColumnState"/> of the computed column
     /// named <paramref name="name"/> on the archive (AB#4189 Phase 7). This single write is the
     /// atomic switch for the add flow: while the state is <c>Pending</c> / <c>Backfilling</c> the

@@ -69,6 +69,22 @@ public interface IArchiveLifecycleService
     Task<bool> RevalidateAccessAsync(OctoObjectId archiveRtId);
 
     /// <summary>
+    /// Adds an <em>ingested</em> column for the CK attribute at <paramref name="path"/> to an <c>Activated</c> raw or
+    /// time-range archive without recreating it (AB#7997). The physical column is added first (nullable: existing rows
+    /// keep their data and read NULL for it), then the archive definition; the next ingested rows fill it. Returns
+    /// <c>false</c> when the archive already captures the path (idempotent), <c>true</c> when the column was added.
+    /// </summary>
+    /// <exception cref="ArchiveNotFoundException">The archive does not exist.</exception>
+    /// <exception cref="InvalidArchiveStateTransitionException">The archive is not <c>Activated</c>.</exception>
+    /// <exception cref="ArchivePathInvalidException">
+    /// The path is empty, does not resolve against the archive's target type, the archive is a rollup (its columns are
+    /// derived), or a computed column already uses the name the path maps to.
+    /// </exception>
+    /// <exception cref="HiddenAttributeInArchiveException">The path reaches a Hidden attribute.</exception>
+    Task<bool> AddArchiveColumnAsync(
+        OctoObjectId archiveRtId, string path, bool indexed, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Adds a computed column to an <c>Activated</c> raw or time-range archive and backfills it
     /// (AB#4189 Phase 7, §8). Validates the prospective column set, persists the column
     /// <c>Pending</c>, adds the physical column, backfills the existing rows while the column stays

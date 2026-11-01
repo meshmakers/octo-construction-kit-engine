@@ -91,6 +91,18 @@ public interface IStreamDataRepository
         ArchiveSnapshot snapshot, string columnName, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Adds the physical column for the <em>ingested</em> column at <paramref name="path"/> to the table of an
+    /// activated archive (AB#7997): <c>ALTER TABLE … ADD COLUMN</c>, always nullable, because every existing row has
+    /// no value for it. Existing rows keep their data. Idempotent (an existing column is reused). The column on
+    /// <paramref name="snapshot"/> is resolved against the CK model like at activation; an unresolvable path throws
+    /// <see cref="ArchivePathInvalidException"/> before any DDL runs. The default re-runs the provisioning, which adds
+    /// the declared columns a table lacks; a repository that can add one column directly overrides it.
+    /// </summary>
+    Task AddIngestedColumnStorageAsync(
+        ArchiveSnapshot snapshot, string path, CancellationToken cancellationToken = default) =>
+        EnsureArchiveCreatedAsync(snapshot);
+
+    /// <summary>
     /// Adds the physical CrateDB column for the <em>pending</em> version of a computed column
     /// (<c>{base}__v{ComputedVersion+1}</c>) via <c>ALTER TABLE … ADD COLUMN</c> (AB#4189 Phase 7,
     /// formula change). Idempotent. Must run before the pending formula is marked so ingest's

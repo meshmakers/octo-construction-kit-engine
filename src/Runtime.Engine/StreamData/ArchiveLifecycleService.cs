@@ -33,7 +33,7 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 /// (e.g. the MongoDB tenant context) can construct it directly with tenant-scoped dependencies
 /// without going through DI registration.
 /// </summary>
-public sealed class ArchiveLifecycleService : IArchiveLifecycleService
+public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
 {
     private readonly string _tenantId;
     private readonly IArchiveRuntimeStore _store;

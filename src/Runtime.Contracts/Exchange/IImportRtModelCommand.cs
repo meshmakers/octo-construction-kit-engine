@@ -9,6 +9,12 @@ namespace Meshmakers.Octo.Runtime.Contracts.Exchange;
 public interface IImportRtModelCommand
 {
     /// <summary>
+    ///     The columns the last import added to activated archives (AB#7997), in the order they were applied, with the
+    ///     outcome of each. Empty when the import added none.
+    /// </summary>
+    IReadOnlyList<RtImportArchiveColumnAddition> ArchiveColumnAdditions => [];
+
+    /// <summary>
     ///     Imports as text
     /// </summary>
     /// <param name="runtimeRepository">The runtime repository</param>

@@ -151,10 +151,16 @@ internal static class ArchiveDefinitionGuard
         var additions = new List<ArchiveSeedColumn>();
         foreach (var item in items)
         {
-            if (item is not RtRecordTcDto record || KeyOf(record) is not { } key || existing.ContainsKey(key)
-                || additions.Any(a => a.Key == key))
+            if (item is not RtRecordTcDto record || KeyOf(record) is not { } key || existing.ContainsKey(key))
             {
                 kept.Add(item);
+                continue;
+            }
+
+            if (additions.Any(a => a.Key == key))
+            {
+                // The seed names the same new column twice (or two paths with one physical name): it is added once,
+                // and the duplicate must not reach the definition either.
                 continue;
             }
 
@@ -190,15 +196,19 @@ internal static class ArchiveDefinitionGuard
         return !string.IsNullOrWhiteSpace(path) ? RollupColumnGenerator.SanitisePath(path) : name;
     }
 
-    private static FormulaResultType? ToFormulaResultType(object? value) => value switch
+    /// <summary>The declared result type by name or key; <c>null</c> for a value that names no defined type.</summary>
+    internal static FormulaResultType? ToFormulaResultType(object? value)
     {
-        null => null,
-        FormulaResultType type => type,
-        string text when Enum.TryParse<FormulaResultType>(text, ignoreCase: true, out var parsed) => parsed,
-        string text when int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var key) => (FormulaResultType)key,
-        IConvertible convertible when value is not string => (FormulaResultType)convertible.ToInt32(CultureInfo.InvariantCulture),
-        _ => null,
-    };
+        int? key = value switch
+        {
+            FormulaResultType type => (int)type,
+            string text when int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) => number,
+            string text when Enum.TryParse<FormulaResultType>(text, ignoreCase: true, out var parsed) => (int)parsed,
+            IConvertible convertible when value is not string => convertible.ToInt32(CultureInfo.InvariantCulture),
+            _ => null,
+        };
+        return key is { } k && Enum.IsDefined(typeof(FormulaResultType), k) ? (FormulaResultType)k : null;
+    }
 
     private static void Ensure(ICkCacheService cacheService, string tenantId, CkTypeGraph ckType, RtEntity stored,
         RtEntityTcDto incoming, bool partial)

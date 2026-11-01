@@ -227,4 +227,126 @@ public class FormulaEngineTests
     {
         Assert.False(_engine.CheckSyntax("  ", Array.Empty<string>()).IsValid);
     }
+
+    // ---- NULL operands (AB#8060) -------------------------------------------
+    // A NULL operand is bound as NaN. These tests pin the semantics a replacement engine (AB#7995)
+    // must keep.
+
+    private const string EnergyIqDischarge =
+        "if(chargingpower<0,-chargingpower,if(coalesce(dischargingpower,0)>0,dischargingpower,0))";
+
+    [Theory]
+    [InlineData("dischargingpower + 1")]
+    [InlineData("-dischargingpower")]
+    [InlineData("dischargingpower > 0")]
+    [InlineData("max(dischargingpower, 0)")]
+    [InlineData("if(dischargingpower > 0, 1, 0)")]
+    public void Evaluate_UnhandledNullOperand_YieldsNull(string formula)
+    {
+        var args = Args(("dischargingpower", double.NaN));
+
+        Assert.Null(_engine.Evaluate(formula, args, FormulaResultType.Double));
+    }
+
+    [Fact]
+    public void Evaluate_NullOperandInTheBranchNotTaken_DoesNotMatter()
+    {
+        var args = Args(("chargingpower", -5.0), ("dischargingpower", double.NaN));
+
+        Assert.Equal(5.0, _engine.Evaluate("if(chargingpower<0,-chargingpower,dischargingpower)", args,
+            FormulaResultType.Double));
+    }
+
+    [Theory]
+    [InlineData(double.NaN, 0.0)]
+    [InlineData(3.0, 3.0)]
+    [InlineData(0.0, 0.0)]
+    public void Evaluate_Coalesce_ReplacesOnlyANullOperand(double value, double expected)
+    {
+        var result = _engine.Evaluate("coalesce(x, 0)", Args(("x", value)), FormulaResultType.Double);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void Evaluate_Coalesce_TakesTheFirstNonNullArgument()
+    {
+        var args = Args(("a", double.NaN), ("b", double.NaN), ("c", 7.0));
+
+        Assert.Equal(7.0, _engine.Evaluate("coalesce(a, b, c, 0)", args, FormulaResultType.Double));
+    }
+
+    [Theory]
+    [InlineData(double.NaN, true)]
+    [InlineData(double.NegativeInfinity, true)]
+    [InlineData(0.0, false)]
+    [InlineData(-12.5, false)]
+    public void Evaluate_IsNull_DetectsANullOperandAndTheNullConstant(double value, bool expected)
+    {
+        var result = _engine.Evaluate("isnull(x)", Args(("x", value)), FormulaResultType.Boolean);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void Evaluate_IsNull_OfTheNullConstant_IsTrue()
+    {
+        Assert.Equal(true, _engine.Evaluate("isnull(null)", Args(), FormulaResultType.Boolean));
+    }
+
+    [Fact]
+    public void Evaluate_IsNull_ComposesWithIf()
+    {
+        var args = Args(("x", double.NaN));
+
+        Assert.Equal(42.0, _engine.Evaluate("if(isnull(x), 42, x)", args, FormulaResultType.Double));
+    }
+
+    /// <summary>
+    /// The EnergyIQ battery DischargingPower column: rows of an on-change source carry only one of the
+    /// two power attributes, or both.
+    /// </summary>
+    [Theory]
+    [InlineData(-4.0, double.NaN, 4.0)]       // only chargingpower (battery discharging)
+    [InlineData(2.0, double.NaN, 0.0)]        // only chargingpower (battery charging)
+    [InlineData(double.NaN, 3.0, double.NaN)] // only dischargingpower: chargingpower<0 is NULL
+    [InlineData(-4.0, 0.0, 4.0)]              // both
+    [InlineData(0.0, 6.0, 6.0)]               // both, discharge reported positively
+    [InlineData(0.0, double.NaN, 0.0)]        // chargingpower 0, no dischargingpower
+    public void Evaluate_EnergyIqDischargeFormula_WithCoalesce(double charging, double discharging,
+        double expected)
+    {
+        var args = Args(("chargingpower", charging), ("dischargingpower", discharging));
+
+        var result = _engine.Evaluate(EnergyIqDischarge, args, FormulaResultType.Double);
+
+        if (double.IsNaN(expected))
+        {
+            Assert.Null(result);
+        }
+        else
+        {
+            Assert.Equal(expected, result);
+        }
+    }
+
+    [Theory]
+    [InlineData(double.NaN, 3.0, 3.0)]
+    [InlineData(-4.0, double.NaN, 4.0)]
+    [InlineData(double.NaN, double.NaN, 0.0)]
+    public void Evaluate_EnergyIqDischargeFormula_CoalescingBothOperands(double charging,
+        double discharging, double expected)
+    {
+        const string formula =
+            "if(coalesce(chargingpower,0)<0,-chargingpower,if(coalesce(dischargingpower,0)>0,dischargingpower,0))";
+        var args = Args(("chargingpower", charging), ("dischargingpower", discharging));
+
+        Assert.Equal(expected, _engine.Evaluate(formula, args, FormulaResultType.Double));
+    }
+
+    [Fact]
+    public void CheckSyntax_CoalesceAndIsNull_AreKnownFunctions()
+    {
+        Assert.True(_engine.CheckSyntax("coalesce(a, 0) + isnull(b)", new[] { "a", "b" }).IsValid);
+    }
 }

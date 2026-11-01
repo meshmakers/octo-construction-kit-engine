@@ -159,6 +159,10 @@ any other value fails the build. Feature branches in CI that publish to a per-ru
 diff against GitHub. There is deliberately no switch that turns the gate off for a ckLanguage 2 model; the accepted
 bypass is deleting the baseline (a model without a baseline is a first publication).
 
+A local catalog that misses the intermediate versions of the declared major falls back to an older baseline and fails
+with `OCTO-CK203` for acknowledgements those versions carry; octo-tools syncs them before the build, see "Intermediate
+versions across catalogs" below.
+
 Never the model under test: in `Local` mode entries of the local catalog at or above the declared version are never
 the baseline, because they come from earlier local builds of the same model. Building the same model twice, or for
 two target frameworks, yields the same baseline both times, and a breaking edit at an unchanged version fails again
@@ -359,6 +363,49 @@ and `PublishCommandGateTests`; the O1 rows by the Pester fixtures of `octo-pipel
 `PublishGateReplayTests`, set `OCTO_PUBLISH_GATE_REPLAY_DIR`) refuses 18 early releases (2.0.x/2.1.x era patch or minor
 releases that changed a dependency pin or added elements, e.g. `Basic-2.0.2`, `Industry.Basic-2.1.1`); they predate the
 rules the classifier enforces today. The latest release of each of the 12 `octo-construction-kit` models replays clean.
+
+## Intermediate versions across catalogs (AB#7974)
+
+An acknowledgement belongs to the version that introduces the change (see "Acknowledge" below): `System.Identity`
+2.28.0 acknowledges the seven access tightenings of its first ckLanguage 2 release, 2.29.0 does not repeat them. In the
+two cases below the baseline is the newest version of the declared major below the declared version in the catalog the
+gate reads (the general rules, including equal published versions, ignored local entries and the lower-major fallback,
+are in "Baseline" above). When that catalog misses the intermediate versions, the baseline falls back to an older
+version, the diff spans several releases and the acknowledgements of the skipped versions are not part of the declared
+model: `OCTO-CK203` for changes that were acknowledged long ago.
+
+Two places hit this:
+
+| Where | Baseline catalog | Why intermediate versions can be missing |
+| ----- | ---------------- | ---------------------------------------- |
+| Publish gate of an r* tag build, target `PublicGitHubCatalog` | the public catalog | main builds publish to the private catalog only; only r* tags publish to private **and** public (r3.5.52, identity tag build 62604: public 2.26.0, private 2.27.0/2.28.0, declared 2.29.0) |
+| Compile gate of a local DebugL build (`OctoCkCompatibilityBaseline=Local`) | the local catalog (plus cached GitHub catalogs, often switched off in `Octo.User.props`) | the intermediate versions were built only in other lanes or PR builds with `OctoPublishCkModel=false` |
+
+**Rule (one, used by both fixes).** For a model with declared version `D`:
+`baseline` = newest version of `D`'s major in the target catalog strictly below `D`; the versions to bring in are the
+source catalog's versions of that major with `baseline < v < D`, in ascending order. No baseline of that major in the
+target = nothing is brought in. That is a limitation of the sync, not a guarantee: a lower-major baseline can still raise
+`OCTO-CK203` (an acknowledgement-required change introduced in `2.0.0` and kept in `2.1.0` is judged against `1.x`); such a
+target needs the missing major line published first. Both catalog roots
+(`ck-models/v3/`, `ck-models/v2/`) count, names compare case-insensitively, like the baseline resolver.
+
+**The fixes are pipeline and tooling, not engine changes.** The engine's rules stay as they are: a gate must judge against
+what its target catalog really holds (a public consumer only sees the public catalog), so the baseline resolver does not
+borrow versions from another catalog. Instead the missing versions are published into the target - byte-identical, through
+`octo-ckc -c Publish`, so every one of them passes the same publish gate (for GitHub catalogs) and the target's index is
+updated:
+
+- **r* tag builds:** `octo-pipeline-templates` `templates/steps/ck-sync-intermediate-versions.yml` (built into
+  `validate-and-publish-ck-versions.yml` before `Publish CK models`) publishes the private catalog's intermediate versions
+  to the public catalog first. A refusal stops the build. On main the same step only warns about missing versions that
+  carry acknowledgements (early warning).
+- **Local builds:** octo-tools `Sync-OctoCkIntermediateVersions` (run by `Invoke-BuildAll` / `Invoke-BuildRange` in DebugL
+  before each repository) publishes them from the private catalog's Pages mirror into `<lane>/.octo/local-catalog`
+  (`-c LocalFileSystemCatalog -lcr <lane>/.octo/local-catalog`; the local catalog has no publish gate).
+
+Manual equivalent for one version:
+`octo-ckc -c Publish -f ck-system.identity-2.28.0.json -c <PublicGitHubCatalog | LocalFileSystemCatalog> -lcr <empty dir | <lane>/.octo/local-catalog>`,
+with the file taken byte for byte from the private catalog.
 
 ## Acknowledge (AB#6295)
 

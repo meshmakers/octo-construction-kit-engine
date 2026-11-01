@@ -12,6 +12,8 @@
 
     <ItemGroup>
         <PackageReference Include="FakeItEasy" Version="9.0.1" />
+        <!-- AB#8037: test-only, UnacknowledgedWriteClassifierTests build the real driver exceptions; the src assemblies stay driver-free -->
+        <PackageReference Include="MongoDB.Driver" Version="3.11.1" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.11" />

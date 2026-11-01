@@ -1767,8 +1767,9 @@ Semantics:
 ## Unacknowledged writes: one classification (AB#8037, rule R3)
 
 `UnacknowledgedWriteClassifier.IsOutcomeUnknown(Exception?)` (`Runtime.Contracts`, public, static) answers whether an exception
-says that a write may have taken effect without being acknowledged: a MongoDB write-concern error (`MongoWriteConcernException`,
-or `MongoWriteException` / `MongoBulkWriteException` carrying a `WriteConcernError`) or the error label
+says that a write may have taken effect without being acknowledged: a MongoDB write-concern error (`MongoWriteConcernException` -
+except its subclass `MongoDuplicateKeyException`, a refused write -, `MongoWriteException` / `MongoBulkWriteException` carrying a
+`WriteConcernError`, `ClientBulkWriteException` with a non-empty `WriteConcernErrors`) or the error label
 `UnknownTransactionCommitResult`, anywhere in the inner-exception chain and in every inner exception of an `AggregateException`
 (depth guard 32). A write error without a write-concern error (refused write, e.g. duplicate key) is not unknown. The driver
 types are recognised by full name (`MongoDB.Driver*` namespaces) and the public members `WriteConcernError` / `ErrorLabels`, so

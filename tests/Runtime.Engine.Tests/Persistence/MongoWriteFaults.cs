@@ -58,6 +58,32 @@ internal static class MongoWriteFaults
         return exception;
     }
 
+    /// <summary>
+    ///     A duplicate key reported as <c>MongoDuplicateKeyException</c> (a subclass of <c>MongoWriteConcernException</c>):
+    ///     the server refused the write, nothing was written (AB#8037 review).
+    /// </summary>
+    public static MongoDuplicateKeyException DuplicateKeyAsWriteConcernSubclass() =>
+        new(Connection, "E11000 duplicate key error",
+            new WriteConcernResult(new BsonDocument { { "ok", 1 }, { "n", 0 }, { "code", 11000 }, { "err", "E11000 duplicate key error" } }));
+
+    /// <summary>A client bulk write (<c>IMongoClient.BulkWrite</c>) whose write-concern wait timed out (AB#8037 review).</summary>
+    public static ClientBulkWriteException ClientBulkWriteConcernTimeout() =>
+        ClientBulkWrite([WriteConcernTimeoutOnCommand()]);
+
+    /// <summary>A client bulk write that failed without a write-concern error.</summary>
+    public static ClientBulkWriteException ClientBulkWriteWithoutWriteConcernError() =>
+        ClientBulkWrite([]);
+
+    private static ClientBulkWriteException ClientBulkWrite(IReadOnlyList<MongoWriteConcernException> writeConcernErrors)
+    {
+        // the constructor is not public; the driver collects one MongoWriteConcernException per batch
+        var constructor = typeof(ClientBulkWriteException)
+            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+            .Single(c => c.GetParameters().Length == 6);
+        return (ClientBulkWriteException)constructor.Invoke(
+            [Connection, "client bulk write failed", null, null, writeConcernErrors, null]);
+    }
+
     /// <summary>A command error that has nothing to do with the write concern (code 2, BadValue).</summary>
     public static MongoCommandException BadValue() =>
         new(Connection, "BadValue", new BsonDocument("ping", 1),

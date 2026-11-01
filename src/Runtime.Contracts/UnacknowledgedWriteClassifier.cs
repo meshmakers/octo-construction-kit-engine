@@ -17,8 +17,10 @@ namespace Meshmakers.Octo.Runtime.Contracts;
 ///     </para>
 ///     <list type="bullet">
 ///         <item>
-///             a write-concern error of MongoDB: <c>MongoWriteConcernException</c> (commands, transaction commit), and
-///             <c>MongoWriteException</c> / <c>MongoBulkWriteException</c> that carry a <c>WriteConcernError</c>. The
+///             a write-concern error of MongoDB: <c>MongoWriteConcernException</c> (commands, transaction commit) - except
+///             its subclass <c>MongoDuplicateKeyException</c>, a refused write -, <c>MongoWriteException</c> /
+///             <c>MongoBulkWriteException</c> that carry a <c>WriteConcernError</c>, and <c>ClientBulkWriteException</c>
+///             with a non-empty <c>WriteConcernErrors</c> list (<c>IMongoClient.BulkWrite</c>). The
 ///             repositories write with <c>w:majority</c> and a <c>wtimeout</c>; a write-concern error (the timeout, code 64,
 ///             or any other) does not undo the write on the primary, it is only not confirmed by a majority;
 ///         </item>
@@ -45,7 +47,11 @@ public static class UnacknowledgedWriteClassifier
 
     private const string DriverNamespacePrefix = "MongoDB.Driver";
     private const string WriteConcernExceptionTypeName = "MongoDB.Driver.MongoWriteConcernException";
+
+    // derives from MongoWriteConcernException, but the server refused the write (E11000)
+    private const string DuplicateKeyExceptionTypeName = "MongoDB.Driver.MongoDuplicateKeyException";
     private const string WriteConcernErrorProperty = "WriteConcernError";
+    private const string WriteConcernErrorsProperty = "WriteConcernErrors";
     private const string ErrorLabelsProperty = "ErrorLabels";
 
     // a guard against pathological (cyclic or very deep) exception chains
@@ -103,7 +109,7 @@ public static class UnacknowledgedWriteClassifier
             return false;
         }
 
-        if (members.IsWriteConcernException)
+        if (members.IsWriteConcernException && !members.IsDuplicateKeyException)
         {
             return true;
         }
@@ -111,6 +117,12 @@ public static class UnacknowledgedWriteClassifier
         try
         {
             if (members.WriteConcernError?.GetValue(exception) is not null)
+            {
+                return true;
+            }
+
+            if (members.WriteConcernErrors?.GetValue(exception) is System.Collections.IEnumerable errors &&
+                errors.GetEnumerator().MoveNext())
             {
                 return true;
             }
@@ -128,15 +140,18 @@ public static class UnacknowledgedWriteClassifier
     private sealed record DriverMembers(
         bool IsDriverException,
         bool IsWriteConcernException,
+        bool IsDuplicateKeyException,
         PropertyInfo? WriteConcernError,
+        PropertyInfo? WriteConcernErrors,
         PropertyInfo? ErrorLabels)
     {
-        private static readonly DriverMembers None = new(false, false, null, null);
+        private static readonly DriverMembers None = new(false, false, false, null, null, null);
 
         public static DriverMembers Of(Type type)
         {
             var isDriver = false;
             var isWriteConcern = false;
+            var isDuplicateKey = false;
             for (var t = type; t is not null && t != typeof(Exception); t = t.BaseType)
             {
                 if (t.Namespace?.StartsWith(DriverNamespacePrefix, StringComparison.Ordinal) == true)
@@ -148,6 +163,11 @@ public static class UnacknowledgedWriteClassifier
                 {
                     isWriteConcern = true;
                 }
+
+                if (string.Equals(t.FullName, DuplicateKeyExceptionTypeName, StringComparison.Ordinal))
+                {
+                    isDuplicateKey = true;
+                }
             }
 
             if (!isDriver)
@@ -155,8 +175,8 @@ public static class UnacknowledgedWriteClassifier
                 return None;
             }
 
-            return new DriverMembers(true, isWriteConcern, Property(type, WriteConcernErrorProperty),
-                Property(type, ErrorLabelsProperty));
+            return new DriverMembers(true, isWriteConcern, isDuplicateKey, Property(type, WriteConcernErrorProperty),
+                Property(type, WriteConcernErrorsProperty), Property(type, ErrorLabelsProperty));
         }
 
         // GetProperty(name) throws on a property a derived type hides with "new"; the first match is the most derived one

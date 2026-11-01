@@ -17,7 +17,8 @@ public class UnacknowledgedWriteClassifierTests
         nameof(MongoWriteFaults.WriteConcernTimeoutOnCommand),
         nameof(MongoWriteFaults.WriteConcernTimeoutOnSingleWrite),
         nameof(MongoWriteFaults.WriteConcernTimeoutOnBulkWrite),
-        nameof(MongoWriteFaults.CommitNetworkErrorWithUnknownResult)
+        nameof(MongoWriteFaults.CommitNetworkErrorWithUnknownResult),
+        nameof(MongoWriteFaults.ClientBulkWriteConcernTimeout)
     };
 
     private static Exception Fault(string name) => name switch
@@ -26,6 +27,7 @@ public class UnacknowledgedWriteClassifierTests
         nameof(MongoWriteFaults.WriteConcernTimeoutOnSingleWrite) => MongoWriteFaults.WriteConcernTimeoutOnSingleWrite(),
         nameof(MongoWriteFaults.WriteConcernTimeoutOnBulkWrite) => MongoWriteFaults.WriteConcernTimeoutOnBulkWrite(),
         nameof(MongoWriteFaults.CommitNetworkErrorWithUnknownResult) => MongoWriteFaults.CommitNetworkErrorWithUnknownResult(),
+        nameof(MongoWriteFaults.ClientBulkWriteConcernTimeout) => MongoWriteFaults.ClientBulkWriteConcernTimeout(),
         _ => throw new ArgumentOutOfRangeException(nameof(name))
     };
 
@@ -54,6 +56,9 @@ public class UnacknowledgedWriteClassifierTests
     {
         Assert.False(UnacknowledgedWriteClassifier.IsOutcomeUnknown(MongoWriteFaults.DuplicateKey()));
         Assert.False(UnacknowledgedWriteClassifier.IsOutcomeUnknown(MongoWriteFaults.BadValue()));
+        // a subclass of MongoWriteConcernException, but a refused write (review of PR #333)
+        Assert.False(UnacknowledgedWriteClassifier.IsOutcomeUnknown(MongoWriteFaults.DuplicateKeyAsWriteConcernSubclass()));
+        Assert.False(UnacknowledgedWriteClassifier.IsOutcomeUnknown(MongoWriteFaults.ClientBulkWriteWithoutWriteConcernError()));
         Assert.False(UnacknowledgedWriteClassifier.IsOutcomeUnknown(new InvalidOperationException("db is down")));
         Assert.False(UnacknowledgedWriteClassifier.IsOutcomeUnknown(new AggregateException()));
         Assert.False(UnacknowledgedWriteClassifier.IsOutcomeUnknown(null));

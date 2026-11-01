@@ -13,6 +13,7 @@ using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.StreamData;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Meshmakers.Octo.Runtime.Engine.Secrets;
 using Microsoft.Extensions.Logging;
@@ -30,7 +31,8 @@ internal class ImportRtModelCommand(
     IRtImportAuditTrail rtImportAuditTrail,
     RtImportOptions importOptions,
     IDataPermissionResolver dataPermissionResolver,
-    IAuditEventSink auditEventSink)
+    IAuditEventSink auditEventSink,
+    IArchiveLifecycleServiceProvider? archiveLifecycleServiceProvider = null)
     : IImportRtModelCommand
 {
     private readonly ConcurrentDictionary<OctoObjectId, byte> _entityImportIds = new();
@@ -46,6 +48,13 @@ internal class ImportRtModelCommand(
     private RtImportBlankingPolicy _blankingPolicy = RtImportBlankingPolicy.Keep;
     private IReadOnlyCollection<RtImportBlankingConfirmation>? _confirmedBlankings;
     private int _associationsCount;
+
+    // AB#7997: columns the seed adds to activated archives, taken out of the import and added through the archive
+    // lifecycle after the commit; and the outcome of each.
+    private readonly ConcurrentQueue<(OctoObjectId ArchiveRtId, string? ArchiveName, ArchiveSeedColumn Column)>
+        _pendingArchiveColumns = new();
+    private readonly List<RtImportArchiveColumnAddition> _archiveColumnAdditions = [];
+    private IArchiveLifecycleService? _archiveLifecycle;
 
     // AB#6392: only set while a user-initiated import runs on a tenant with an opted-in policy.
     private ImportBlueprintLockEnforcer? _lockEnforcer;
@@ -68,12 +77,18 @@ internal class ImportRtModelCommand(
         _importEntityQueue.Clear();
         _importAssociationQueue.Clear();
         _associationsCount = 0;
+        _pendingArchiveColumns.Clear();
+        _archiveColumnAdditions.Clear();
+        _archiveLifecycle = null;
         _lockEnforcer = null;
         _blueprintLockSummary = RtImportBlueprintLockSummary.Empty;
     }
 
     /// <inheritdoc />
     public IReadOnlyList<RtImportGuardEntry> GuardEntries => _guardEntries.ToArray();
+
+    /// <inheritdoc />
+    public IReadOnlyList<RtImportArchiveColumnAddition> ArchiveColumnAdditions => _archiveColumnAdditions.ToArray();
 
     /// <inheritdoc />
     public RtImportBlueprintLockSummary BlueprintLockSummary => _lockEnforcer?.Summary ?? _blueprintLockSummary;
@@ -103,6 +118,7 @@ internal class ImportRtModelCommand(
                 .ConfigureAwait(false);
 
             await session.CommitTransactionAsync().ConfigureAwait(false);
+            await ApplyArchiveColumnAdditionsAsync().ConfigureAwait(false);
 
             logger.LogInformation("{Count} entities, {AssociationsCount} associations imported", _entityImportIds.Count,
                 _associationsCount);
@@ -141,6 +157,7 @@ internal class ImportRtModelCommand(
                 .ConfigureAwait(false);
 
             await session.CommitTransactionAsync().ConfigureAwait(false);
+            await ApplyArchiveColumnAdditionsAsync().ConfigureAwait(false);
 
             logger.LogInformation("{Count} entities, {AssociationsCount} associations imported", _entityImportIds.Count,
                 _associationsCount);
@@ -252,6 +269,7 @@ internal class ImportRtModelCommand(
             }
 
             await session.CommitTransactionAsync().ConfigureAwait(false);
+            await ApplyArchiveColumnAdditionsAsync().ConfigureAwait(false);
 
             if (_lockEnforcer != null)
             {
@@ -1264,6 +1282,14 @@ internal class ImportRtModelCommand(
                 if (ArchiveDefinitionGuard.IsArchive(cacheService, runtimeRepository.TenantId, typeGroup.Key, out _))
                 {
                     ArchiveDefinitionGuard.EnsureUnchanged(cacheService, runtimeRepository.TenantId, ckTypeGraph, existing, modelEntity);
+
+                    // AB#7997: a column the seed adds is not written with the definition; the archive lifecycle adds it
+                    // with its storage after the commit (ApplyArchiveColumnAdditionsAsync).
+                    foreach (var column in ArchiveDefinitionGuard.TakeColumnAdditions(
+                                 cacheService, runtimeRepository.TenantId, ckTypeGraph, existing, modelEntity))
+                    {
+                        _pendingArchiveColumns.Enqueue((existing.RtId, existing.RtWellKnownName, column));
+                    }
                 }
 
                 if (preservedForEntity > 0)
@@ -1281,6 +1307,94 @@ internal class ImportRtModelCommand(
             logger.LogInformation(
                 "RT import preserved {TotalPreserved} runtime-state attribute value(s) for tenant {TenantId}",
                 totalPreserved, runtimeRepository.TenantId);
+        }
+
+        await EnsureArchiveLifecycleAsync(runtimeRepository.TenantId).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// AB#7997: before anything is written, makes sure the columns the seed adds to activated archives can be added
+    /// after the commit. Without an archive lifecycle (no stream-data backend registered, or stream data off for the
+    /// tenant) the import is refused rather than writing column definitions without storage.
+    /// </summary>
+    private async Task EnsureArchiveLifecycleAsync(string tenantId)
+    {
+        if (_pendingArchiveColumns.IsEmpty || _archiveLifecycle != null)
+        {
+            return;
+        }
+
+        if (archiveLifecycleServiceProvider != null)
+        {
+            _archiveLifecycle = await archiveLifecycleServiceProvider.GetAsync(tenantId).ConfigureAwait(false);
+        }
+
+        if (_archiveLifecycle == null && _pendingArchiveColumns.TryPeek(out var first))
+        {
+            throw new ArchiveSchemaImmutableException(first.ArchiveRtId, first.ArchiveName, CkArchiveStatus.Activated,
+                "Columns", $"column '{first.Column.Key}' cannot be added because stream data is not available to add its storage");
+        }
+    }
+
+    /// <summary>
+    /// AB#7997: adds the columns the seed declared for activated archives, after the import committed: ingested columns
+    /// first (a computed column may reference one), each through the archive lifecycle - <c>ALTER TABLE … ADD COLUMN</c>
+    /// for an ingested column, the queued computed-column add (Pending, storage, background backfill, Active) for a
+    /// computed one. Every addition is tried and recorded in <see cref="ArchiveColumnAdditions" />; when one failed,
+    /// <see cref="ArchiveColumnAdditionFailedException" /> is thrown. The definitions do not name a failed column, so
+    /// running the import again retries it.
+    /// </summary>
+    private async Task ApplyArchiveColumnAdditionsAsync()
+    {
+        if (_pendingArchiveColumns.IsEmpty || _archiveLifecycle == null)
+        {
+            return;
+        }
+
+        var pending = _pendingArchiveColumns.ToArray();
+        _pendingArchiveColumns.Clear();
+
+        foreach (var (archiveRtId, archiveName, column) in pending.OrderBy(p => p.Column.IsComputed ? 1 : 0))
+        {
+            var label = column.IsComputed ? column.Name ?? column.Key : column.Path ?? column.Key;
+            try
+            {
+                OctoObjectId? jobRtId = null;
+                if (column.IsComputed)
+                {
+                    if (string.IsNullOrWhiteSpace(column.Name) || column.ResultType is not { } resultType)
+                    {
+                        throw new InvalidOperationException("a computed column needs a Name and a ResultType.");
+                    }
+
+                    var job = await _archiveLifecycle.EnqueueAddComputedColumnAsync(
+                        archiveRtId, column.Name, column.Formula!, resultType, column.Indexed).ConfigureAwait(false);
+                    jobRtId = job?.RtId;
+                }
+                else
+                {
+                    await _archiveLifecycle.AddArchiveColumnAsync(archiveRtId, column.Path ?? string.Empty, column.Indexed)
+                        .ConfigureAwait(false);
+                }
+
+                _archiveColumnAdditions.Add(new RtImportArchiveColumnAddition(
+                    archiveRtId, archiveName, label, column.IsComputed, jobRtId, null));
+                logger.LogInformation(
+                    "Import added {Kind} column '{Column}' to activated archive {ArchiveRtId}",
+                    column.IsComputed ? "computed" : "ingested", label, archiveRtId);
+            }
+            catch (Exception ex)
+            {
+                _archiveColumnAdditions.Add(new RtImportArchiveColumnAddition(
+                    archiveRtId, archiveName, label, column.IsComputed, null, ex.Message));
+                logger.LogError(ex, "Import could not add column '{Column}' to activated archive {ArchiveRtId}",
+                    label, archiveRtId);
+            }
+        }
+
+        if (_archiveColumnAdditions.Any(a => !a.Succeeded))
+        {
+            throw new ArchiveColumnAdditionFailedException(_archiveColumnAdditions.ToArray());
         }
     }
 

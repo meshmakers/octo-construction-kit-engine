@@ -2378,10 +2378,17 @@ internal class BlueprintService : IBlueprintService
                     confirmations).ConfigureAwait(false);
 
                 ReportBlankedAttributes(diff.Blanked, options, confirmations, result);
+                result.ArchiveColumnsAdded.AddRange(_importRtModelCommand.ArchiveColumnAdditions);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error importing blueprint entities for {BlueprintId}", targetVersion);
+                // AB#7997: the entities were committed; the additions that worked are reported with the failed ones.
+                if (ex is ArchiveColumnAdditionFailedException columnFailure)
+                {
+                    result.ArchiveColumnsAdded.AddRange(columnFailure.Additions);
+                }
+
                 result.Errors.Add($"Failed to import blueprint entities: {ex.Message}");
                 // AB#7872: a refused change of an activated archive is no error to continue over; the update did not
                 // happen, and the blueprint must not report it as applied.
@@ -3057,6 +3064,14 @@ internal class BlueprintService : IBlueprintService
 
             await _importRtModelCommand.ImportModelAsync(
                 repository, seedRoot, ImportStrategy.Upsert, cancellationToken).ConfigureAwait(false);
+
+            // AB#7997: columns the seed added to activated archives (an addition that failed throws above).
+            foreach (var addition in _importRtModelCommand.ArchiveColumnAdditions)
+            {
+                operationResult.AddMessage(new OperationMessage(MessageLevel.Info, SeedDataDescription(blueprint), 21,
+                    $"Added {(addition.IsComputed ? "computed" : "ingested")} column '{addition.Column}' to activated archive " +
+                    $"{addition.ArchiveRtId}{(addition.BackfillJobRtId is { } job ? $" (backfill job {job})" : string.Empty)}"));
+            }
 
             if (tenantOwnedStamps.Count > 0)
             {

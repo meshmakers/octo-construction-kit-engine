@@ -570,6 +570,18 @@ proceeds and returns the forced blockers; `Off` (the default) never asks the gua
 
 Updates do not create a tenant backup — take an external snapshot (e.g. the platform's tenant dump/backup jobs) beforehand if you need a safety net.
 
+### Archive columns a seed adds (AB#7997)
+
+`Archive.Columns` is seed-owned, but an activated archive has a table. When a seed (install, `--force` re-apply, update, or
+`ImportRt`) adds a column to an archive that is `Activated`, the import does not write it with the definition: it adds it after the
+commit through the archive lifecycle - an ingested column with `ALTER TABLE … ADD COLUMN` (nullable, history kept), a computed column
+through the computed-column add (Pending, storage, background backfill job, Active). The update result lists every addition in
+`ArchiveColumnsAdded` (archive, column, computed or not, backfill job, error); an install reports them as info messages. A failed
+addition fails the apply after the entities are committed, the column stays out of the definition, and applying again retries it.
+Removing or retyping a column of an activated archive is still refused (AB#7872), and a column added to a disabled archive that was
+activated before is refused until it is enabled again. Seed computed columns declare `Path: ""` and `Required: false` (AB#8034).
+Rules: engine-mongodb `docs/streamdata-archive-concept.md` §10.
+
 ### What a successful update records
 
 A successful update writes **two** records, in this order:

@@ -1,5 +1,7 @@
 #pragma warning disable CS1591 // Missing XML docs on archive exception members
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 
 namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
@@ -154,5 +156,26 @@ public sealed class HiddenAttributeInArchiveException : StreamDataException
     {
         ColumnPath = columnPath;
         AttributeName = attributeName;
+    }
+}
+
+/// <summary>
+/// An import (seed, blueprint update, <c>ImportRt</c>) committed its entities, but one or more columns it declared for
+/// activated archives could not be added (AB#7997). The archive definitions do not name these columns, so the archives
+/// stay consistent with their tables; running the same import again retries the additions.
+/// </summary>
+public sealed class ArchiveColumnAdditionFailedException : StreamDataException
+{
+    /// <summary>Every addition of the import with its outcome, the failed ones included.</summary>
+    public IReadOnlyList<Exchange.RtImportArchiveColumnAddition> Additions { get; }
+
+    public ArchiveColumnAdditionFailedException(IReadOnlyList<Exchange.RtImportArchiveColumnAddition> additions)
+        : base("The import was applied, but these archive columns could not be added: " +
+               string.Join("; ", additions.Where(a => !a.Succeeded).Select(a =>
+                   $"{Describe(a.ArchiveRtId)}{(string.IsNullOrEmpty(a.ArchiveWellKnownName) ? string.Empty : $" ('{a.ArchiveWellKnownName}')")} column '{a.Column}': {a.Error}")) +
+               ". Fix the cause and run the import again to add them.",
+            additions.FirstOrDefault(a => !a.Succeeded)?.ArchiveRtId)
+    {
+        Additions = additions;
     }
 }

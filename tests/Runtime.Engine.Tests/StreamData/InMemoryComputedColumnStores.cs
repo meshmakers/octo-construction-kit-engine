@@ -59,6 +59,14 @@ internal sealed class InMemoryArchiveRuntimeStore : IArchiveRuntimeStore
         return Task.CompletedTask;
     }
 
+    // AB#7997: an ingested column has no name; appended as is (the computed add above replaces by name).
+    public Task AddIngestedColumnAsync(OctoObjectId archiveRtId, CkArchiveColumnSpec column)
+    {
+        var archive = _archives[archiveRtId];
+        _archives[archiveRtId] = archive with { Columns = archive.Columns.Append(column).ToList() };
+        return Task.CompletedTask;
+    }
+
     public Task SetComputedColumnStateAsync(OctoObjectId archiveRtId, string name, ComputedColumnState state) =>
         Change(archiveRtId, name, c => c with { ComputedState = state });
 

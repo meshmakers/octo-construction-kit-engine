@@ -7,6 +7,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.Formulas;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.StreamData;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
@@ -53,6 +54,8 @@ internal static class ArchiveDefinitionGuard
     private const string PathMember = "Path";
     private const string NameMember = "Name";
     private const string ResultTypeMember = "ResultType";
+    private const string FormulaMember = "Formula";
+    private const string IndexedMember = "Indexed";
 
     private static readonly string[] FrozenRollupAttributes =
         [TargetCkTypeIdAttribute, AggregationsAttribute, "BucketSizeMs", "BucketAlignment", "ReferenceTimeZone"];
@@ -113,6 +116,98 @@ internal static class ArchiveDefinitionGuard
         }
 
         Ensure(cacheService, tenantId, ckType, stored, incoming, partial);
+    }
+
+    /// <summary>
+    /// AB#7997: takes the columns the seed adds to a guarded archive out of <paramref name="incoming" /> and returns them,
+    /// so the import writes the definition without them and the archive lifecycle adds each with its storage afterwards.
+    /// Run after <see cref="EnsureUnchanged(ICkCacheService, string, CkTypeGraph, RtEntity, RtEntityTcDto)" />, which
+    /// already refused removed and retyped columns. A column is identified as in that check: the physical name of an
+    /// ingested path, the name of a computed column. Nothing is taken from an archive that is not guarded (no table yet)
+    /// or from a rollup (its columns are derived). A disabled archive that was activated before keeps its table, but the
+    /// lifecycle adds columns to an activated archive only, so an addition there is refused.
+    /// </summary>
+    /// <exception cref="ArchiveSchemaImmutableException">The archive is disabled and the seed adds a column.</exception>
+    public static IReadOnlyList<ArchiveSeedColumn> TakeColumnAdditions(ICkCacheService cacheService, string tenantId,
+        CkTypeGraph ckType, RtEntity stored, RtEntityTcDto incoming)
+    {
+        if (!IsGuarded(stored) || IsRollup(ckType))
+        {
+            return [];
+        }
+
+        var attribute = incoming.Attributes.FirstOrDefault(a => NameOf(ckType, a) == ColumnsAttribute);
+        if (attribute?.Value is not IEnumerable items || attribute.Value is string)
+        {
+            return [];
+        }
+
+        object? ToTransport(object? value) => ImportRtModelCommand.ToTransportValue(cacheService, tenantId, value);
+        CkEnumGraph? ResolveEnum(CkId<CkEnumId> enumId) => cacheService.TryGetCkEnum(tenantId, enumId, out var e) ? e : null;
+        CkRecordGraph? ResolveRecord(RtCkId<CkRecordId> recordId) => cacheService.TryGetRtCkRecord(tenantId, recordId, out var r) ? r : null;
+
+        var existing = ToColumns(ToTransport(StoredValue(stored, ColumnsAttribute)), ResolveEnum, ResolveRecord);
+        var kept = new List<object?>();
+        var additions = new List<ArchiveSeedColumn>();
+        foreach (var item in items)
+        {
+            if (item is not RtRecordTcDto record || KeyOf(record) is not { } key || existing.ContainsKey(key))
+            {
+                kept.Add(item);
+                continue;
+            }
+
+            if (additions.Any(a => a.Key == key))
+            {
+                // The seed names the same new column twice (or two paths with one physical name): it is added once,
+                // and the duplicate must not reach the definition either.
+                continue;
+            }
+
+            var formula = MemberValue(record, FormulaMember) as string;
+            additions.Add(new ArchiveSeedColumn(
+                key,
+                string.IsNullOrWhiteSpace(formula) ? MemberValue(record, PathMember) as string : null,
+                MemberValue(record, NameMember) as string,
+                string.IsNullOrWhiteSpace(formula) ? null : formula,
+                ToFormulaResultType(MemberValue(record, ResultTypeMember)),
+                MemberValue(record, IndexedMember) is bool indexed && indexed));
+        }
+
+        if (additions.Count == 0)
+        {
+            return [];
+        }
+
+        if (StatusOf(stored) != CkArchiveStatus.Activated)
+        {
+            throw Frozen(false, stored, ColumnsAttribute,
+                $"column '{additions[0].Key}' can only be added while the archive is Activated; enable it first");
+        }
+
+        attribute.Value = kept;
+        return additions;
+    }
+
+    private static string? KeyOf(RtRecordTcDto record)
+    {
+        var name = MemberValue(record, NameMember) as string;
+        var path = MemberValue(record, PathMember) as string;
+        return !string.IsNullOrWhiteSpace(path) ? RollupColumnGenerator.SanitisePath(path) : name;
+    }
+
+    /// <summary>The declared result type by name or key; <c>null</c> for a value that names no defined type.</summary>
+    internal static FormulaResultType? ToFormulaResultType(object? value)
+    {
+        int? key = value switch
+        {
+            FormulaResultType type => (int)type,
+            string text when int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) => number,
+            string text when Enum.TryParse<FormulaResultType>(text, ignoreCase: true, out var parsed) => (int)parsed,
+            IConvertible convertible when value is not string => convertible.ToInt32(CultureInfo.InvariantCulture),
+            _ => null,
+        };
+        return key is { } k && Enum.IsDefined(typeof(FormulaResultType), k) ? (FormulaResultType)k : null;
     }
 
     private static void Ensure(ICkCacheService cacheService, string tenantId, CkTypeGraph ckType, RtEntity stored,
@@ -192,9 +287,7 @@ internal static class ArchiveDefinitionGuard
         var columns = new Dictionary<string, string?>(StringComparer.Ordinal);
         foreach (var record in Records(value))
         {
-            var name = MemberValue(record, NameMember) as string;
-            var path = MemberValue(record, PathMember) as string;
-            var key = !string.IsNullOrWhiteSpace(path) ? RollupColumnGenerator.SanitisePath(path) : name;
+            var key = KeyOf(record);
             if (key is null)
             {
                 continue;
@@ -300,4 +393,21 @@ internal static class ArchiveDefinitionGuard
             ? new RollupSchemaImmutableException(stored.RtId, stored.RtWellKnownName, status, attribute)
             : new ArchiveSchemaImmutableException(stored.RtId, stored.RtWellKnownName, status, attribute, change);
     }
+}
+
+/// <summary>
+/// AB#7997: a column a seed adds to an activated archive, taken out of the import by
+/// <see cref="ArchiveDefinitionGuard.TakeColumnAdditions" /> and added through the archive lifecycle after the import.
+/// </summary>
+/// <param name="Key">How the column is identified in the table: the physical name of a path, the name of a computed column.</param>
+/// <param name="Path">The attribute path of an ingested column; <c>null</c> for a computed column.</param>
+/// <param name="Name">The declared name (required for a computed column).</param>
+/// <param name="Formula">The formula of a computed column; <c>null</c> for an ingested column.</param>
+/// <param name="ResultType">The declared result type of a computed column.</param>
+/// <param name="Indexed">Whether the column is indexed.</param>
+internal sealed record ArchiveSeedColumn(
+    string Key, string? Path, string? Name, string? Formula, FormulaResultType? ResultType, bool Indexed)
+{
+    /// <summary>True for a computed column.</summary>
+    public bool IsComputed => Formula is not null;
 }

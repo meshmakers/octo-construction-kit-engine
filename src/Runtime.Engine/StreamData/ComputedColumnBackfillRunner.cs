@@ -234,6 +234,13 @@ public sealed class ComputedColumnBackfillRunner
         CancellationToken cancellationToken)
     {
         var startedAt = _clock();
+        // Checkpoint (AB#8002): a job that an earlier run had to give up (shutdown, rollout, dead process)
+        // carries the last completed time slice in RangeStart; resume there instead of starting over.
+        // A new job starts at UnixEpoch, i.e. from the first row.
+        var resumeFrom = job is { RangeStart: var checkpoint } && checkpoint > DateTime.UnixEpoch
+            ? checkpoint
+            : (DateTime?)null;
+        var rowsBefore = resumeFrom is null ? 0L : job?.RowsProcessed ?? 0;
         job = await UpdateJobAsync(job, j => j with
         {
             State = RecomputeJobState.Running,
@@ -241,11 +248,18 @@ public sealed class ComputedColumnBackfillRunner
             FinishedAt = null,
             DurationMs = null,
             ErrorReason = null,
-            RowsProcessed = 0,
+            RowsProcessed = (int)Math.Min(int.MaxValue, rowsBefore),
             LastProgressAt = startedAt,
         });
 
-        var progress = new RowProgress();
+        if (resumeFrom is not null)
+        {
+            _logger.LogInformation(
+                "Backfill of computed column '{Column}' on archive {Archive} resumes at {Checkpoint:O} ({Rows} rows already written).",
+                columnName, archiveRtId, resumeFrom, rowsBefore);
+        }
+
+        var progress = new RowProgress(rowsBefore, resumeFrom);
         using var heartbeatStop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var heartbeat = RunHeartbeatAsync(job, progress, heartbeatStop.Token);
         var formulaChange = false;
@@ -276,7 +290,7 @@ public sealed class ComputedColumnBackfillRunner
             // The physical column exists: the add (and the retry) provision it before the column is
             // queued, a formula change provisions the pending column before it marks the formula.
             backfillStarted = true;
-            await _repository.BackfillComputedColumnAsync(snapshot, columnName, progress, cancellationToken);
+            await _repository.BackfillComputedColumnAsync(snapshot, columnName, resumeFrom, progress, cancellationToken);
 
             // The column may have been removed or re-formulated while the rows were written.
             var after = await _store.GetAsync(archiveRtId) ?? throw new ArchiveNotFoundException(archiveRtId);
@@ -324,13 +338,15 @@ public sealed class ComputedColumnBackfillRunner
             await StopHeartbeatAsync(heartbeatStop, heartbeat);
             // Shutdown: the column stays queued and the job goes back to Pending, so the next drain
             // picks both up again without counting a failure.
+            // Keep the checkpoint and the row count: the next run resumes where this one stopped.
             await UpdateJobAsync(job, j => j with
             {
                 State = RecomputeJobState.Pending,
                 StartedAt = null,
-                RowsProcessed = null,
+                RowsProcessed = progress.RowsAsInt,
+                RangeStart = progress.CompletedThrough ?? j.RangeStart,
                 LastProgressAt = _clock(),
-                ErrorReason = "Interrupted by a shutdown; the backfill runs again on the next start.",
+                ErrorReason = "Interrupted by a shutdown; the backfill resumes from its checkpoint on the next start.",
             });
             _logger.LogInformation(
                 "Backfill of computed column '{Column}' on archive {Archive} interrupted by shutdown; it is queued again.",
@@ -463,7 +479,13 @@ public sealed class ComputedColumnBackfillRunner
             {
                 await Task.Delay(_heartbeatInterval, stop);
                 var rows = progress.RowsAsInt;
-                await UpdateJobAsync(job, j => j with { RowsProcessed = rows, LastProgressAt = _clock() });
+                var checkpoint = progress.CompletedThrough;
+                job = await UpdateJobAsync(job, j => j with
+                {
+                    RowsProcessed = rows,
+                    RangeStart = checkpoint ?? j.RangeStart,
+                    LastProgressAt = _clock(),
+                });
             }
         }
         catch (OperationCanceledException) when (stop.IsCancellationRequested)
@@ -481,15 +503,51 @@ public sealed class ComputedColumnBackfillRunner
     private static CkArchiveColumnSpec? FindComputed(ArchiveSnapshot snapshot, string columnName) =>
         snapshot.Columns.FirstOrDefault(c => c.IsComputed && string.Equals(c.Name, columnName, StringComparison.Ordinal));
 
-    /// <summary>Thread-safe running row count reported by the repository after every chunk.</summary>
-    private sealed class RowProgress : IProgress<long>
+    /// <summary>
+    /// Thread-safe running row count and checkpoint reported by the repository after every chunk. Counts
+    /// on from the rows an interrupted earlier run had written; the checkpoint never moves backwards.
+    /// </summary>
+    private sealed class RowProgress(long rowsBefore, DateTime? resumeFrom) : IProgress<ComputedColumnBackfillProgress>
     {
-        private long _rows;
+        private readonly object _lock = new();
+        private readonly long _rowsBefore = rowsBefore;
+        private long _rows = rowsBefore;
+        private DateTime? _completedThrough = resumeFrom;
 
-        public long Rows => Interlocked.Read(ref _rows);
+        public long Rows
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _rows;
+                }
+            }
+        }
 
         public int RowsAsInt => (int)Math.Min(int.MaxValue, Rows);
 
-        public void Report(long value) => Interlocked.Exchange(ref _rows, value);
+        public DateTime? CompletedThrough
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _completedThrough;
+                }
+            }
+        }
+
+        public void Report(ComputedColumnBackfillProgress value)
+        {
+            lock (_lock)
+            {
+                _rows = _rowsBefore + value.Rows;
+                if (value.CompletedThrough is { } through && (_completedThrough is null || through > _completedThrough))
+                {
+                    _completedThrough = through;
+                }
+            }
+        }
     }
 }

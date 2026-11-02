@@ -614,8 +614,17 @@ Rules:
   the definition of an existing rollup is AB#7992 / AB#7993.)
 - **Opt-out** per archive: `archiveActivation.exclude` in `blueprint.yaml` lists rtIds or well-known names (case-insensitive) that stay
   `Created`. An entry that matches no archive of the seed is a warning. A rollup whose new source is excluded fails (its source is not active).
-- **Stream data off** (or no stream-data backend in the host, no `IStreamDataTenantServicesProvider` registered): the apply succeeds, the new
-  archives stay `Created`, one warning says so. Enable stream data and activate them manually.
+- **Stream data off** (the tenant's stream data is switched off): the apply **succeeds** and leaves the stream-data part out, because the CK
+  model `System.StreamData` is service-managed (only `EnableStreamData` installs it) and the catalogs do not offer the floor a blueprint
+  declares (for example `System.StreamData-[1.2,2.0)`), so it can neither be satisfied nor installed. The engine therefore (install, forced
+  re-apply and update alike) does not install or validate `System.StreamData` (blueprint `ckModelDependencies` and the seed's `dependencies`),
+  does not import the seed entities of that model (the archives, `System.StreamData/RawArchive`, `RollupArchive`, ...) and applies the rest of
+  the blueprint as usual (`BlueprintStreamDataGate`). Entities of other models that merely refer to an archive keep the reference; queries on
+  it fail until the archive exists. The result lists every left-out archive as `SkippedStreamDataDisabled` ("not imported", they do not exist
+  yet) and carries warning 72 (the model is skipped) and warning 71 (the archives were not imported). After `EnableStreamData`, re-apply the
+  blueprint with force: the archives are then new to the tenant and are created and activated as above. With no stream-data backend in the host
+  (no `IStreamDataTenantServicesProvider` registered) nothing is known about the tenant: the blueprint is applied as before, new archives stay
+  `Created` and one warning says so.
 - **A failed activation never fails the apply** (the seed is committed): the archive ends `Failed` (retry with `RetryArchiveActivation` once
   the cause is fixed) and is reported with the reason; the other archives go on. A rollup on a failed source is not attempted and is `Failed` too.
 - **AB#7984 guard**: a new rollup with `TimeWeightedAvg` or `StateDuration` over a raw (non-windowed) source is activated, but its backfill is
@@ -626,7 +635,7 @@ Rules:
 - The host wiring is `IStreamDataTenantServicesProvider` (`Runtime.Contracts/StreamData`), an optional constructor dependency of
   `BlueprintService` implemented in engine-mongodb (`TenantStreamDataServicesProvider`). Rights: activation runs as part of the blueprint
   operation, which needs the same API policy as `ActivateArchive`.
-- Tests: `BlueprintArchiveActivatorTests`, `BlueprintServiceArchiveActivationTests` (Runtime.Engine.Tests); engine-mongodb
+- Tests: `BlueprintArchiveActivatorTests`, `BlueprintServiceArchiveActivationTests` (incl. stream data off on install, update and forced re-apply) (Runtime.Engine.Tests); engine-mongodb
   `BlueprintArchiveActivationIntegrationTests` (MongoDB + CrateDB: activation, re-apply, update, stream data off, backfill to completion and the
   rollup of a rollup converging).
 

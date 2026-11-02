@@ -320,6 +320,20 @@ internal class BlueprintService : IBlueprintService
                 .GroupBy(d => d.Name, StringComparer.Ordinal)
                 .Select(g => g.First())
                 .ToList();
+
+            // 2a. AB#7991: System.StreamData is service-managed (installed by EnableStreamData only) and the catalogs do
+            //     not offer the floor a blueprint declares. On a tenant without stream data the dependency can be neither
+            //     satisfied nor installed: leave it out of the apply (the seed's archives are left out too, see
+            //     ApplySeedDataForBlueprintAsync) and warn, instead of failing the whole install.
+            if (aggregatedCkDeps.Any(d => BlueprintStreamDataGate.IsStreamDataModel(d.Name))
+                && await _archiveActivator.IsStreamDataOffAsync(tenantId, cancellationToken).ConfigureAwait(false))
+            {
+                aggregatedCkDeps = BlueprintStreamDataGate.WithoutStreamDataModel(aggregatedCkDeps);
+                operationResult.AddMessage(new OperationMessage(MessageLevel.Warning, null, 72,
+                    $"Stream data is not enabled on tenant '{tenantId}': the CK model {BlueprintStreamDataGate.ModelName} " +
+                    "is not installed and the stream-data part of the blueprint (archives) is skipped."));
+            }
+
             loadedCkModels.AddRange(aggregatedCkDeps);
 
             // 2b. AB#6672: a CK model the tenant runs in a version OUTSIDE the declared range (e.g. System 3.0.0
@@ -1274,7 +1288,15 @@ internal class BlueprintService : IBlueprintService
                 }
             }
 
-            var outcome = await EvaluateCkUpgradeGuardAsync(tenantId, targetBlueprint.CkModelDependencies ?? [],
+            // AB#7991: with stream data off the service-managed System.StreamData model is not part of the apply.
+            var guardDependencies = targetBlueprint.CkModelDependencies ?? [];
+            if (guardDependencies.Any(d => BlueprintStreamDataGate.IsStreamDataModel(d.Name))
+                && await _archiveActivator.IsStreamDataOffAsync(tenantId, cancellationToken).ConfigureAwait(false))
+            {
+                guardDependencies = BlueprintStreamDataGate.WithoutStreamDataModel(guardDependencies);
+            }
+
+            var outcome = await EvaluateCkUpgradeGuardAsync(tenantId, guardDependencies,
                 cancellationToken).ConfigureAwait(false);
             preview.CkUpdateSet.AddRange(outcome.UpdateSet);
             preview.CkUpgradeBlockers.AddRange(outcome.Blockers);
@@ -1979,6 +2001,17 @@ internal class BlueprintService : IBlueprintService
 
             var ckDependencies = targetBlueprint.CkModelDependencies ?? [];
 
+            // AB#7991: with stream data off the service-managed System.StreamData model is not part of the update (its
+            // archives are left out of the import, see ApplyDiffAsync), instead of failing on its unavailable floor.
+            if (ckDependencies.Any(d => BlueprintStreamDataGate.IsStreamDataModel(d.Name))
+                && await _archiveActivator.IsStreamDataOffAsync(tenantId, cancellationToken).ConfigureAwait(false))
+            {
+                ckDependencies = BlueprintStreamDataGate.WithoutStreamDataModel(ckDependencies);
+                result.Warnings.Add(
+                    $"Stream data is not enabled on tenant '{tenantId}': the CK model {BlueprintStreamDataGate.ModelName} " +
+                    "is not installed and the stream-data part of the blueprint (archives) is skipped.");
+            }
+
             // 4a. AB#6672: same pre-flight as the first install, before any CK model is installed.
             if (ckDependencies.Count > 0 && !options.DryRun)
             {
@@ -2357,6 +2390,16 @@ internal class BlueprintService : IBlueprintService
         }
         entitiesToImport.AddRange(diff.PromotedConflictUpserts);
 
+        // AB#7991: stream data off - the archives of the System.StreamData model cannot be imported; report and skip them.
+        var skippedStreamDataArchives = new List<BlueprintArchiveCandidate>();
+        var streamDataOff = BlueprintStreamDataGate.ContainsStreamData([], entitiesToImport)
+            && await _archiveActivator.IsStreamDataOffAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        if (streamDataOff)
+        {
+            skippedStreamDataArchives = BlueprintStreamDataGate.RemoveStreamDataEntities(
+                entitiesToImport, targetVersion);
+        }
+
         if (entitiesToImport.Count > 0)
         {
             // AB#7121: refuse a new entity of a type whose method replaces the generic create, before any write
@@ -2384,7 +2427,9 @@ internal class BlueprintService : IBlueprintService
             {
                 var importRoot = new RtModelRootTcDto
                 {
-                    Dependencies = targetBlueprint.CkModelDependencies?.ToList() ?? [],
+                    Dependencies = streamDataOff
+                        ? BlueprintStreamDataGate.WithoutStreamDataModel(targetBlueprint.CkModelDependencies ?? [])
+                        : targetBlueprint.CkModelDependencies?.ToList() ?? [],
                     Entities = entitiesToImport
                 };
 
@@ -2409,6 +2454,7 @@ internal class BlueprintService : IBlueprintService
                 result.ArchiveColumnsAdded.AddRange(_importRtModelCommand.ArchiveColumnAdditions);
 
                 // AB#7991: the import committed; activate the archives it created and queue the new rollups' backfill.
+                importedArchives.AddRange(skippedStreamDataArchives);
                 result.ArchiveActivations.AddRange(await ActivateNewArchivesAsync(tenantId, importedArchives,
                         result.Warnings.Add, cancellationToken)
                     .ConfigureAwait(false));
@@ -3111,6 +3157,17 @@ internal class BlueprintService : IBlueprintService
                 return 0;
             }
 
+            // AB#7991: stream data off - the System.StreamData model is not installed, so its entities (the archives) can
+            // not be imported. They are left out and reported; the rest of the seed is applied.
+            var skippedStreamDataArchives = new List<BlueprintArchiveCandidate>();
+            if (BlueprintStreamDataGate.ContainsStreamData(seedRoot.Dependencies, seedRoot.Entities)
+                && await _archiveActivator.IsStreamDataOffAsync(tenantId, cancellationToken).ConfigureAwait(false))
+            {
+                seedRoot.Dependencies = BlueprintStreamDataGate.WithoutStreamDataModel(seedRoot.Dependencies);
+                skippedStreamDataArchives = BlueprintStreamDataGate.RemoveStreamDataEntities(
+                    seedRoot.Entities, blueprint.BlueprintId);
+            }
+
             // Runtime-state attributes (deployment/communication status, sync counters,
             // stream-data Archive.Status, …) are preserved automatically inside the Upsert
             // import path (ImportRtModelCommand.PreserveRuntimeStateAttributesAsync), so a
@@ -3157,6 +3214,7 @@ internal class BlueprintService : IBlueprintService
             await _importRtModelCommand.ImportModelAsync(
                 repository, seedRoot, ImportStrategy.Upsert, cancellationToken).ConfigureAwait(false);
             archiveCandidates.AddRange(seedArchives);
+            archiveCandidates.AddRange(skippedStreamDataArchives);
 
             // AB#7997: columns the seed added to activated archives (an addition that failed throws above).
             foreach (var addition in _importRtModelCommand.ArchiveColumnAdditions)

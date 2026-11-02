@@ -216,6 +216,16 @@ the root `System/Entity` type allocated >60 GB and killed the asset-repo service
   records on the current descent path and throws a `DependencyGraphException` on a cycle
   (a record containing itself directly or transitively) instead of recursing to stack
   overflow.
+- **No Secret or Hidden columns**: the collector never emits a column for a `Secret` attribute
+  (not filterable, sortable or projectable) or for an attribute whose effective `access` is `Hidden`
+  (`CkTypeAttributeGraph.IsReadableOutsideMethod == false`). The skip applies on every level - type
+  attributes, record and record-array members (a Hidden member drops out of the record's columns, a Hidden
+  record attribute drops the whole record) and attributes reached through navigation. `ReadOnly` and
+  `MethodOnly` attributes stay default columns (both are readable). This only shapes the **default** column
+  set; an explicit request for a Hidden path (filter, sort, column, stored query) is still refused by the
+  consumers' access guards (`AccessQueryGuard` in asset-repo, `ReportColumnAccessGuard` in report-services,
+  the stored-query guards of bot-services and mesh-adapter). Tests: `CkTypeQueryColumnCollectorTests`
+  (`HiddenAndSecret_*`).
 
 ## Repository Structure
 
@@ -261,6 +271,7 @@ Blueprints initialize tenants with pre-configured CK models and runtime data. Se
 Key services:
 - `IBlueprintService` - Applies blueprints to tenants
 - `IBlueprintCkUpgradeGuard` (host-registered, optional) - tenant upgrade guard for the CK models a blueprint installs or raises (CK v2 F2.5, AB#6871), see below
+- `IStreamDataTenantServicesProvider` (host-registered, optional, `Runtime.Contracts/StreamData`; engine-mongodb `TenantStreamDataServicesProvider`) - after the seed import `BlueprintService` activates the archives the seed created (raw first, rollups in source order; pre-existing archives never touched; `archiveActivation.exclude` opt-out; AB#7984 guard: no backfill for TimeWeightedAvg/StateDuration rollups over a raw source) and queues the backfill of new rollups through `BlueprintArchiveActivator`; results in `ArchiveActivations` (AB#7991). Without a provider new archives stay Created. Rules: `docs/blueprints.md`, "Archives and rollups in a blueprint"; tests `BlueprintArchiveActivatorTests`, `BlueprintServiceArchiveActivationTests`
 
 #### Tenant upgrade guard in `BlueprintService` (CK v2 F2.5, AB#6871)
 

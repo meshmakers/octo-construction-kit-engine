@@ -182,9 +182,14 @@ of another computed column. mXparser binds each referenced name as an `Argument`
 > **Binding-name decision (important):** a formula binds to columns by their **physical CrateDB
 > column name** — the lower-cased, dot-stripped form `ColumnNameMapper.PathToColumnName` produces
 > (e.g. CK path `ActivePower` → `activepower`). The row dictionary is already keyed this way, so
-> binding is direct and deterministic. Only columns with a numeric reading (number, bool→0/1,
-> DateTime→ticks, numeric string) are bound; a formula referencing a non-numeric / absent column
-> yields NaN → `NULL`. Standard columns (`timestamp`, `rtid`, …) are **not** bound today — a
+> binding is direct and deterministic. Columns with a numeric reading (number, bool→0/1,
+> DateTime→ticks, numeric string) bind their value; every other operand column of the archive — absent
+> from the row, NULL, or non-numeric — binds `NaN`, the engine's NULL (**AB#8060**). Before AB#8060
+> such an operand stayed unbound, the expression failed its syntax check and the cell was NULL even
+> when the formula did not need the operand for the row (an `if` branch not taken), so a newly added
+> column backfilled NULL for every historical row and an on-change source that sends one of two
+> attributes produced NULL rows. NaN propagates (an unhandled NULL in arithmetic → `NULL`);
+> `coalesce(x, default)` and `isnull(x)` handle it explicitly. Standard columns (`timestamp`, `rtid`, …) are **not** bound today — a
 > timestamp-derived computed column (#4190) would add `timestamp` to the argument set later.
 >
 > **Logical names at create time — implemented (AB#4779).** A formula may be written in the archive's
@@ -209,8 +214,9 @@ attributes are flattened into the per-row column dictionary and before the INSER
 1. For each `Active` computed column of the archive (in dependency order — see §9):
    - Build an `OctoExpression(ConvertTernaryToIf(formula))`.
    - For each referenced column name, `addArguments(new Argument(name, value))`, where `value`
-     is the row's value for that column. A missing / NULL operand binds the `null` constant
-     (mXparser `-Infinity`), matching the existing engine convention.
+     is the row's value for that column. A missing / NULL operand binds `NaN` (AB#8060; the
+     original design said the `null` constant `-Infinity`, which would make `-x` +Infinity and
+     `x < 0` true for a NULL `x`).
    - `calculate()` returns a `double`. **Cast back to `ResultType`** — the identical pattern
      the runtime-query path uses (`FieldFilterResolver.ResolveSearchAttributeValue`):
 
@@ -242,8 +248,8 @@ The mXparser dialect already in field use (`OctoExpression`):
 | Arithmetic | `+ - * / ^ %`, parentheses |
 | Comparison / logic | `< <= > >= == !=`, `&&`, `\|\|`, mXparser boolean operators |
 | Conditional | `if(cond, a, b)`; C-style `cond ? a : b` sugar (translated to `if`) |
-| Built-in functions | mXparser math functions, plus Octo extensions `now(addMinutes)`, `startOfDay(dayCount)` |
-| Null | the `null` constant (`-Infinity`); referenced NULL operands bind to it; NaN result → SQL NULL |
+| Built-in functions | mXparser math functions, plus Octo extensions `now(addMinutes)`, `startOfDay(dayCount)`, `isnull(x)` |
+| Null | NULL operands bind `NaN` and propagate (AB#8060); `coalesce(x, default, …)` / `isnull(x)` handle them; the `null` constant (`-Infinity`) produces NULL on purpose; NaN / `null` result → SQL NULL |
 | Operands | bound arguments by column name; numeric, boolean (0/1), and DateTime (ticks) columns can all feed a formula — only `String` columns cannot be referenced |
 | Result | `double` internally, **cast back to the declared `ResultType`** (`Boolean` / `Int` / `Int64` / `Double` / `DateTime`); stored nullable. No `String` result. |
 

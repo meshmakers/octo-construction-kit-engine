@@ -93,6 +93,13 @@ public class BlueprintApplicationResult
     public IReadOnlyList<string> CkUpdateSet { get; private init; } = [];
 
     /// <summary>
+    /// AB#7991: the archives of the applied seeds and what the apply did with each - newly created archives activated
+    /// (or skipped with a reason, or failed), pre-existing archives untouched - and for new rollups whether a backfill
+    /// was queued. Empty when the seeds carry no archive.
+    /// </summary>
+    public IReadOnlyList<BlueprintArchiveActivation> ArchiveActivations { get; private init; } = [];
+
+    /// <summary>
     /// Creates a successful result (six-parameter form kept for consumers compiled against earlier packages)
     /// </summary>
     /// <param name="tenantId">The tenant id</param>
@@ -136,6 +143,34 @@ public class BlueprintApplicationResult
         IReadOnlyList<BlueprintCkUpgradeBlocker>? forcedCkUpgradeBlockers,
         IReadOnlyList<string>? ckUpdateSet)
     {
+        return Success(tenantId, blueprintId, loadedCkModels, appliedSeedDataFiles, entitiesCreated, operationResult,
+            forcedCkUpgradeBlockers, ckUpdateSet, null);
+    }
+
+    /// <summary>
+    /// Creates a successful result with the archive activations of the apply (AB#7991)
+    /// </summary>
+    /// <param name="tenantId">The tenant id</param>
+    /// <param name="blueprintId">The blueprint id</param>
+    /// <param name="loadedCkModels">List of loaded CK models (as version ranges)</param>
+    /// <param name="appliedSeedDataFiles">List of applied seed data files</param>
+    /// <param name="entitiesCreated">Number of entities created</param>
+    /// <param name="operationResult">Operation result with messages</param>
+    /// <param name="forcedCkUpgradeBlockers">The blockers the caller forced past (AB#6871); none by default</param>
+    /// <param name="ckUpdateSet">The CK models (full ids) the tenant upgrade guard judged as one set; none by default</param>
+    /// <param name="archiveActivations">What the apply did with the archives of its seeds; none by default</param>
+    /// <returns>A successful result</returns>
+    public static BlueprintApplicationResult Success(
+        string tenantId,
+        BlueprintId blueprintId,
+        List<CkModelIdVersionRange> loadedCkModels,
+        List<string> appliedSeedDataFiles,
+        int entitiesCreated,
+        OperationResult operationResult,
+        IReadOnlyList<BlueprintCkUpgradeBlocker>? forcedCkUpgradeBlockers,
+        IReadOnlyList<string>? ckUpdateSet,
+        IReadOnlyList<BlueprintArchiveActivation>? archiveActivations)
+    {
         return new BlueprintApplicationResult
         {
             IsSuccess = true,
@@ -146,7 +181,8 @@ public class BlueprintApplicationResult
             EntitiesCreated = entitiesCreated,
             OperationResult = operationResult,
             CkUpgradeBlockers = forcedCkUpgradeBlockers ?? [],
-            CkUpdateSet = ckUpdateSet ?? []
+            CkUpdateSet = ckUpdateSet ?? [],
+            ArchiveActivations = archiveActivations ?? []
         };
     }
 

@@ -157,7 +157,14 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
             SeedDataPath = source.SeedDataPath,
             SeedDataPaths = source.SeedDataPaths == null ? null : [..source.SeedDataPaths],
             Migrations = source.Migrations == null ? null : [..source.Migrations],
-            Requires = source.Requires
+            Requires = source.Requires,
+            // AB#7991: the archive opt-out list must survive the cache, or a GitHub-catalog install activates them.
+            ArchiveActivation = source.ArchiveActivation == null
+                ? null
+                : new BlueprintArchiveActivationDto
+                {
+                    Exclude = source.ArchiveActivation.Exclude == null ? null : [..source.ArchiveActivation.Exclude]
+                }
         };
     }
 

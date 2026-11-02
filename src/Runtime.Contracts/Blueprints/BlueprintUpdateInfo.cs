@@ -495,6 +495,14 @@ public class BlueprintUpdateResult
     public List<Exchange.RtImportArchiveColumnAddition> ArchiveColumnsAdded { get; set; } = [];
 
     /// <summary>
+    /// AB#7991: the archives the update imported and what it did with each - archives the update newly created are
+    /// activated (or skipped with a reason, or failed), archives that already existed are untouched - and for new
+    /// rollups whether a backfill was queued. A failed activation or a backfill that was not queued is also listed in
+    /// <see cref="Warnings" />; neither fails the update.
+    /// </summary>
+    public List<BlueprintArchiveActivation> ArchiveActivations { get; set; } = [];
+
+    /// <summary>
     /// Errors that occurred during the update
     /// </summary>
     public List<string> Errors { get; set; } = [];

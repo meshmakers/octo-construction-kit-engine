@@ -74,6 +74,12 @@ requires:
   octo.environment: [staging, production]
   octo.isSystemTenant: "false"
 
+# Optional: archives of the seed that stay Created on install/update (AB#7991)
+archiveActivation:
+  exclude:
+    - MyRollupWellKnownName
+    - 6a0e000000000000000a0007
+
 # Optional migrations from older versions of this blueprint
 migrations:
   - fromVersion: "0.9.0"
@@ -93,6 +99,7 @@ migrations:
 | `seedDataPaths`         | string[] | Optional list of seed-data files, merged into one model before import      |
 | `requires`              | object   | Optional preconditions evaluated against the tenant variable context       |
 | `migrations`            | array    | Optional list of migration scripts keyed by source version                 |
+| `archiveActivation`     | object   | Optional; `exclude` lists archives (rtId or well-known name) of the seed that are not activated (AB#7991) |
 
 > Composition (`composedBlueprints`) was removed in favour of dependency-only resolution. The field is no longer accepted; the schema rejects manifests that still carry it.
 
@@ -581,6 +588,47 @@ addition fails the apply after the entities are committed, the column stays out 
 Removing or retyping a column of an activated archive is still refused (AB#7872), and a column added to a disabled archive that was
 activated before is refused until it is enabled again. Seed computed columns declare `Path: ""` and `Required: false` (AB#8034).
 Rules: engine-mongodb `docs/streamdata-archive-concept.md` §10.
+
+## Archives and rollups in a blueprint (AB#7991)
+
+A blueprint ships stream-data archives (raw, time-range, rollup) as seed entities. On **install, forced re-apply and update** the
+engine activates every archive **the seed import created** and queues the backfill of every new rollup, so a fresh tenant gets
+working archives without `ActivateArchive` / `BackfillRollup`:
+
+1. Before the import, `BlueprintArchiveActivator.CollectAsync` records which archive entities of the seed (types derived from
+   `System.StreamData/Archive`) the tenant does not hold yet (looked up by rtId). Only these are "new".
+2. After the import committed, `BlueprintArchiveActivator.ActivateAsync` activates them through `IArchiveLifecycleService`: raw and
+   time-range archives first, then rollups so that every rollup comes after the new rollups it reads from (a rollup needs activated
+   sources). Then, for every rollup that was activated, `IRecomputeOrchestrator.EnqueueBackfillFromSourceAsync` queues a durable
+   background backfill over the history of its sources (never inline). Empty sources = "nothing to backfill"; a rollup of a new rollup
+   gets its history when the backfill of its source commits and propagates (one level per recompute).
+3. The result lists every archive of the seed (`BlueprintApplicationResult.ArchiveActivations`, `BlueprintUpdateResult.ArchiveActivations`,
+   type `BlueprintArchiveActivation`): `Activated`, `SkippedPreExisting`, `SkippedOptOut`, `SkippedStreamDataDisabled` or `Failed` with a
+   reason, and per rollup `Backfill` (`Queued` + job rtId, `NothingToBackfill`, `NotQueued`, `Failed`). Install adds a summary info message
+   (70) and one warning (71) per skipped group, failed archive or backfill that was not queued; update puts the warnings into `Warnings`.
+
+Rules:
+
+- **Archives that existed before are never touched**, whatever their status: a re-apply (also `--force`) is idempotent, and an archive an
+  operator left `Created` or `Disabled` on purpose stays so. A blueprint update that adds an archive activates exactly that one. (Changing
+  the definition of an existing rollup is AB#7992 / AB#7993.)
+- **Opt-out** per archive: `archiveActivation.exclude` in `blueprint.yaml` lists rtIds or well-known names (case-insensitive) that stay
+  `Created`. An entry that matches no archive of the seed is a warning. A rollup whose new source is excluded fails (its source is not active).
+- **Stream data off** (or no stream-data backend in the host, no `IStreamDataTenantServicesProvider` registered): the apply succeeds, the new
+  archives stay `Created`, one warning says so. Enable stream data and activate them manually.
+- **A failed activation never fails the apply** (the seed is committed): the archive ends `Failed` (retry with `RetryArchiveActivation` once
+  the cause is fixed) and is reported with the reason; the other archives go on. A rollup on a failed source is not attempted and is `Failed` too.
+- **AB#7984 guard**: a new rollup with `TimeWeightedAvg` or `StateDuration` over a raw (non-windowed) source is activated, but its backfill is
+  **not** queued (the LOCF statement trips the CrateDB memory breaker over a long history); the result and a warning name AB#7984. The rollup
+  aggregates new buckets. Removing the guard is part of AB#7984.
+- An archive without an rtId in the seed cannot be identified before the import and is not activated (warning). Give seed archives an rtId.
+- Seed archives carry `Status: 0` (Created) or omit it; `Archive.Status` is runtime state.
+- The host wiring is `IStreamDataTenantServicesProvider` (`Runtime.Contracts/StreamData`), an optional constructor dependency of
+  `BlueprintService` implemented in engine-mongodb (`TenantStreamDataServicesProvider`). Rights: activation runs as part of the blueprint
+  operation, which needs the same API policy as `ActivateArchive`.
+- Tests: `BlueprintArchiveActivatorTests`, `BlueprintServiceArchiveActivationTests` (Runtime.Engine.Tests); engine-mongodb
+  `BlueprintArchiveActivationIntegrationTests` (MongoDB + CrateDB: activation, re-apply, update, stream data off, backfill to completion and the
+  rollup of a rollup converging).
 
 ### What a successful update records
 

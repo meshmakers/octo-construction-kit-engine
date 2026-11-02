@@ -115,7 +115,7 @@ public class ExchangeException : PersistenceException
     }
 
     /// <summary>
-    /// AB#8042: a user-initiated import sets an identity-owned User field or an identity association
+    /// AB#8042: a user-initiated import sets an identity association
     /// (<c>IdentityOwnedWrites</c>), which only the identity service writes. Raised before anything is written; one failure that
     /// lists every offender with its parameters (rtId, ckTypeId, path).
     /// </summary>

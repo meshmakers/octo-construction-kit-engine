@@ -88,9 +88,9 @@ public class ImportRtModelCommandGenericCreateTests : IDisposable
     private static CkTypeGraph IdentityUserGraph()
     {
         var name = NameAttr();
-        var create = new CkMethodGraph(new CkId<CkTypeId>("System.Identity-2.30.0/User"),
-            new CkMethodDto { MethodId = "CreateUser-1", Kind = CkMethodKindDto.Static });
-        return new CkTypeGraph(new CkId<CkTypeId>("System.Identity-2.30.0/User"),
+        var create = new CkMethodGraph(new CkId<CkTypeId>("System.Identity-3.0.0/User"),
+            new CkMethodDto { MethodId = "CreateUser-1", Kind = CkMethodKindDto.Static, ReplacesGenericCreate = true });
+        return new CkTypeGraph(new CkId<CkTypeId>("System.Identity-3.0.0/User"),
             isAbstract: false, isFinal: true, isCollectionRoot: false, baseTypes: [],
             derivedFromCkTypeId: null, definingCollectionRootCkTypeId: null, derivedTypes: [], definedAttributes: [],
             allAttributes: new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> { [name.CkAttributeId] = name },
@@ -126,7 +126,7 @@ public class ImportRtModelCommandGenericCreateTests : IDisposable
 
             if (withIdentityUser)
             {
-                // AB#7777: System.Identity/User with its static, unflagged CreateUser-1 (System.Identity 2.x).
+                // AB#7777 / AB#8053: System.Identity/User with its static CreateUser-1, flagged replacesGenericCreate (System.Identity 3.0.0).
                 var user = IdentityUserGraph();
                 graphs.Add(user);
                 var userOut = (CkTypeGraph?)user;

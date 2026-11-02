@@ -248,7 +248,7 @@ internal class ImportRtModelCommand(
                     // pass is skipped on tenants without a Hidden or MethodOnly attribute.
                     var checkAttributeAccess =
                         RtAttributeAccessCheck.TenantHasRestrictedAttribute(cacheService, runtimeRepository.TenantId);
-                    // AB#8042: identity-owned User fields and identity associations, caller path only.
+                    // AB#8042: identity associations, caller path only.
                     var checkIdentityOwned = caller != null &&
                                              RtIdentityOwnedWriteCheck.TenantHasIdentityModel(cacheService,
                                                  runtimeRepository.TenantId);
@@ -367,7 +367,7 @@ internal class ImportRtModelCommand(
     }
 
     /// <summary>
-    /// AB#8042: a user-initiated import (caller path only) cannot set an identity-owned User field or an identity association
+    /// AB#8042: a user-initiated import (caller path only) cannot set an identity association
     /// (<see cref="IdentityOwnedWrites" />): only the identity service writes them, through its REST API and methods. Runs over
     /// the whole entity list before the first write and fails the whole file with one <see cref="ExchangeException"/>
     /// (message 140) that lists every offender. The system path (no caller: blueprint seed, <c>ImportModelAsync</c>,
@@ -393,7 +393,7 @@ internal class ImportRtModelCommand(
         }
 
         logger.LogWarning(
-            "Import into '{TenantId}' rejected: {Count} value(s) for identity-owned User fields or identity associations, which only the identity service writes (subject '{SubjectId}')",
+            "Import into '{TenantId}' rejected: {Count} identity association edge(s), which only the identity service writes (subject '{SubjectId}')",
             tenantId, offenders.Count, caller?.SubjectId);
         throw ExchangeException.IdentityOwnedWriteRestricted(
             offenders.Select(RtIdentityOwnedWriteCheck.ToMessage).ToList());
@@ -1269,16 +1269,16 @@ internal class ImportRtModelCommand(
             // existing-entity lookup unless it has no attributes at all.
             var seedOwnedAttributes = SelectGuardedAttributes(ckTypeGraph);
 
-            // AB#8059: a user-initiated import must not change an identity-owned User attribute - not by a value (refused by
-            // the preflight, message 140) and not by omission: the Upsert is a full replace, and under the blanking policy
-            // Allow (or a confirmation) an omitted SeedOwned value would be cleared, e.g. a lockout reset. On the caller path
-            // these attributes are therefore preserved like runtime state, whatever the policy. The system path is unchanged.
-            if (_callerImport && IdentityOwnedWrites.IsUserType(typeGroup.Key))
+            // AB#8059 / AB#8053: a user-initiated import must not change an attribute that only a CK method may write
+            // (access MethodOnly or Hidden) - not by a value (refused by the access preflight, message 139) and not by
+            // omission: the Upsert is a full replace, and under the blanking policy Allow (or a confirmation) an omitted
+            // SeedOwned value would be cleared, e.g. a lockout reset on System.Identity/User. On the caller path these
+            // attributes are therefore preserved like runtime state, whatever the policy. The system path is unchanged.
+            if (_callerImport)
             {
-                var identityOwned = seedOwnedAttributes
-                    .Where(a => IdentityOwnedWrites.IsIdentityOwnedAttribute(typeGroup.Key, a.AttributeName)).ToList();
-                flaggedAttributes.AddRange(identityOwned);
-                seedOwnedAttributes = seedOwnedAttributes.Except(identityOwned).ToList();
+                var methodOnly = seedOwnedAttributes.Where(a => !a.IsWritableOutsideMethod).ToList();
+                flaggedAttributes.AddRange(methodOnly);
+                seedOwnedAttributes = seedOwnedAttributes.Except(methodOnly).ToList();
             }
 
             if (flaggedAttributes.Count == 0 && secretRecordAttributes.Count == 0 && seedOwnedAttributes.Count == 0)

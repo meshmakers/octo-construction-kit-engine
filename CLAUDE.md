@@ -321,23 +321,20 @@ flag (`ImportRt` has its own check, next section). The lookup itself is public: 
 table of `ConstructionKit.Engine` is `internal`; the assembly makes it visible to `Meshmakers.Octo.Runtime.Engine` for this
 message. Tests: `BlueprintGenericCreateRefusalTests` (type graphs are built in the test, no System version involved).
 
-#### `System.Identity/User` is created only through `User.CreateUser-1` (AB#7777, runtime rule)
+#### `System.Identity/User` is created only through `User.CreateUser-1` (AB#7777, AB#8053)
 
-`GenericCreateReplacement.FindReplacingMethod` (and so `TryGetReplacingMethod`) answers the static `User.CreateUser-1` for
-`System.Identity/User` when no method of the type carries `replacesGenericCreate` and the tenant's System.Identity declares that
-static method (2.29.0 and later; version-less match through `IdentityOwnedWrites.IsUserType`, constant
-`GenericCreateReplacement.IdentityUserCreateMethodId`). A user is created only by the identity service (REST or the method), which
-runs the user manager (normalised name and e-mail, password policy, security stamp). The model cannot say so in 2.x: the flag on
-the existing type is a Major (row M16), planned for the next System.Identity major (AB#8053). Because every generic writer asks
-this one helper, a **new** user is refused everywhere with `GENERIC_CREATE_REPLACED_BY_METHOD` and the method id
-`System.Identity/User.CreateUser-1`: asset-repo generic, typed and query-row create, MCP create, the mesh-adapter insert pre-check
-(`GenericCreateGuard`), the caller path of `ImportRt` (137) and blueprint seed data, update diff and migration `Add` (136). An
-existing user (rtId stored) is updated as before. Not affected: the identity service's repository writes, the system import path
-of `ImportRt` without a caller (no blueprint guard there), a tenant restore, a tenant whose System.Identity predates the method.
-The returned method's `ReplacesGenericCreate` stays `false` (CK meta and docs show the model as it is). **Remove the rule** when
-the next System.Identity major sets the flag (the model's flagged method already wins over it). Note for a blueprint seed: the
-`access` preflight (139) runs first, so a seeded user that carries `UserName`/`Email` reports 139, one without them 136; both write
-nothing. Tests: `GenericCreateReplacementIdentityUserTests`, `ImportRtModelCommandGenericCreateTests` (`*IdentityUser*`),
+System.Identity 3.0.0 sets `replacesGenericCreate: true` on the static `User.CreateUser-1` in the model (row M16, part of the
+major), so `GenericCreateReplacement.FindReplacingMethod` answers it from the flag like for every other type. A user is created
+only by the identity service (REST or the method), which runs the user manager (normalised name and e-mail, password policy,
+security stamp). Every generic writer asks this one helper, so a **new** user is refused everywhere with
+`GENERIC_CREATE_REPLACED_BY_METHOD` and the method id `System.Identity/User.CreateUser-1`: asset-repo generic, typed and
+query-row create, MCP create, the mesh-adapter insert pre-check (`GenericCreateGuard`), the caller path of `ImportRt` (137) and
+blueprint seed data, update diff and migration `Add` (136). An existing user (rtId stored) is updated as before. Not affected: the
+identity service's repository writes, the system import path of `ImportRt` without a caller (no blueprint guard there), a tenant
+restore. **History:** System.Identity 2.29.0 - 2.30.0 could not carry the flag (a Major) and the engine stood in for it with a
+runtime rule in `GenericCreateReplacement` (AB#7777); that rule was removed with AB#8053. A tenant still on System.Identity 2.x
+(until the identity service has imported 3.0.0 into it) keeps the generic create of a user. Tests:
+`GenericCreateReplacementIdentityUserTests`, `ImportRtModelCommandGenericCreateTests` (`*IdentityUser*`),
 `BlueprintGenericCreateRefusalTests` (`*IdentityUser*`).
 
 #### `ImportRt` and `replacesGenericCreate` (AB#7107, F3.7)
@@ -388,40 +385,42 @@ testing the enum inline.
 - Tests: `RtAttributeAccessCheckTests`, `RtEntityToTcDtoConverterAccessTests`, `ImportRtModelCommandAttributeAccessTests`,
   `BlueprintAttributeAccessRefusalTests` (synthetic graph `Access/AccessTestModel.cs`).
 
-#### Identity-owned User fields and identity associations (AB#8042, F4.2)
+#### Identity-owned User fields and identity associations (AB#8042, AB#8053, F4.2)
 
-`IdentityOwnedWrites` (`ConstructionKit.Contracts`, public) is the one list of what only the identity service writes: the
-`System.Identity/User` attributes `NormalizedUserName`, `NormalizedEmail`, `EmailConfirmed`, `PhoneNumberConfirmed`,
-`TwoFactorEnabled`, `LockoutEnabled`, `ResetPasswordOnLogin`, `Claims` (`UserClaims`), `UserLogins`, `PreferredChannelBindingId`,
-`LockoutEnd`, `AccessFailedCount` (AB#8059: both are `ReadOnly` in the model, which a user-started import accepts under the general
-rule; listed so that such an import cannot reset a lockout - the general rule stays for every other model), and the association roles `System.Identity/AssignedRole`, `GroupMember`, `ChildGroup`, `MayActAs`, `GrantsPermission` (both
-directions). Matching is version-less (`System.Identity-2.30.0/User`, `System.Identity@2/User` and `System.Identity/User` are the
-same type) and case-insensitive on the attribute name. Consumers: asset-repo GraphQL (generic and typed create/update, query-row
-update) and the **caller path** of `ImportRt`: `ImportRtModelCommand.PreflightIdentityOwnedWrites` (YAML) and the first pass of
-the JSON stream (`RtIdentityOwnedWriteCheck`, made only for a caller import on a tenant that has System.Identity) refuse the whole
-file before the first write with one `ExchangeException`, **message 140** `RtIdentityOwnedWriteRestricted` (parameters `rtId`,
-`ckTypeId`, `path` = the attribute name or `association <roleId> -> <targetRtId>`; the association is caught on whichever entity of
-the file declares it). The system path (no caller: blueprint seed and update, `ImportModelAsync`, `ImportTextAsync`, CK
-migrations) is **not** checked: the System.Identity.Bootstrap seed writes the `TenantOwners` role edges through it. Repository writes
-(`ApplyChangesAsync`, insert/replace) are not checked either: the identity service writes these fields and edges through its own
-repository.
-- **Not by omission either (AB#8059):** a caller `Upsert` is a full replace, and these attributes are SeedOwned, so the
-  blanking guard alone would let an omitted value go under `RtImportBlankingPolicy.Allow` or a confirmation (a lockout reset by
-  leaving `LockoutEnd` out). On the caller path `PreserveRuntimeStateAttributesAsync` therefore treats the identity-owned User
-  attributes like runtime state (existing value carried over, whatever the policy; flag `_callerImport`, set by `ImportFileAsync`
-  only). The system path keeps the blanking semantics. Tests: `ImportRtModelCommandIdentityOwnedTests` (`CallerUpsert_*`,
-  `SystemUpsert_*`).
-- **Why a list and not CK `access` (decision Gerald 2026-11-01, option B):** none of these attributes was `securitySensitive` in an
-  earlier 2.x System.Identity, so tightening their access is a Major (row T7, AB#6585) and System.Identity 3.0.0 would leave every
-  blueprint range `[2.x,3.0)` unsatisfied; association writes cannot be expressed in the CK access model at all. **Move the
-  attributes into the model's `access` (MethodOnly) with the next System.Identity major, together with AB#7777**, and delete
-  `UserAttributeNames` then; the association list stays until the CK model can restrict association writes.
-- Scope (decision Gerald 2026-11-01, AB#8042): the list is enforced by `ImportRt` (caller path) and asset-repo GraphQL only. The
-  mesh-adapter load nodes judge CK `access` alone (`RtAttributeAccessGuard`); the association roles `PolicyPermission` and
-  `IdentifiesUser` are deliberately not in the list.
-- Tests: `ImportRtModelCommandIdentityOwnedTests` (every attribute and role on the caller path, YAML and JSON stream, several
-  offenders, other User attributes and the system path import as before, tenant without System.Identity reads the file once,
-  version-less matching).
+**Attributes: the model says it (System.Identity 3.0.0).** The identity-owned attributes of `System.Identity/User` -
+`NormalizedUserName`, `NormalizedEmail`, `EmailConfirmed`, `PhoneNumberConfirmed`, `TwoFactorEnabled`, `LockoutEnabled`,
+`LockoutEnd`, `AccessFailedCount`, `ResetPasswordOnLogin`, `Claims`, `UserLogins`, `PreferredChannelBindingId` (with `UserName` and
+`Email` from 2.28.0 twelve in all) - are `access: MethodOnly` in `ck-user.yaml`. There is no attribute list in the engine any more
+(AB#8053 removed `UserAttributeNames` / `IsIdentityOwnedAttribute` / `IsUserType`): the generic access rules enforce it for every
+model - asset-repo GraphQL and query rows (`ATTRIBUTE_NOT_WRITABLE`), `ImportRt` and blueprint seeds (rule 139, every path), the
+mesh-adapter write nodes (`RtAttributeAccessGuard`). `ReadOnly` would not do (it is importable), which is why `LockoutEnd` and
+`AccessFailedCount` went from `ReadOnly` to `MethodOnly`. Differences to the AB#8042 list: the system path (blueprint seed,
+`ImportModelAsync`) refuses a value for these attributes too (139; no blueprint seeds a User), and a GraphQL refusal no longer
+carries `reason = identity-owned` but the generic access detail. The identity service writes through its own repository and the
+tenant restore works on MongoDB: neither is guarded.
+- **Omission (AB#8059, now general):** a caller `Upsert` is a full replace, and the blanking guard alone would let an omitted value
+  go under `RtImportBlankingPolicy.Allow` or a confirmation (a lockout reset by leaving `LockoutEnd` out). On the caller path
+  `PreserveRuntimeStateAttributesAsync` therefore treats **every attribute that is not writable outside a method** (`access`
+  `MethodOnly` or `Hidden`, `!IsWritableOutsideMethod`) like runtime state: the existing value is carried over, whatever the policy
+  (flag `_callerImport`, set by `ImportFileAsync` only). The system path keeps the blanking semantics. Tests:
+  `ImportRtModelCommandIdentityOwnedTests` (`CallerUpsert_*`, `SystemUpsert_*`).
+
+**Associations: still a list.** `IdentityOwnedWrites` (`ConstructionKit.Contracts`, public) is reduced to the association roles
+`System.Identity/AssignedRole`, `GroupMember`, `ChildGroup`, `MayActAs`, `GrantsPermission` (both directions; `IsIdentityOwnedAssociation`,
+`AssociationRoleIds`, `RefusalReason`). **Why not in the model:** the CK access model has no association-level restriction -
+`access` exists only on attributes (including the attributes of an association role), and an association cannot be declared
+method-only. Matching is version-less. Consumers: asset-repo GraphQL (generic and typed create/update, query-row update), the
+mesh-adapter write nodes and the **caller path** of `ImportRt`: `ImportRtModelCommand.PreflightIdentityOwnedWrites` (YAML) and
+the first pass of the JSON stream (`RtIdentityOwnedWriteCheck`, made only for a caller import on a tenant that has System.Identity)
+refuse the whole file before the first write with one `ExchangeException`, **message 140** `RtIdentityOwnedWriteRestricted`
+(parameters `rtId`, `ckTypeId`, `path` = `association <roleId> -> <targetRtId>`; the association is caught on whichever entity of the
+file declares it). The system path (no caller: blueprint seed and update, `ImportModelAsync`, `ImportTextAsync`, CK migrations) is
+**not** checked: the System.Identity.Bootstrap seed writes the `TenantOwners` role edges through it. Repository writes
+(`ApplyChangesAsync`, insert/replace) are not checked either. The roles `PolicyPermission` and `IdentifiesUser` are deliberately not
+in the list. Remove the list when the CK language can express association write restrictions.
+- Tests: `ImportRtModelCommandIdentityOwnedTests` (every role on the caller path, YAML and JSON stream, several offenders, the MethodOnly
+  attributes through rule 139 on caller and system path, the system path imports the edges as before, tenant without System.Identity
+  reads the file once, version-less matching, omission preserved).
 
 #### Runtime-State Preservation on Re-Import (Upsert)
 
@@ -1415,7 +1414,7 @@ exists in Industry.Basic-2.6.0. Check the model prefix of the reference."). `OCT
 | 137 | `ImportRtCreateReplacedByMethod` | `ImportRtModelCommand.PreflightGenericCreateAsync` (Runtime.Engine, raised by a user-initiated `ImportRt`, not by the compiler) | AB#7107: the import file would create a **new** entity of a type whose static method declares `replacesGenericCreate` (own or inherited). Message parameters `rtId`, `ckTypeId`, `methodId` and `reason` (`GENERIC_CREATE_REPLACED_BY_METHOD`); one message per entity, carried by one `ExchangeException` (`MessageNumber` 137, `Messages`). See "`ImportRt` and `replacesGenericCreate`" above |
 | 138 | `ExportedRecordDropsRequiredMember` | `ExportedRecordMemberValidator` (from `CatalogModelResolver.CompileAsync`, after `SecretAttributeValidator`) | AB#7467 (follow-up of AB#7446), **warning**: an attribute assignment declared in the compiled model (type or record; interfaces are not walked) whose value type is `Record`/`RecordArray` and whose effective ownership is exported (`SeedOwned`/`TenantOwned`; assignment override over definition) reaches - through the referenced record, also from a dependency model, and nested exported record members - a member that is required (`isOptional` false), has no default value and whose effective ownership `IsExcludedFromExport()` (`RuntimeState`, `Secret`). This is the shape `RtEntityToTcDtoConverter.ConvertAttributes` drops (it evaluates record members individually). One message per member; parameters `ckElementId` (declaring type/record, versioned id), `attributeName`, `ckRecordId` (record that contains the member), `memberPath` (e.g. `States.ExternalId`), `memberOwnership`. Not reported: optional or defaulted members, anything below a record-valued attribute/member that is itself excluded (dropped as one unit, e.g. `MappingTargets`), records not reachable from an assignment of the compiled model (reported where they are used). A warning only, so existing models compile unchanged; no generated code, cache or catalog change. Tests: `ExportedRecordMemberValidatorTests`, `CkExportedRecordMemberCompileTests`. Rules: `docs/ck-semver-rules.md` "Record members and export" |
 | 139 | `RtAttributeWriteRestricted` | `RtAttributeAccessCheck` (Runtime.Engine/Exchange; raised by `ImportRtModelCommand` on every RT import path and by `BlueprintGenericCreateGuard` / `BlueprintMigrationExecutor`, not by the compiler) | AB#7767 (H3): an RT import, blueprint seed, blueprint update diff or migration step sets an attribute with `access: Hidden` or `MethodOnly` (also a record member). Parameters `rtId`, `ckTypeId`, `attributePath`; one message per value, refused before anything is written. `ReadOnly` stays importable. See "RT export and import honour `access`" above |
-| 140 | `RtIdentityOwnedWriteRestricted` | `RtIdentityOwnedWriteCheck` (Runtime.Engine/Exchange; raised by `ImportRtModelCommand` on the caller path of `ImportRt` only, not by the compiler) | AB#8042: a user-initiated import sets an identity-owned `System.Identity/User` attribute or an edge of an identity association role (`IdentityOwnedWrites`). Parameters `rtId`, `ckTypeId`, `path`; one message per value, refused before anything is written. See "Identity-owned User fields and identity associations" above |
+| 140 | `RtIdentityOwnedWriteRestricted` | `RtIdentityOwnedWriteCheck` (Runtime.Engine/Exchange; raised by `ImportRtModelCommand` on the caller path of `ImportRt` only, not by the compiler) | AB#8042 / AB#8053: a user-initiated import sets an edge of an identity association role (`IdentityOwnedWrites`; the identity-owned User attributes are MethodOnly since System.Identity 3.0.0 and refused by 139). Parameters `rtId`, `ckTypeId`, `path`; one message per edge, refused before anything is written. See "Identity-owned User fields and identity associations" above |
 
 `InheritanceResolver.ResolveInterfacesAndMethods` also completes `AllImplementedInterfaces` (own ∪ every base
 type's declared interfaces), `AllMethods` (nearest declaration wins; `CkMethodGraph.DeclaringCkTypeId` is the

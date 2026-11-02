@@ -37,7 +37,7 @@ public class BlueprintGenericCreateRefusalTests
     private static readonly RtCkId<CkTypeId> AccountType = new("Test-1.0.0/Account");
     private static readonly RtCkId<CkTypeId> SpecialAccountType = new("Test-1.0.0/SpecialAccount");
     private static readonly RtCkId<CkTypeId> PlainType = new("Test-1.0.0/Plain");
-    private static readonly RtCkId<CkTypeId> IdentityUserType = new("System.Identity-2.30.0/User");
+    private static readonly RtCkId<CkTypeId> IdentityUserType = new("System.Identity-3.0.0/User");
     private static readonly RtCkId<CkAttributeId> LockedAttr = new("System/RtBlueprintLocked");
     private static readonly RtCkId<CkAttributeId> ThresholdAttr = new("Test-1.0.0/Threshold");
 
@@ -64,9 +64,9 @@ public class BlueprintGenericCreateRefusalTests
         Cache(AccountType, method);
         Cache(SpecialAccountType, method);
         Cache(PlainType);
-        // AB#7777: System.Identity/User declares the static CreateUser-1 WITHOUT the flag (System.Identity 2.x).
-        Cache(IdentityUserType, new CkMethodGraph(new CkId<CkTypeId>("System.Identity-2.30.0/User"),
-            new CkMethodDto { MethodId = "CreateUser-1", Kind = CkMethodKindDto.Static }));
+        // AB#7777 / AB#8053: System.Identity/User declares the static CreateUser-1 with the flag (System.Identity 3.0.0).
+        Cache(IdentityUserType, new CkMethodGraph(new CkId<CkTypeId>("System.Identity-3.0.0/User"),
+            new CkMethodDto { MethodId = "CreateUser-1", Kind = CkMethodKindDto.Static, ReplacesGenericCreate = true }));
 
         A.CallTo(() => _catalog.IsExistingAsync(A<BlueprintId>._, A<object?>._)).Returns(true);
         A.CallTo(() => _catalog.GetAsync(A<BlueprintId>._, A<OperationResult>._, A<object?>._, A<CancellationToken?>._))
@@ -420,7 +420,7 @@ public class BlueprintGenericCreateRefusalTests
         var refusal = Assert.Single(result.OperationResult.Messages,
             m => m.MessageNumber == BlueprintGenericCreateGuard.MessageNumber);
         Assert.Equal(Id(7), refusal.Parameters["rtId"]);
-        Assert.Equal("System.Identity-2.30.0/User", refusal.Parameters["ckTypeId"]);
+        Assert.Equal("System.Identity-3.0.0/User", refusal.Parameters["ckTypeId"]);
         Assert.Equal("System.Identity/User.CreateUser-1", refusal.Parameters["methodId"]);
         Assert.Equal(GenericCreateReplacement.ReasonToken, refusal.Parameters["reason"]);
     }

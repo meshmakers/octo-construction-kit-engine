@@ -14,8 +14,9 @@ namespace Meshmakers.Octo.Runtime.Contracts.Formulas;
 /// <see cref="double.NaN"/> instead of leaving it unbound. An unhandled NULL in arithmetic, a
 /// comparison or a function yields NULL (<see cref="Evaluate"/> returns <c>null</c>). <c>if(cond, a, b)</c>
 /// yields the branch it takes, so a NULL in the other branch does not matter; a NULL condition yields
-/// NULL. <c>coalesce(x, default, …)</c> returns the first argument that is not NULL;
-/// <c>isnull(x)</c> is <c>1</c> for a NULL operand or the <c>null</c> constant, otherwise <c>0</c>.
+/// NULL. <c>coalesce(x, default, …)</c> returns the first argument that is not NaN, so it replaces a
+/// NULL operand but not the <c>null</c> constant (negative infinity); <c>isnull(x)</c> recognizes both
+/// and is <c>1</c> for a NULL operand or the <c>null</c> constant, otherwise <c>0</c>.
 /// </remarks>
 public interface IFormulaEngine
 {

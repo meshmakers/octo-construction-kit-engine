@@ -41,7 +41,8 @@ internal class StartOfDayFunction : FunctionExtension
 
     public double calculate()
     {
-        return DateTime.Today.AddDays(_dayCount).Ticks;
+        // A NULL operand (NaN) yields NULL instead of throwing in DateTime.AddDays (AB#8060).
+        return double.IsNaN(_dayCount) ? double.NaN : DateTime.Today.AddDays(_dayCount).Ticks;
     }
 
     public FunctionExtension clone()

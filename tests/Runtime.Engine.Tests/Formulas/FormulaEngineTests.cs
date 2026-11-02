@@ -349,4 +349,20 @@ public class FormulaEngineTests
     {
         Assert.True(_engine.CheckSyntax("coalesce(a, 0) + isnull(b)", new[] { "a", "b" }).IsValid);
     }
+
+    [Theory]
+    [InlineData("now(x)")]
+    [InlineData("startOfDay(x)")]
+    public void Evaluate_DateFunctionWithANullOperand_YieldsNull(string formula)
+    {
+        Assert.Null(_engine.Evaluate(formula, Args(("x", double.NaN)), FormulaResultType.DateTime));
+    }
+
+    [Fact]
+    public void Evaluate_Coalesce_DoesNotReplaceTheNullConstant()
+    {
+        // coalesce skips NaN (a NULL operand) only; the null constant needs isnull.
+        Assert.Null(_engine.Evaluate("coalesce(null, 5)", Args(), FormulaResultType.Double));
+        Assert.Equal(5.0, _engine.Evaluate("if(isnull(null), 5, 0)", Args(), FormulaResultType.Double));
+    }
 }

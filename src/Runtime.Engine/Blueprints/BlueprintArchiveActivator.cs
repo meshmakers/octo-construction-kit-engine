@@ -19,13 +19,18 @@ namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
 /// <param name="BlueprintId">The blueprint whose seed carries the archive.</param>
 /// <param name="IsNew"><c>true</c> when the tenant did not hold the archive before the import.</param>
 /// <param name="OptedOut"><c>true</c> when the blueprint lists the archive in <c>archiveActivation.exclude</c>.</param>
+/// <param name="NotImported">
+/// <c>true</c> when stream data is off on the tenant and the archive entity was left out of the seed import because its
+/// CK model <c>System.StreamData</c> is not installed there (AB#7991).
+/// </param>
 internal sealed record BlueprintArchiveCandidate(
     OctoObjectId RtId,
     string? WellKnownName,
     RtCkId<CkTypeId> CkTypeId,
     BlueprintId BlueprintId,
     bool IsNew,
-    bool OptedOut);
+    bool OptedOut,
+    bool NotImported = false);
 
 /// <summary>
 /// Activates the archives a blueprint seed created and queues the backfill of new rollups (AB#7991).
@@ -143,6 +148,21 @@ internal sealed class BlueprintArchiveActivator(IStreamDataTenantServicesProvide
     }
 
     /// <summary>
+    /// <c>true</c> when the stream-data backend knows the tenant and stream data is switched off there (AB#7991). Without a
+    /// backend (or an unknown tenant) the answer is <c>false</c>: nothing is known, the blueprint is applied as before.
+    /// </summary>
+    public async Task<bool> IsStreamDataOffAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        if (servicesProvider == null)
+        {
+            return false;
+        }
+
+        var services = await servicesProvider.GetAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        return services is { IsStreamDataEnabled: false };
+    }
+
+    /// <summary>
     /// Activates the new, not opted-out archives of <paramref name="candidates" /> and queues the backfill of the new
     /// rollups. Runs after the seed import committed. Never throws for a single archive: the outcome of each is in the
     /// returned list and warnings are handed to <paramref name="warn" />.
@@ -171,10 +191,18 @@ internal sealed class BlueprintArchiveActivator(IStreamDataTenantServicesProvide
         });
 
         var toActivate = new List<BlueprintArchiveCandidate>();
+        var notImported = new List<BlueprintArchiveCandidate>();
         foreach (var candidate in unique)
         {
             var result = results[candidate.RtId];
-            if (!candidate.IsNew)
+            if (candidate.NotImported)
+            {
+                result.Outcome = BlueprintArchiveActivationOutcome.SkippedStreamDataDisabled;
+                result.Reason = $"Stream data is not enabled on tenant '{tenantId}'; the archive was not imported because " +
+                                "its CK model System.StreamData is not installed there.";
+                notImported.Add(candidate);
+            }
+            else if (!candidate.IsNew)
             {
                 result.Outcome = BlueprintArchiveActivationOutcome.SkippedPreExisting;
                 result.Reason = "The archive already existed on the tenant; its status was not changed.";
@@ -188,6 +216,13 @@ internal sealed class BlueprintArchiveActivator(IStreamDataTenantServicesProvide
             {
                 toActivate.Add(candidate);
             }
+        }
+
+        if (notImported.Count > 0)
+        {
+            warn($"Stream data is not enabled on tenant '{tenantId}': {notImported.Count} archive(s) of the blueprint were " +
+                 $"not imported ({Names(notImported)}). Enable stream data, then re-apply the blueprint (force) to create " +
+                 "and activate them.");
         }
 
         if (toActivate.Count == 0)

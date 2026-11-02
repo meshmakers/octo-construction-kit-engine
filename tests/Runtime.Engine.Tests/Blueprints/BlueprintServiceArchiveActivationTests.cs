@@ -51,6 +51,8 @@ public class BlueprintServiceArchiveActivationTests
     private readonly IStreamDataTenantServicesProvider _streamData = A.Fake<IStreamDataTenantServicesProvider>();
     private readonly IArchiveLifecycleService _lifecycle = A.Fake<IArchiveLifecycleService>();
     private readonly IArchiveRuntimeStore _archiveStore = A.Fake<IArchiveRuntimeStore>();
+    private readonly ICkModelUpgradeService _upgrade = A.Fake<ICkModelUpgradeService>();
+    private readonly List<RtModelRootTcDto> _imported = [];
 
     private readonly Dictionary<string, OctoObjectId[]> _seeds = [];
     private readonly List<RtEntity> _tenant = [];
@@ -83,9 +85,17 @@ public class BlueprintServiceArchiveActivationTests
         A.CallTo(() => _import.ImportModelAsync(A<IRuntimeRepository>._, A<RtModelRootTcDto>._,
                 A<ImportStrategy>._, A<CancellationToken?>._, A<RtImportBlankingPolicy>._,
                 A<IReadOnlyCollection<RtImportBlankingConfirmation>?>._))
-            .ReturnsLazily(() => _importFails
-                ? throw new InvalidOperationException("import refused")
-                : Task.CompletedTask);
+            .ReturnsLazily((IRuntimeRepository _, RtModelRootTcDto root, ImportStrategy _, CancellationToken? _,
+                    RtImportBlankingPolicy _, IReadOnlyCollection<RtImportBlankingConfirmation>? _) =>
+            {
+                _imported.Add(root);
+                return _importFails
+                    ? throw new InvalidOperationException("import refused")
+                    : Task.CompletedTask;
+            });
+        A.CallTo(() => _upgrade.UpgradeModelsAsync(A<string>._, A<IEnumerable<CkModelIdVersionRange>>._,
+                A<CkMigrationOptions?>._, A<IReadOnlyDictionary<string, string>?>._, A<CancellationToken>._))
+            .Returns(Task.FromResult(new CkModelUpgradeResult { Success = true }));
         A.CallTo(() => _installations.GetByBlueprintNameAsync(TenantId, A<string>._, A<CancellationToken>._))
             .Returns(Task.FromResult<BlueprintInstallation?>(null));
 
@@ -128,7 +138,7 @@ public class BlueprintServiceArchiveActivationTests
 
     private BlueprintService CreateService(bool withStreamData = true) => new(
         _cache, _catalog, _history, A.Fake<IBlueprintMigrationExecutor>(), A.Fake<IBlueprintMigrationParser>(),
-        A.Fake<ICkModelUpgradeService>(), _repositoryProvider, _import, _serializer, A.Fake<IBlueprintNotifications>(),
+        _upgrade, _repositoryProvider, _import, _serializer, A.Fake<IBlueprintNotifications>(),
         _resolver, _installations, _variables, NullLogger<BlueprintService>.Instance, null,
         withStreamData ? _streamData : null);
 
@@ -136,10 +146,21 @@ public class BlueprintServiceArchiveActivationTests
     {
         BlueprintId = id,
         SeedDataPath = "seed.yaml",
+        CkModelDependencies = _ckDependencies.Select(d => new CkModelIdVersionRange(d)).ToList(),
         ArchiveActivation = _exclude.Count == 0 ? null : new BlueprintArchiveActivationDto { Exclude = _exclude }
     };
 
     private readonly List<string> _exclude = [];
+    private readonly List<string> _ckDependencies = [];
+
+    private void GivenStreamDataOff() =>
+        A.CallTo(() => _streamData.GetAsync(TenantId, A<CancellationToken>._))
+            .Returns(Task.FromResult<StreamDataTenantServices?>(
+                new StreamDataTenantServices(false, _lifecycle, _archiveStore, null, null)));
+
+    private bool EnsuredStreamDataModel() => Fake.GetCalls(_repositoryProvider).Any(c =>
+        c.Method.Name == nameof(IRuntimeRepositoryProvider.EnsureCkModelInstalledAsync) &&
+        c.Arguments.Any(a => a is CkModelId id && id.Name == "System.StreamData"));
 
     private static RtModelRootTcDto BuildSeed(OctoObjectId[] ids)
     {
@@ -234,7 +255,7 @@ public class BlueprintServiceArchiveActivationTests
         Assert.True(result.IsSuccess);
         Assert.Empty(_activated);
         Assert.Equal(BlueprintArchiveActivationOutcome.SkippedPreExisting, Assert.Single(result.ArchiveActivations).Outcome);
-        A.CallTo(() => _streamData.GetAsync(A<string>._, A<CancellationToken>._)).MustNotHaveHappened();
+        A.CallTo(() => _lifecycle.ActivateAsync(A<OctoObjectId>._)).MustNotHaveHappened();
     }
 
     [Fact]
@@ -281,6 +302,110 @@ public class BlueprintServiceArchiveActivationTests
             Assert.Single(result.ArchiveActivations).Outcome);
         Assert.Contains(result.OperationResult.Messages,
             m => m.MessageNumber == 71 && m.MessageLevel == MessageLevel.Warning);
+    }
+
+    // ---- stream data off: the System.StreamData dependency and the archives are left out (AB#7991) -----------
+
+    [Fact]
+    public async Task Install_StreamDataOff_Succeeds_SkipsTheStreamDataModelAndTheArchives_AndWarns()
+    {
+        _ckDependencies.AddRange(["System.StreamData-[1.2,2.0)", "Test-[1.0,2.0)"]);
+        _seeds[V1.FullName] = [Raw, Raw2, Rule];
+        GivenResolution(V1);
+        GivenStreamDataOff();
+
+        var result = await CreateService().ApplyBlueprintAsync(TenantId, V1, false, TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsSuccess, string.Join("; ", result.OperationResult.Messages.Select(m => m.MessageText)));
+        // The unavailable service-managed model is not installed; the blueprint's other model still is.
+        Assert.False(EnsuredStreamDataModel());
+        A.CallTo(() => _repositoryProvider.EnsureCkModelInstalledAsync(TenantId,
+                A<CkModelId>.That.Matches(m => m.Name == "Test"), A<OperationResult>._, A<CancellationToken>._))
+            .MustHaveHappened();
+        // Only the non-archive entity is imported; the archives are reported, not created, not activated.
+        var imported = Assert.Single(_imported);
+        Assert.Equal([RuleType], imported.Entities.Select(e => e.CkTypeId));
+        Assert.DoesNotContain(imported.Dependencies, d => d.Name == "System.StreamData");
+        Assert.Empty(_activated);
+        Assert.Equal(2, result.ArchiveActivations.Count);
+        Assert.All(result.ArchiveActivations, a =>
+        {
+            Assert.Equal(BlueprintArchiveActivationOutcome.SkippedStreamDataDisabled, a.Outcome);
+            Assert.Contains("not imported", a.Reason);
+        });
+        Assert.Contains(result.OperationResult.Messages,
+            m => m.MessageNumber == 72 && m.MessageLevel == MessageLevel.Warning && m.MessageText.Contains("Stream data is not enabled"));
+        Assert.Contains(result.OperationResult.Messages,
+            m => m.MessageNumber == 71 && m.MessageLevel == MessageLevel.Warning && m.MessageText.Contains("were not imported"));
+    }
+
+    [Fact]
+    public async Task Install_StreamDataOn_StillInstallsTheStreamDataModelAndImportsTheArchives()
+    {
+        _ckDependencies.Add("System.StreamData-[1.2,2.0)");
+        _seeds[V1.FullName] = [Raw];
+        GivenResolution(V1);
+
+        var result = await CreateService().ApplyBlueprintAsync(TenantId, V1, false, TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(EnsuredStreamDataModel());
+        Assert.Equal([Raw], _activated);
+        Assert.DoesNotContain(result.OperationResult.Messages, m => m.MessageNumber == 72);
+    }
+
+    [Fact]
+    public async Task Install_StreamDataOff_ForcedReApplyAfterEnablingActivatesTheArchives()
+    {
+        _ckDependencies.Add("System.StreamData-[1.2,2.0)");
+        _seeds[V1.FullName] = [Raw];
+        GivenResolution(V1);
+        GivenStreamDataOff();
+        var first = await CreateService().ApplyBlueprintAsync(TenantId, V1, false, TestContext.Current.CancellationToken);
+        Assert.True(first.IsSuccess);
+        Assert.Empty(_activated);
+
+        // Stream data is switched on later; the archives are new to the tenant, a forced re-apply creates and activates them.
+        A.CallTo(() => _streamData.GetAsync(TenantId, A<CancellationToken>._))
+            .Returns(Task.FromResult<StreamDataTenantServices?>(
+                new StreamDataTenantServices(true, _lifecycle, _archiveStore, null, null)));
+        GivenInstalled(V1);
+        var second = await CreateService().ApplyBlueprintAsync(TenantId, V1, true, TestContext.Current.CancellationToken);
+
+        Assert.True(second.IsSuccess);
+        Assert.Equal([Raw], _activated);
+    }
+
+    [Fact]
+    public async Task Update_StreamDataOff_Succeeds_SkipsTheStreamDataModelAndTheArchives_AndWarns()
+    {
+        _ckDependencies.Add("System.StreamData-[1.2,2.0)");
+        GivenInstalled(V1);
+        _seeds[V1.FullName] = [Rule];
+        _seeds[V2.FullName] = [Rule, Raw, Raw2];
+        GivenStreamDataOff();
+
+        var result = await CreateService().ApplyUpdateAsync(TenantId, V2, BlueprintUpdateMode.Merge,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.True(result.Success, string.Join("; ", result.Errors));
+        Assert.False(EnsuredStreamDataModel());
+        Assert.All(_imported, i => Assert.DoesNotContain(i.Entities, e => e.CkTypeId.Equals(RawType)));
+        Assert.Empty(_activated);
+        Assert.Equal(2, result.ArchiveActivations.Count);
+        Assert.All(result.ArchiveActivations,
+            a => Assert.Equal(BlueprintArchiveActivationOutcome.SkippedStreamDataDisabled, a.Outcome));
+        Assert.Contains(result.Warnings, w => w.Contains("Stream data is not enabled"));
+    }
+
+    [Fact]
+    public void BlueprintStreamDataGate_RecognisesOnlyTheStreamDataModel()
+    {
+        Assert.True(BlueprintStreamDataGate.IsStreamDataModel("System.StreamData"));
+        Assert.True(BlueprintStreamDataGate.IsStreamDataModel("System.StreamData-1.2.0"));
+        Assert.False(BlueprintStreamDataGate.IsStreamDataModel("System"));
+        Assert.False(BlueprintStreamDataGate.IsStreamDataModel("System.StreamDataExtras"));
+        Assert.False(BlueprintStreamDataGate.IsStreamDataModel(null));
     }
 
     [Fact]

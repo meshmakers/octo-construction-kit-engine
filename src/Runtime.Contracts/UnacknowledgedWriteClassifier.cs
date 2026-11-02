@@ -67,6 +67,8 @@ public static class UnacknowledgedWriteClassifier
     public static bool IsOutcomeUnknown(Exception? exception)
     {
         var pending = new Stack<(Exception Exception, int Depth)>();
+        // an instance reachable over several paths (AggregateException(previous, previous)) is classified once
+        var visited = new HashSet<Exception>(ReferenceEqualityComparer.Instance);
         if (exception is not null)
         {
             pending.Push((exception, 0));
@@ -75,6 +77,11 @@ public static class UnacknowledgedWriteClassifier
         while (pending.Count > 0)
         {
             var (current, depth) = pending.Pop();
+            if (!visited.Add(current))
+            {
+                continue;
+            }
+
             if (IsUnacknowledgedWrite(current))
             {
                 return true;

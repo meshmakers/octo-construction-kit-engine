@@ -85,6 +85,23 @@ public class UnacknowledgedWriteClassifierTests
     }
 
     [Fact]
+    public void ASharedInnerException_IsVisitedOnce_NotOncePerPath()
+    {
+        // 31 aggregates over the same instance twice: 2^31 paths without a visited set, 32 nodes with one
+        Exception shared = new InvalidOperationException("shared, not a write fault");
+        for (var i = 0; i < 31; i++)
+        {
+            shared = new AggregateException(shared, shared);
+        }
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var unknown = UnacknowledgedWriteClassifier.IsOutcomeUnknown(shared);
+
+        Assert.False(unknown);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(5), "the walk is linear in distinct exceptions");
+    }
+
+    [Fact]
     public void TheAssembly_DoesNotReferenceTheMongoDbDriver()
     {
         var references = typeof(UnacknowledgedWriteClassifier).Assembly.GetReferencedAssemblies();

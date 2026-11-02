@@ -163,23 +163,25 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
     public async Task SystemPath_IdentityAssociations_ImportAsBefore_TheBootstrapSeedIsNotAffected()
     {
         var h = new Harness();
+        var user = Dto(UserType, ("FirstName", "f"));
         var group = Dto(OtherType, ("Name", "g"));
         group.Associations =
         [
             new RtAssociationTcDto
             {
-                RoleId = "System.Identity/AssignedRole", TargetRtId = OctoObjectId.GenerateNewId(),
-                TargetCkTypeId = UserType
+                RoleId = "System.Identity/AssignedRole", TargetRtId = user.RtId, TargetCkTypeId = UserType
             }
         ];
-        h.YamlReturns(group, Dto(UserType, ("FirstName", "f")));
 
-        await h.CreateCommand().ImportAsync(h.Repository, TempFile(), ExchangeMimeTypes.MimeTypeYaml,
-            ImportStrategy.Insert);
-        await h.CreateCommand().ImportModelAsync(h.Repository, new RtModelRootTcDto { Entities = [group] },
-            ImportStrategy.Insert);
+        // Both endpoints are part of the import, so the dangling-edge filter keeps the edge.
+        await h.CreateCommand().ImportModelAsync(h.Repository,
+            new RtModelRootTcDto { Entities = [group, user] }, ImportStrategy.Insert);
 
-        Assert.Equal(3, h.Written.Count);
+        Assert.Equal(2, h.Written.Count);
+        var edge = Assert.Single(h.WrittenAssociations);
+        Assert.Equal(group.RtId, edge.OriginRtId);
+        Assert.Equal(user.RtId, edge.TargetRtId);
+        Assert.Equal("System.Identity/AssignedRole", edge.AssociationRoleId!.FullName.Replace("-1", string.Empty));
     }
 
     [Fact]
@@ -427,6 +429,9 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
             A.CallTo(() => Repository.BulkInsertRtEntitiesAsync(A<IOctoSession>._, A<IEnumerable<RtEntity>>._,
                     A<BulkOperationOptions>._))
                 .Invokes(call => Written.AddRange(call.GetArgument<IEnumerable<RtEntity>>(1)!));
+            A.CallTo(() => Repository.BulkRtAssociationsAsync(A<IOctoSession>._, A<IEnumerable<RtAssociation>>._,
+                    A<BulkOperationOptions>._))
+                .Invokes(call => WrittenAssociations.AddRange(call.GetArgument<IEnumerable<RtAssociation>>(1)!));
             A.CallTo(() => Repository.GetRtEntitiesByIdAsync(A<IOctoSession>._, A<RtCkId<CkTypeId>>._,
                     A<IReadOnlyList<OctoObjectId>>._, A<RtEntityQueryOptions>._, A<int?>._, A<int?>._))
                 .ReturnsLazily(call =>
@@ -459,6 +464,7 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
         public IRtJsonSerializer Json { get; } = A.Fake<IRtJsonSerializer>();
         public IOctoSession Session { get; } = A.Fake<IOctoSession>();
         public List<RtEntity> Written { get; } = [];
+        public List<RtAssociation> WrittenAssociations { get; } = [];
 
         public ImportRtModelCommand CreateCommand() => new(NullLogger<ImportRtModelCommand>.Instance, CkCache, Yaml,
             Json, A.Fake<IRtImportAuditTrail>(), new RtImportOptions(), Resolver, A.Fake<IAuditEventSink>());

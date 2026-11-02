@@ -496,4 +496,120 @@ public class CkTypeQueryColumnCollectorTests
 
         Assert.Contains(result, x => x.Path == "category.nToMTestCategory->name");
     }
+
+    // Hidden (CK v2 access) and Secret attributes are never default query columns - on the type, inside
+    // records and record arrays, as a whole record and on navigation targets. ReadOnly and MethodOnly stay.
+
+    private static readonly string[] RestrictedAttributeNames = ["PasswordHash", "Tags", "ApiKey", "Token", "Recovery"];
+
+    [Fact]
+    public void HiddenAndSecret_TypeColumns_ExactDefaultSet()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.hiddenColumns.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        var result = collector.GetColumns("HiddenColumns/Account",
+            new CkTypeQueryColumnOptions { IgnoreNavigationProperties = true });
+
+        Assert.Equal<object>(
+        [
+            "name", "email", "status", "profile.label", "credentials[0].label", "credentials[*].label",
+            "rtId", "ckTypeId", "rtWellKnownName", "rtCreatedBy", "rtDisplayName", "rtDisplayDescription",
+            "rtVersion", "rtCreationDateTime", "rtChangedDateTime"
+        ], result.Select(x => x.Path));
+    }
+
+    [Fact]
+    public void HiddenAndSecret_TypeAttributes_AreOmitted_ReadOnlyAndMethodOnlyKept()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.hiddenColumns.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        var paths = collector.GetColumns("HiddenColumns/Account").Select(x => x.Path).ToList();
+
+        Assert.Contains("name", paths);
+        Assert.Contains("email", paths); // ReadOnly
+        Assert.Contains("status", paths); // MethodOnly is readable
+        Assert.DoesNotContain("passwordHash", paths); // Hidden scalar
+        Assert.DoesNotContain("tags[0]", paths); // Hidden array
+        Assert.DoesNotContain("tags[*]", paths);
+        Assert.DoesNotContain("apiKey", paths); // Secret
+    }
+
+    [Fact]
+    public void HiddenAndSecret_RecordMembers_AreOmitted()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.hiddenColumns.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        var paths = collector.GetColumns("HiddenColumns/Account").Select(x => x.Path).ToList();
+
+        Assert.Contains("profile.label", paths);
+        Assert.DoesNotContain("profile.token", paths); // Hidden record member
+        Assert.DoesNotContain("profile.apiKey", paths); // Secret record member
+
+        Assert.Contains("credentials[0].label", paths);
+        Assert.Contains("credentials[*].label", paths);
+        Assert.DoesNotContain("credentials[0].token", paths);
+        Assert.DoesNotContain("credentials[*].token", paths);
+        Assert.DoesNotContain("credentials[0].apiKey", paths);
+
+        // A Hidden record attribute drops the whole record, readable members included.
+        Assert.DoesNotContain(paths, p => p.StartsWith("recovery", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void HiddenAttribute_OnNavigationTarget_IsOmitted()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.hiddenColumns.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        var accountPaths = collector.GetColumns("HiddenColumns/Account").Select(x => x.Path).ToList();
+        Assert.Contains("owner.hiddenColumnsOwner->name", accountPaths);
+        Assert.DoesNotContain("owner.hiddenColumnsOwner->passwordHash", accountPaths);
+
+        // Inbound N value columns (opt-in) follow the same rule.
+        var ownerPaths = collector.GetColumns("HiddenColumns/Owner",
+            new CkTypeQueryColumnOptions { IncludeManyNavigations = true }).Select(x => x.Path).ToList();
+        Assert.Contains("ownedAccounts.hiddenColumnsAccount->name", ownerPaths);
+        Assert.Contains("ownedAccounts.hiddenColumnsAccount->profile.label", ownerPaths);
+        Assert.DoesNotContain("ownedAccounts.hiddenColumnsAccount->passwordHash", ownerPaths);
+        Assert.DoesNotContain("ownedAccounts.hiddenColumnsAccount->profile.token", ownerPaths);
+        Assert.DoesNotContain("passwordHash", ownerPaths);
+    }
+
+    [Theory]
+    [InlineData("HiddenColumns/Account", false)]
+    [InlineData("HiddenColumns/Account", true)]
+    [InlineData("HiddenColumns/Owner", true)]
+    public void HiddenAndSecret_NoAccessPathReachesARestrictedAttribute(string ckTypeId, bool includeManyNavigations)
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.hiddenColumns.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        var result = collector.GetColumns(ckTypeId,
+            new CkTypeQueryColumnOptions { IncludeManyNavigations = includeManyNavigations });
+
+        Assert.NotEmpty(result);
+        var offending = result
+            .Where(c => c.AccessPathList.Any(t =>
+                t.Type == PathType.Attribute && RestrictedAttributeNames.Contains(t.Value, StringComparer.Ordinal)))
+            .Select(c => c.Path)
+            .ToList();
+        Assert.Empty(offending);
+    }
+
+    [Fact]
+    public void HiddenAndSecret_GetColumnsByRtCkId_SameRule()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.hiddenColumns.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        var byCkId = collector.GetColumns("HiddenColumns/Account").Select(x => x.Path).ToList();
+        var byRtCkId = collector.GetColumnsByRtCkId(new RtCkId<CkTypeId>("HiddenColumns/Account"))
+            .Select(x => x.Path).ToList();
+
+        Assert.Equal(byCkId, byRtCkId);
+        Assert.DoesNotContain("passwordHash", byRtCkId);
+    }
 }

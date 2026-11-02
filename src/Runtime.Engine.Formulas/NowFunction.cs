@@ -41,8 +41,9 @@ internal class NowFunction : FunctionExtension
 
     public double calculate()
     {
-        // A NULL operand (NaN) yields NULL instead of throwing in DateTime.AddMinutes (AB#8060).
-        return double.IsNaN(_minutesCount) ? double.NaN : DateTime.Now.AddMinutes(_minutesCount).Ticks;
+        // A NULL operand (NaN) or the null constant yields NULL instead of throwing in
+        // DateTime.AddMinutes (AB#8060).
+        return IsNullFunction.IsNull(_minutesCount) ? double.NaN : DateTime.Now.AddMinutes(_minutesCount).Ticks;
     }
 
     public FunctionExtension clone()

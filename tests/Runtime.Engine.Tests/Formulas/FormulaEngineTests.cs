@@ -353,6 +353,8 @@ public class FormulaEngineTests
     [Theory]
     [InlineData("now(x)")]
     [InlineData("startOfDay(x)")]
+    [InlineData("now(null)")]
+    [InlineData("startOfDay(null)")]
     public void Evaluate_DateFunctionWithANullOperand_YieldsNull(string formula)
     {
         Assert.Null(_engine.Evaluate(formula, Args(("x", double.NaN)), FormulaResultType.DateTime));

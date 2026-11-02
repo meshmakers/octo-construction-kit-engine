@@ -1775,6 +1775,25 @@ Semantics:
 - Tests: `BulkRtMutationExpectedRtVersionTests` (this repo); the real-MongoDB tests (50 repeated parallel increments) live in
   engine-mongodb.
 
+## Unacknowledged writes: one classification (AB#8037, rule R3)
+
+`UnacknowledgedWriteClassifier.IsOutcomeUnknown(Exception?)` (`Runtime.Contracts`, public, static) answers whether an exception
+says that a write may have taken effect without being acknowledged: a MongoDB write-concern error (`MongoWriteConcernException` -
+except its subclass `MongoDuplicateKeyException`, a refused write -, `MongoWriteException` / `MongoBulkWriteException` carrying a
+`WriteConcernError`, `ClientBulkWriteException` with a non-empty `WriteConcernErrors`) or the error label
+`UnknownTransactionCommitResult`, anywhere in the inner-exception chain and in every inner exception of an `AggregateException`
+(depth guard 32). A write error without a write-concern error (refused write, e.g. duplicate key) is not unknown. The driver
+types are recognised by full name (`MongoDB.Driver*` namespaces) and the public members `WriteConcernError` / `ErrorLabels`, so
+`Runtime.Contracts` keeps **no MongoDB reference** (pinned by a test). It is the single implementation for every host:
+- `octo-common-services` CK method host: `CkMethodWriteOutcome` delegates to it (`METHOD_OUTCOME_UNKNOWN` + `correlationId`);
+- pipeline hosts (mesh adapter `MeshAdapterTriggerContext` / `LeasedPipelineWorkItem`, SDK adapters `AdapterTriggerContext` in
+  `octo-communication-sdk`): a failed execution is reported with `PipelineExecutionFailureKind.OutcomeUnknown` (octo-sdk
+  `PipelineExecutionEndDto` / `LeaseResultDto`), which the communication controller stores on `PipelineExecution.FailureKind`
+  and maps to `METHOD_OUTCOME_UNKNOWN` for pipeline methods.
+Tests: `tests/Runtime.Engine.Tests/Persistence/UnacknowledgedWriteClassifierTests` build the real driver exceptions
+(`MongoWriteFaults`; `MongoDB.Driver` is a **test-only** package reference of `Runtime.Engine.Tests`), so a rename in a driver
+update turns them red.
+
 ## Important Notes
 
 - The solution uses Azure Pipelines for CI/CD (`azure-pipelines.yml` in the repo root)

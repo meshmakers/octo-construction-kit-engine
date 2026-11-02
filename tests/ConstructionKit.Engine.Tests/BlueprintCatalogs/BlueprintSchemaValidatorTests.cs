@@ -39,6 +39,40 @@ public class BlueprintSchemaValidatorTests
     }
 
     [Fact]
+    public void ValidateMetaInYaml_ArchiveActivationExclude_ReturnsTrue()
+    {
+        // AB#7991: additionalProperties:false - the opt-out block must be declared or every blueprint using it fails.
+        const string yaml = """
+            $schema: https://schemas.meshmakers.cloud/blueprint-meta.schema.json
+            blueprintId: TestBlueprint-1.0.0
+            archiveActivation:
+              exclude:
+                - 6a0e000000000000000a0007
+                - GridConnectionRollup1h
+            """;
+
+        using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(yaml));
+        var operationResult = new OperationResult();
+
+        Assert.True(_validator.ValidateMetaInYaml(stream, "test.yaml", operationResult));
+        Assert.Empty(operationResult.Messages);
+    }
+
+    [Theory]
+    [InlineData("archiveActivation:\n  skip:\n    - A")]
+    [InlineData("archiveActivation:\n  exclude:\n    - \"\"")]
+    [InlineData("archiveActivation:\n  exclude: GridArchive")]
+    public void ValidateMetaInYaml_InvalidArchiveActivation_ReturnsFalse(string block)
+    {
+        var yaml = "blueprintId: TestBlueprint-1.0.0\n" + block + "\n";
+
+        using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(yaml));
+        var operationResult = new OperationResult();
+
+        Assert.False(_validator.ValidateMetaInYaml(stream, "test.yaml", operationResult));
+    }
+
+    [Fact]
     public void ValidateMetaInYaml_SplitSeedDataPaths_ReturnsTrue()
     {
         // The meta schema sets additionalProperties:false, so seedDataPaths (AB#4758) has to be

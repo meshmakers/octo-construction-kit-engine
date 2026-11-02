@@ -41,7 +41,8 @@ public sealed class GitHubBlueprintCatalogMetaCacheTests : IDisposable
             {
                 BlueprintId = Id,
                 CkModelDependencies = [],
-                BlueprintDependencies = []
+                BlueprintDependencies = [],
+                ArchiveActivation = new BlueprintArchiveActivationDto { Exclude = ["GridArchive"] }
             }));
         A.CallTo(() => _http.GetAsync(A<string?>._, A<CancellationToken>._))
             .ReturnsLazily(() => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
@@ -88,6 +89,19 @@ public sealed class GitHubBlueprintCatalogMetaCacheTests : IDisposable
         var second = await _catalog.GetAsync(Id, new OperationResult());
 
         Assert.Empty(second.BlueprintDependencies!);
+    }
+
+    [Fact]
+    public async Task GetAsync_CachedManifest_KeepsTheArchiveOptOut()
+    {
+        // AB#7991: the clone of the cached manifest must carry archiveActivation, or a GitHub-catalog install would
+        // activate archives the author excluded.
+        var first = await _catalog.GetAsync(Id, new OperationResult());
+        first.ArchiveActivation!.Exclude!.Add("Other");
+
+        var second = await _catalog.GetAsync(Id, new OperationResult());
+
+        Assert.Equal(["GridArchive"], second.ArchiveActivation!.Exclude!);
     }
 
     [Fact]

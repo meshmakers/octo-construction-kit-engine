@@ -18,6 +18,7 @@ using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Microsoft.Extensions.Logging;
 using Meshmakers.Octo.Runtime.Engine.Exchange;
+using Meshmakers.Octo.Runtime.Engine.StreamData;
 
 namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
 
@@ -40,6 +41,7 @@ internal class BlueprintService : IBlueprintService
     private readonly ITenantBlueprintInstallations _installations;
     private readonly IBlueprintVariableProvider _variableProvider;
     private readonly IBlueprintCkUpgradeGuard? _ckUpgradeGuard;
+    private readonly BlueprintArchiveActivator _archiveActivator;
     private readonly ILogger<BlueprintService> _logger;
 
     // System CK attribute identifiers for blueprint tracking.
@@ -74,7 +76,8 @@ internal class BlueprintService : IBlueprintService
         ITenantBlueprintInstallations installations,
         IBlueprintVariableProvider variableProvider,
         ILogger<BlueprintService> logger,
-        IBlueprintCkUpgradeGuard? ckUpgradeGuard = null)
+        IBlueprintCkUpgradeGuard? ckUpgradeGuard = null,
+        IStreamDataTenantServicesProvider? streamDataServices = null)
     {
         _ckCacheService = ckCacheService;
         _blueprintCatalogManager = blueprintCatalogManager;
@@ -91,6 +94,8 @@ internal class BlueprintService : IBlueprintService
         _variableProvider = variableProvider;
         _logger = logger;
         _ckUpgradeGuard = ckUpgradeGuard;
+        // AB#7991: without a stream-data backend new archives of a seed stay Created, reported per archive.
+        _archiveActivator = new BlueprintArchiveActivator(streamDataServices, logger);
     }
 
     /// <summary>
@@ -232,6 +237,7 @@ internal class BlueprintService : IBlueprintService
         var entitiesCreated = 0;
         var correlationId = Guid.NewGuid();
         var applicationMode = force ? BlueprintApplicationMode.ReApply : BlueprintApplicationMode.Initial;
+        var archiveCandidates = new List<BlueprintArchiveCandidate>();
 
         try
         {
@@ -515,7 +521,7 @@ internal class BlueprintService : IBlueprintService
                 {
                     var perBlueprintEntities = await ApplySeedDataForBlueprintAsync(
                         tenantId, blueprint, variables, operationResult, appliedSeedDataFiles,
-                        existing?.BlueprintId, cancellationToken)
+                        existing?.BlueprintId, archiveCandidates, cancellationToken)
                         .ConfigureAwait(false);
 
                     if (operationResult.HasErrors)
@@ -542,6 +548,19 @@ internal class BlueprintService : IBlueprintService
                 {
                     rootDependencyIds.Add(blueprint.BlueprintId);
                 }
+            }
+
+            // 4c. AB#7991: activate the archives the seeds created (raw first, rollups in source order) and queue the
+            //     backfill of new rollups. The seeds are committed; a failure is reported per archive, never fails
+            //     the apply.
+            var archiveActivations = await ActivateNewArchivesAsync(tenantId, archiveCandidates,
+                    warning => operationResult.AddMessage(new OperationMessage(MessageLevel.Warning, null, 71, warning)),
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (archiveActivations.Count > 0)
+            {
+                operationResult.AddMessage(new OperationMessage(MessageLevel.Info, null, 70,
+                    DescribeArchiveActivations(archiveActivations)));
             }
 
             // 5. Append a single history entry for the root operation.
@@ -582,7 +601,8 @@ internal class BlueprintService : IBlueprintService
                 entitiesCreated,
                 operationResult,
                 forcedCkBlockers,
-                judgedCkUpdateSet);
+                judgedCkUpdateSet,
+                archiveActivations);
         }
         catch (Exception ex)
         {
@@ -2368,6 +2388,14 @@ internal class BlueprintService : IBlueprintService
                     Entities = entitiesToImport
                 };
 
+                // AB#7991: record which archives of the import the tenant does not hold yet; only those are activated.
+                var archiveWarnings = new List<string>();
+                var importedArchives = await BlueprintArchiveActivator.CollectAsync(repository, entitiesToImport,
+                        ckTypeId => ArchiveDefinitionGuard.IsArchive(_ckCacheService, tenantId, ckTypeId, out _),
+                        targetBlueprint, archiveWarnings)
+                    .ConfigureAwait(false);
+                result.Warnings.AddRange(archiveWarnings);
+
                 var confirmations = ToImportConfirmations(options, result);
                 await _importRtModelCommand.ImportModelAsync(
                     repository,
@@ -2379,6 +2407,11 @@ internal class BlueprintService : IBlueprintService
 
                 ReportBlankedAttributes(diff.Blanked, options, confirmations, result);
                 result.ArchiveColumnsAdded.AddRange(_importRtModelCommand.ArchiveColumnAdditions);
+
+                // AB#7991: the import committed; activate the archives it created and queue the new rollups' backfill.
+                result.ArchiveActivations.AddRange(await ActivateNewArchivesAsync(tenantId, importedArchives,
+                        result.Warnings.Add, cancellationToken)
+                    .ConfigureAwait(false));
             }
             catch (Exception ex)
             {
@@ -2985,6 +3018,52 @@ internal class BlueprintService : IBlueprintService
     }
 
     /// <summary>
+    /// AB#7991: activates the archives in <paramref name="candidates" /> that the seed import created (and the blueprint
+    /// did not opt out of) and queues the backfill of the new rollups. Archives that existed before are listed, never
+    /// touched. An unexpected failure is logged and reported as a warning; it never fails the blueprint operation,
+    /// because the seed is already committed.
+    /// </summary>
+    private async Task<IReadOnlyList<BlueprintArchiveActivation>> ActivateNewArchivesAsync(
+        string tenantId,
+        IReadOnlyList<BlueprintArchiveCandidate> candidates,
+        Action<string> warn,
+        CancellationToken cancellationToken)
+    {
+        if (candidates.Count == 0)
+        {
+            return [];
+        }
+
+        try
+        {
+            return await _archiveActivator.ActivateAsync(tenantId, candidates, warn, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Archive activation after the seed import failed for tenant {TenantId}", tenantId);
+            warn($"The archives of the blueprint could not be activated: {ex.Message}. Activate them manually.");
+            return [];
+        }
+    }
+
+    /// <summary>AB#7991: one-line summary of the archive activations for the operation messages.</summary>
+    internal static string DescribeArchiveActivations(IReadOnlyList<BlueprintArchiveActivation> activations)
+    {
+        int Count(BlueprintArchiveActivationOutcome outcome) => activations.Count(a => a.Outcome == outcome);
+        var queued = activations.Where(a => a.Backfill == BlueprintRollupBackfillOutcome.Queued).ToList();
+        var text = $"Archives: {Count(BlueprintArchiveActivationOutcome.Activated)} activated, " +
+                   $"{Count(BlueprintArchiveActivationOutcome.SkippedPreExisting)} already present, " +
+                   $"{Count(BlueprintArchiveActivationOutcome.SkippedOptOut)} opted out, " +
+                   $"{Count(BlueprintArchiveActivationOutcome.SkippedStreamDataDisabled)} skipped (stream data off), " +
+                   $"{Count(BlueprintArchiveActivationOutcome.Failed)} failed; " +
+                   $"{queued.Count} rollup backfill(s) queued";
+        return queued.Count == 0
+            ? text
+            : $"{text} ({string.Join(", ", queued.Select(a => $"{a.WellKnownName ?? a.ArchiveRtId}: job {a.BackfillJobRtId}"))})";
+    }
+
+    /// <summary>
     /// Imports the seed-data file (if any) of one blueprint in an install
     /// order. Returns the number of entities written. On error, errors are
     /// pushed onto <paramref name="operationResult"/> and the caller treats
@@ -2997,6 +3076,7 @@ internal class BlueprintService : IBlueprintService
         OperationResult operationResult,
         List<string> appliedSeedDataFiles,
         BlueprintId? previousVersion,
+        List<BlueprintArchiveCandidate> archiveCandidates,
         CancellationToken cancellationToken)
     {
         var seedDataPaths = BlueprintSeedData.ResolvePaths(blueprint);
@@ -3062,8 +3142,21 @@ internal class BlueprintService : IBlueprintService
                 return 0;
             }
 
+            // AB#7991: record which archives of the seed the tenant does not hold yet; only those are activated.
+            var archiveWarnings = new List<string>();
+            var seedArchives = await BlueprintArchiveActivator.CollectAsync(repository, seedRoot.Entities,
+                    ckTypeId => ArchiveDefinitionGuard.IsArchive(_ckCacheService, tenantId, ckTypeId, out _),
+                    blueprint, archiveWarnings)
+                .ConfigureAwait(false);
+            foreach (var warning in archiveWarnings)
+            {
+                operationResult.AddMessage(new OperationMessage(MessageLevel.Warning, SeedDataDescription(blueprint), 71,
+                    warning));
+            }
+
             await _importRtModelCommand.ImportModelAsync(
                 repository, seedRoot, ImportStrategy.Upsert, cancellationToken).ConfigureAwait(false);
+            archiveCandidates.AddRange(seedArchives);
 
             // AB#7997: columns the seed added to activated archives (an addition that failed throws above).
             foreach (var addition in _importRtModelCommand.ArchiveColumnAdditions)

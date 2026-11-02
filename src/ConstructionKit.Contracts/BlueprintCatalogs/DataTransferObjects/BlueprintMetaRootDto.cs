@@ -79,4 +79,12 @@ public class BlueprintMetaRootDto : BlueprintPropertiesDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public RequiresMap? Requires { get; set; }
+
+    /// <summary>
+    ///     Gets or sets how the archives the seed creates are treated (AB#7991). Optional: without it every archive the
+    ///     seed newly creates is activated and every new rollup is backfilled; <c>exclude</c> lists the archives (rtId or
+    ///     well-known name) that stay <c>Created</c>.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public BlueprintArchiveActivationDto? ArchiveActivation { get; set; }
 }

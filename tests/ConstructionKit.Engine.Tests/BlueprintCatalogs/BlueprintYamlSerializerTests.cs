@@ -52,6 +52,34 @@ public class BlueprintYamlSerializerTests
     }
 
     [Fact]
+    public void Deserialize_ArchiveActivation_ReadsTheExcludeList()
+    {
+        // AB#7991: archives listed here stay Created when the seed creates them.
+        var yaml = """
+            $schema: https://schemas.meshmakers.cloud/blueprint-meta.schema.json
+            blueprintId: TestBlueprint-1.0.0
+            archiveActivation:
+              exclude:
+                - 6a0e000000000000000a0007
+                - GridConnectionRollup1h
+            """;
+
+        var result = _serializer.DeserializeBlueprintMeta(yaml, "test.yaml", new OperationResult());
+
+        Assert.NotNull(result.ArchiveActivation);
+        Assert.Equal(["6a0e000000000000000a0007", "GridConnectionRollup1h"], result.ArchiveActivation.Exclude!);
+    }
+
+    [Fact]
+    public void Deserialize_WithoutArchiveActivation_LeavesItNull()
+    {
+        var result = _serializer.DeserializeBlueprintMeta("blueprintId: TestBlueprint-1.0.0", "test.yaml",
+            new OperationResult());
+
+        Assert.Null(result.ArchiveActivation);
+    }
+
+    [Fact]
     public void Deserialize_Requires_AcceptsScalarShortcut()
     {
         // Manifest authors prefer `key: value` for single-value requires; the converter

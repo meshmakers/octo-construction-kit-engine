@@ -261,6 +261,7 @@ Blueprints initialize tenants with pre-configured CK models and runtime data. Se
 Key services:
 - `IBlueprintService` - Applies blueprints to tenants
 - `IBlueprintCkUpgradeGuard` (host-registered, optional) - tenant upgrade guard for the CK models a blueprint installs or raises (CK v2 F2.5, AB#6871), see below
+- `IStreamDataTenantServicesProvider` (host-registered, optional, `Runtime.Contracts/StreamData`; engine-mongodb `TenantStreamDataServicesProvider`) - after the seed import `BlueprintService` activates the archives the seed created (raw first, rollups in source order; pre-existing archives never touched; `archiveActivation.exclude` opt-out; AB#7984 guard: no backfill for TimeWeightedAvg/StateDuration rollups over a raw source) and queues the backfill of new rollups through `BlueprintArchiveActivator`; results in `ArchiveActivations` (AB#7991). Without a provider new archives stay Created. Rules: `docs/blueprints.md`, "Archives and rollups in a blueprint"; tests `BlueprintArchiveActivatorTests`, `BlueprintServiceArchiveActivationTests`
 
 #### Tenant upgrade guard in `BlueprintService` (CK v2 F2.5, AB#6871)
 

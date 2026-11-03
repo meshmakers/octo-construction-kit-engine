@@ -567,6 +567,30 @@ public async Task UpdateTenantAsync(string tenantId)
 }
 ```
 
+### Preview and install of a blueprint that is not installed - adoption (AB#8256)
+
+A tenant can hold the content of a blueprint without an installation of it: the entities came from a manual `ImportRt`, an
+older install without an installation record, or another blueprint with the same rtIds. `PreviewUpdateAsync` for such a
+blueprint (no history entry of its name) diffs the seed against the tenant with the normal output contract instead of a
+placeholder:
+
+- a seed entity is matched **by rtId** against every tenant entity of its type, whatever its `RtBlueprintSource` (the install
+  upserts by rtId). Matched and differing = `EntitiesToUpdate` with the attribute changes in `Changes`; matched and equal =
+  `EntitiesUnchanged`; not matched = `EntitiesToAdd`. A well-known name that a tenant entity with another rtId already uses is
+  no match (the install would create a second entity) and is named in a warning;
+- tenant-owned seed entities the tenant holds are in `TenantOwnedSkipped`, blanked attributes in `BlankedAttributes`, as for an
+  installed blueprint; a tenant entity with `RtBlueprintLocked = false` is a `UserModified` conflict (`UpdateBlueprint` skips it, `InstallBlueprint` would overwrite it - resolve it first);
+- nothing is deleted, in any mode: no tenant entity carries this blueprint's source yet;
+- warnings say that the blueprint is not installed, how many entities are adopted, and which of them carry the source of another
+  blueprint (they are taken over); `Safe` reports only the adds, `Migration` keeps the "no migration script" conflict.
+
+**Adopt path:** run the preview, check the changes, then `InstallBlueprint` (`ApplyBlueprintAsync`): it upserts exactly the listed
+adds and updates (runtime-state and tenant-owned attributes are kept, seed values never blank tenant values), stamps them with
+the blueprint's source and lock, leaves every other tenant entity alone and records the installation. From then on
+`PreviewUpdateAsync` / `UpdateBlueprint` work against the installation (a preview of the same version shows everything
+unchanged). `UpdateBlueprint` (`ApplyUpdateAsync`) without an installation uses the same diff. Tests:
+`BlueprintServiceAdoptionPreviewTests` (engine), `BlueprintServiceIntegrationTests.PreviewWithoutInstallation_*` (engine-mongodb).
+
 ### CK upgrade guard (AB#6871)
 
 `PreviewUpdateAsync` also reports which installed CK models the blueprint's `ckModelDependencies` would break (`CkUpdateSet`, `CkUpgradeBlockers`,

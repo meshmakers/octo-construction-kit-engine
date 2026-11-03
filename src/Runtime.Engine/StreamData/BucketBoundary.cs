@@ -27,6 +27,36 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 public static class BucketBoundary
 {
     /// <summary>
+    /// The distinct UTC offsets a zone has used since 1970 (standard and daylight time); <c>{ 0 }</c> for no zone.
+    /// Earlier rules (local mean time with odd seconds) are ignored: no archive holds data from then.
+    /// </summary>
+    public static IReadOnlyCollection<TimeSpan> UtcOffsetsOf(TimeZoneInfo? zone)
+    {
+        var offsets = new HashSet<TimeSpan>();
+        if (zone is null)
+        {
+            offsets.Add(TimeSpan.Zero);
+            return offsets;
+        }
+
+        offsets.Add(zone.BaseUtcOffset);
+        var epoch = new DateTime(1970, 1, 1);
+        foreach (var rule in zone.GetAdjustmentRules())
+        {
+            if (rule.DateEnd < epoch)
+            {
+                continue;
+            }
+
+            var standard = zone.BaseUtcOffset + rule.BaseUtcOffsetDelta;
+            offsets.Add(standard);
+            offsets.Add(standard + rule.DaylightDelta);
+        }
+
+        return offsets;
+    }
+
+    /// <summary>
     /// Resolves an IANA reference-time-zone id (AB#4290 / O6) to a <see cref="TimeZoneInfo"/>, or
     /// <c>null</c> (⇒ UTC calendar boundaries) when the id is empty or unknown. Tolerant by design:
     /// this is the write/aggregation path, where an unknown stored id must fall back to UTC rather

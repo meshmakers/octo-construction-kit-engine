@@ -137,6 +137,45 @@ public class BucketBoundaryDayStartTests
         Assert.Equal(Utc(2026, 3, 29, 1, 30), next);
         Assert.Equal(next, start);
     }
+    private static TimeZoneInfo MidnightGapZone() =>
+        // UTC+0 that jumps to UTC+2 at 00:00 local on 29 March: local 00:00-02:00 does not exist that day.
+        TimeZoneInfo.CreateCustomTimeZone("Test/MidnightGap", TimeSpan.Zero, "Test/MidnightGap", "Test/MidnightGap",
+            "Test/MidnightGap DST",
+            new[]
+            {
+                TimeZoneInfo.AdjustmentRule.CreateAdjustmentRule(
+                    new DateTime(2026, 1, 1), new DateTime(2026, 12, 31), TimeSpan.FromHours(2),
+                    TimeZoneInfo.TransitionTime.CreateFixedDateRule(new DateTime(1, 1, 1, 0, 0, 0), 3, 29),
+                    TimeZoneInfo.TransitionTime.CreateFixedDateRule(new DateTime(1, 1, 1, 1, 0, 0), 10, 25)),
+            });
+
+    [Fact]
+    public void ADayStartAboveTheGapInAZoneWithAGapAtMidnight_KeepsEveryLaterDayOnTheDayStart()
+    {
+        // AB#7358 review round 3: with a day start the next boundary is re-derived from the local day,
+        // so a gap at local midnight cannot shift the days after it.
+        var zone = MidnightGapZone();
+        var calendar = new BucketCalendar(BucketAlignment.CalendarDay, OneHour, zone, SixAm);
+
+        var next = BucketBoundary.NextBucketEnd(Utc(2026, 3, 28, 6), calendar);
+        var afterwards = BucketBoundary.NextBucketEnd(next, calendar);
+
+        Assert.Equal(SixAm, TimeZoneInfo.ConvertTimeFromUtc(next, zone).TimeOfDay);
+        Assert.Equal(SixAm, TimeZoneInfo.ConvertTimeFromUtc(afterwards, zone).TimeOfDay);
+    }
+
+    [Fact]
+    public void ADayStartInsideAGapAtMidnight_ShiftsThatDayOnly()
+    {
+        var zone = MidnightGapZone();
+        var calendar = new BucketCalendar(BucketAlignment.CalendarDay, OneHour, zone, TimeSpan.FromMinutes(30));
+
+        var gapDayStart = BucketBoundary.NextBucketEnd(Utc(2026, 3, 28, 0, 30), calendar); // 29 March: 00:30 does not exist
+        var following = BucketBoundary.NextBucketEnd(gapDayStart, calendar);
+
+        Assert.Equal(TimeSpan.FromMinutes(30), TimeZoneInfo.ConvertTimeFromUtc(following, zone).TimeOfDay);
+    }
+
     [Fact]
     public void WithoutAZone_TheDayStartAppliesToUtc()
     {

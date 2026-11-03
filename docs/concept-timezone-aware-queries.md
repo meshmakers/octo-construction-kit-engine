@@ -172,6 +172,7 @@ Int64, milliseconds after local midnight of `ReferenceTimeZone`) moves the start
 | Alignment | only `CalendarDay`; any other alignment with an offset above 0 is refused |
 | Change | frozen on an activated rollup (like `BucketAlignment` and `ReferenceTimeZone`): create a new rollup |
 | Chaining | a rollup on an offset day rollup needs the same offset and the same zone; a week / month / quarter / year rollup cannot be chained on it (it would cut gas days in two) |
+| Fixed-size source | a `FixedSize` source (e.g. hourly) under a rollup with a day start must have its boundaries on the local day starts, because the target aggregates whole source rows. Refused unless the source bucket size divides 24 h, divides the day start, and divides every UTC offset the zone has used since 1970 (standard and daylight time). 06:00 over hourly in Europe/Vienna is valid; 06:30 over hourly is refused (valid over 30 or 15 minutes); 06:00 over hourly in a +05:30 zone is refused (valid over 30 minutes). A midnight day (null / 0) is not checked, as before |
 
 **Boundary arithmetic.** The offset is applied on the **local wall clock** (`BucketBoundary`): subtract the offset from the local time, align
 to the local day, add the offset, convert to UTC. A UTC shift would be off by one hour around the DST changes. With 06:00 Europe/Vienna:

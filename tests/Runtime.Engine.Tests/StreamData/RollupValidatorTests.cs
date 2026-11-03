@@ -1104,6 +1104,55 @@ public class RollupValidatorTests
         Assert.Throws<RollupDayStartOffsetInvalidException>(() => RollupValidator.ValidateDayStartCoincides(target, GasDay()));
     }
 
+    private static RollupArchiveSnapshot FixedSource(TimeSpan size) =>
+        GasDay(null, BucketAlignment.FixedSize, zone: null) with { RtId = SourceRt, BucketSize = size };
+
+    [Theory]
+    [InlineData(21_600_000L, 60)] // 06:00 over hourly: the gas day
+    [InlineData(23_400_000L, 30)] // 06:30 over 30 minutes
+    [InlineData(23_400_000L, 15)] // 06:30 over 15 minutes
+    [InlineData(23_400_000L, 5)]
+    public void ValidateDayStartCoincides_FixedSourceDividingTheDayStart_DoesNotThrow(long offsetMs, int sourceMinutes) =>
+        RollupValidator.ValidateDayStartCoincides(GasDay(offsetMs), FixedSource(TimeSpan.FromMinutes(sourceMinutes)));
+
+    [Fact]
+    public void ValidateDayStartCoincides_HourlyFixedSourceUnderAHalfHourDayStart_Throws()
+    {
+        // 06:30 local: the target would include the data before 06:30 and drop the last 30 minutes of the day.
+        var ex = Assert.Throws<RollupDayStartOffsetInvalidException>(
+            () => RollupValidator.ValidateDayStartCoincides(GasDay(23_400_000L), FixedSource(TimeSpan.FromHours(1))));
+
+        Assert.Contains("DayStartOffsetMs", ex.Message);
+        Assert.Contains("multiple of the source bucket size", ex.Message);
+        Assert.Equal(23_400_000L, ex.DayStartOffsetMs);
+    }
+
+    [Fact]
+    public void ValidateDayStartCoincides_FixedSourceNotDividingTheDay_Throws() =>
+        Assert.Throws<RollupDayStartOffsetInvalidException>(
+            () => RollupValidator.ValidateDayStartCoincides(GasDay(), FixedSource(TimeSpan.FromHours(7))));
+
+    [Fact]
+    public void ValidateDayStartCoincides_HourlyFixedSourceInAHalfHourZone_Throws()
+    {
+        // Asia/Kolkata is UTC+05:30: local 06:00 is 00:30Z, between two hourly buckets. 30-minute buckets fit.
+        TimeZoneInfo kolkata;
+        try { kolkata = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata"); }
+        catch (TimeZoneNotFoundException) { return; }
+
+        var target = GasDay(zone: kolkata.Id);
+
+        Assert.Throws<RollupDayStartOffsetInvalidException>(
+            () => RollupValidator.ValidateDayStartCoincides(target, FixedSource(TimeSpan.FromHours(1))));
+        RollupValidator.ValidateDayStartCoincides(target, FixedSource(TimeSpan.FromMinutes(30)));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0L)]
+    public void ValidateDayStartCoincides_FixedSourceUnderAMidnightDay_IsNotChecked(long? offsetMs) =>
+        RollupValidator.ValidateDayStartCoincides(GasDay(offsetMs), FixedSource(TimeSpan.FromHours(7)));
+
     [Fact]
     public void ValidateForActivation_RollupChainedOnAGasDayRollupWithAnotherOffset_Throws()
     {

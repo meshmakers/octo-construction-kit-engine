@@ -185,7 +185,6 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
         // gas days (and vice versa). PerSeries answers in the rung's own calendar.
         var calendar = BucketCalendar.For(rung).WithZone(zone);
         if (policy == SeriesComparisonPolicy.PerQuery
-            && rung.Alignment == BucketAlignment.CalendarDay
             && calendar.DayStart != BucketCalendar.DayStartFromMs(queryDayStartOffsetMs))
         {
             return null;

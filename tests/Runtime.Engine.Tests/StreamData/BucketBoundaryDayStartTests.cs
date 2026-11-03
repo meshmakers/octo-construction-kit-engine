@@ -105,6 +105,21 @@ public class BucketBoundaryDayStartTests
         Assert.Equal(Utc(2026, 3, 30, 0, 30), BucketBoundary.NextBucketEnd(start, gapDay));
     }
 
+
+    [Fact]
+    public void AlignDown_InputBeforeAShiftedGapDayStart_BelongsToThePreviousDay()
+    {
+        // 03:10 CEST (01:10Z) on 29 March: the 02:30 day start of that day was shifted to 03:30 CEST (01:30Z),
+        // which is after the input, so AlignDown must not return a time later than its input.
+        var gapDay = GasDay(TimeSpan.FromHours(2.5));
+        var input = Utc(2026, 3, 29, 1, 10);
+
+        var aligned = BucketBoundary.AlignDown(input, gapDay);
+
+        Assert.Equal(Utc(2026, 3, 28, 1, 30), aligned);
+        Assert.True(aligned <= input);
+        Assert.Equal(Utc(2026, 3, 29, 1, 30), BucketBoundary.NextBucketEnd(aligned, gapDay));
+    }
     [Fact]
     public void WithoutAZone_TheDayStartAppliesToUtc()
     {

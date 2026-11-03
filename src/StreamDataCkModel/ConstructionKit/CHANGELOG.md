@@ -22,4 +22,3 @@ _Required bump level: minor._
   `[0, 86400000)`, only with `CalendarDay`, frozen on an activated rollup, and a chained rollup needs the same offset and zone
   (a week/month/quarter/year rollup cannot be chained on an offset day rollup). A service built before 1.22.0 ignores the
   attribute and would build midnight days: do not declare an offset before every service of the installation runs the engine
-  that contains this version. The engine persistence and recompute changes follow in AB#7359, downsampling in AB#7360.

@@ -172,7 +172,15 @@ public static class BucketBoundary
             BucketAlignment.CalendarYear => AlignDownToYear(local),
             _ => throw UnknownAlignment(alignment)
         };
-        return ToUtcFromLocal(alignedLocal, zone);
+        var result = ToUtcFromLocal(alignedLocal, zone);
+        if (dayStart > TimeSpan.Zero && alignment == BucketAlignment.CalendarDay && result > utc)
+        {
+            // The day start fell into a spring-forward gap and was shifted past the input: the input still
+            // belongs to the previous day.
+            result = ToUtcFromLocal(AlignDownToDay(local - dayStart - TimeSpan.FromDays(1)) + dayStart, zone);
+        }
+
+        return result;
     }
 
     private static DateTime AlignDownFixed(DateTime utc, TimeSpan bucketSize)
@@ -213,8 +221,8 @@ public static class BucketBoundary
         var unspecified = DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
         if (zone.IsInvalidTime(unspecified))
         {
-            // A day start inside the spring-forward gap does not exist; the day starts when the clock
-            // jumps, i.e. at the first valid wall-clock time after the gap.
+            // A day start inside the spring-forward gap does not exist; that one day starts one hour later
+            // (03:30 for a 02:30 start), and AlignDown steps back a day for an input before that moment.
             unspecified = unspecified.AddHours(1);
         }
 

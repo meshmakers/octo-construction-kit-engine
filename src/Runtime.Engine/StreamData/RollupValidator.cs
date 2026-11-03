@@ -401,9 +401,11 @@ public static class RollupValidator
                 $"source rollup '{sourceRollup.RtId}' has DayStartOffsetMs {sourceRollup.DayStartOffsetMs?.ToString() ?? "(null)"}, the day buckets would not coincide. Both must carry the same DayStartOffsetMs.");
         }
 
-        var sourceZone = BucketBoundary.ResolveZone(sourceRollup.ReferenceTimeZone) ?? TimeZoneInfo.Utc;
-        var targetZone = BucketBoundary.ResolveZone(rollup.ReferenceTimeZone) ?? TimeZoneInfo.Utc;
-        if (!sourceZone.Equals(targetZone) && !sourceZone.HasSameRules(targetZone))
+        // Same zone id, not "same rules": HasSameRules answers differently per platform (tzdata history of
+        // Europe/Berlin vs Europe/Vienna), and a stored rollup must validate the same everywhere.
+        var sourceZone = BucketBoundary.ResolveZone(sourceRollup.ReferenceTimeZone)?.Id ?? TimeZoneInfo.Utc.Id;
+        var targetZone = BucketBoundary.ResolveZone(rollup.ReferenceTimeZone)?.Id ?? TimeZoneInfo.Utc.Id;
+        if (!string.Equals(sourceZone, targetZone, StringComparison.OrdinalIgnoreCase))
         {
             throw new RollupDayStartOffsetInvalidException(rollup.RtId, rollup.DayStartOffsetMs,
                 $"source rollup '{sourceRollup.RtId}' uses ReferenceTimeZone '{sourceRollup.ReferenceTimeZone ?? "UTC"}', the day buckets would not coincide with '{rollup.ReferenceTimeZone ?? "UTC"}'. Both must use the same ReferenceTimeZone.");

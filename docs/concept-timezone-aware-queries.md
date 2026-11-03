@@ -171,7 +171,7 @@ Int64, milliseconds after local midnight of `ReferenceTimeZone`) moves the start
 | Range | whole minutes in `[0, 86400000)`; refused otherwise, the message names `DayStartOffsetMs` and the range |
 | Alignment | only `CalendarDay`; any other alignment with an offset above 0 is refused |
 | Change | frozen on an activated rollup (like `BucketAlignment` and `ReferenceTimeZone`): create a new rollup |
-| Chaining | a rollup on an offset day rollup needs the same offset and a zone with the same rules; a week / month / quarter / year rollup cannot be chained on it (it would cut gas days in two) |
+| Chaining | a rollup on an offset day rollup needs the same offset and the same zone; a week / month / quarter / year rollup cannot be chained on it (it would cut gas days in two) |
 
 **Boundary arithmetic.** The offset is applied on the **local wall clock** (`BucketBoundary`): subtract the offset from the local time, align
 to the local day, add the offset, convert to UTC. A UTC shift would be off by one hour around the DST changes. With 06:00 Europe/Vienna:
@@ -183,7 +183,7 @@ to the local day, add the offset, convert to UTC. A UTC shift would be off by on
 | 2026-10-24T04:00Z | 2026-10-25T05:00Z | 25 h (fall back) |
 
 `AlignDown(2026-03-29T03:30Z)` is `2026-03-28T05:00Z` (05:30 CEST still belongs to the gas day of 28 March). A day start that falls into the
-spring-forward gap (for example 02:30) starts that one day at the first valid time after the gap; the next day starts at 02:30 again.
+spring-forward gap (for example 02:30) starts that one day one hour later (03:30); an input before that moment still belongs to the previous day, and the next day starts at 02:30 again.
 
 **One value object.** The engine passes `BucketCalendar` (alignment, bucket size, zone, day start) to `BucketBoundary.AlignDown` /
 `NextBucketEnd` / `InitialWatermark`, `RecomputePlanner.AlignRangeToBuckets` / `PlanChunks` and the callers `RollupOrchestrator`,
@@ -191,6 +191,6 @@ spring-forward gap (for example 02:30) starts that one day at the first valid ti
 `BucketCalendar.For(RollupArchiveSnapshot)` and `BucketCalendar.For(ResolutionRung)` build it from the stored rollup, so no caller can drop the
 offset. The older overloads with `(alignment, bucketSize, zone)` stay and mean a midnight day.
 
-**Reading.** `SeriesResolutionRequest.QueryDayStartOffsetMs` is the day start of the query (default midnight). Under `PerQuery` a `CalendarDay`
-rung is only a candidate when its own `DayStartOffsetMs` equals the request's, so a midnight chart never reads gas days and a gas-day query never
+**Reading.** `SeriesResolutionRequest.QueryDayStartOffsetMs` is the day start of the query (default midnight). Under `PerQuery` a calendar
+rung is only a candidate when its own `DayStartOffsetMs` equals the request's, so a midnight chart never reads gas days (also not through a midnight week / month rung) and a gas-day query never
 reads midnight days. `PerSeries` answers in each rung's own calendar and ignores the request's day start.

@@ -577,4 +577,22 @@ public class SeriesResolutionServiceTests
 
         Assert.NotEqual(gasDay.RtId, result.ArchiveRtId);
     }
+
+    [Fact]
+    public async Task GasDayRequest_NeverPicksAMidnightMonthRung()
+    {
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        var month = CalendarRollup(baseArchive.RtId, BucketAlignment.CalendarMonth, "Europe/Vienna");
+        StubRollups(baseArchive.RtId, month);
+
+        var request = Request(baseArchive.RtId, YearFrom, YearTo, 12) with
+        {
+            QueryTimeZone = "Europe/Vienna",
+            QueryDayStartOffsetMs = 21_600_000,
+        };
+        var result = await NewSut().ResolveAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.NotEqual(month.RtId, result.ArchiveRtId);
+    }
 }

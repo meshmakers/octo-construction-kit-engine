@@ -1049,8 +1049,16 @@ public class RollupValidatorTests
         RollupValidator.ValidateDayStartCoincides(GasDay(), GasDay());
 
     [Fact]
-    public void ValidateDayStartCoincides_ZoneWithTheSameRules_DoesNotThrow() =>
-        RollupValidator.ValidateDayStartCoincides(GasDay(zone: "Europe/Berlin"), GasDay());
+    public void ValidateDayStartCoincides_AnotherZoneIdEvenWithTheSameRules_Throws() =>
+        // Zone ids are compared, not rules: HasSameRules differs per platform and a rollup must validate the same everywhere.
+        Assert.Throws<RollupDayStartOffsetInvalidException>(
+            () => RollupValidator.ValidateDayStartCoincides(GasDay(zone: "Europe/Berlin"), GasDay()));
+
+    [Fact]
+    public void ValidateDayStartCoincides_NullZoneVersusUtc_DoNotThrow()
+    {
+        RollupValidator.ValidateDayStartCoincides(GasDay(zone: null), GasDay(zone: "UTC"));
+    }
 
     [Fact]
     public void ValidateDayStartCoincides_TwoMidnightRollups_DoesNotThrow() =>

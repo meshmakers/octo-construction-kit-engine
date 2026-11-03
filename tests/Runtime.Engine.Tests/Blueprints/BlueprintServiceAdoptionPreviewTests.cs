@@ -284,6 +284,25 @@ public class BlueprintServiceAdoptionPreviewTests
     }
 
     [Fact]
+    public async Task NotInstalled_FullMode_NeverDeletesLeftoversCarryingThisBlueprintsSource()
+    {
+        GivenSeed(V2, new SeedSpec("seeded", null));
+        GivenUnmanagedTenantEntity("seeded", 1);
+        // Left over from an uninstall that kept the data: carries the blueprint's source, absent from the seed.
+        GivenUnmanagedTenantEntity("leftover", 0, source: V1.FullName);
+
+        var preview = await Preview(BlueprintUpdateMode.Full);
+        var result = await CreateService().ApplyUpdateAsync(TenantId, V2, BlueprintUpdateMode.Full,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, preview.EntitiesToDelete);
+        Assert.Empty(preview.Conflicts);
+        Assert.True(result.Success, string.Join("; ", result.Errors));
+        A.CallTo(() => _repository.DeleteOneRtEntityByRtIdAsync(A<IOctoSession>._, A<RtCkId<CkTypeId>>._,
+            A<OctoObjectId>._, A<DeleteOptions>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
     public async Task Preview_NotInstalled_SafeMode_ReportsOnlyTheAdds()
     {
         GivenSeed(V2, new SeedSpec("held", null), new SeedSpec("new", null));

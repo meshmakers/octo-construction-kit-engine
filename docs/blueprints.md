@@ -580,7 +580,7 @@ placeholder:
   no match (the install would create a second entity) and is named in a warning;
 - tenant-owned seed entities the tenant holds are in `TenantOwnedSkipped`, blanked attributes in `BlankedAttributes`, as for an
   installed blueprint; a tenant entity with `RtBlueprintLocked = false` is a `UserModified` conflict (`UpdateBlueprint` skips it, `InstallBlueprint` would overwrite it - resolve it first);
-- nothing is deleted, in any mode: no tenant entity carries this blueprint's source yet;
+- nothing is deleted, in any mode (also `UpdateBlueprint -m Full` without an installation: entities that carry the blueprint's source from an earlier install are no orphans of a version in effect);
 - warnings say that the blueprint is not installed, how many entities are adopted, and which of them carry the source of another
   blueprint (they are taken over); `Safe` reports only the adds, `Migration` keeps the "no migration script" conflict.
 

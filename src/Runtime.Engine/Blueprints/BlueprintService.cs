@@ -1634,7 +1634,9 @@ internal class BlueprintService : IBlueprintService
                 }
             }
 
-            if (updateMode == BlueprintUpdateMode.Full)
+            // AB#8256: no deletions without an installation - entities that carry this blueprint's source anyway (left
+            // over from an uninstall that kept the data) are not orphans of a version in effect.
+            if (updateMode == BlueprintUpdateMode.Full && !adoption)
             {
                 foreach (var kvp in tenantOfBlueprintByKey)
                 {

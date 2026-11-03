@@ -190,6 +190,15 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
             return null;
         }
 
+        // AB#7360: a day rung with a day start has buckets of 23, 24 and 25 hours. The width of the bucket that
+        // happens to contain `from` would make the grain (and any fixed-width bin derived from it) depend on
+        // whether the window starts on a DST day, so 24 h gas days next to a 23 h one would be dropped. Such a
+        // rung reports its nominal day. Midnight day rungs keep the width of the first bucket (unchanged).
+        if (calendar.HasDayStart && calendar.Alignment == BucketAlignment.CalendarDay)
+        {
+            return (long)TimeSpan.FromDays(1).TotalMilliseconds;
+        }
+
         var start = BucketBoundary.AlignDown(from, calendar);
         var end = BucketBoundary.NextBucketEnd(start, calendar);
         var ms = (long)(end - start).TotalMilliseconds;

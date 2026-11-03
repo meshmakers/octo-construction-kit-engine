@@ -22,7 +22,33 @@ public class StreamDataDownsamplingQueryOptions : StreamDataQueryOptionsBase
     /// </summary>
     public IReadOnlyList<string>? GroupByColumnPaths { get; private set; }
 
-    public TimeSpan BinInterval { get; private set; }
+    /// <summary>
+    /// IANA id of the time zone the bins are cut in (AB#7360), e.g. <c>Europe/Vienna</c>. Null together with
+    /// <see cref="BinOrigin"/> and <see cref="BinInterval"/> null keeps the fixed-width UTC bins of earlier
+    /// versions. Set (or a <see cref="BinOrigin"/> / <see cref="BinInterval"/> given), the bins are local calendar
+    /// days of this zone (UTC when null): 23, 24 or 25 hours across DST changes, built with the same
+    /// <c>BucketBoundary</c> logic as day rollups, so raw and rollup bins coincide.
+    /// </summary>
+    public string? TimeZone { get; private set; }
+
+    /// <summary>
+    /// Width of one bin in whole days (AB#7360). Null means one day when <see cref="TimeZone"/> or
+    /// <see cref="BinOrigin"/> is set. Must be a whole number of days when a zone or origin is given.
+    /// Weeks and months are served by calendar rollups, not here.
+    /// </summary>
+    public TimeSpan? BinInterval { get; private set; }
+
+    /// <summary>
+    /// Local time of day at which a bin starts (AB#7360), e.g. 06:00 for a gas day. A whole number of minutes in
+    /// <c>[00:00, 24:00)</c>; null means midnight. Same meaning as <c>DayStartOffsetMs</c> of a day rollup.
+    /// </summary>
+    public TimeSpan? BinOrigin { get; private set; }
+
+    /// <summary>
+    /// True when the bins are local-day bins (a time zone, an origin or an interval is given) instead of the
+    /// fixed-width UTC bins derived from range and <see cref="StreamDataQueryOptionsBase.Limit"/>.
+    /// </summary>
+    public bool HasLocalDayBins => TimeZone is not null || BinInterval is not null || BinOrigin is not null;
 
     public static StreamDataDownsamplingQueryOptions Create() => new();
 
@@ -45,9 +71,21 @@ public class StreamDataDownsamplingQueryOptions : StreamDataQueryOptionsBase
         return this;
     }
 
-    public StreamDataDownsamplingQueryOptions WithBinInterval(TimeSpan interval)
+    public StreamDataDownsamplingQueryOptions WithBinInterval(TimeSpan? interval)
     {
         BinInterval = interval;
+        return this;
+    }
+
+    public StreamDataDownsamplingQueryOptions WithTimeZone(string? timeZone)
+    {
+        TimeZone = string.IsNullOrWhiteSpace(timeZone) ? null : timeZone;
+        return this;
+    }
+
+    public StreamDataDownsamplingQueryOptions WithBinOrigin(TimeSpan? origin)
+    {
+        BinOrigin = origin;
         return this;
     }
 

@@ -1178,4 +1178,35 @@ public class RollupValidatorTests
 
         RollupValidator.ValidateForActivation(target, sources);
     }
+
+    // AB#7360 (review of AB#7358): ValidateDayStartCoincides does not look at a coarser source under an offset
+    // day target; the granularity rule of ValidateForActivation refuses it before.
+    [Theory]
+    [InlineData(BucketAlignment.Iso8601Week, 7)]
+    [InlineData(BucketAlignment.CalendarMonth, 28)]
+    [InlineData(BucketAlignment.CalendarQuarter, 90)]
+    [InlineData(BucketAlignment.CalendarYear, 365)]
+    public void ValidateForActivation_GasDayRollupOverACoarserCalendarSource_Throws(BucketAlignment sourceAlignment, int days)
+    {
+        var target = GasDay();
+
+        Assert.Throws<RollupBucketIntervalException>(() => RollupValidator.ValidateForActivation(
+            target, CalendarSource(target, sourceAlignment, TimeSpan.FromDays(days))));
+    }
+
+    // AB#7360: DayStartFromMs is the one place a stored offset is read; it refuses what validation would have refused.
+    [Theory]
+    [InlineData(-1L)]
+    [InlineData(86_400_000L)]
+    [InlineData(90_000_000L)]
+    public void DayStartFromMs_OutsideTheDay_Throws(long ms) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => BucketCalendar.DayStartFromMs(ms));
+
+    [Theory]
+    [InlineData(null, 0L)]
+    [InlineData(0L, 0L)]
+    [InlineData(21_600_000L, 21_600_000L)]
+    [InlineData(86_399_000L, 86_399_000L)]
+    public void DayStartFromMs_InsideTheDay_IsTheTimeOfDay(long? ms, long expectedMs) =>
+        Assert.Equal(TimeSpan.FromMilliseconds(expectedMs), BucketCalendar.DayStartFromMs(ms));
 }

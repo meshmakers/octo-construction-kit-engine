@@ -484,6 +484,13 @@ public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
             return (true, null); // no-op: formula unchanged
         }
 
+        // AB#8255: the formula already in progress is no new change (a re-applied seed or a repeated call spells it
+        // logically, the marker holds the physical form) - the queued backfill finishes it.
+        if (target.HasPendingFormula && string.Equals(target.PendingFormula, physicalFormula, StringComparison.Ordinal))
+        {
+            return (true, null);
+        }
+
         // AB#8002: one backfill per column at a time. A second change while the first is still queued
         // or running would race it for the same pending physical column.
         if (target.HasPendingFormula || target.ComputedState is ComputedColumnState.Backfilling or ComputedColumnState.Pending)

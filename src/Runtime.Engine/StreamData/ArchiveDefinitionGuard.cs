@@ -208,7 +208,8 @@ internal static class ArchiveDefinitionGuard
     /// the change already in progress is no new change. Run after <see cref="TakeColumnAdditions" />.
     /// </summary>
     /// <exception cref="ArchiveSchemaImmutableException">
-    /// The archive is disabled (after it was activated) and the seed changes the formula of a computed column.
+    /// The archive is disabled (after it was activated) and the seed changes the formula of a computed column, or the
+    /// seed drops the formula of a computed column of a guarded archive.
     /// </exception>
     public static IReadOnlyList<ArchiveSeedFormulaChange> KeepColumnRuntimeState(ICkCacheService cacheService,
         string tenantId, CkTypeGraph ckType, RtEntity stored, RtEntityTcDto incoming)
@@ -246,6 +247,14 @@ internal static class ArchiveDefinitionGuard
             var seedFormula = MemberValue(record, FormulaMember) as string;
             var storedFormula = MemberValue(storedRecord, FormulaMember) as string;
             var pendingFormula = MemberValue(storedRecord, PendingFormulaMember) as string;
+            if (guarded && !string.IsNullOrWhiteSpace(storedFormula) && string.IsNullOrWhiteSpace(seedFormula))
+            {
+                // A seed that drops the formula would turn the computed column into one without a formula and lose the
+                // live formula without telling the archive lifecycle.
+                throw Frozen(false, stored, ColumnsAttribute,
+                    $"computed column '{MemberValue(record, NameMember) as string ?? key}' cannot lose its formula");
+            }
+
             var computed = !string.IsNullOrWhiteSpace(seedFormula) && !string.IsNullOrWhiteSpace(storedFormula);
             if (guarded && computed && !string.Equals(seedFormula, storedFormula, StringComparison.Ordinal))
             {

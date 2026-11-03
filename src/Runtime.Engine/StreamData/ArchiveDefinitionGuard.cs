@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
@@ -56,6 +57,11 @@ internal static class ArchiveDefinitionGuard
     private const string ResultTypeMember = "ResultType";
     private const string FormulaMember = "Formula";
     private const string IndexedMember = "Indexed";
+    private const string PendingFormulaMember = "PendingFormula";
+    private const string ColumnRecordId = "System.StreamData/CkArchiveColumn";
+
+    // The runtime members of CkArchiveColumn, for when the record type is not in the cache.
+    private static readonly string[] ColumnRuntimeMembers = ["ComputedState", "ComputedVersion", PendingFormulaMember];
 
     private static readonly string[] FrozenRollupAttributes =
         [TargetCkTypeIdAttribute, AggregationsAttribute, "BucketSizeMs", "BucketAlignment", "ReferenceTimeZone", "DayStartOffsetMs"];
@@ -188,6 +194,134 @@ internal static class ArchiveDefinitionGuard
         attribute.Value = kept;
         return additions;
     }
+
+    /// <summary>
+    /// AB#8255: the import replaces the whole <c>Columns</c> list, and a seed carries no runtime state of a column - not
+    /// the version pointer of a computed column (<c>ComputedVersion</c>), not its <c>ComputedState</c>, not a formula change
+    /// in progress (<c>PendingFormula</c>). Without this step a re-apply reset a computed column that had been versioned by a
+    /// formula change to version 0, so reads hit the stale physical column of the original formula. For every column of
+    /// <paramref name="incoming" /> that the archive already has (identified as in <see cref="TakeColumnAdditions" />), the
+    /// stored runtime members are carried over - the stored value wins, also when the seed names one. On a guarded archive
+    /// (it has a table) a computed column whose seed formula differs from the live one keeps its live formula in the
+    /// definition and the change is returned, so the import hands it to the archive lifecycle after the commit: the same
+    /// versioned change with backfill as <c>UpdateComputedColumnFormula</c>, never a silent overwrite. A seed formula equal to
+    /// the change already in progress is no new change. Run after <see cref="TakeColumnAdditions" />.
+    /// </summary>
+    /// <exception cref="ArchiveSchemaImmutableException">
+    /// The archive is disabled (after it was activated) and the seed changes the formula of a computed column.
+    /// </exception>
+    public static IReadOnlyList<ArchiveSeedFormulaChange> KeepColumnRuntimeState(ICkCacheService cacheService,
+        string tenantId, CkTypeGraph ckType, RtEntity stored, RtEntityTcDto incoming)
+    {
+        var attribute = incoming.Attributes.FirstOrDefault(a => NameOf(ckType, a) == ColumnsAttribute);
+        if (attribute?.Value is not IEnumerable items || attribute.Value is string)
+        {
+            return [];
+        }
+
+        object? ToTransport(object? value) => ImportRtModelCommand.ToTransportValue(cacheService, tenantId, value);
+        var storedColumns = new Dictionary<string, RtRecordTcDto>(StringComparer.Ordinal);
+        foreach (var record in Records(ToTransport(StoredValue(stored, ColumnsAttribute))))
+        {
+            if (KeyOf(record) is { } key)
+            {
+                storedColumns.TryAdd(key, record);
+            }
+        }
+
+        if (storedColumns.Count == 0)
+        {
+            return [];
+        }
+
+        var guarded = IsGuarded(stored) && !IsRollup(ckType);
+        var changes = new List<ArchiveSeedFormulaChange>();
+        foreach (var record in items.OfType<RtRecordTcDto>())
+        {
+            if (KeyOf(record) is not { } key || !storedColumns.TryGetValue(key, out var storedRecord))
+            {
+                continue;
+            }
+
+            var seedFormula = MemberValue(record, FormulaMember) as string;
+            var storedFormula = MemberValue(storedRecord, FormulaMember) as string;
+            var pendingFormula = MemberValue(storedRecord, PendingFormulaMember) as string;
+            var computed = !string.IsNullOrWhiteSpace(seedFormula) && !string.IsNullOrWhiteSpace(storedFormula);
+            if (guarded && computed && !string.Equals(seedFormula, storedFormula, StringComparison.Ordinal))
+            {
+                if (!string.Equals(seedFormula, pendingFormula, StringComparison.Ordinal))
+                {
+                    var name = MemberValue(record, NameMember) as string ?? key;
+                    if (StatusOf(stored) != CkArchiveStatus.Activated)
+                    {
+                        throw Frozen(false, stored, ColumnsAttribute,
+                            $"the formula of computed column '{name}' can only be changed while the archive is Activated; enable it first");
+                    }
+
+                    changes.Add(new ArchiveSeedFormulaChange(name, seedFormula!));
+                }
+
+                // The definition keeps the live formula; the lifecycle swaps it when the backfill of the new one is done.
+                SetMember(record, storedRecord, FormulaMember, storedFormula);
+            }
+
+            CarryRuntimeMembers(cacheService, tenantId, record, storedRecord);
+        }
+
+        return changes;
+    }
+
+    /// <summary>
+    /// Sets every runtime member (<see cref="AttributeOwnershipDto.RuntimeState" />, any ownership preserved on upsert
+    /// apart from secrets) of <paramref name="record" /> to the stored value; a member the stored column does not hold is
+    /// removed from the seed record.
+    /// </summary>
+    private static void CarryRuntimeMembers(ICkCacheService cacheService, string tenantId, RtRecordTcDto record,
+        RtRecordTcDto storedRecord)
+    {
+        IEnumerable<string> runtimeMembers = cacheService.TryGetRtCkRecord(tenantId, record.CkRecordId, out var graph) && graph != null
+            ? graph.AllAttributes.Values
+                .Where(m => m.Ownership.IsPreservedOnUpsert() && m.ValueType != AttributeValueTypesDto.Secret)
+                .Select(m => m.AttributeName)
+            : ColumnRuntimeMembers;
+        foreach (var member in runtimeMembers)
+        {
+            SetMember(record, storedRecord, member, MemberValue(storedRecord, member));
+        }
+    }
+
+    /// <summary>
+    /// AB#8255: true for the column record of an archive, whose runtime members the import keeps (see
+    /// <see cref="KeepColumnRuntimeState" />); the blueprint preview does not report them as changes.
+    /// </summary>
+    public static bool KeepsRuntimeMembersOf(CkRecordGraph recordGraph)
+        => string.Equals(recordGraph.CkRecordId.ToRtCkId().ToString(), ColumnRecordId, StringComparison.Ordinal);
+
+    private static void SetMember(RtRecordTcDto record, RtRecordTcDto storedRecord, string member, object? value)
+    {
+        var existing = record.Attributes.FirstOrDefault(a => IsMember(a, member));
+        if (value == null)
+        {
+            if (existing != null)
+            {
+                record.Attributes.Remove(existing);
+            }
+
+            return;
+        }
+
+        if (existing != null)
+        {
+            existing.Value = value;
+            return;
+        }
+
+        var id = storedRecord.Attributes.First(a => IsMember(a, member)).Id;
+        record.Attributes.Add(new RtAttributeTcDto { Id = id, Value = value });
+    }
+
+    private static bool IsMember(RtAttributeTcDto attribute, string member)
+        => attribute.Id.ToString().EndsWith("." + member, StringComparison.Ordinal);
 
     private static string? KeyOf(RtRecordTcDto record)
     {
@@ -342,7 +476,7 @@ internal static class ArchiveDefinitionGuard
     };
 
     private static object? MemberValue(RtRecordTcDto record, string member)
-        => record.Attributes.FirstOrDefault(a => a.Id.ToString().EndsWith("." + member, StringComparison.Ordinal))?.Value;
+        => record.Attributes.FirstOrDefault(a => IsMember(a, member))?.Value;
 
     private static string NameOf(CkTypeGraph ckType, RtAttributeTcDto attribute)
         => ckType.AllAttributes.Values.FirstOrDefault(a => a.CkAttributeId.ToRtCkId().Equals(attribute.Id))?.AttributeName ?? string.Empty;
@@ -411,3 +545,12 @@ internal sealed record ArchiveSeedColumn(
     /// <summary>True for a computed column.</summary>
     public bool IsComputed => Formula is not null;
 }
+
+/// <summary>
+/// AB#8255: a seed formula of a computed column that differs from the live formula of a guarded archive, taken out of the
+/// import by <see cref="ArchiveDefinitionGuard.KeepColumnRuntimeState" /> and applied as a versioned formula change with
+/// backfill through the archive lifecycle after the import.
+/// </summary>
+/// <param name="Name">The name of the computed column.</param>
+/// <param name="Formula">The formula the seed declares.</param>
+internal sealed record ArchiveSeedFormulaChange(string Name, string Formula);

@@ -8,6 +8,7 @@ using Meshmakers.Octo.Runtime.Contracts.Blueprints;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Meshmakers.Octo.Runtime.Engine.Exchange;
+using Meshmakers.Octo.Runtime.Engine.StreamData;
 
 namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
 
@@ -530,6 +531,14 @@ internal static class BlueprintEntityComparer
             // through to the raw comparison.
             var member = graph?.AllAttributes.Values.FirstOrDefault(m =>
                 string.Equals(m.CkAttributeId.ToRtCkId().ToString(), key, StringComparison.Ordinal));
+
+            if (member != null && graph != null && ArchiveDefinitionGuard.KeepsRuntimeMembersOf(graph) &&
+                member.Ownership.IsPreservedOnUpsert())
+            {
+                // AB#8255: the import keeps the runtime members of an existing archive column (version pointer, computed
+                // state, formula change in progress) whatever the seed says, so they are no change the apply would make.
+                continue;
+            }
 
             if (member?.ValueType == AttributeValueTypesDto.Secret)
             {

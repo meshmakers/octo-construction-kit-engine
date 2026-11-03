@@ -2452,6 +2452,7 @@ internal class BlueprintService : IBlueprintService
 
                 ReportBlankedAttributes(diff.Blanked, options, confirmations, result);
                 result.ArchiveColumnsAdded.AddRange(_importRtModelCommand.ArchiveColumnAdditions);
+                ReportFormulaChanges(_importRtModelCommand.ArchiveFormulaChanges, result);
 
                 // AB#7991: the import committed; activate the archives it created and queue the new rollups' backfill.
                 importedArchives.AddRange(skippedStreamDataArchives);
@@ -2466,6 +2467,16 @@ internal class BlueprintService : IBlueprintService
                 if (ex is ArchiveColumnAdditionFailedException columnFailure)
                 {
                     result.ArchiveColumnsAdded.AddRange(columnFailure.Additions);
+                    ReportFormulaChanges(_importRtModelCommand.ArchiveFormulaChanges, result);
+                    result.Errors.AddRange(_importRtModelCommand.ArchiveFormulaChanges.Where(c => !c.Succeeded)
+                        .Select(c => $"Formula of computed column '{c.Column}' of archive {c.ArchiveRtId} could not be changed: {c.Error}"));
+                }
+
+                // AB#8255: thrown after every addition and every formula change was tried.
+                if (ex is ArchiveFormulaChangeFailedException formulaFailure)
+                {
+                    result.ArchiveColumnsAdded.AddRange(_importRtModelCommand.ArchiveColumnAdditions);
+                    ReportFormulaChanges(formulaFailure.Changes, result);
                 }
 
                 result.Errors.Add($"Failed to import blueprint entities: {ex.Message}");
@@ -2540,6 +2551,26 @@ internal class BlueprintService : IBlueprintService
 
         return confirmations;
     }
+
+    /// <summary>
+    /// AB#8255: lists the formula changes an update queued - as warnings too, so every client shows them (a backfill
+    /// runs). A failed change is in <see cref="BlueprintUpdateResult.Errors" /> through the exception message.
+    /// </summary>
+    private static void ReportFormulaChanges(IReadOnlyList<RtImportComputedFormulaChange> changes,
+        BlueprintUpdateResult result)
+    {
+        result.ArchiveFormulaChanges = changes.ToList();
+        foreach (var change in changes.Where(c => c.Succeeded))
+        {
+            result.Warnings.Add(DescribeFormulaChange(change));
+        }
+    }
+
+    private static string DescribeFormulaChange(RtImportComputedFormulaChange change) =>
+        $"Formula of computed column '{change.Column}' of activated archive {change.ArchiveRtId}" +
+        $"{(string.IsNullOrEmpty(change.ArchiveWellKnownName) ? string.Empty : $" ('{change.ArchiveWellKnownName}')")} " +
+        "differs from the seed: changed as a new column version with backfill" +
+        $"{(change.BackfillJobRtId is { } job ? $" (job {job})" : string.Empty)}; reads keep the previous values until it is done";
 
     /// <summary>
     /// AB#6315: puts the attributes the seed would blank into the result - applied or kept, so a
@@ -3222,6 +3253,13 @@ internal class BlueprintService : IBlueprintService
                 operationResult.AddMessage(new OperationMessage(MessageLevel.Info, SeedDataDescription(blueprint), 21,
                     $"Added {(addition.IsComputed ? "computed" : "ingested")} column '{addition.Column}' to activated archive " +
                     $"{addition.ArchiveRtId}{(addition.BackfillJobRtId is { } job ? $" (backfill job {job})" : string.Empty)}"));
+            }
+
+            // AB#8255: computed columns whose seed formula differs from the live one run a versioned change with backfill.
+            foreach (var change in _importRtModelCommand.ArchiveFormulaChanges)
+            {
+                operationResult.AddMessage(new OperationMessage(MessageLevel.Info, SeedDataDescription(blueprint), 21,
+                    DescribeFormulaChange(change)));
             }
 
             if (tenantOwnedStamps.Count > 0)

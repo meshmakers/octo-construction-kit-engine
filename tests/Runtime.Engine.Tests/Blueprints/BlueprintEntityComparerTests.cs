@@ -541,6 +541,39 @@ public class BlueprintEntityComparerTests
         Assert.StartsWith("string (", (string)change.NewValue!);
     }
 
+    /// <summary>
+    ///     AB#8255: the import keeps the runtime members of an existing archive column (the version pointer of a computed
+    ///     column that went through a formula change, its state), so a seed without them is no change; a changed formula
+    ///     still is. Runtime members of other records are compared as before.
+    /// </summary>
+    [Fact]
+    public void RuntimeMembersOfAnArchiveColumn_AreNotAChange_AFormulaIs()
+    {
+        var archiveColumn = new CkId<CkRecordId>("System.StreamData-1.22.0/CkArchiveColumn");
+        var otherRecord = new CkId<CkRecordId>($"{Model}/Other");
+        CkRecordGraph? Resolve(RtCkId<CkRecordId> id) =>
+            new[] { archiveColumn, otherRecord }.Where(r => r.ToRtCkId().ToString() == id.ToString())
+                .Select(r => RecordGraph(r,
+                    Attr("Name", AttributeValueTypesDto.String),
+                    Attr("Formula", AttributeValueTypesDto.String),
+                    Attr("ComputedVersion", AttributeValueTypesDto.Int, AttributeOwnershipDto.RuntimeState)))
+                .FirstOrDefault();
+        var type = BuildType(RecordArrayAttr("Columns"));
+        RtRecordTcDto Column(CkId<CkRecordId> record, string formula, object? version) => version == null
+            ? Record(record, ("Name", "power"), ("Formula", formula))
+            : Record(record, ("Name", "power"), ("Formula", formula), ("ComputedVersion", version));
+
+        var stored = Stored(("Columns", new List<object?> { Column(archiveColumn, "a + b", 1L) }));
+        Assert.Empty(BlueprintEntityComparer.Compare(
+            Seed(("Columns", new List<object?> { Column(archiveColumn, "a + b", null) })), stored, type, v => v, ResolveEnum, Resolve));
+        Assert.Single(BlueprintEntityComparer.Compare(
+            Seed(("Columns", new List<object?> { Column(archiveColumn, "a - b", null) })), stored, type, v => v, ResolveEnum, Resolve));
+
+        var otherStored = Stored(("Columns", new List<object?> { Column(otherRecord, "a + b", 1L) }));
+        Assert.Single(BlueprintEntityComparer.Compare(
+            Seed(("Columns", new List<object?> { Column(otherRecord, "a + b", null) })), otherStored, type, v => v, ResolveEnum, Resolve));
+    }
+
     private static List<Meshmakers.Octo.Runtime.Contracts.Blueprints.BlueprintAttributeChange> Compare(
         RtEntityTcDto seed, RtEntity stored, CkTypeGraph type)
     {

@@ -219,10 +219,11 @@ public static class BucketBoundary
         // The aligners preserve Kind; normalise to Unspecified so ConvertTimeToUtc treats the value
         // as wall-clock time in `zone` rather than machine-local.
         var unspecified = DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
-        if (zone.IsInvalidTime(unspecified))
+        // A day start inside a spring-forward gap does not exist; that one day starts the length of the gap
+        // later (03:30 for a 02:30 start in a one-hour gap, 03:30 for 01:30 in a two-hour gap), and AlignDown
+        // steps back a day for an input before that moment. The guard keeps a bad zone from looping.
+        for (var i = 0; i < 4 && zone.IsInvalidTime(unspecified); i++)
         {
-            // A day start inside the spring-forward gap does not exist; that one day starts one hour later
-            // (03:30 for a 02:30 start), and AlignDown steps back a day for an input before that moment.
             unspecified = unspecified.AddHours(1);
         }
 

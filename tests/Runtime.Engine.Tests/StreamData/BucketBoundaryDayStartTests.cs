@@ -120,6 +120,23 @@ public class BucketBoundaryDayStartTests
         Assert.True(aligned <= input);
         Assert.Equal(Utc(2026, 3, 29, 1, 30), BucketBoundary.NextBucketEnd(aligned, gapDay));
     }
+
+    [Fact]
+    public void ADayStartInsideATwoHourGap_DoesNotThrow_AndStartsTheGapLengthLater()
+    {
+        // Antarctica/Troll skips 01:00-03:00 on 29 March 2026 (UTC+0 to UTC+2). A 01:30 day start does not exist
+        // that day; it starts at 03:30 local (01:30Z). Platforms without the zone data skip the test.
+        TimeZoneInfo troll;
+        try { troll = TimeZoneInfo.FindSystemTimeZoneById("Antarctica/Troll"); }
+        catch (TimeZoneNotFoundException) { return; }
+        var calendar = new BucketCalendar(BucketAlignment.CalendarDay, OneHour, troll, TimeSpan.FromHours(1.5));
+
+        var start = BucketBoundary.AlignDown(Utc(2026, 3, 29, 2), calendar);
+        var next = BucketBoundary.NextBucketEnd(Utc(2026, 3, 28, 1, 30), calendar);
+
+        Assert.Equal(Utc(2026, 3, 29, 1, 30), next);
+        Assert.Equal(next, start);
+    }
     [Fact]
     public void WithoutAZone_TheDayStartAppliesToUtc()
     {

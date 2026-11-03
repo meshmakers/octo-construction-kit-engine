@@ -613,4 +613,26 @@ public class ArchiveLifecycleServiceTests
         A.CallTo(() => _repo.DeleteArchiveAsync(Rt)).MustHaveHappenedOnceExactly();
         A.CallTo(() => _store.ArchiveEntityAsync(Rt)).MustHaveHappenedOnceExactly();
     }
+
+    [Fact]
+    public async Task Activate_GasDayRollupWithNullWatermark_SeedsToTheLastGasDayStart()
+    {
+        // AB#7358: now = 14:00:42Z on 11 May = 16:00:42 CEST; the last completed gas day ended at 06:00 CEST = 04:00Z.
+        var rollupStore = A.Fake<IRollupArchiveRuntimeStore>();
+        A.CallTo(() => rollupStore.GetAsync(Rt)).Returns(
+            RollupSnapshot(watermark: null, bucketSize: TimeSpan.FromDays(1)) with
+            {
+                BucketAlignment = BucketAlignment.CalendarDay,
+                ReferenceTimeZone = "Europe/Vienna",
+                DayStartOffsetMs = 21_600_000,
+            });
+        Stub(CkArchiveStatus.Created);
+        StubSourceActivatedWithVoltage();
+
+        await NewSutWithRollupAndClock(rollupStore).ActivateAsync(Rt);
+
+        A.CallTo(() => rollupStore.AdvanceWatermarkAsync(
+                Rt, new DateTime(2026, 5, 11, 4, 0, 0, DateTimeKind.Utc), A<bool>._))
+            .MustHaveHappenedOnceExactly();
+    }
 }

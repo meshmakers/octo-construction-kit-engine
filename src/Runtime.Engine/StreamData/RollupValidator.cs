@@ -75,6 +75,8 @@ public static class RollupValidator
             throw new RollupCycleException(rollup.RtId);
         }
 
+        ValidateDayStartOffset(rollup);
+
         var seen = new HashSet<(string Path, CkRollupFunction Function)>();
         foreach (var agg in rollup.Aggregations)
         {
@@ -188,16 +190,16 @@ public static class RollupValidator
             }
         }
 
-        var zone = BucketBoundary.ResolveZone(rollup.ReferenceTimeZone);
+        var calendar = BucketCalendar.For(rollup);
         foreach (var source in sources)
         {
-            if (source.ValidFrom is { } validFrom && !IsOnBucketBoundary(validFrom, rollup, zone))
+            if (source.ValidFrom is { } validFrom && !IsOnBucketBoundary(validFrom, rollup, calendar))
             {
                 throw new RollupSourceSpanNotOnBucketBoundaryException(
                     rollup.RtId, source.SourceArchiveRtId, nameof(RollupSourceReference.ValidFrom), validFrom);
             }
 
-            if (source.ValidTo is { } validTo && !IsOnBucketBoundary(validTo, rollup, zone))
+            if (source.ValidTo is { } validTo && !IsOnBucketBoundary(validTo, rollup, calendar))
             {
                 throw new RollupSourceSpanNotOnBucketBoundaryException(
                     rollup.RtId, source.SourceArchiveRtId, nameof(RollupSourceReference.ValidTo), validTo);
@@ -314,6 +316,11 @@ public static class RollupValidator
 
             ValidateBucketGranularity(rollup, source, archive);
 
+            if (source.Rollup is { } sourceRollup)
+            {
+                ValidateDayStartCoincides(rollup, sourceRollup);
+            }
+
             // Every logical aggregation spec must resolve on every source (AB#5157 decision 2) — a
             // source that cannot serve one would silently produce empty columns for the buckets it
             // serves. Two-step per source (RollupSourceColumnResolver): a captured column addressed
@@ -331,9 +338,135 @@ public static class RollupValidator
         }
     }
 
-    private static bool IsOnBucketBoundary(DateTime boundary, RollupArchiveSnapshot rollup, TimeZoneInfo? zone)
+    /// <summary>
+    /// Validates the day start of a rollup (AB#7358): <see cref="RollupArchiveSnapshot.DayStartOffsetMs"/> is
+    /// null/0 (midnight) or a whole number of minutes in <c>[0, 24 h)</c>, and only on
+    /// <see cref="BucketAlignment.CalendarDay"/>. Throws <see cref="RollupDayStartOffsetInvalidException"/>.
+    /// </summary>
+    public static void ValidateDayStartOffset(RollupArchiveSnapshot rollup)
     {
-        var aligned = BucketBoundary.AlignDown(boundary, rollup.BucketAlignment, rollup.BucketSize, zone);
+        const long dayMs = 86_400_000;
+        const long minuteMs = 60_000;
+        if (rollup.DayStartOffsetMs is not { } offset)
+        {
+            return;
+        }
+
+        if (offset < 0 || offset >= dayMs)
+        {
+            throw new RollupDayStartOffsetInvalidException(rollup.RtId, offset,
+                $"the value is outside [0, {dayMs}) ms (a day start is a time of day). {RollupDayStartOffsetInvalidException.AllowedRange}.");
+        }
+
+        if (offset % minuteMs != 0)
+        {
+            throw new RollupDayStartOffsetInvalidException(rollup.RtId, offset,
+                $"the value is not a whole minute. {RollupDayStartOffsetInvalidException.AllowedRange}.");
+        }
+
+        if (offset != 0 && rollup.BucketAlignment != BucketAlignment.CalendarDay)
+        {
+            throw new RollupDayStartOffsetInvalidException(rollup.RtId, offset,
+                $"the rollup has BucketAlignment {rollup.BucketAlignment}. {RollupDayStartOffsetInvalidException.AllowedRange}.");
+        }
+    }
+
+    /// <summary>
+    /// A rollup chained on a day rollup that starts at another time than midnight (or a midnight day rollup
+    /// chained under an offset one) only works when the bucket boundaries coincide (AB#7358): the target must
+    /// be a <see cref="BucketAlignment.CalendarDay"/> rollup with the same day start and a time zone with the
+    /// same rules. A week / month / quarter / year rollup over offset days would cut gas days in two.
+    /// </summary>
+    public static void ValidateDayStartCoincides(RollupArchiveSnapshot rollup, RollupArchiveSnapshot sourceRollup)
+    {
+        var sourceStart = BucketCalendar.DayStartFromMs(sourceRollup.DayStartOffsetMs);
+        var targetStart = BucketCalendar.DayStartFromMs(rollup.DayStartOffsetMs);
+        var sourceIsDays = sourceRollup.BucketAlignment == BucketAlignment.CalendarDay;
+        var targetIsDays = rollup.BucketAlignment == BucketAlignment.CalendarDay;
+
+        if (sourceIsDays && sourceStart > TimeSpan.Zero && !targetIsDays)
+        {
+            throw new RollupDayStartOffsetInvalidException(rollup.RtId, sourceRollup.DayStartOffsetMs,
+                $"source rollup '{sourceRollup.RtId}' has day buckets starting at a time of day (DayStartOffsetMs), a {rollup.BucketAlignment} rollup over it would cut those days in two. Chain only CalendarDay rollups with the same DayStartOffsetMs and ReferenceTimeZone on it.");
+        }
+
+        if (!sourceIsDays && targetIsDays && targetStart > TimeSpan.Zero
+            && sourceRollup.BucketAlignment == BucketAlignment.FixedSize)
+        {
+            ValidateFixedSourceOnDayStartGrid(rollup, sourceRollup);
+            return;
+        }
+
+        if (!sourceIsDays || !targetIsDays || (sourceStart == TimeSpan.Zero && targetStart == TimeSpan.Zero))
+        {
+            return;
+        }
+
+        if (sourceStart != targetStart)
+        {
+            throw new RollupDayStartOffsetInvalidException(rollup.RtId, rollup.DayStartOffsetMs,
+                $"source rollup '{sourceRollup.RtId}' has DayStartOffsetMs {sourceRollup.DayStartOffsetMs?.ToString() ?? "(null)"}, the day buckets would not coincide. Both must carry the same DayStartOffsetMs.");
+        }
+
+        // Same zone id, not "same rules": HasSameRules answers differently per platform (tzdata history of
+        // Europe/Berlin vs Europe/Vienna), and a stored rollup must validate the same everywhere.
+        var sourceZone = BucketBoundary.ResolveZone(sourceRollup.ReferenceTimeZone)?.Id ?? TimeZoneInfo.Utc.Id;
+        var targetZone = BucketBoundary.ResolveZone(rollup.ReferenceTimeZone)?.Id ?? TimeZoneInfo.Utc.Id;
+        if (!string.Equals(sourceZone, targetZone, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new RollupDayStartOffsetInvalidException(rollup.RtId, rollup.DayStartOffsetMs,
+                $"source rollup '{sourceRollup.RtId}' uses ReferenceTimeZone '{sourceRollup.ReferenceTimeZone ?? "UTC"}', the day buckets would not coincide with '{rollup.ReferenceTimeZone ?? "UTC"}'. Both must use the same ReferenceTimeZone.");
+        }
+    }
+
+    /// <summary>
+    /// A <see cref="BucketAlignment.FixedSize"/> source under a day rollup with a day start (AB#7358): the target
+    /// aggregates whole source rows, so every local day start must fall on a source bucket boundary (a multiple of
+    /// the source bucket size counted from the UTC epoch). That holds on every day only when the source bucket size
+    /// divides 24 h, divides the day start offset, and divides the distance between the day start's UTC position in
+    /// every UTC offset the zone uses (standard and daylight time, e.g. +1 h / +2 h in Europe/Vienna). An hourly
+    /// source under a 06:00 day start in Vienna passes; under 06:30, or in a +05:30 zone under 06:00, it is refused.
+    /// </summary>
+    private static void ValidateFixedSourceOnDayStartGrid(RollupArchiveSnapshot rollup, RollupArchiveSnapshot sourceRollup)
+    {
+        var size = sourceRollup.BucketSize.Ticks;
+        var offset = BucketCalendar.DayStartFromMs(rollup.DayStartOffsetMs);
+        if (size <= 0)
+        {
+            return;
+        }
+
+        var reason = (string?)null;
+        if (TimeSpan.TicksPerDay % size != 0)
+        {
+            reason = "the source bucket size does not divide 24 hours, so its boundaries drift against the days";
+        }
+        else if (offset.Ticks % size != 0)
+        {
+            reason = "the day start is not a multiple of the source bucket size";
+        }
+        else
+        {
+            foreach (var utcOffset in BucketBoundary.UtcOffsetsOf(BucketBoundary.ResolveZone(rollup.ReferenceTimeZone)))
+            {
+                if (utcOffset.Ticks % size != 0)
+                {
+                    reason = $"the UTC offset {utcOffset} of the time zone is not a multiple of the source bucket size, so local day starts fall between source buckets";
+                    break;
+                }
+            }
+        }
+
+        if (reason is not null)
+        {
+            throw new RollupDayStartOffsetInvalidException(rollup.RtId, rollup.DayStartOffsetMs,
+                $"source rollup '{sourceRollup.RtId}' has fixed-size buckets of {sourceRollup.BucketSize}, the day buckets would not coincide: {reason}. The day start (DayStartOffsetMs), the 24-hour day and every UTC offset of the ReferenceTimeZone must be whole multiples of the source bucket size.");
+        }
+    }
+
+    private static bool IsOnBucketBoundary(DateTime boundary, RollupArchiveSnapshot rollup, BucketCalendar calendar)
+    {
+        var aligned = BucketBoundary.AlignDown(boundary, calendar);
         return aligned == AsUtc(boundary);
     }
 

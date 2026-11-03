@@ -486,3 +486,27 @@ public sealed class RollupSourceCycleException : StreamDataException
         SourceArchiveRtId = sourceArchiveRtId;
     }
 }
+
+/// <summary>
+/// The <c>DayStartOffsetMs</c> of a rollup is not valid (AB#7358): outside <c>[0, 24 h)</c>, not a whole
+/// minute, set on an alignment other than <see cref="BucketAlignment.CalendarDay"/>, or a rollup chained on
+/// an offset day rollup whose bucket boundaries would not coincide with its source's (different zone,
+/// different day start, or a week / month / quarter / year rollup over offset days). The message names the
+/// attribute and the allowed range.
+/// </summary>
+public sealed class RollupDayStartOffsetInvalidException : StreamDataException
+{
+    /// <summary>The offending value in milliseconds.</summary>
+    public long? DayStartOffsetMs { get; }
+
+    public RollupDayStartOffsetInvalidException(OctoObjectId rollupArchiveRtId, long? dayStartOffsetMs, string reason)
+        : base($"Rollup archive {Describe(rollupArchiveRtId)}: DayStartOffsetMs {dayStartOffsetMs?.ToString() ?? "(null)"} is invalid: {reason}",
+            rollupArchiveRtId)
+    {
+        DayStartOffsetMs = dayStartOffsetMs;
+    }
+
+    /// <summary>The allowed range, as quoted in every message.</summary>
+    public const string AllowedRange =
+        "DayStartOffsetMs must be a whole number of minutes in [0, 86400000) (0 or unset = midnight) and is only allowed with BucketAlignment CalendarDay";
+}

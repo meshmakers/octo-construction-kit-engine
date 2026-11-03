@@ -58,7 +58,7 @@ internal static class ArchiveDefinitionGuard
     private const string IndexedMember = "Indexed";
 
     private static readonly string[] FrozenRollupAttributes =
-        [TargetCkTypeIdAttribute, AggregationsAttribute, "BucketSizeMs", "BucketAlignment", "ReferenceTimeZone"];
+        [TargetCkTypeIdAttribute, AggregationsAttribute, "BucketSizeMs", "BucketAlignment", "ReferenceTimeZone", "DayStartOffsetMs"];
 
     private static readonly string[] FrozenBaseAttributes = [TargetCkTypeIdAttribute];
 

@@ -63,6 +63,15 @@ public sealed record SeriesResolutionRequest(
     public string? QueryTimeZone { get; init; }
 
     /// <summary>
+    /// Local time of day at which a calendar-day bucket of this query starts, in milliseconds after
+    /// local midnight (AB#7358). <c>null</c> or 0 ⇒ midnight days (every request before System.StreamData
+    /// 1.22.0). Under <see cref="SeriesComparisonPolicy.PerQuery"/> a <see cref="BucketAlignment.CalendarDay"/>
+    /// rung whose own day start differs holds other days' buckets and is excluded, so a midnight chart never
+    /// reads gas days. Ignored under <see cref="SeriesComparisonPolicy.PerSeries"/>.
+    /// </summary>
+    public long? QueryDayStartOffsetMs { get; init; }
+
+    /// <summary>
     /// How civil boundaries are resolved when the series spans multiple reference time zones
     /// (AB#4190, decision T2). Defaults to <see cref="SeriesComparisonPolicy.PerQuery"/>.
     /// </summary>

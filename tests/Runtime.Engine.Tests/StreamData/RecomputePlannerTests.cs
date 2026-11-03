@@ -309,4 +309,64 @@ public class RecomputePlannerTests
         Assert.Contains(all, c => c.End == cutover);
         Assert.Contains(all, c => c.Start == cutover);
     }
+
+    // ---- AB#7358: gas-day rollup (CalendarDay, 06:00 Europe/Vienna) ----------------------------
+
+    private static BucketCalendar GasDayCalendar =>
+        new(BucketAlignment.CalendarDay, TimeSpan.FromDays(1),
+            TimeZoneInfo.FindSystemTimeZoneById("Europe/Vienna"), TimeSpan.FromHours(6));
+
+    private static DateTime At(int y, int mo, int d, int h = 0, int mi = 0) =>
+        new(y, mo, d, h, mi, 0, DateTimeKind.Utc);
+
+    [Fact]
+    public void AlignRangeToBuckets_GasDay_SnapsOutwardToGasDayBoundaries()
+    {
+        var (start, end) = RecomputePlanner.AlignRangeToBuckets(At(2026, 3, 29, 3, 30), At(2026, 3, 29, 10), GasDayCalendar);
+
+        Assert.Equal(At(2026, 3, 28, 5), start);
+        Assert.Equal(At(2026, 3, 30, 4), end);
+    }
+
+    [Fact]
+    public void AlignRangeToBuckets_GasDay_EndOnABoundaryDoesNotDragInTheNextDay()
+    {
+        var (start, end) = RecomputePlanner.AlignRangeToBuckets(At(2026, 3, 28, 5), At(2026, 3, 29, 4), GasDayCalendar);
+
+        Assert.Equal(At(2026, 3, 28, 5), start);
+        Assert.Equal(At(2026, 3, 29, 4), end);
+    }
+
+    [Fact]
+    public void PlanChunks_GasDay_CutsOnGasDayBoundaries()
+    {
+        var chunks = RecomputePlanner.PlanChunks(At(2026, 3, 28, 5), At(2026, 3, 31, 4), GasDayCalendar, 2);
+
+        Assert.Equal(new[] { (At(2026, 3, 28, 5), At(2026, 3, 30, 4)), (At(2026, 3, 30, 4), At(2026, 3, 31, 4)) }, chunks);
+    }
+
+    [Fact]
+    public void BuildRecomputeRanges_GasDayDependent_UsesTheOffset()
+    {
+        var dependent = new RollupArchiveSnapshot(
+            OctoObjectId.GenerateNewId(), new RtCkId<CkTypeId>("Test", new CkTypeId("CkRollupArchive")),
+            CkArchiveStatus.Activated, null,
+            new[] { new RollupSourceReference(OctoObjectId.GenerateNewId()) },
+            TimeSpan.FromDays(1), TimeSpan.Zero, null,
+            new[] { new CkRollupAggregationSpec("v", CkRollupFunction.Sum, null) }, null)
+        {
+            BucketAlignment = BucketAlignment.CalendarDay,
+            ReferenceTimeZone = "Europe/Vienna",
+            DayStartOffsetMs = 21_600_000,
+        };
+        var window = new ArchiveDirtyWindow(
+            At(2026, 3, 29, 3, 30), At(2026, 3, 29, 10),
+            RecomputeChangeKind.RetroactiveModify, RecomputeChangeSource.Pipeline, At(2026, 5, 1));
+
+        var ranges = RecomputePlanner.BuildRecomputeRanges(window, new[] { dependent }, At(2026, 5, 1));
+
+        var range = Assert.Single(ranges);
+        Assert.Equal(At(2026, 3, 28, 5), range.RangeStart);
+        Assert.Equal(At(2026, 3, 30, 4), range.RangeEnd);
+    }
 }

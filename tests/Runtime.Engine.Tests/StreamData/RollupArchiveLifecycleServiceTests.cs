@@ -67,7 +67,7 @@ public class RollupArchiveLifecycleServiceTests
                 A<string?>._, A<RtCkId<CkTypeId>>._, A<IReadOnlyList<RollupSourceReference>>._,
                 A<TimeSpan>._, A<TimeSpan>._,
                 A<IReadOnlyList<CkRollupAggregationSpec>>._, A<IReadOnlyList<CkArchiveColumnSpec>>._,
-                A<BucketAlignment>._, A<string?>._, A<TimeSpan?>._))
+                A<BucketAlignment>._, A<string?>._, A<TimeSpan?>._, A<long?>._))
             .Returns(insertedRtId);
 
     private void MustNotHaveInserted() =>
@@ -75,7 +75,7 @@ public class RollupArchiveLifecycleServiceTests
                 A<string?>._, A<RtCkId<CkTypeId>>._, A<IReadOnlyList<RollupSourceReference>>._,
                 A<TimeSpan>._, A<TimeSpan>._,
                 A<IReadOnlyList<CkRollupAggregationSpec>>._, A<IReadOnlyList<CkArchiveColumnSpec>>._,
-                A<BucketAlignment>._, A<string?>._, A<TimeSpan?>._))
+                A<BucketAlignment>._, A<string?>._, A<TimeSpan?>._, A<long?>._))
             .MustNotHaveHappened();
 
     private static async IAsyncEnumerable<T> ToAsync<T>(T[] items)
@@ -590,6 +590,111 @@ public class RollupArchiveLifecycleServiceTests
         await NewSut().RewindWatermarkAsync(Rt, passedIn);
 
         A.CallTo(() => _store.AdvanceWatermarkAsync(Rt, expectedBucketEnd, true))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    // ---- AB#7358: day start offset (gas day, 06:00 Europe/Vienna) -------------------------------
+
+    private const long SixAmMs = 21_600_000;
+
+    [Fact]
+    public async Task Create_GasDay_PassesTheOffsetToTheStore()
+    {
+        StubSource(SourceRt);
+        StubInsert(OctoObjectId.GenerateNewId());
+        var sources = Sources(SourceRt);
+
+        await NewSut().CreateAsync(
+            "GasDay", sources, TimeSpan.FromDays(1), TimeSpan.FromMinutes(15), VoltageAvg,
+            BucketAlignment.CalendarDay, "Europe/Vienna", dayStartOffsetMs: SixAmMs);
+
+        A.CallTo(() => _store.InsertAsync(
+                "GasDay", TargetType, sources, TimeSpan.FromDays(1), TimeSpan.FromMinutes(15),
+                VoltageAvg, A<IReadOnlyList<CkArchiveColumnSpec>>._,
+                BucketAlignment.CalendarDay, "Europe/Vienna", null, SixAmMs))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Theory]
+    [InlineData(-1L)]
+    [InlineData(86_400_000L)]
+    [InlineData(21_600_001L)]
+    public async Task Create_InvalidDayStartOffset_IsRefusedBeforeTheInsert(long offsetMs)
+    {
+        StubSource(SourceRt);
+
+        var ex = await Assert.ThrowsAsync<RollupDayStartOffsetInvalidException>(() => NewSut().CreateAsync(
+            "Bad", Sources(SourceRt), TimeSpan.FromDays(1), TimeSpan.FromMinutes(15), VoltageAvg,
+            BucketAlignment.CalendarDay, "Europe/Vienna", dayStartOffsetMs: offsetMs));
+
+        Assert.Contains("DayStartOffsetMs", ex.Message);
+        MustNotHaveInserted();
+    }
+
+    [Theory]
+    [InlineData(BucketAlignment.FixedSize)]
+    [InlineData(BucketAlignment.CalendarMonth)]
+    public async Task Create_DayStartOffsetOnAnotherAlignment_IsRefused(BucketAlignment alignment)
+    {
+        StubSource(SourceRt);
+
+        await Assert.ThrowsAsync<RollupDayStartOffsetInvalidException>(() => NewSut().CreateAsync(
+            "Bad", Sources(SourceRt), TimeSpan.FromDays(1), TimeSpan.FromMinutes(15), VoltageAvg,
+            alignment, "Europe/Vienna", dayStartOffsetMs: SixAmMs));
+
+        MustNotHaveInserted();
+    }
+
+    private static RollupArchiveSnapshot GasDayParent(string? zone = "Europe/Vienna", long? offsetMs = SixAmMs) =>
+        Snapshot(bucketSize: TimeSpan.FromDays(1), alignment: BucketAlignment.CalendarDay) with
+        {
+            ReferenceTimeZone = zone,
+            DayStartOffsetMs = offsetMs,
+        };
+
+    private void StubRollupsInTenant(params RollupArchiveSnapshot[] rollups) =>
+        A.CallTo(() => _store.EnumerateAsync()).Returns(ToAsync(rollups));
+
+    [Fact]
+    public async Task Create_ChainedOnAGasDayRollupWithTheSameOffsetAndZone_Succeeds()
+    {
+        StubSource(Rt);
+        StubInsert(OctoObjectId.GenerateNewId());
+        StubRollupsInTenant(GasDayParent());
+
+        await NewSut().CreateAsync(
+            "Chained", Sources(Rt), TimeSpan.FromDays(1), TimeSpan.FromMinutes(15), VoltageAvg,
+            BucketAlignment.CalendarDay, "Europe/Vienna", dayStartOffsetMs: SixAmMs);
+    }
+
+    [Theory]
+    [InlineData("Europe/Vienna", null, BucketAlignment.CalendarDay)]           // different offset
+    [InlineData("Europe/Vienna", 25_200_000L, BucketAlignment.CalendarDay)]    // different offset
+    [InlineData("Europe/London", SixAmMs, BucketAlignment.CalendarDay)]       // different zone
+    [InlineData("Europe/Vienna", null, BucketAlignment.CalendarMonth)]         // coarser parent calendar
+    [InlineData("Europe/Vienna", null, BucketAlignment.Iso8601Week)]
+    public async Task Create_ChainedOnAGasDayRollupWhoseBoundariesDoNotCoincide_IsRefused(
+        string zone, long? offsetMs, BucketAlignment alignment)
+    {
+        StubSource(Rt);
+        StubRollupsInTenant(GasDayParent());
+
+        await Assert.ThrowsAsync<RollupDayStartOffsetInvalidException>(() => NewSut().CreateAsync(
+            "Chained", Sources(Rt), TimeSpan.FromDays(1), TimeSpan.FromMinutes(15), VoltageAvg,
+            alignment, zone, dayStartOffsetMs: offsetMs));
+
+        MustNotHaveInserted();
+    }
+
+    [Fact]
+    public async Task Rewind_GasDayRollup_SnapsToTheGasDayStart()
+    {
+        A.CallTo(() => _store.GetAsync(Rt)).Returns(GasDayParent());
+
+        await NewSut().RewindWatermarkAsync(Rt, new DateTime(2026, 3, 29, 3, 30, 0, DateTimeKind.Utc));
+
+        A.CallTo(() => _store.AdvanceWatermarkAsync(
+                Rt, new DateTime(2026, 3, 28, 5, 0, 0, DateTimeKind.Utc), true))
             .MustHaveHappenedOnceExactly();
     }
 }

@@ -27,6 +27,36 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 public static class BucketBoundary
 {
     /// <summary>
+    /// The distinct UTC offsets a zone has used since 1970 (standard and daylight time); <c>{ 0 }</c> for no zone.
+    /// Earlier rules (local mean time with odd seconds) are ignored: no archive holds data from then.
+    /// </summary>
+    public static IReadOnlyCollection<TimeSpan> UtcOffsetsOf(TimeZoneInfo? zone)
+    {
+        var offsets = new HashSet<TimeSpan>();
+        if (zone is null)
+        {
+            offsets.Add(TimeSpan.Zero);
+            return offsets;
+        }
+
+        offsets.Add(zone.BaseUtcOffset);
+        var epoch = new DateTime(1970, 1, 1);
+        foreach (var rule in zone.GetAdjustmentRules())
+        {
+            if (rule.DateEnd < epoch)
+            {
+                continue;
+            }
+
+            var standard = zone.BaseUtcOffset + rule.BaseUtcOffsetDelta;
+            offsets.Add(standard);
+            offsets.Add(standard + rule.DaylightDelta);
+        }
+
+        return offsets;
+    }
+
+    /// <summary>
     /// Resolves an IANA reference-time-zone id (AB#4290 / O6) to a <see cref="TimeZoneInfo"/>, or
     /// <c>null</c> (⇒ UTC calendar boundaries) when the id is empty or unknown. Tolerant by design:
     /// this is the write/aggregation path, where an unknown stored id must fall back to UTC rather
@@ -59,8 +89,19 @@ public static class BucketBoundary
     /// <paramref name="zone"/> if supplied.
     /// </summary>
     public static DateTime NextBucketEnd(
-        DateTime bucketStart, BucketAlignment alignment, TimeSpan bucketSize, TimeZoneInfo? zone = null)
+        DateTime bucketStart, BucketAlignment alignment, TimeSpan bucketSize, TimeZoneInfo? zone = null) =>
+        NextBucketEnd(bucketStart, new BucketCalendar(alignment, bucketSize, zone));
+
+    /// <inheritdoc cref="NextBucketEnd(DateTime, BucketAlignment, TimeSpan, TimeZoneInfo?)"/>
+    /// <remarks>
+    /// With a <see cref="BucketCalendar.DayStart"/> the day bucket runs from the local day start to the
+    /// next local day start (23 / 24 / 25 h across DST changes); the offset is applied on the local
+    /// wall clock, never as a UTC shift: a start on a day start advances one local day, which keeps the day start.
+    /// </remarks>
+    public static DateTime NextBucketEnd(DateTime bucketStart, BucketCalendar calendar)
     {
+        var (alignment, bucketSize, zone, _) = calendar;
+        var dayStart = calendar.HasDayStart ? calendar.DayStart : TimeSpan.Zero;
         if (alignment == BucketAlignment.FixedSize)
         {
             return bucketStart + bucketSize;
@@ -84,6 +125,10 @@ public static class BucketBoundary
         var local = TimeZoneInfo.ConvertTimeFromUtc(utc, zone);
         var nextLocal = alignment switch
         {
+            // Re-derive the local day from (local - dayStart): a day start that fell into a spring-forward gap was
+            // shifted by ToUtcFromLocal, and plain AddDays(1) would carry that shift into every later day.
+            BucketAlignment.CalendarDay when dayStart > TimeSpan.Zero =>
+                AlignDownToDay(local - dayStart).AddDays(1) + dayStart,
             BucketAlignment.CalendarDay => local.AddDays(1),
             BucketAlignment.Iso8601Week => local.AddDays(7),
             BucketAlignment.CalendarMonth => local.AddMonths(1),
@@ -100,12 +145,16 @@ public static class BucketBoundary
     /// — so the orchestrator's next tick processes that bucket as a backlog of one.
     /// </summary>
     public static DateTime InitialWatermark(
-        DateTime now, BucketAlignment alignment, TimeSpan bucketSize, TimeZoneInfo? zone = null)
+        DateTime now, BucketAlignment alignment, TimeSpan bucketSize, TimeZoneInfo? zone = null) =>
+        InitialWatermark(now, new BucketCalendar(alignment, bucketSize, zone));
+
+    /// <inheritdoc cref="InitialWatermark(DateTime, BucketAlignment, TimeSpan, TimeZoneInfo?)"/>
+    public static DateTime InitialWatermark(DateTime now, BucketCalendar calendar)
     {
         var utc = ToUtc(now);
-        return alignment == BucketAlignment.FixedSize
-            ? AlignDownFixed(utc - bucketSize, bucketSize)
-            : AlignDownCalendar(utc, alignment, zone);
+        return calendar.Alignment == BucketAlignment.FixedSize
+            ? AlignDownFixed(utc - calendar.BucketSize, calendar.BucketSize)
+            : AlignDownCalendar(utc, calendar);
     }
 
     /// <summary>
@@ -114,21 +163,27 @@ public static class BucketBoundary
     /// of which arbitrary timestamp the caller passes, and by the resolution-aware grain probe.
     /// </summary>
     public static DateTime AlignDown(
-        DateTime target, BucketAlignment alignment, TimeSpan bucketSize, TimeZoneInfo? zone = null)
+        DateTime target, BucketAlignment alignment, TimeSpan bucketSize, TimeZoneInfo? zone = null) =>
+        AlignDown(target, new BucketCalendar(alignment, bucketSize, zone));
+
+    /// <inheritdoc cref="AlignDown(DateTime, BucketAlignment, TimeSpan, TimeZoneInfo?)"/>
+    public static DateTime AlignDown(DateTime target, BucketCalendar calendar)
     {
         var utc = ToUtc(target);
-        return alignment == BucketAlignment.FixedSize
-            ? (bucketSize.Ticks > 0 ? AlignDownFixed(utc, bucketSize) : utc)
-            : AlignDownCalendar(utc, alignment, zone);
+        return calendar.Alignment == BucketAlignment.FixedSize
+            ? (calendar.BucketSize.Ticks > 0 ? AlignDownFixed(utc, calendar.BucketSize) : utc)
+            : AlignDownCalendar(utc, calendar);
     }
 
-    private static DateTime AlignDownCalendar(DateTime utc, BucketAlignment alignment, TimeZoneInfo? zone)
+    private static DateTime AlignDownCalendar(DateTime utc, BucketCalendar calendar)
     {
+        var (alignment, _, zone, _) = calendar;
+        var dayStart = calendar.HasDayStart ? calendar.DayStart : TimeSpan.Zero;
         if (zone is null)
         {
             return alignment switch
             {
-                BucketAlignment.CalendarDay => AlignDownToDay(utc),
+                BucketAlignment.CalendarDay => AlignDownToDay(utc - dayStart) + dayStart,
                 BucketAlignment.Iso8601Week => AlignDownToIso8601Week(utc),
                 BucketAlignment.CalendarMonth => AlignDownToMonth(utc),
                 BucketAlignment.CalendarQuarter => AlignDownToQuarter(utc),
@@ -140,14 +195,22 @@ public static class BucketBoundary
         var local = TimeZoneInfo.ConvertTimeFromUtc(utc, zone);
         var alignedLocal = alignment switch
         {
-            BucketAlignment.CalendarDay => AlignDownToDay(local),
+            BucketAlignment.CalendarDay => AlignDownToDay(local - dayStart) + dayStart,
             BucketAlignment.Iso8601Week => AlignDownToIso8601Week(local),
             BucketAlignment.CalendarMonth => AlignDownToMonth(local),
             BucketAlignment.CalendarQuarter => AlignDownToQuarter(local),
             BucketAlignment.CalendarYear => AlignDownToYear(local),
             _ => throw UnknownAlignment(alignment)
         };
-        return ToUtcFromLocal(alignedLocal, zone);
+        var result = ToUtcFromLocal(alignedLocal, zone);
+        if (dayStart > TimeSpan.Zero && alignment == BucketAlignment.CalendarDay && result > utc)
+        {
+            // The day start fell into a spring-forward gap and was shifted past the input: the input still
+            // belongs to the previous day.
+            result = ToUtcFromLocal(AlignDownToDay(local - dayStart - TimeSpan.FromDays(1)) + dayStart, zone);
+        }
+
+        return result;
     }
 
     private static DateTime AlignDownFixed(DateTime utc, TimeSpan bucketSize)
@@ -186,6 +249,14 @@ public static class BucketBoundary
         // The aligners preserve Kind; normalise to Unspecified so ConvertTimeToUtc treats the value
         // as wall-clock time in `zone` rather than machine-local.
         var unspecified = DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
+        // A day start inside a spring-forward gap does not exist; that one day starts the length of the gap
+        // later (03:30 for a 02:30 start in a one-hour gap, 03:30 for 01:30 in a two-hour gap), and AlignDown
+        // steps back a day for an input before that moment. The guard keeps a bad zone from looping.
+        for (var i = 0; i < 4 && zone.IsInvalidTime(unspecified); i++)
+        {
+            unspecified = unspecified.AddHours(1);
+        }
+
         return TimeZoneInfo.ConvertTimeToUtc(unspecified, zone);
     }
 

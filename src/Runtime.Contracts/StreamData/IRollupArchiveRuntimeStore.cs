@@ -67,6 +67,11 @@ public interface IRollupArchiveRuntimeStore
     /// <c>CarryLookbackMs</c>. <c>null</c> ⇒ attribute unset ⇒ the engine default of 35 days.
     /// AB#4336 / decision D1.
     /// </param>
+    /// <param name="dayStartOffsetMs">
+    /// Optional local time of day at which a <see cref="BucketAlignment.CalendarDay"/> bucket starts, in
+    /// milliseconds after local midnight (AB#7358, e.g. 21600000 = 06:00 for a gas day). <c>null</c> or 0 is a
+    /// midnight day. Persisted as <c>DayStartOffsetMs</c>.
+    /// </param>
     /// <returns>The generated runtime id of the new rollup archive.</returns>
     Task<OctoObjectId> InsertAsync(
         string? rtWellKnownName,
@@ -78,7 +83,8 @@ public interface IRollupArchiveRuntimeStore
         IReadOnlyList<CkArchiveColumnSpec> columns,
         BucketAlignment bucketAlignment = BucketAlignment.FixedSize,
         string? referenceTimeZone = null,
-        TimeSpan? carryLookback = null);
+        TimeSpan? carryLookback = null,
+        long? dayStartOffsetMs = null);
 
     /// <summary>
     /// Soft-deletes the rollup entity by setting <c>rtState = Archived</c>. The Crate table is

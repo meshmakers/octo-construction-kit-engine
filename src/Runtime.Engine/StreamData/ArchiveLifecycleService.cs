@@ -653,8 +653,8 @@ public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
 
         var now = _clock();
         // Reference time-zone for calendar bucket boundaries (AB#4300 / O6); null ⇒ UTC.
-        var zone = BucketBoundary.ResolveZone(rollup.ReferenceTimeZone);
-        var initialBucketEnd = BucketBoundary.InitialWatermark(now, rollup.BucketAlignment, rollup.BucketSize, zone);
+        var calendar = BucketCalendar.For(rollup);
+        var initialBucketEnd = BucketBoundary.InitialWatermark(now, calendar);
 
         await _rollupStore.AdvanceWatermarkAsync(archiveRtId, initialBucketEnd);
 

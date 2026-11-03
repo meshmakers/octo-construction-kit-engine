@@ -504,4 +504,95 @@ public class SeriesResolutionServiceTests
         Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
         Assert.Equal(hourly.RtId, result.ArchiveRtId);
     }
+
+    // ---- AB#7358: a day rollup that starts at a local time of day --------------------------------
+
+    private static RollupArchiveSnapshot GasDayRollup(OctoObjectId sourceRtId) =>
+        CalendarRollup(sourceRtId, BucketAlignment.CalendarDay, "Europe/Vienna") with { DayStartOffsetMs = 21_600_000 };
+
+    [Fact]
+    public async Task MidnightDayRequest_NeverPicksAGasDayRung()
+    {
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        var gasDay = GasDayRollup(baseArchive.RtId);
+        StubRollups(baseArchive.RtId, gasDay);
+
+        var request = Request(baseArchive.RtId, YearFrom, YearTo, 365) with { QueryTimeZone = "Europe/Vienna" };
+        var result = await NewSut().ResolveAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.NotEqual(gasDay.RtId, result.ArchiveRtId);
+    }
+
+    [Fact]
+    public async Task GasDayRequest_PicksTheGasDayRung()
+    {
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        var gasDay = GasDayRollup(baseArchive.RtId);
+        StubRollups(baseArchive.RtId, gasDay);
+
+        var request = Request(baseArchive.RtId, YearFrom, YearTo, 365) with
+        {
+            QueryTimeZone = "Europe/Vienna",
+            QueryDayStartOffsetMs = 21_600_000,
+        };
+        var result = await NewSut().ResolveAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(gasDay.RtId, result.ArchiveRtId);
+    }
+
+    [Fact]
+    public async Task GasDayRequest_NeverPicksAMidnightDayRung()
+    {
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        var midnight = CalendarRollup(baseArchive.RtId, BucketAlignment.CalendarDay, "Europe/Vienna");
+        StubRollups(baseArchive.RtId, midnight);
+
+        var request = Request(baseArchive.RtId, YearFrom, YearTo, 365) with
+        {
+            QueryTimeZone = "Europe/Vienna",
+            QueryDayStartOffsetMs = 21_600_000,
+        };
+        var result = await NewSut().ResolveAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.NotEqual(midnight.RtId, result.ArchiveRtId);
+    }
+
+    [Fact]
+    public async Task GasDayRequest_WithAnotherDayStart_NeverPicksTheRung()
+    {
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        var gasDay = GasDayRollup(baseArchive.RtId);
+        StubRollups(baseArchive.RtId, gasDay);
+
+        var request = Request(baseArchive.RtId, YearFrom, YearTo, 365) with
+        {
+            QueryTimeZone = "Europe/Vienna",
+            QueryDayStartOffsetMs = 7 * 3_600_000L,
+        };
+        var result = await NewSut().ResolveAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.NotEqual(gasDay.RtId, result.ArchiveRtId);
+    }
+
+    [Fact]
+    public async Task GasDayRequest_NeverPicksAMidnightMonthRung()
+    {
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        var month = CalendarRollup(baseArchive.RtId, BucketAlignment.CalendarMonth, "Europe/Vienna");
+        StubRollups(baseArchive.RtId, month);
+
+        var request = Request(baseArchive.RtId, YearFrom, YearTo, 12) with
+        {
+            QueryTimeZone = "Europe/Vienna",
+            QueryDayStartOffsetMs = 21_600_000,
+        };
+        var result = await NewSut().ResolveAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.NotEqual(month.RtId, result.ArchiveRtId);
+    }
 }

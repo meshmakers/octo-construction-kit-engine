@@ -39,6 +39,11 @@ public interface IRollupArchiveLifecycleService
     /// opening state); <c>null</c> ⇒ the engine default of 35 days. Only meaningful when the
     /// aggregations include TimeWeightedAvg. AB#4336 / decision D1.
     /// </param>
+    /// <param name="dayStartOffsetMs">
+    /// Optional local time of day at which a <see cref="BucketAlignment.CalendarDay"/> bucket starts, in
+    /// milliseconds after local midnight (AB#7358, e.g. 21600000 = 06:00 for a gas day). <c>null</c> or 0 is a
+    /// midnight day. Persisted as <c>DayStartOffsetMs</c>.
+    /// </param>
     /// <returns>The generated runtime id of the new rollup archive.</returns>
     /// <remarks>
     /// The full aggregation rules, the source-span rules and the transitive cycle check all run
@@ -53,7 +58,8 @@ public interface IRollupArchiveLifecycleService
         IReadOnlyList<CkRollupAggregationSpec> aggregations,
         BucketAlignment bucketAlignment = BucketAlignment.FixedSize,
         string? referenceTimeZone = null,
-        TimeSpan? carryLookback = null);
+        TimeSpan? carryLookback = null,
+        long? dayStartOffsetMs = null);
 
     /// <summary>
     /// Sets <see cref="RollupArchiveSnapshot.FrozenUntil"/> to <paramref name="until"/>.

@@ -105,6 +105,7 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
                 // query is answered in (query zone vs. this stored zone) is applied by the grain probe
                 // per the comparison policy — see EffectiveGrainMs.
                 ReferenceTimeZone = rollup.ReferenceTimeZone,
+                DayStartOffsetMs = rollup.DayStartOffsetMs,
             });
         }
 
@@ -132,7 +133,8 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
             request.To,
             request.TargetPoints,
             request.RequiredAggregation,
-            (rung, from, to) => EffectiveGrainMs(rung, from, to, request.QueryTimeZone, request.ComparisonPolicy));
+            (rung, from, to) => EffectiveGrainMs(
+                rung, from, to, request.QueryTimeZone, request.ComparisonPolicy, request.QueryDayStartOffsetMs));
     }
 
     /// <summary>
@@ -156,7 +158,7 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
     /// </remarks>
     private static long? EffectiveGrainMs(
         ResolutionRung rung, DateTime from, DateTime to,
-        string? queryTimeZone, SeriesComparisonPolicy policy)
+        string? queryTimeZone, SeriesComparisonPolicy policy, long? queryDayStartOffsetMs = null)
     {
         if (rung.Alignment == BucketAlignment.FixedSize)
         {
@@ -177,8 +179,19 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
         }
 
         var zone = policy == SeriesComparisonPolicy.PerSeries ? storedZone : BucketBoundary.ResolveZone(queryTimeZone);
-        var start = BucketBoundary.AlignDown(from, rung.Alignment, TimeSpan.Zero, zone);
-        var end = BucketBoundary.NextBucketEnd(start, rung.Alignment, TimeSpan.Zero, zone);
+
+        // AB#7358: a day rung with another local day start holds other days' buckets. Under PerQuery
+        // only a rung whose day start equals the query's can answer; a midnight query never reads
+        // gas days (and vice versa). PerSeries answers in the rung's own calendar.
+        var calendar = BucketCalendar.For(rung).WithZone(zone);
+        if (policy == SeriesComparisonPolicy.PerQuery
+            && calendar.DayStart != BucketCalendar.DayStartFromMs(queryDayStartOffsetMs))
+        {
+            return null;
+        }
+
+        var start = BucketBoundary.AlignDown(from, calendar);
+        var end = BucketBoundary.NextBucketEnd(start, calendar);
         var ms = (long)(end - start).TotalMilliseconds;
         return ms > 0 ? ms : null;
     }

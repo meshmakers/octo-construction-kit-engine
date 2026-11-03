@@ -48,6 +48,13 @@ public sealed record ResolutionRung(
     public string? ReferenceTimeZone { get; init; }
 
     /// <summary>
+    /// Local day start of a <see cref="BucketAlignment.CalendarDay"/> rung in milliseconds after local
+    /// midnight (AB#7358); <c>null</c> or 0 ⇒ a midnight day. A rung with a day start is only a candidate
+    /// for a request with the same day start.
+    /// </summary>
+    public long? DayStartOffsetMs { get; init; }
+
+    /// <summary>
     /// Measured earliest timestamp this rung actually holds data for (AB#5157) —
     /// <c>ArchiveCoverage.AvailableFrom</c> as probed from the storage layer. <c>null</c> when the
     /// rung has no data (no table, no rows) or coverage was not probed at all. The planner reads

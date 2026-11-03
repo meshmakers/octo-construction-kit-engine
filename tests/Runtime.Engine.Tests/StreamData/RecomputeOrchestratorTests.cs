@@ -2117,4 +2117,121 @@ public class RecomputeOrchestratorTests
                     rs.Any(r => r.RangeStart <= failedChunkStart && r.RangeEnd >= to))))
             .MustHaveHappened();
     }
+
+    // ---- AB#7358: gas-day rollup (CalendarDay, 06:00 Europe/Vienna) ----------------------------
+
+    private static RollupArchiveSnapshot GasDay(OctoObjectId rtId, DateTime? lastAggregatedBucketEnd = null) =>
+        Rollup(rtId, SourceRt, lastAggregatedBucketEnd: lastAggregatedBucketEnd) with
+        {
+            BucketSize = TimeSpan.FromDays(1),
+            BucketAlignment = BucketAlignment.CalendarDay,
+            ReferenceTimeZone = "Europe/Vienna",
+            DayStartOffsetMs = 21_600_000,
+        };
+
+    [Fact]
+    public async Task Recompute_GasDayRollup_FloorsAndCeilsToGasDayBoundaries()
+    {
+        StubRollupAndSource(GasDay(RollupRt));
+        var from = new DateTime(2026, 3, 29, 3, 30, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 3, 30, 10, 0, 0, DateTimeKind.Utc);
+
+        await NewSut().RecomputeArchiveAsync(RollupRt, from, to, null, RecomputeTrigger.Manual, CancellationToken.None);
+
+        // 03:30Z on 29 March is inside the gas day that started 28 March 06:00 CET; 10:00Z on 30 March
+        // is inside the gas day that ends 31 March 06:00 CEST.
+        A.CallTo(() => _executor.ExecuteAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                new DateTime(2026, 3, 28, 5, 0, 0, DateTimeKind.Utc),
+                new DateTime(2026, 3, 31, 4, 0, 0, DateTimeKind.Utc),
+                null, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Recompute_GasDayRollup_SplitsIntoChunksOnGasDayBoundaries()
+    {
+        StubRollupAndSource(GasDay(RollupRt));
+        var from = new DateTime(2026, 3, 28, 5, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 3, 31, 4, 0, 0, DateTimeKind.Utc);
+
+        await NewSut(maxBucketsPerChunk: 1).RecomputeArchiveAsync(
+            RollupRt, from, to, null, RecomputeTrigger.Manual, CancellationToken.None);
+
+        foreach (var (s, e) in new[]
+                 {
+                     (from, new DateTime(2026, 3, 29, 4, 0, 0, DateTimeKind.Utc)),
+                     (new DateTime(2026, 3, 29, 4, 0, 0, DateTimeKind.Utc), new DateTime(2026, 3, 30, 4, 0, 0, DateTimeKind.Utc)),
+                     (new DateTime(2026, 3, 30, 4, 0, 0, DateTimeKind.Utc), to),
+                 })
+        {
+            A.CallTo(() => _executor.ExecuteAsync(
+                    A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, s, e, null, A<CancellationToken>._))
+                .MustHaveHappenedOnceExactly();
+        }
+    }
+
+    [Fact]
+    public async Task Backfill_GasDayRollup_AlignsTheSourceStartToTheGasDayStart()
+    {
+        StubRollupAndSource(GasDay(RollupRt));
+        A.CallTo(() => _streamData.GetArchiveCoverageAsync(SourceRt, A<CancellationToken>._))
+            .Returns(Coverage(new DateTime(2026, 3, 29, 3, 30, 0, DateTimeKind.Utc)));
+
+        await NewSut().EnqueueBackfillFromSourceAsync(RollupRt, CancellationToken.None);
+
+        A.CallTo(() => _jobStore.CreateAsync(A<RecomputeJobSnapshot>.That.Matches(
+                j => j.RangeStart == new DateTime(2026, 3, 28, 5, 0, 0, DateTimeKind.Utc))))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Propagate_GasDayDependent_EnqueuesGasDayAlignedRange()
+    {
+        var child = GasDay(OctoObjectId.GenerateNewId(), lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt)).Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
+        {
+            new ArchiveDirtyWindow(
+                new DateTime(2026, 3, 29, 3, 30, 0, DateTimeKind.Utc),
+                new DateTime(2026, 3, 29, 10, 0, 0, DateTimeKind.Utc),
+                RecomputeChangeKind.RetroactiveModify, RecomputeChangeSource.Pipeline, Now),
+        });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == new DateTime(2026, 3, 28, 5, 0, 0, DateTimeKind.Utc)
+                    && rs[0].RangeEnd == new DateTime(2026, 3, 30, 4, 0, 0, DateTimeKind.Utc))))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Propagate_GasDayDependent_RetroReachFloorSnapsToAGasDayStart()
+    {
+        var child = GasDay(OctoObjectId.GenerateNewId(), lastAggregatedBucketEnd: new DateTime(2026, 5, 11, 4, 0, 0, DateTimeKind.Utc));
+        A.CallTo(() => _archiveStore.GetAsync(SourceRt)).Returns(SourceWithCap((long)TimeSpan.FromDays(2).TotalMilliseconds));
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt)).Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
+        {
+            new ArchiveDirtyWindow(
+                new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc),
+                new DateTime(2026, 5, 11, 3, 0, 0, DateTimeKind.Utc),
+                RecomputeChangeKind.RetroactiveModify, RecomputeChangeSource.Pipeline, Now),
+        });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        // watermark 11 May 04:00Z - 2 d = 9 May 04:00Z, which is 06:00 CEST: already a gas-day start.
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1 && rs[0].RangeStart == new DateTime(2026, 5, 9, 4, 0, 0, DateTimeKind.Utc))))
+            .MustHaveHappenedOnceExactly();
+    }
 }

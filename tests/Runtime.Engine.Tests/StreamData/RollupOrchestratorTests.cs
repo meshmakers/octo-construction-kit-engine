@@ -706,4 +706,70 @@ public class RollupOrchestratorTests
 
         A.CallTo(() => _rollupStore.RecordRunFailureAsync(A<OctoObjectId>._, A<string>._, A<DateTime>._)).MustHaveHappenedTwiceExactly();
     }
+
+    // ---- AB#7358: gas-day rollup (CalendarDay, 06:00 Europe/Vienna) ----------------------------
+
+    private static RollupArchiveSnapshot GasDayRollup(DateTime? watermark) =>
+        Rollup(watermark, TimeSpan.FromDays(1)) with
+        {
+            BucketAlignment = BucketAlignment.CalendarDay,
+            ReferenceTimeZone = "Europe/Vienna",
+            DayStartOffsetMs = 21_600_000,
+        };
+
+    [Fact]
+    public async Task Tick_GasDayRollup_AggregatesBucketsOfTheirLocalLength()
+    {
+        // Watermark = 06:00 CET on 28 March. The next buckets are 23 h (spring forward) and 24 h.
+        var watermark = new DateTime(2026, 3, 28, 5, 0, 0, DateTimeKind.Utc);
+        var now = new DateTime(2026, 3, 31, 12, 0, 0, DateTimeKind.Utc);
+        StubRollups(GasDayRollup(watermark));
+        StubActivatedSource();
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, A<DateTime>._, A<DateTime>._, A<CancellationToken>._))
+            .Returns(1);
+
+        var n = await NewSut(now).TickAsync(CancellationToken.None);
+
+        Assert.Equal(3, n);
+        var d29 = new DateTime(2026, 3, 29, 4, 0, 0, DateTimeKind.Utc);
+        var d30 = new DateTime(2026, 3, 30, 4, 0, 0, DateTimeKind.Utc);
+        var d31 = new DateTime(2026, 3, 31, 4, 0, 0, DateTimeKind.Utc);
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, watermark, d29, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, d29, d30, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _rollupStore.AdvanceWatermarkAsync(RollupRt, d31, false)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Tick_GasDayRollup_RefreshOpenBucket_UsesTheGasDayEnd()
+    {
+        // Watermark 06:00 local 1 July (04:00Z); now 10:00Z: the open bucket is [04:00Z, next day 04:00Z).
+        var watermark = new DateTime(2026, 7, 1, 4, 0, 0, DateTimeKind.Utc);
+        StubRollups(GasDayRollup(watermark));
+        StubActivatedSource();
+
+        await NewSutWithRefresh(new DateTime(2026, 7, 1, 10, 0, 0, DateTimeKind.Utc))
+            .TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                watermark, new DateTime(2026, 7, 2, 4, 0, 0, DateTimeKind.Utc), A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Rewind_GasDayRollup_SnapsToTheGasDayStart()
+    {
+        A.CallTo(() => _rollupStore.GetAsync(RollupRt)).Returns(GasDayRollup(BaseTime));
+
+        await NewSut(BaseTime).RewindWatermarkAsync(RollupRt, new DateTime(2026, 3, 29, 3, 30, 0, DateTimeKind.Utc));
+
+        A.CallTo(() => _rollupStore.AdvanceWatermarkAsync(
+                RollupRt, new DateTime(2026, 3, 28, 5, 0, 0, DateTimeKind.Utc), true))
+            .MustHaveHappenedOnceExactly();
+    }
 }

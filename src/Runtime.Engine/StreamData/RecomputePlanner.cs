@@ -15,7 +15,7 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 public static class RecomputePlanner
 {
     /// <summary>
-    /// Upper bound on bucket-stepping iterations in <see cref="PlanChunks"/>, mirroring the executor's
+    /// Upper bound on bucket-stepping iterations in <see cref="PlanChunks(DateTime, DateTime, BucketCalendar, int)"/>, mirroring the executor's
     /// bucket enumerator. A 10-year hourly range is ~87k buckets, far below this — the guard only trips
     /// on a pathological (mis-configured sub-second) bucket size.
     /// </summary>
@@ -41,8 +41,7 @@ public static class RecomputePlanner
         foreach (var dependent in dependents)
         {
             var (start, end) = AlignRangeToBuckets(
-                window.WindowStart, window.WindowEnd, dependent.BucketAlignment, dependent.BucketSize,
-                BucketBoundary.ResolveZone(dependent.ReferenceTimeZone));
+                window.WindowStart, window.WindowEnd, BucketCalendar.For(dependent));
 
             ranges.Add(new ArchiveRecomputeRange(
                 dependent.RtId, start, end, RtIdScope: null, enqueuedAt));
@@ -59,17 +58,22 @@ public static class RecomputePlanner
     /// </summary>
     public static (DateTime Start, DateTime End) AlignRangeToBuckets(
         DateTime windowStart, DateTime windowEnd, BucketAlignment alignment, TimeSpan bucketSize,
-        TimeZoneInfo? zone = null)
+        TimeZoneInfo? zone = null) =>
+        AlignRangeToBuckets(windowStart, windowEnd, new BucketCalendar(alignment, bucketSize, zone));
+
+    /// <inheritdoc cref="AlignRangeToBuckets(DateTime, DateTime, BucketAlignment, TimeSpan, TimeZoneInfo?)"/>
+    public static (DateTime Start, DateTime End) AlignRangeToBuckets(
+        DateTime windowStart, DateTime windowEnd, BucketCalendar calendar)
     {
-        var start = BucketBoundary.AlignDown(windowStart, alignment, bucketSize, zone);
-        var alignedEnd = BucketBoundary.AlignDown(windowEnd, alignment, bucketSize, zone);
+        var start = BucketBoundary.AlignDown(windowStart, calendar);
+        var alignedEnd = BucketBoundary.AlignDown(windowEnd, calendar);
         var end = alignedEnd >= windowEnd
             ? alignedEnd
-            : BucketBoundary.NextBucketEnd(alignedEnd, alignment, bucketSize, zone);
+            : BucketBoundary.NextBucketEnd(alignedEnd, calendar);
 
         if (end <= start)
         {
-            end = BucketBoundary.NextBucketEnd(start, alignment, bucketSize, zone);
+            end = BucketBoundary.NextBucketEnd(start, calendar);
         }
 
         return (start, end);
@@ -94,7 +98,12 @@ public static class RecomputePlanner
     /// </remarks>
     public static IReadOnlyList<(DateTime Start, DateTime End)> PlanChunks(
         DateTime from, DateTime to, BucketAlignment alignment, TimeSpan bucketSize, int maxBucketsPerChunk,
-        TimeZoneInfo? zone = null)
+        TimeZoneInfo? zone = null) =>
+        PlanChunks(from, to, new BucketCalendar(alignment, bucketSize, zone), maxBucketsPerChunk);
+
+    /// <inheritdoc cref="PlanChunks(DateTime, DateTime, BucketAlignment, TimeSpan, int, TimeZoneInfo?)"/>
+    public static IReadOnlyList<(DateTime Start, DateTime End)> PlanChunks(
+        DateTime from, DateTime to, BucketCalendar calendar, int maxBucketsPerChunk)
     {
         if (maxBucketsPerChunk <= 0)
         {
@@ -116,7 +125,7 @@ public static class RecomputePlanner
         var guard = 0;
         while (cursor < toUtc)
         {
-            var next = BucketBoundary.NextBucketEnd(cursor, alignment, bucketSize, zone);
+            var next = BucketBoundary.NextBucketEnd(cursor, calendar);
             if (next <= cursor)
             {
                 break; // defensive: zero / negative bucket would loop forever

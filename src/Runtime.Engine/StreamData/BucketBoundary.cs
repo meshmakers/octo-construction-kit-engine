@@ -30,6 +30,14 @@ public static class BucketBoundary
     /// The distinct UTC offsets a zone has used since 1970 (standard and daylight time); <c>{ 0 }</c> for no zone.
     /// Earlier rules (local mean time with odd seconds) are ignored: no archive holds data from then.
     /// </summary>
+    /// <remarks>
+    /// The cut-off is deliberately 1970 and not a later year (AB#7360): an archive may hold data of any time since
+    /// then, and a source whose buckets do not divide an offset the zone once used would cut local days in two for
+    /// that data. The consequence is that a zone whose offset changed later (Europe/Moscow, Europe/Istanbul) is
+    /// judged against its former offsets as well, so a fixed-size source may be refused that divides only the
+    /// current ones. The offsets come from the host's time zone data; two hosts with different tzdata can answer
+    /// differently for such zones. Vienna, Berlin, London and the other zones with whole-hour offsets are unaffected.
+    /// </remarks>
     public static IReadOnlyCollection<TimeSpan> UtcOffsetsOf(TimeZoneInfo? zone)
     {
         var offsets = new HashSet<TimeSpan>();
@@ -250,14 +258,36 @@ public static class BucketBoundary
         // as wall-clock time in `zone` rather than machine-local.
         var unspecified = DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
         // A day start inside a spring-forward gap does not exist; that one day starts the length of the gap
-        // later (03:30 for a 02:30 start in a one-hour gap, 03:30 for 01:30 in a two-hour gap), and AlignDown
-        // steps back a day for an input before that moment. The guard keeps a bad zone from looping.
-        for (var i = 0; i < 4 && zone.IsInvalidTime(unspecified); i++)
+        // later (03:30 for a 02:30 start in a one-hour gap, 03:30 for 01:30 in a two-hour gap, 02:45 for 02:15 in
+        // the 30-minute gap of Australia/Lord_Howe), and AlignDown steps back a day for an input before that
+        // moment. The gap is measured in minutes, so a gap shorter than an hour is handled; the bounds keep a
+        // bad zone from looping.
+        if (zone.IsInvalidTime(unspecified))
         {
-            unspecified = unspecified.AddHours(1);
+            unspecified += GapLength(unspecified, zone);
         }
 
         return TimeZoneInfo.ConvertTimeToUtc(unspecified, zone);
+    }
+
+    private static TimeSpan GapLength(DateTime invalidLocal, TimeZoneInfo zone)
+    {
+        const int maxMinutes = 24 * 60;
+        var minute = new DateTime(invalidLocal.Ticks - invalidLocal.Ticks % TimeSpan.TicksPerMinute, DateTimeKind.Unspecified);
+        var after = minute;
+        for (var i = 0; i < maxMinutes && zone.IsInvalidTime(after); i++)
+        {
+            after = after.AddMinutes(1);
+        }
+
+        var before = minute;
+        for (var i = 0; i < maxMinutes && zone.IsInvalidTime(before); i++)
+        {
+            before = before.AddMinutes(-1);
+        }
+
+        // `before` is the last valid minute ahead of the gap, `after` the first valid one behind it.
+        return after - before.AddMinutes(1);
     }
 
     private static ArgumentOutOfRangeException UnknownAlignment(BucketAlignment alignment) =>

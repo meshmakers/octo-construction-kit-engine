@@ -510,3 +510,17 @@ public sealed class RollupDayStartOffsetInvalidException : StreamDataException
     public const string AllowedRange =
         "DayStartOffsetMs must be a whole number of minutes in [0, 86400000) (0 or unset = midnight) and is only allowed with BucketAlignment CalendarDay";
 }
+
+/// <summary>
+/// The local-day bin options of a downsampling query (<c>TimeZone</c>, <c>BinInterval</c>, <c>BinOrigin</c>,
+/// AB#7360) are not valid: unknown time zone, origin outside <c>[00:00, 24:00)</c> or not a whole minute, an
+/// interval that is not a whole number of days, a missing time range, or more bins than allowed. The message
+/// names the option and the allowed values.
+/// </summary>
+public sealed class DownsamplingBinOptionsInvalidException : StreamDataException
+{
+    public DownsamplingBinOptionsInvalidException(string message)
+        : base($"Invalid downsampling bin options: {message}")
+    {
+    }
+}

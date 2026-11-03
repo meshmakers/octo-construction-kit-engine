@@ -595,4 +595,62 @@ public class SeriesResolutionServiceTests
 
         Assert.NotEqual(month.RtId, result.ArchiveRtId);
     }
+
+    // AB#7360: the grain of a gas-day rung must not depend on whether the window starts on a DST day.
+    [Theory]
+    [InlineData(2026, 3, 28, 5)] // gas day of 28 March: 23 hours (spring forward)
+    [InlineData(2026, 7, 1, 4)] // 24 hours
+    [InlineData(2026, 10, 24, 4)] // gas day of 24 October: 25 hours (fall back)
+    public async Task GasDayRung_BucketWidthIsTheNominalDay_WhateverTheWindowStartsOn(int y, int mo, int d, int h)
+    {
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        var gasDay = GasDayRollup(baseArchive.RtId);
+        StubRollups(baseArchive.RtId, gasDay);
+        var from = new DateTime(y, mo, d, h, 0, 0, DateTimeKind.Utc);
+
+        var request = Request(baseArchive.RtId, from, from.AddDays(31), 31) with
+        {
+            QueryTimeZone = "Europe/Vienna",
+            QueryDayStartOffsetMs = 21_600_000,
+        };
+        var result = await NewSut().ResolveAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(gasDay.RtId, result.ArchiveRtId);
+        Assert.Equal(TimeSpan.FromDays(1).TotalMilliseconds, result.EffectiveBucketMs);
+    }
+
+    // The midnight day rung keeps the width of the first bucket: unchanged behaviour (no regression).
+    [Fact]
+    public async Task MidnightDayRung_KeepsTheWidthOfTheFirstBucket()
+    {
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        var midnight = CalendarRollup(baseArchive.RtId, BucketAlignment.CalendarDay, "Europe/Vienna");
+        StubRollups(baseArchive.RtId, midnight);
+        var from = new DateTime(2026, 3, 28, 23, 0, 0, DateTimeKind.Utc); // Vienna 29 March 00:00, a 23 h day
+
+        var request = Request(baseArchive.RtId, from, from.AddDays(31), 31) with { QueryTimeZone = "Europe/Vienna" };
+        var result = await NewSut().ResolveAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(midnight.RtId, result.ArchiveRtId);
+        Assert.Equal(TimeSpan.FromHours(23).TotalMilliseconds, result.EffectiveBucketMs);
+    }
+
+    [Fact]
+    public async Task RequestWithAnInvalidDayStart_IsRefused()
+    {
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        StubRollups(baseArchive.RtId, GasDayRollup(baseArchive.RtId));
+
+        var request = Request(baseArchive.RtId, YearFrom, YearTo, 365) with
+        {
+            QueryTimeZone = "Europe/Vienna",
+            QueryDayStartOffsetMs = 90_000_000,
+        };
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => NewSut().ResolveAsync(request, TestContext.Current.CancellationToken));
+    }
 }

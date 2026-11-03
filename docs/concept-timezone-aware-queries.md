@@ -195,3 +195,38 @@ offset. The older overloads with `(alignment, bucketSize, zone)` stay and mean a
 **Reading.** `SeriesResolutionRequest.QueryDayStartOffsetMs` is the day start of the query (default midnight). Under `PerQuery` a calendar
 rung is only a candidate when its own `DayStartOffsetMs` equals the request's, so a midnight chart never reads gas days (also not through a midnight week / month rung) and a gas-day query never
 reads midnight days. `PerSeries` answers in each rung's own calendar and ignores the request's day start.
+
+**Rung width of a gas-day rung (AB#7360).** The effective grain of a day rung with a day start is the nominal 24 h, not the width of the bucket
+that contains the window start: a window that begins on the 23 h gas day would otherwise yield a 23 h grain and fixed-width bins derived from it would drop
+the 24 h days next to it. Midnight day rungs (day start null / 0) and all other rungs keep the width of the first bucket. A `QueryDayStartOffsetMs` outside
+`[0, 24 h)` is refused (`BucketCalendar.DayStartFromMs` throws `ArgumentOutOfRangeException`; it used to read a negative value as midnight).
+
+**Gap days shorter than an hour (AB#7360).** `BucketBoundary` measures the spring-forward gap in minutes: a day start inside the 30 minute gap of
+Australia/Lord_Howe (02:15 on 4 October 2026) starts that one day at 02:45, the gap length later, not at 03:15.
+
+**Offsets of a zone (AB#7360).** `BucketBoundary.UtcOffsetsOf` collects the offsets of every adjustment rule that ends in 1970 or later. The cut-off is
+deliberate: an archive may hold data of any time since then, and a source that does not divide an offset the zone once used would cut local days in two for that
+data. Zones whose offset changed later (Europe/Moscow, Europe/Istanbul) are therefore judged against their former offsets too, and a fixed-size source that divides only the current ones
+can be refused. The offsets come from the host's time zone data, so two hosts with different tzdata can differ for such zones. Whole-hour zones such as Europe/Vienna are unaffected.
+
+## §13 Downsampling queries with local-day bins (AB#7360)
+
+`StreamDataDownsamplingQueryOptions` (Runtime.Contracts) carries three options that replace the former unused `BinInterval` of type `TimeSpan`:
+
+| Option | Meaning |
+| --- | --- |
+| `TimeZone` | IANA id (`Europe/Vienna`); null with `BinOrigin` / `BinInterval` set means UTC |
+| `BinOrigin` | local time of day at which a bin starts (06:00 for a gas day); whole minute in `[00:00, 24:00)`; null = midnight |
+| `BinInterval` | bin width in whole days; null = 1 day. Weeks and months are served by calendar rollups |
+
+`HasLocalDayBins` is true when any of the three is set. Without them a downsampling query behaves as before (fixed-width UTC bins, `Limit` = bin count).
+With them the bins are the local days of the zone, 23 / 24 / 25 h across DST changes, and `Limit` no longer decides the number of bins.
+
+`DownsamplingBinAxis` (Runtime.Engine) validates the options and builds the axis with `BucketBoundary` on a `BucketCalendar` (day alignment, zone, origin) - the same
+primitive that cuts the buckets of day rollups, so raw bins and rollup buckets coincide on the instant. The first bin is the day start that contains `From`,
+each further bin starts `BinInterval` local days after the previous one, the last one starts before `To`; empty bins are on the axis.
+Refused with `DownsamplingBinOptionsInvalidException` (names the option): unknown zone, origin outside `[00:00, 24:00)` or not a whole minute, interval that is not a whole
+number of days, no time range, more than `DownsamplingBinAxis.MaxBins` (10,000) bins.
+
+Gas days from hourly data, `Europe/Vienna`, origin 06:00, interval 1 day, `2026-03-27T05:00Z` to `2026-03-30T04:00Z`: bins start `2026-03-27T05:00Z`, `2026-03-28T05:00Z`
+(23 h), `2026-03-29T04:00Z`. The CrateDB side (SQL for the bin key, empty bins read `COUNT` 0) is part of engine-mongodb.

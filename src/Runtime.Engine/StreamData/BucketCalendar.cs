@@ -24,9 +24,29 @@ public readonly record struct BucketCalendar(
     TimeZoneInfo? Zone = null,
     TimeSpan DayStart = default)
 {
-    /// <summary>Converts the stored <c>DayStartOffsetMs</c> (null or 0 means midnight) to a <see cref="TimeSpan"/>.</summary>
-    public static TimeSpan DayStartFromMs(long? dayStartOffsetMs) =>
-        dayStartOffsetMs is { } ms and > 0 ? TimeSpan.FromMilliseconds(ms) : TimeSpan.Zero;
+    /// <summary>
+    /// Converts the stored <c>DayStartOffsetMs</c> (null or 0 means midnight) to a <see cref="TimeSpan"/>. A value
+    /// outside <c>[0, 24 h)</c> is refused (AB#7360): save and activation validate it, but an entity updated
+    /// directly could still carry one, and a negative value must not quietly become midnight nor a value of 24 h or
+    /// more cut days of another length.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">The value is negative or at least 24 hours.</exception>
+    public static TimeSpan DayStartFromMs(long? dayStartOffsetMs)
+    {
+        const long dayMs = 86_400_000;
+        if (dayStartOffsetMs is not { } ms || ms == 0)
+        {
+            return TimeSpan.Zero;
+        }
+
+        if (ms < 0 || ms >= dayMs)
+        {
+            throw new ArgumentOutOfRangeException(nameof(dayStartOffsetMs), ms,
+                $"DayStartOffsetMs must be in [0, {dayMs}) ms (a local time of day); 0 or unset means midnight.");
+        }
+
+        return TimeSpan.FromMilliseconds(ms);
+    }
 
     /// <summary>The bucket calendar of a rollup, including its reference time zone and day start.</summary>
     public static BucketCalendar For(RollupArchiveSnapshot rollup) =>

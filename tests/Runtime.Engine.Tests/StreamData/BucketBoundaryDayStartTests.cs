@@ -230,9 +230,8 @@ public class BucketBoundaryDayStartTests
     [Theory]
     [InlineData(null, 0L)]
     [InlineData(0L, 0L)]
-    [InlineData(-1L, 0L)]
     [InlineData(21_600_000L, 21_600_000L)]
-    public void DayStartFromMs_NullZeroAndNegativeMeanMidnight(long? ms, long expectedMs) =>
+    public void DayStartFromMs_NullAndZeroMeanMidnight(long? ms, long expectedMs) =>
         Assert.Equal(TimeSpan.FromMilliseconds(expectedMs), BucketCalendar.DayStartFromMs(ms));
 
     [Fact]

@@ -73,6 +73,14 @@ public sealed record RollupArchiveSnapshot(
     public string? ReferenceTimeZone { get; init; }
 
     /// <summary>
+    /// Local time of day at which a <see cref="BucketAlignment.CalendarDay"/> bucket starts, in milliseconds
+    /// after local midnight in <see cref="ReferenceTimeZone"/> (AB#7358, System.StreamData 1.22.0): 21600000 is a
+    /// gas day starting 06:00 local. <c>null</c> or 0 ⇒ midnight (the behaviour before 1.22.0). Only valid for
+    /// <see cref="BucketAlignment.CalendarDay"/>. Build boundaries through <c>BucketCalendar.For(snapshot)</c>.
+    /// </summary>
+    public long? DayStartOffsetMs { get; init; }
+
+    /// <summary>
     /// How far before a bucket's start the <see cref="CkRollupFunction.TimeWeightedAvg"/>
     /// carry-in scan (LOCF opening state) looks for the latest source observation. Bounds the
     /// per-bucket source scan. <c>null</c> ⇒ the engine default of 35 days. Only consulted by

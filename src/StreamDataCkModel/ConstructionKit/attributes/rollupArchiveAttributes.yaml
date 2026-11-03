@@ -44,6 +44,10 @@ attributes:
     description: "Optional IANA time-zone id (e.g. 'Europe/Vienna') used to align calendar bucket boundaries (day / week / month / year) to local wall-clock time so they are DST-correct across countries. Null (the default) keeps UTC calendar boundaries — the pre-1.6.4 behaviour. Only meaningful for calendar BucketAlignment variants; ignored for FixedSize. AB#4290 / decision O6. A change is refused on an activated rollup (AB#7872): it needs a new rollup."
     valueType: String
     ownership: SeedOwned
+  - id: RollupArchive.DayStartOffsetMs
+    description: "Optional local time of day at which a CalendarDay bucket starts, in milliseconds after local midnight of ReferenceTimeZone (AB#7358). 21600000 (06:00) with ReferenceTimeZone Europe/Vienna makes every bucket one gas day of 23, 24 or 25 hours. The offset is applied on the local wall clock, so the day start follows the zone across DST changes. Null or 0 = a midnight day (the behaviour before 1.22.0). Must be a whole number of minutes in [0, 86400000) and is only allowed with BucketAlignment CalendarDay. A rollup chained on an offset day rollup needs the same offset and ReferenceTimeZone, a week/month/quarter/year rollup cannot be chained on it. A change is refused on an activated rollup: it needs a new rollup."
+    valueType: Int64
+    ownership: SeedOwned
   - id: RollupArchive.LastRunError
     description: "Why the last run of the rollup orchestrator failed (AB#7872). Null while the rollup runs. Set by the orchestrator together with LastRunErrorAt and ConsecutiveRunFailures, cleared by the next run that succeeds. The rollup keeps its status and is retried on every tick; a rollup that keeps failing does not advance."
     valueType: String

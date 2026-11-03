@@ -76,7 +76,8 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
         IReadOnlyList<CkRollupAggregationSpec> aggregations,
         BucketAlignment bucketAlignment = BucketAlignment.FixedSize,
         string? referenceTimeZone = null,
-        TimeSpan? carryLookback = null)
+        TimeSpan? carryLookback = null,
+        long? dayStartOffsetMs = null)
     {
         if (carryLookback is { } cl && cl <= TimeSpan.Zero)
         {
@@ -168,6 +169,7 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
             BucketAlignment = bucketAlignment,
             ReferenceTimeZone = normalizedTimeZone,
             CarryLookback = carryLookback,
+            DayStartOffsetMs = dayStartOffsetMs,
         };
 
         RollupValidator.ValidateForSave(prospective);
@@ -180,6 +182,15 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
         }
 
         RollupValidator.ValidateNoTransitiveCycle(prospective, rollupsByRtId);
+
+        // AB#7358: a rollup chained on an offset day rollup must have coinciding bucket boundaries.
+        foreach (var source in sources)
+        {
+            if (rollupsByRtId.TryGetValue(source.SourceArchiveRtId, out var sourceRollup))
+            {
+                RollupValidator.ValidateDayStartCoincides(prospective, sourceRollup);
+            }
+        }
 
         // Pure-function derivation lives in Runtime.Contracts; ports (e.g. studio) mirror this rule.
         var columns = RollupColumnGenerator.Generate(aggregations);
@@ -194,7 +205,8 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
             columns,
             bucketAlignment,
             normalizedTimeZone,
-            carryLookback);
+            carryLookback,
+            dayStartOffsetMs);
 
         _logger.LogInformation(
             "Rollup {RollupRtId} created from {SourceCount} source(s) [{SourceRtIds}] with {AggregationCount} aggregations / {ColumnCount} derived columns, alignment={Alignment}, referenceTimeZone={ReferenceTimeZone} (tenant {TenantId})",
@@ -264,8 +276,8 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
         // variants (snap to the start of the period containing the target) uniformly — the plain
         // modulo below only floored correctly for FixedSize and left calendar rollups off-grid.
         // The reference time-zone (AB#4300 / O6) aligns calendar boundaries to local midnight.
-        var zone = BucketBoundary.ResolveZone(snapshot.ReferenceTimeZone);
-        toBucketEnd = BucketBoundary.AlignDown(toBucketEnd, snapshot.BucketAlignment, snapshot.BucketSize, zone);
+        var calendar = BucketCalendar.For(snapshot);
+        toBucketEnd = BucketBoundary.AlignDown(toBucketEnd, calendar);
 
         await _rollupStore.AdvanceWatermarkAsync(rollupRtId, toBucketEnd, allowRewind: true);
 

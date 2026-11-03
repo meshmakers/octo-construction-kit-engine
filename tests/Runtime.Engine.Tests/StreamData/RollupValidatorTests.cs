@@ -970,4 +970,155 @@ public class RollupValidatorTests
         Assert.Throws<RollupSourcePathMissingException>(
             () => RollupValidator.ValidateForActivation(rollup, Activation(rollup, Source(paths: "voltage"))));
     }
+
+    // ---- AB#7358: day start offset (gas day, 06:00 Europe/Vienna) -------------------------------
+
+    private const long SixAmMs = 21_600_000;
+
+    private static RollupArchiveSnapshot GasDay(
+        long? offsetMs = SixAmMs,
+        BucketAlignment alignment = BucketAlignment.CalendarDay,
+        string? zone = "Europe/Vienna",
+        RollupSourceReference[]? sources = null) =>
+        RollupWithSources(sources ?? new[] { new RollupSourceReference(SourceRt) }) with
+        {
+            BucketSize = TimeSpan.FromDays(1),
+            BucketAlignment = alignment,
+            ReferenceTimeZone = zone,
+            DayStartOffsetMs = offsetMs,
+        };
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0L)]
+    [InlineData(SixAmMs)]
+    [InlineData(60_000L)]
+    [InlineData(86_340_000L)] // 23:59
+    public void ValidateForSave_ValidDayStartOffset_DoesNotThrow(long? offsetMs) =>
+        RollupValidator.ValidateForSave(GasDay(offsetMs));
+
+    [Theory]
+    [InlineData(-60_000L)]
+    [InlineData(86_400_000L)]
+    [InlineData(90_000_000L)]
+    [InlineData(21_600_001L)]
+    [InlineData(30_000L)]
+    public void ValidateForSave_InvalidDayStartOffset_ThrowsAndNamesTheAttributeAndRange(long offsetMs)
+    {
+        var ex = Assert.Throws<RollupDayStartOffsetInvalidException>(() => RollupValidator.ValidateForSave(GasDay(offsetMs)));
+
+        Assert.Contains("DayStartOffsetMs", ex.Message);
+        Assert.Contains("[0, 86400000)", ex.Message);
+        Assert.Equal(offsetMs, ex.DayStartOffsetMs);
+    }
+
+    [Theory]
+    [InlineData(BucketAlignment.FixedSize)]
+    [InlineData(BucketAlignment.Iso8601Week)]
+    [InlineData(BucketAlignment.CalendarMonth)]
+    [InlineData(BucketAlignment.CalendarQuarter)]
+    [InlineData(BucketAlignment.CalendarYear)]
+    public void ValidateForSave_DayStartOffsetOnAnotherAlignment_Throws(BucketAlignment alignment)
+    {
+        var ex = Assert.Throws<RollupDayStartOffsetInvalidException>(
+            () => RollupValidator.ValidateForSave(GasDay(SixAmMs, alignment)));
+
+        Assert.Contains("DayStartOffsetMs", ex.Message);
+        Assert.Contains("CalendarDay", ex.Message);
+    }
+
+    [Theory]
+    [InlineData(BucketAlignment.FixedSize)]
+    [InlineData(BucketAlignment.CalendarMonth)]
+    public void ValidateForSave_ZeroDayStartOffsetOnAnotherAlignment_DoesNotThrow(BucketAlignment alignment) =>
+        RollupValidator.ValidateForSave(GasDay(0, alignment));
+
+    [Fact]
+    public void ValidateSourcesForSave_GasDayBoundary_IsOnTheBucketGrid()
+    {
+        // 06:00 CET on 15 January = 05:00Z is a gas-day boundary; local midnight (23:00Z) is not.
+        var onGrid = GasDay(sources: new[] { new RollupSourceReference(SourceRt, ValidTo: Utc(2026, 1, 15, 5)) });
+        var offGrid = GasDay(sources: new[] { new RollupSourceReference(SourceRt, ValidTo: Utc(2026, 1, 14, 23)) });
+
+        RollupValidator.ValidateSourcesForSave(onGrid);
+        Assert.Throws<RollupSourceSpanNotOnBucketBoundaryException>(() => RollupValidator.ValidateSourcesForSave(offGrid));
+    }
+
+    [Fact]
+    public void ValidateDayStartCoincides_SameOffsetAndZone_DoesNotThrow() =>
+        RollupValidator.ValidateDayStartCoincides(GasDay(), GasDay());
+
+    [Fact]
+    public void ValidateDayStartCoincides_ZoneWithTheSameRules_DoesNotThrow() =>
+        RollupValidator.ValidateDayStartCoincides(GasDay(zone: "Europe/Berlin"), GasDay());
+
+    [Fact]
+    public void ValidateDayStartCoincides_TwoMidnightRollups_DoesNotThrow() =>
+        RollupValidator.ValidateDayStartCoincides(GasDay(null), GasDay(null, zone: null));
+
+    [Fact]
+    public void ValidateDayStartCoincides_DifferentOffset_Throws()
+    {
+        var ex = Assert.Throws<RollupDayStartOffsetInvalidException>(
+            () => RollupValidator.ValidateDayStartCoincides(GasDay(7 * 3_600_000L), GasDay()));
+
+        Assert.Contains("DayStartOffsetMs", ex.Message);
+    }
+
+    [Fact]
+    public void ValidateDayStartCoincides_MidnightDayOverAGasDay_Throws() =>
+        Assert.Throws<RollupDayStartOffsetInvalidException>(
+            () => RollupValidator.ValidateDayStartCoincides(GasDay(null), GasDay()));
+
+    [Fact]
+    public void ValidateDayStartCoincides_GasDayOverMidnightDay_Throws() =>
+        Assert.Throws<RollupDayStartOffsetInvalidException>(
+            () => RollupValidator.ValidateDayStartCoincides(GasDay(), GasDay(null)));
+
+    [Fact]
+    public void ValidateDayStartCoincides_DifferentZone_Throws()
+    {
+        var ex = Assert.Throws<RollupDayStartOffsetInvalidException>(
+            () => RollupValidator.ValidateDayStartCoincides(GasDay(zone: "Europe/London"), GasDay()));
+
+        Assert.Contains("ReferenceTimeZone", ex.Message);
+    }
+
+    [Theory]
+    [InlineData(BucketAlignment.Iso8601Week)]
+    [InlineData(BucketAlignment.CalendarMonth)]
+    [InlineData(BucketAlignment.CalendarQuarter)]
+    [InlineData(BucketAlignment.CalendarYear)]
+    public void ValidateDayStartCoincides_CoarserCalendarOverGasDays_Throws(BucketAlignment alignment)
+    {
+        var target = GasDay(0, alignment);
+
+        Assert.Throws<RollupDayStartOffsetInvalidException>(() => RollupValidator.ValidateDayStartCoincides(target, GasDay()));
+    }
+
+    [Fact]
+    public void ValidateForActivation_RollupChainedOnAGasDayRollupWithAnotherOffset_Throws()
+    {
+        var sourceRollup = GasDay() with { RtId = SourceRt };
+        var target = GasDay(null);
+        var sources = new List<RollupActivationSource>
+        {
+            new(target.Sources[0], Source(SourceRt, CkArchiveStatus.Activated, "voltage"), sourceRollup),
+        };
+
+        Assert.Throws<RollupDayStartOffsetInvalidException>(() => RollupValidator.ValidateForActivation(target, sources));
+    }
+
+    [Fact]
+    public void ValidateForActivation_RollupChainedOnAGasDayRollupWithTheSameOffset_DoesNotThrow()
+    {
+        var sourceRollup = GasDay() with { RtId = SourceRt };
+        var target = GasDay();
+        var sources = new List<RollupActivationSource>
+        {
+            new(target.Sources[0], Source(SourceRt, CkArchiveStatus.Activated, "voltage"), sourceRollup),
+        };
+
+        RollupValidator.ValidateForActivation(target, sources);
+    }
 }

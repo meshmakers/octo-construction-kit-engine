@@ -681,8 +681,8 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         // series off-grid, writing buckets at HH:MM:SS instead of on the bucket boundary. The automatic
         // dirty-window and backfill paths already snap via AlignRangeToBuckets; the manual entry point
         // must do the same so the coalesce-enqueue and PlanChunks below both see aligned bounds.
-        var zone = BucketBoundary.ResolveZone(rollup.ReferenceTimeZone);
-        (from, to) = RecomputePlanner.AlignRangeToBuckets(from, to, rollup.BucketAlignment, rollup.BucketSize, zone);
+        var calendar = BucketCalendar.For(rollup);
+        (from, to) = RecomputePlanner.AlignRangeToBuckets(from, to, calendar);
 
         // AB#4306: never recompute a bucket the forward pass still owns — it re-aggregates its open
         // bucket every tick at generation 0 (RollupOrchestrator). If a recompute claimed it,
@@ -702,8 +702,7 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         // closes it, and by a recompute any time after that — both values are final, so either order
         // is correct; the buckets inside the lag window are the forward pass's alone.
         var forwardFrontier = now - rollup.WatermarkLag;
-        var openBucketStart = BucketBoundary.AlignDown(
-            forwardFrontier, rollup.BucketAlignment, rollup.BucketSize, zone);
+        var openBucketStart = BucketBoundary.AlignDown(forwardFrontier, calendar);
         if (to > openBucketStart)
         {
             to = openBucketStart;
@@ -835,8 +834,7 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             {
                 var segmentSource = sourcesByRtId[segment.Reference.SourceArchiveRtId];
                 foreach (var (chunkStart, chunkEnd) in RecomputePlanner.PlanChunks(
-                             segment.From, segment.To, rollup.BucketAlignment, rollup.BucketSize, _maxBucketsPerChunk,
-                             BucketBoundary.ResolveZone(rollup.ReferenceTimeZone)))
+                             segment.From, segment.To, BucketCalendar.For(rollup), _maxBucketsPerChunk))
                 {
                     chunks.Add((segmentSource, chunkStart, chunkEnd));
                 }
@@ -1083,8 +1081,7 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         // Snap the earliest in-span timestamp down to the rollup's bucket boundary so the recompute
         // starts on a clean bucket-start; recompute the whole history [from, now).
         var (from, _) = RecomputePlanner.AlignRangeToBuckets(
-            sourceMin.Value, sourceMin.Value, rollup.BucketAlignment, rollup.BucketSize,
-            BucketBoundary.ResolveZone(rollup.ReferenceTimeZone));
+            sourceMin.Value, sourceMin.Value, BucketCalendar.For(rollup));
 
         if (now <= from)
         {
@@ -1330,8 +1327,7 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             }
 
             var (start, end) = RecomputePlanner.AlignRangeToBuckets(
-                clipped.From, clipped.To, dependent.BucketAlignment, dependent.BucketSize,
-                BucketBoundary.ResolveZone(dependent.ReferenceTimeZone));
+                clipped.From, clipped.To, BucketCalendar.For(dependent));
 
             // AB#4336 decision D2: a retroactive source change inside a bucket also changes the
             // LOCF carry-in of the NEXT bucket when this dependent materialises a TimeWeightedAvg —
@@ -1342,9 +1338,7 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             // fresh carry from normal forward aggregation anyway.
             if (dependent.Aggregations.Any(a => a.Function == CkRollupFunction.TimeWeightedAvg))
             {
-                end = BucketBoundary.NextBucketEnd(
-                    end, dependent.BucketAlignment, dependent.BucketSize,
-                    BucketBoundary.ResolveZone(dependent.ReferenceTimeZone));
+                end = BucketBoundary.NextBucketEnd(end, BucketCalendar.For(dependent));
 
                 // AB#5157: the successor bucket past the span end is served by ANOTHER source,
                 // whose carry-in comes from that source's own rows — a change in this source cannot
@@ -1376,9 +1370,7 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             // Null cap (chain propagation) leaves start untouched.
             if (maxRetroReach is { } reach)
             {
-                var reachFloor = BucketBoundary.AlignDown(
-                    aggregatedEnd - reach, dependent.BucketAlignment, dependent.BucketSize,
-                    BucketBoundary.ResolveZone(dependent.ReferenceTimeZone));
+                var reachFloor = BucketBoundary.AlignDown(aggregatedEnd - reach, BucketCalendar.For(dependent));
                 if (reachFloor > start)
                 {
                     start = reachFloor;

@@ -30,6 +30,9 @@ types:
       - id: ${this}/RollupArchive.ReferenceTimeZone
         name: ReferenceTimeZone
         isOptional: true
+      - id: ${this}/RollupArchive.DayStartOffsetMs
+        name: DayStartOffsetMs
+        isOptional: true
       - id: ${this}/RollupArchive.CarryLookbackMs
         name: CarryLookbackMs
         isOptional: true

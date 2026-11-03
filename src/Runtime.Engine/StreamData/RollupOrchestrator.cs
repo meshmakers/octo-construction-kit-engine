@@ -225,8 +225,8 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
         // aware helper handles FixedSize (legacy modulo arithmetic) and calendar variants
         // (snap to start of period containing the target) uniformly. The reference time-zone
         // (AB#4300 / O6) makes calendar boundaries land on local wall-clock midnight, not UTC.
-        var rewindZone = BucketBoundary.ResolveZone(snapshot.ReferenceTimeZone);
-        toBucketEnd = BucketBoundary.AlignDown(toBucketEnd, snapshot.BucketAlignment, snapshot.BucketSize, rewindZone);
+        var rewindCalendar = BucketCalendar.For(snapshot);
+        toBucketEnd = BucketBoundary.AlignDown(toBucketEnd, rewindCalendar);
 
         await _rollupStore.AdvanceWatermarkAsync(rollupRtId, toBucketEnd, allowRewind: true);
 
@@ -279,14 +279,14 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
         var committed = 0;
         var stalled = false;
         // Reference time-zone for calendar bucket boundaries (AB#4300 / O6); null ⇒ UTC.
-        var zone = BucketBoundary.ResolveZone(rollup.ReferenceTimeZone);
+        var calendar = BucketCalendar.For(rollup);
 
         for (var i = 0; i < _maxBucketsPerTick; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             var bucketStart = watermark;
-            var bucketEnd = BucketBoundary.NextBucketEnd(bucketStart, rollup.BucketAlignment, rollup.BucketSize, zone);
+            var bucketEnd = BucketBoundary.NextBucketEnd(bucketStart, calendar);
 
             // Wait until the bucket is fully past + lag so late-arriving inserts are captured.
             if (bucketEnd > now - rollup.WatermarkLag)
@@ -356,7 +356,7 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
         // bucket reads only a handful of rows from the finer level below).
         if (_refreshOpenBucket)
         {
-            var openEnd = BucketBoundary.NextBucketEnd(watermark, rollup.BucketAlignment, rollup.BucketSize, zone);
+            var openEnd = BucketBoundary.NextBucketEnd(watermark, calendar);
             // openEnd > now - lag ⇔ this is exactly the not-yet-finalised bucket the loop stopped at.
             // If the loop instead stopped on the per-tick cap (backlog) or on an unavailable source,
             // openEnd is still past-and-finalisable and we skip, letting the closed loop catch up

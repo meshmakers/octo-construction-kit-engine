@@ -157,3 +157,40 @@ Grounded, minimal, mostly wiring — the DST math already exists.
 - **AB#4290 O6** reserved `ReferenceTimeZone` on the archive/rollup and on `ResolutionRung` explicitly for this ("Phase 4"). This concept is that Phase 4: it activates the field on the read path and adds the query-time zone + comparison policy on top.
 - **AB#4233** supplies the exact-N reducer; this concept only supplies its civil-time window and picks a calendar rung to run it against.
 - **AB#4236 / AB#4290** supply the addressing and per-rtId fan-out the per-series policy reuses unchanged.
+
+## §12 Gas day: a day rollup that starts at a local time of day (AB#7358, System.StreamData 1.22.0)
+
+A gas day runs from 06:00 to 06:00 local time (Europe/Vienna), so it has 23, 24 or 25 hours. `RollupArchive.DayStartOffsetMs` (optional,
+Int64, milliseconds after local midnight of `ReferenceTimeZone`) moves the start of a `CalendarDay` bucket from midnight to that time of day.
+`null` or `0` is the midnight day of every earlier version.
+
+**Declaring it.** A `CalendarDay` rollup with `ReferenceTimeZone: Europe/Vienna` and `DayStartOffsetMs: 21600000` (06:00):
+
+| Rule | Behaviour |
+| --- | --- |
+| Range | whole minutes in `[0, 86400000)`; refused otherwise, the message names `DayStartOffsetMs` and the range |
+| Alignment | only `CalendarDay`; any other alignment with an offset above 0 is refused |
+| Change | frozen on an activated rollup (like `BucketAlignment` and `ReferenceTimeZone`): create a new rollup |
+| Chaining | a rollup on an offset day rollup needs the same offset and a zone with the same rules; a week / month / quarter / year rollup cannot be chained on it (it would cut gas days in two) |
+
+**Boundary arithmetic.** The offset is applied on the **local wall clock** (`BucketBoundary`): subtract the offset from the local time, align
+to the local day, add the offset, convert to UTC. A UTC shift would be off by one hour around the DST changes. With 06:00 Europe/Vienna:
+
+| Bucket start (UTC) | Bucket end (UTC) | Length |
+| --- | --- | --- |
+| 2026-03-28T05:00Z | 2026-03-29T04:00Z | 23 h (spring forward) |
+| 2026-07-01T04:00Z | 2026-07-02T04:00Z | 24 h |
+| 2026-10-24T04:00Z | 2026-10-25T05:00Z | 25 h (fall back) |
+
+`AlignDown(2026-03-29T03:30Z)` is `2026-03-28T05:00Z` (05:30 CEST still belongs to the gas day of 28 March). A day start that falls into the
+spring-forward gap (for example 02:30) starts that one day at the first valid time after the gap; the next day starts at 02:30 again.
+
+**One value object.** The engine passes `BucketCalendar` (alignment, bucket size, zone, day start) to `BucketBoundary.AlignDown` /
+`NextBucketEnd` / `InitialWatermark`, `RecomputePlanner.AlignRangeToBuckets` / `PlanChunks` and the callers `RollupOrchestrator`,
+`RecomputeOrchestrator`, `ArchiveLifecycleService` (initial watermark), `RollupArchiveLifecycleService` (rewind) and `RollupValidator`.
+`BucketCalendar.For(RollupArchiveSnapshot)` and `BucketCalendar.For(ResolutionRung)` build it from the stored rollup, so no caller can drop the
+offset. The older overloads with `(alignment, bucketSize, zone)` stay and mean a midnight day.
+
+**Reading.** `SeriesResolutionRequest.QueryDayStartOffsetMs` is the day start of the query (default midnight). Under `PerQuery` a `CalendarDay`
+rung is only a candidate when its own `DayStartOffsetMs` equals the request's, so a midnight chart never reads gas days and a gas-day query never
+reads midnight days. `PerSeries` answers in each rung's own calendar and ignores the request's day start.

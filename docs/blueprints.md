@@ -604,7 +604,7 @@ Readers see the previous values until the backfill is done. The lifecycle compar
 writes the live formula in the logical spelling changes nothing. The update result lists queued changes in `ArchiveFormulaChanges`
 and as warnings; an install reports them as info messages. A change that cannot be queued (for example while a backfill of the
 column still runs) fails the apply after the entities are committed; the column keeps its live formula and applying again retries
-it. A seed formula equal to the change in progress is no new change. A formula change on a disabled archive that was activated
+it. A seed formula equal to the change in progress (compared normalised) is no new change; a seed that drops the formula of a computed column of a guarded archive is refused. A formula change on a disabled archive that was activated
 before is refused until it is enabled again. On an archive without a table (never activated, or `Failed`) the seed formula is
 written as before and the runtime members are kept.
 

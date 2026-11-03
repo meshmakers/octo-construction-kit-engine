@@ -355,6 +355,19 @@ public class ComputedColumnBackfillJobTests
         Assert.Single(await _jobs.GetForArchiveAsync(_rt, 10));
     }
 
+    // AB#8255: the inline variant promises a completed change when it returns; with the same formula still being
+    // backfilled it keeps refusing instead of returning early.
+    [Fact]
+    public async Task InlineFormulaChange_ToTheFormulaAlreadyInProgress_IsStillRejected()
+    {
+        AddColumn(Active("ExportPower"));
+        var sut = NewSut();
+        await sut.EnqueueUpdateComputedColumnFormulaAsync(_rt, "ExportPower", "activepower * -2", Ct);
+
+        await Assert.ThrowsAsync<ComputedColumnInvalidException>(() =>
+            sut.UpdateComputedColumnFormulaAsync(_rt, "ExportPower", "activepower * -2"));
+    }
+
     [Fact]
     public async Task FormulaChange_WhileABackfillIsQueued_IsRejected()
     {

@@ -484,9 +484,11 @@ public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
             return (true, null); // no-op: formula unchanged
         }
 
-        // AB#8255: the formula already in progress is no new change (a re-applied seed or a repeated call spells it
-        // logically, the marker holds the physical form) - the queued backfill finishes it.
-        if (target.HasPendingFormula && string.Equals(target.PendingFormula, physicalFormula, StringComparison.Ordinal))
+        // AB#8255: for a queued request (seed re-apply, repeated EnqueueUpdate) the formula already in progress is no new
+        // change - the queued backfill finishes it. The inline variant promises a completed change when it returns, so
+        // it keeps refusing below while the backfill runs.
+        if (jobState == RecomputeJobState.Pending && target.HasPendingFormula
+            && string.Equals(target.PendingFormula, physicalFormula, StringComparison.Ordinal))
         {
             return (true, null);
         }

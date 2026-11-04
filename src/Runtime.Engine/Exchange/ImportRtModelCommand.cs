@@ -1855,38 +1855,53 @@ internal class ImportRtModelCommand(
         Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord, HashSet<string> visiting)
     {
         var graph = record.CkRecordId == null ? null : resolveRecord(record.CkRecordId);
-        if (graph == null || !visiting.Add(graph.CkRecordId.ToString()))
+        if (graph == null)
         {
             return null;
         }
 
-        foreach (var member in graph.AllAttributes.Values)
+        // The set is the current recursion path (cycle guard), not a global "seen" set: sibling records of the same
+        // record type must each be inspected.
+        var recordId = graph.CkRecordId.ToString();
+        if (!visiting.Add(recordId))
         {
-            if (!record.Attributes.TryGetValue(member.AttributeName, out var value) || value == null)
-            {
-                continue;
-            }
-
-            if (!member.IsWritableOutsideMethod)
-            {
-                return member.AttributeName;
-            }
-
-            var nested = value is RtRecord single
-                ? [single]
-                : value is IEnumerable many && value is not string
-                    ? many.OfType<RtRecord>().ToList()
-                    : new List<RtRecord>();
-            foreach (var nestedRecord in nested)
-            {
-                if (FindStoredProtectedMember(nestedRecord, resolveRecord, visiting) is { } inner)
-                {
-                    return $"{member.AttributeName}.{inner}";
-                }
-            }
+            return null;
         }
 
-        return null;
+        try
+        {
+            foreach (var member in graph.AllAttributes.Values)
+            {
+                if (!record.Attributes.TryGetValue(member.AttributeName, out var value) || value == null)
+                {
+                    continue;
+                }
+
+                if (!member.IsWritableOutsideMethod)
+                {
+                    return member.AttributeName;
+                }
+
+                var nested = value is RtRecord single
+                    ? [single]
+                    : value is IEnumerable many && value is not string
+                        ? many.OfType<RtRecord>().ToList()
+                        : new List<RtRecord>();
+                foreach (var nestedRecord in nested)
+                {
+                    if (FindStoredProtectedMember(nestedRecord, resolveRecord, visiting) is { } inner)
+                    {
+                        return $"{member.AttributeName}.{inner}";
+                    }
+                }
+            }
+
+            return null;
+        }
+        finally
+        {
+            visiting.Remove(recordId);
+        }
     }
 
     /// <summary>

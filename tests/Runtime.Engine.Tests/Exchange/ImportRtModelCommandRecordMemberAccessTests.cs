@@ -161,6 +161,26 @@ public class ImportRtModelCommandRecordMemberAccessTests : IDisposable
     }
 
     [Fact]
+    public void KeylessNestedArray_ProtectedValueInALaterSiblingElement_IsStillFound()
+    {
+        // Review (CodeRabbit): sibling records of one record type must each be inspected, not only the first.
+        var storedItem = StoredItem("k", "tok");
+        storedItem.SetAttributeRawValue("Details", new List<RtRecord> { StoredDetail(null), StoredDetail("1234") });
+        var existing = StoredHolder();
+        existing.SetAttributeRawValue("Single", storedItem);
+        var item = ItemDto("k", "L");
+        var detail = new RtRecordTcDto { CkRecordId = Detail.CkRecordId.ToRtCkId() };
+        item.Attributes.Add(new RtAttributeTcDto { Id = AttrId("Details"), Value = new List<object> { detail } });
+        var seed = Seed(existing, ("Single", item));
+
+        var ex = Assert.Throws<ExchangeException>(() => ImportRtModelCommand.PreserveSecretRecordMembers(seed, existing,
+            AllRecordAttributes, Resolve, Convert(Cache())));
+
+        Assert.Equal(141, ex.MessageNumber);
+        Assert.Contains("Single.Details[0].Pin", ex.Message);
+    }
+
+    [Fact]
     public void KeylessRecordArray_WithStoredProtectedValue_IsRefused_WithMessage141()
     {
         var existing = StoredHolder();
@@ -331,7 +351,7 @@ public class ImportRtModelCommandRecordMemberAccessTests : IDisposable
         return record;
     }
 
-    private static RtRecord StoredDetail(string pin)
+    private static RtRecord StoredDetail(string? pin)
     {
         var detail = new RtRecord { CkRecordId = Detail.CkRecordId.ToRtCkId() };
         detail.SetAttributeRawValue("Note", "stored-note");

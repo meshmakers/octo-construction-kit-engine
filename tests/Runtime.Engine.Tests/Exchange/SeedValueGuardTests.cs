@@ -95,6 +95,7 @@ public class SeedValueGuardTests
             SeedValueGuard.FindBlankedJsonLeaf("""{"outer":{"it's":["x"]}}""", """{"outer":{"it's":[""]}}"""));
         Assert.Equal("$['back\\\\slash']", SeedValueGuard.AppendProperty("$", "back\\slash"));
         Assert.Equal("$._id1", SeedValueGuard.AppendProperty("$", "_id1"));
+        Assert.Equal("$['line\\nbreak\\ttab\\u0001']", SeedValueGuard.AppendProperty("$", "line\nbreak\ttab\u0001"));
     }
 
     [Fact]

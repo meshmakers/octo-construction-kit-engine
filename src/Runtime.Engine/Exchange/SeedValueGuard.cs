@@ -275,16 +275,45 @@ public static class SeedValueGuard
     }
 
     /// <summary>
-    /// <c>$.name</c> for a plain identifier, otherwise the bracket form <c>$['a.b']</c> with <c>'</c> and <c>\</c>
-    /// escaped, so a property name with dots, spaces or brackets cannot be misread as a nested path.
+    /// <c>$.name</c> for a plain identifier, otherwise the bracket form <c>$['a.b']</c> with <c>'</c>, <c>\</c> and control
+    /// characters escaped (RFC 9535), so a property name with dots, spaces or brackets cannot be misread as a nested path.
     /// </summary>
     internal static string AppendProperty(string path, string name)
     {
         var plain = name.Length > 0 && (char.IsLetter(name[0]) || name[0] == '_') &&
                     name.All(c => char.IsLetterOrDigit(c) || c == '_');
-        return plain
-            ? $"{path}.{name}"
-            : $"{path}['{name.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("'", "\\'", StringComparison.Ordinal)}']";
+        return plain ? $"{path}.{name}" : $"{path}['{EscapeBracketName(name)}']";
+    }
+
+    private static string EscapeBracketName(string name)
+    {
+        var builder = new System.Text.StringBuilder(name.Length + 4);
+        foreach (var c in name)
+        {
+            switch (c)
+            {
+                case '\\': builder.Append("\\\\"); break;
+                case '\'': builder.Append("\\'"); break;
+                case '\n': builder.Append("\\n"); break;
+                case '\r': builder.Append("\\r"); break;
+                case '\t': builder.Append("\\t"); break;
+                case '\b': builder.Append("\\b"); break;
+                case '\f': builder.Append("\\f"); break;
+                default:
+                    if (char.IsControl(c))
+                    {
+                        builder.Append("\\u").Append(((int)c).ToString("x4", System.Globalization.CultureInfo.InvariantCulture));
+                    }
+                    else
+                    {
+                        builder.Append(c);
+                    }
+
+                    break;
+            }
+        }
+
+        return builder.ToString();
     }
 
     private static string? FindBlankedJsonLeaf(JsonElement existing, JsonElement seed, string path)

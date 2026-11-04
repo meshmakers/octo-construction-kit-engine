@@ -17,13 +17,15 @@ namespace Meshmakers.Octo.Runtime.Engine.Exchange;
 /// <param name="SeedPresent">True when the seed declares the attribute.</param>
 /// <param name="SeedValue">The seed's value (transport shape), when declared.</param>
 /// <param name="DefaultValues">The attribute's CK default values (relevant for <see cref="RtImportBlankingReason.ResetToDefault"/>).</param>
+/// <param name="JsonPath">The first emptied JSON field for <see cref="RtImportBlankingReason.SeedEmptiesJsonField"/> (AB#8263).</param>
 internal sealed record SeedBlankingFinding(
     CkTypeAttributeGraph Attribute,
     RtImportBlankingReason Reason,
     object? ExistingValue,
     bool SeedPresent,
     object? SeedValue,
-    ICollection<object>? DefaultValues = null);
+    ICollection<object>? DefaultValues = null,
+    string? JsonPath = null);
 
 /// <summary>
 /// The detection loop shared by the Upsert import (<see cref="ImportRtModelCommand"/>) and the
@@ -50,7 +52,7 @@ internal static class SeedBlankingDetector
             if (verdict.IsBlanking)
             {
                 findings.Add(new SeedBlankingFinding(attr, verdict.Blanking, existingValue, seedAttr != null,
-                    seedAttr?.Value, attr.DefaultValues));
+                    seedAttr?.Value, attr.DefaultValues, verdict.JsonPath));
             }
         }
 
@@ -60,11 +62,18 @@ internal static class SeedBlankingDetector
     /// <summary>
     /// The value-free description of what the seed brings for a finding (AB#6395): for
     /// <see cref="RtImportBlankingReason.ResetToDefault"/> the CK default the attribute is reset to
-    /// (<c>default (0)</c>; the default is model content, not tenant data), otherwise
+    /// (<c>default (0)</c>; the default is model content, not tenant data); for
+    /// <see cref="RtImportBlankingReason.SeedEmptiesJsonField"/> the size plus the path of the first emptied
+    /// field (<c>string (184 chars), empties $.valueAttribute</c>, AB#8263); otherwise
     /// <see cref="Summarize"/> of the seed value.
     /// </summary>
     internal static string SummarizeIncoming(SeedBlankingFinding finding)
     {
+        if (finding.Reason == RtImportBlankingReason.SeedEmptiesJsonField && finding.JsonPath != null)
+        {
+            return $"{Summarize(finding.SeedValue, finding.SeedPresent)}, empties {finding.JsonPath}";
+        }
+
         if (finding.Reason != RtImportBlankingReason.ResetToDefault || finding.DefaultValues is not { Count: > 0 })
         {
             return Summarize(finding.SeedValue, finding.SeedPresent);

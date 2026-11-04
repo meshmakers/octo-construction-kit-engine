@@ -489,11 +489,11 @@ For a `SeedOwned` attribute the decision is made per attribute by `SeedValueGuar
 | no value stored | anything | seed value lands |
 | empty value | anything | seed value lands |
 | non-empty | different non-empty value | **seed wins** (blueprint-owned change, as before) |
-| non-empty | empty value (`null`, `""`, empty array, record with only empty members) | **existing kept**, reported |
+| non-empty | empty value (`null`, `""`, empty array, record with only empty members) | **existing kept**, reported (`SeedEmpty`) |
 | non-empty | attribute omitted, attribute has no CK default | **existing kept**, reported (`SeedOmitted`) |
 | non-empty, equals the CK default | attribute omitted, attribute has a CK default | seed (the default lands again), **no finding** (AB#6395) |
 | non-empty, differs from the CK default | attribute omitted, attribute has a CK default | **existing kept**, reported as `ResetToDefault` (AB#6395) |
-| non-empty JSON text | JSON text with an empty string where the existing has a non-empty one | **existing kept as a whole**, reported (an "empty skeleton" such as the EDA adapter configuration of AB#6310) |
+| non-empty JSON text | non-empty JSON text with an empty string where the existing has a non-empty one | **existing kept as a whole**, reported as `SeedEmptiesJsonField` with the path of the first emptied field (an "empty skeleton" such as the EDA adapter configuration of AB#6310; own reason since AB#8263) |
 
 "Empty" is narrow on purpose: numbers, booleans, enums, dates and time spans are never empty, so an
 explicit `0`, `false` or the first enum member in a seed is a value the author chose and replaces
@@ -508,9 +508,17 @@ default the update would reset it, which is reported as `ResetToDefault` rather 
 A seed that declares the attribute as `null` or empty is still `SeedEmpty`, because a declared null
 is written as null and the default does not apply.
 
+`SeedEmpty` means exactly that the seed value is empty. A non-empty seed value is never `SeedEmpty`
+(AB#8263): when it is a JSON text that empties one string field the tenant filled, the reason is
+`SeedEmptiesJsonField`. The tenant value still wins by default, because that field may be a credential
+(AB#6310), but the report says which field is emptied, e.g. `string (184 chars), empties
+$.valueAttribute`. When the new seed clears that field on purpose (a dashboard widget switched from a
+query value to a formula, for instance), confirm the attribute (`--confirm-blanking <rtId>:<attribute>`)
+and the whole seed value lands.
+
 Every kept (or, under policy `Allow`, applied) case is logged as a warning and listed in
-`IImportRtModelCommand.GuardEntries` (rtId, CK type, attribute, reason `SeedEmpty` / `SeedOmitted` /
-`ResetToDefault`,
+`IImportRtModelCommand.GuardEntries` (rtId, CK type, attribute, reason `SeedEmpty` /
+`SeedEmptiesJsonField` / `SeedOmitted` / `ResetToDefault`,
 applied or kept). The default policy is `RtImportBlankingPolicy.Keep`; `Allow` exists only for an
 explicit operator confirmation.
 
@@ -528,10 +536,12 @@ what the preview announces is exactly what the apply keeps.
 
 - `BlueprintUpdatePreview.BlankedAttributes` lists, for every locked entity the update would touch,
   each attribute whose non-empty tenant value the seed would blank: `rtId`, `ckTypeId`,
-  `attributeName`, `reason` (`SeedEmpty` / `SeedOmitted` / `ResetToDefault`), `currentSummary`,
-  `incomingSummary` (kind and size only, e.g. `string (223 chars)`, `empty string`, `omitted`; never
-  the value, which may be a credential. For `ResetToDefault` the incoming summary names the CK default,
-  e.g. `default (0)` with current `int32`: model content, not tenant data). `reason` is an open set;
+  `attributeName`, `reason` (`SeedEmpty` / `SeedEmptiesJsonField` / `SeedOmitted` / `ResetToDefault`),
+  `currentSummary`, `incomingSummary` (kind and size only, e.g. `string (223 chars)`, `empty string`,
+  `omitted`; never the value, which may be a credential. For `ResetToDefault` the incoming summary names
+  the CK default, e.g. `default (0)` with current `int32`: model content, not tenant data. For
+  `SeedEmptiesJsonField` it adds the JSON path of the first emptied field, e.g. `string (184 chars),
+  empties $.valueAttribute`: a field name from the seed, never a value). `reason` is an open set;
   clients must tolerate values they do not know and `appliedOnUpdate` (always `false` in a preview).
 - `BlueprintUpdateOptions.AllowBlanking` (engine policy `Allow`) confirms every listed blanking;
   `BlueprintUpdateOptions.ConfirmedBlankings` (`[{ rtId, attributeName }]`) confirms exactly those

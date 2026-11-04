@@ -28,7 +28,10 @@ public enum RtImportBlankingReason
     /// <summary>The seed does not blank anything.</summary>
     None = 0,
 
-    /// <summary>The seed declares the attribute with an empty value (null, empty string, empty array, empty record).</summary>
+    /// <summary>
+    /// The seed declares the attribute with an empty value (null, empty string, empty array, empty record).
+    /// Only then: a non-empty seed value is never <c>SeedEmpty</c> (AB#8263).
+    /// </summary>
     SeedEmpty = 1,
 
     /// <summary>The seed does not declare the attribute at all; the full replace would clear it.</summary>
@@ -41,6 +44,15 @@ public enum RtImportBlankingReason
     /// not reported at all.
     /// </summary>
     ResetToDefault = 3,
+
+    /// <summary>
+    /// The seed value is a non-empty JSON text (a serialized configuration in a string attribute) that
+    /// carries an empty or null string at a path where the tenant's JSON text has a non-empty string
+    /// (AB#6310 "empty skeleton", reported separately since AB#8263). The tenant value wins by default
+    /// because the emptied field may be a credential; confirm the attribute to take the seed value, for
+    /// example when a new seed version deliberately clears that field.
+    /// </summary>
+    SeedEmptiesJsonField = 4,
 }
 
 /// <summary>

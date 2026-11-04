@@ -1075,22 +1075,25 @@ internal class BlueprintService : IBlueprintService
 
         if (currentInfo == null)
         {
+            // AB#8256: no installation of this blueprint - the tenant may still hold its entities (manual imports,
+            // an older install without a record). The preview diffs the seed against the tenant by well-known name /
+            // rtId like for an installed blueprint (adoption), instead of a placeholder.
             preview.Warnings.Add(
-                $"Blueprint '{targetVersion.Name}' is not currently applied to tenant - this will be a fresh application");
-            preview.EntitiesToAdd = 1; // Placeholder - actual count would come from seed data analysis
-
-            // AB#6871: a first-time application installs the CK floors of the blueprint like an update does.
-            await AddCkUpgradeGuardToPreviewAsync(tenantId, targetVersion, null, preview, cancellationToken)
-                .ConfigureAwait(false);
+                $"Blueprint '{targetVersion.Name}' is not installed on the tenant: the seed is compared with the tenant's " +
+                "entities by well-known name and rtId (adoption). InstallBlueprint applies exactly these adds and updates " +
+                "and records the installation; entities the seed does not contain are left alone.");
 
             if (updateMode == BlueprintUpdateMode.Migration)
             {
+                // AB#6871: a first-time application installs the CK floors of the blueprint like an update does.
+                await AddCkUpgradeGuardToPreviewAsync(tenantId, targetVersion, null, preview, cancellationToken)
+                    .ConfigureAwait(false);
+
                 // Nothing to migrate from: a migration script is defined per source version.
                 preview.Conflicts.Add(MissingMigrationScriptConflict(
                     targetVersion, currentVersion: null, targetBlueprintMigrations: null));
+                return preview;
             }
-
-            return preview;
         }
 
         // 2. Validate target version exists
@@ -1139,14 +1142,14 @@ internal class BlueprintService : IBlueprintService
         if (updateMode == BlueprintUpdateMode.Migration)
         {
             var migrationRef = (targetBlueprint.Migrations ?? [])
-                .FirstOrDefault(m => m.FromVersion == currentInfo.BlueprintId.Version.ToString());
+                .FirstOrDefault(m => m.FromVersion == currentInfo!.BlueprintId.Version.ToString());
 
             if (migrationRef == null)
             {
                 // Blocking, not a warning: the caller explicitly asked for Migration mode, and
                 // silently degrading to Merge is what made this failure invisible (AB#4832).
                 preview.Conflicts.Add(MissingMigrationScriptConflict(
-                    targetVersion, currentInfo.BlueprintId, targetBlueprint.Migrations));
+                    targetVersion, currentInfo!.BlueprintId, targetBlueprint.Migrations));
             }
             else
             {
@@ -1203,7 +1206,7 @@ internal class BlueprintService : IBlueprintService
             // Real diff: compare seed entities to tenant entities tagged with this
             // blueprint's source. Modes affect interpretation, not the diff itself.
             var diff = await ComputeUpdateDiffAsync(
-                tenantId, targetVersion, targetBlueprint, updateMode, currentInfo.BlueprintId, cancellationToken)
+                tenantId, targetVersion, targetBlueprint, updateMode, currentInfo?.BlueprintId, cancellationToken)
                 .ConfigureAwait(false);
 
             preview.EntitiesToAdd = diff.ToAdd;
@@ -1415,6 +1418,14 @@ internal class BlueprintService : IBlueprintService
 
         var session = await repository.GetSessionAsync().ConfigureAwait(false);
 
+        // AB#8256: no version of this blueprint is in effect (not installed). Its install upserts every seed entity
+        // by rtId, whatever the tenant entity's source, so the diff matches the seed against every tenant entity of
+        // the type (adoption) instead of only the ones carrying this blueprint's source.
+        var adoption = previousVersion == null;
+        var adoptedCount = 0;
+        var adoptedFromOtherBlueprints = new List<string>();
+        var wellKnownNameClashes = new List<string>();
+
         foreach (var typeGroup in seedRoot.Entities.GroupBy(e => e.CkTypeId))
         {
             var ckTypeId = typeGroup.Key;
@@ -1512,8 +1523,21 @@ internal class BlueprintService : IBlueprintService
                     continue;
                 }
 
-                if (tenantOfBlueprintByKey.TryGetValue(key!, out var tenant))
+                var tenant = tenantOfBlueprintByKey.TryGetValue(key!, out var ofBlueprint)
+                    ? ofBlueprint
+                    : adoption ? FindAdoptedEntity(tenantAnyByKey, seed, ckTypeId, wellKnownNameClashes) : null;
+                if (tenant != null)
                 {
+                    if (adoption && !ReferenceEquals(tenant, ofBlueprint))
+                    {
+                        adoptedCount++;
+                        var otherSource = tenant.GetAttributeStringValueOrDefault("RtBlueprintSource");
+                        if (!string.IsNullOrEmpty(otherSource))
+                        {
+                            adoptedFromOtherBlueprints.Add($"{ckTypeId}/{key} ({otherSource})");
+                        }
+                    }
+
                     var locked = tenant.GetAttributeValueOrDefault<bool>("RtBlueprintLocked")
                         ?? true;
                     if (locked)
@@ -1610,7 +1634,9 @@ internal class BlueprintService : IBlueprintService
                 }
             }
 
-            if (updateMode == BlueprintUpdateMode.Full)
+            // AB#8256: no deletions without an installation - entities that carry this blueprint's source anyway (left
+            // over from an uninstall that kept the data) are not orphans of a version in effect.
+            if (updateMode == BlueprintUpdateMode.Full && !adoption)
             {
                 foreach (var kvp in tenantOfBlueprintByKey)
                 {
@@ -1648,6 +1674,28 @@ internal class BlueprintService : IBlueprintService
                     }
                 }
             }
+        }
+
+        if (adoptedCount > 0)
+        {
+            diff.Warnings.Add(
+                $"{adoptedCount} seed entities already exist in the tenant without this blueprint's source and are adopted " +
+                "(compared like blueprint-managed entities; the apply re-tags them with this blueprint)");
+        }
+
+        if (wellKnownNameClashes.Count > 0)
+        {
+            diff.Warnings.Add(
+                $"{wellKnownNameClashes.Count} seed entities carry a well-known name that a tenant entity with another rtId already " +
+                "uses; the install matches by rtId and would create a second entity with that name: " +
+                string.Join(", ", wellKnownNameClashes));
+        }
+
+        if (adoptedFromOtherBlueprints.Count > 0)
+        {
+            diff.Warnings.Add(
+                $"{adoptedFromOtherBlueprints.Count} of them carry the source of another blueprint and are taken over: " +
+                string.Join(", ", adoptedFromOtherBlueprints));
         }
 
         if (unavailableTenantOwned.Count > 0)
@@ -1701,6 +1749,28 @@ internal class BlueprintService : IBlueprintService
         return !seed.RtId.Equals(OctoObjectId.Empty) && tenantByKey.TryGetValue(seed.RtId.ToString(), out var byId)
             ? byId
             : null;
+    }
+
+    /// <summary>
+    /// AB#8256: the tenant entity a seed entity of a blueprint that is not installed would overwrite. The install upserts by
+    /// rtId, so only the rtId identifies it (a tenant entity with the same well-known name but another rtId is not the
+    /// same entity - it is recorded in <paramref name="wellKnownNameClashes" />).
+    /// </summary>
+    private static RtEntity? FindAdoptedEntity(IReadOnlyDictionary<string, RtEntity> tenantByKey, RtEntityTcDto seed,
+        RtCkId<CkTypeId> ckTypeId, List<string> wellKnownNameClashes)
+    {
+        if (!seed.RtId.Equals(OctoObjectId.Empty) && tenantByKey.TryGetValue(seed.RtId.ToString(), out var byId)
+            && byId.RtId.Equals(seed.RtId))
+        {
+            return byId;
+        }
+
+        if (!string.IsNullOrEmpty(seed.RtWellKnownName) && tenantByKey.TryGetValue(seed.RtWellKnownName, out var byName))
+        {
+            wellKnownNameClashes.Add($"{ckTypeId}/{seed.RtWellKnownName} (tenant rtId {byName.RtId})");
+        }
+
+        return null;
     }
 
     private static BlueprintTenantOwnedEntity ToTenantOwnedEntity(

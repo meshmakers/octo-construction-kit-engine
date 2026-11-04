@@ -88,6 +88,16 @@ public class SeedValueGuardTests
     }
 
     [Fact]
+    public void JsonPath_PropertyNamesThatAreNoPlainIdentifier_UseTheEscapedBracketForm()
+    {
+        Assert.Equal("$['a.b']", SeedValueGuard.FindBlankedJsonLeaf("""{"a.b":"x"}""", """{"a.b":""}"""));
+        Assert.Equal("$.outer['it\\'s'][0]",
+            SeedValueGuard.FindBlankedJsonLeaf("""{"outer":{"it's":["x"]}}""", """{"outer":{"it's":[""]}}"""));
+        Assert.Equal("$['back\\\\slash']", SeedValueGuard.AppendProperty("$", "back\\slash"));
+        Assert.Equal("$._id1", SeedValueGuard.AppendProperty("$", "_id1"));
+    }
+
+    [Fact]
     public void FilledTenantValue_EmptyOrNullSeed_HasNoJsonPath()
     {
         Assert.Null(Decide(AttributeValueTypesDto.String, "{\"A\":\"x\"}", present: true, seedValue: "").JsonPath);

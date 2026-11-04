@@ -28,15 +28,14 @@ public enum SeedValueDecisionKind
 /// </summary>
 /// <param name="Kind">Keep the existing value or take the seed value.</param>
 /// <param name="Blanking">Why the seed counts as blanking, or <c>None</c>.</param>
-/// <param name="JsonPath">
-/// For <see cref="RtImportBlankingReason.SeedEmptiesJsonField"/>: the JSON path of the first field the seed
-/// empties (e.g. <c>$.valueAttribute</c>, AB#8263); <c>null</c> otherwise. A field name from the seed, never a value.
-/// </param>
-public readonly record struct SeedValueVerdict(
-    SeedValueDecisionKind Kind,
-    RtImportBlankingReason Blanking,
-    string? JsonPath = null)
+public readonly record struct SeedValueVerdict(SeedValueDecisionKind Kind, RtImportBlankingReason Blanking)
 {
+    /// <summary>
+    /// For <see cref="RtImportBlankingReason.SeedEmptiesJsonField"/>: the JSON path of the first field the seed
+    /// empties (e.g. <c>$.valueAttribute</c>, AB#8263); <c>null</c> otherwise. A field name from the seed, never a value.
+    /// </summary>
+    public string? JsonPath { get; init; }
+
     /// <summary>True when the seed would blank a non-empty existing value.</summary>
     public bool IsBlanking => Blanking != RtImportBlankingReason.None;
 }
@@ -147,7 +146,10 @@ public static class SeedValueGuard
         else if (FindBlankedJsonLeaf(existingValue, seedValue) is { } jsonPath)
         {
             // AB#8263: the seed value itself is not empty; say which field it empties instead of "SeedEmpty".
-            return new SeedValueVerdict(KindFor(policy), RtImportBlankingReason.SeedEmptiesJsonField, jsonPath);
+            return new SeedValueVerdict(KindFor(policy), RtImportBlankingReason.SeedEmptiesJsonField)
+            {
+                JsonPath = jsonPath
+            };
         }
         else
         {
@@ -272,6 +274,19 @@ public static class SeedValueGuard
         return trimmed.Length > 1 && (trimmed[0] == '{' || trimmed[0] == '[');
     }
 
+    /// <summary>
+    /// <c>$.name</c> for a plain identifier, otherwise the bracket form <c>$['a.b']</c> with <c>'</c> and <c>\</c>
+    /// escaped, so a property name with dots, spaces or brackets cannot be misread as a nested path.
+    /// </summary>
+    internal static string AppendProperty(string path, string name)
+    {
+        var plain = name.Length > 0 && (char.IsLetter(name[0]) || name[0] == '_') &&
+                    name.All(c => char.IsLetterOrDigit(c) || c == '_');
+        return plain
+            ? $"{path}.{name}"
+            : $"{path}['{name.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("'", "\\'", StringComparison.Ordinal)}']";
+    }
+
     private static string? FindBlankedJsonLeaf(JsonElement existing, JsonElement seed, string path)
     {
         switch (seed.ValueKind)
@@ -280,7 +295,7 @@ public static class SeedValueGuard
                 foreach (var seedProperty in seed.EnumerateObject())
                 {
                     if (existing.TryGetProperty(seedProperty.Name, out var existingProperty) &&
-                        FindBlankedJsonLeaf(existingProperty, seedProperty.Value, $"{path}.{seedProperty.Name}") is { } found)
+                        FindBlankedJsonLeaf(existingProperty, seedProperty.Value, AppendProperty(path, seedProperty.Name)) is { } found)
                     {
                         return found;
                     }

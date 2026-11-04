@@ -737,6 +737,12 @@
       "number": 140,
       "level": "ERROR",
       "text": "Write refused: the entity '{rtId}' of type '{ckTypeId}' sets '{path}', which only the identity service writes (identity REST API or identity methods); a user-initiated import cannot set it"
+    },
+    {
+      "key": "RtRecordMemberNotPreservable",
+      "number": 141,
+      "level": "ERROR",
+      "text": "Import refused: the entity '{rtId}' of type '{ckTypeId}' writes a record array without a usable record key, and a stored element holds a value in '{path}', which only a CK method may write (access Hidden or MethodOnly); the elements cannot be matched, so the value would be lost. Declare a recordKey the caller may write, or leave the record array out"
     }
   ]
 }

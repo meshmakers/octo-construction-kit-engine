@@ -404,6 +404,21 @@ tenant restore works on MongoDB: neither is guarded.
   `MethodOnly` or `Hidden`, `!IsWritableOutsideMethod`) like runtime state: the existing value is carried over, whatever the policy
   (flag `_callerImport`, set by `ImportFileAsync` only). The system path keeps the blanking semantics. Tests:
   `ImportRtModelCommandIdentityOwnedTests` (`CallerUpsert_*`, `SystemUpsert_*`).
+- **Omission inside records (AB#8141): merge.** The attribute rule alone left a hole: a record attribute `R` whose record has a member `M`
+  with `access: MethodOnly` or `Hidden` is replaced as a whole by an upsert, so a file that writes `R` without `M` dropped the stored
+  `R.M`. On the caller path `PreserveSecretRecordMembers` (the AB#5532 Secret carry-over, now with the optional `convertProtected`
+  converter that only the caller path passes) therefore also carries the stored value of every `!IsWritableOutsideMethod` member into the
+  written record: single record by position, record array by the **record key** (same matching as Secrets; a new element has nothing to
+  keep; a removed element or an omitted record attribute removes its members, as for Secrets and as the asset-repo GraphQL update does,
+  AB#8055), nested records the same. Chosen over refusing for symmetry with the attribute rule and with GraphQL
+  (`RecordMemberPreservation`). Where merging is unsafe - a record array whose record has **no record key**, or whose key member is itself
+  not writable outside a method, so the elements cannot be matched - the write is **refused** before anything is written with **message
+  141** `RtRecordMemberNotPreservable` (`ExchangeException.RecordMemberNotPreservable`; parameters `rtId`, `ckTypeId`, `path` such as
+  `Credentials[0].Token`), but only when the seed holds an element and a stored element holds a value in such a member (nested records
+  of the stored element included); nothing stored means nothing to lose. An explicit value for the member is still refused by 139. The
+  secret-record selection (`secretRecordAttributes`) takes record attributes with such members on the caller path
+  (`RecordHasSecretMembers(..., includeMethodOnlyMembers)`); a record attribute that is itself MethodOnly/Hidden is carried whole by the
+  attribute rule. The system path is unchanged. Tests: `ImportRtModelCommandRecordMemberAccessTests`.
 
 **Associations: still a list.** `IdentityOwnedWrites` (`ConstructionKit.Contracts`, public) is reduced to the association roles
 `System.Identity/AssignedRole`, `GroupMember`, `ChildGroup`, `MayActAs`, `GrantsPermission` (both directions; `IsIdentityOwnedAssociation`,
@@ -1339,7 +1354,7 @@ Notes:
   `ReadWrite`, visibility `Public`, derivable `Any`) through a `JsonTypeInfo` modifier in `CkCache` (`OmitCkV2Defaults`), so v1 caches stay
   byte-identical; reading tolerates the missing keys (trailing defaulted `[JsonConstructor]` parameters on
   `CkTypeGraph`, init setter on `CkTypeAttributeGraph.Access`).
-- Message codes for CK v2: 90–113 and 118–140 are in use (table below); **spare: 111, 114–117**. Range
+- Message codes for CK v2: 90–113 and 118–141 are in use (table below); **spare: 111, 114–117**. Range
   retention (F0.2) has no message codes of its own — its failures are `ModelValidationException`s and the
   unbound-reference diagnostic is the source-generator diagnostic OM1004.
   Warnings (e.g. 110, 124) of a successful compile are printed by `octo-ckc -c compile` (to **stderr**, also with
@@ -1415,6 +1430,7 @@ exists in Industry.Basic-2.6.0. Check the model prefix of the reference."). `OCT
 | 138 | `ExportedRecordDropsRequiredMember` | `ExportedRecordMemberValidator` (from `CatalogModelResolver.CompileAsync`, after `SecretAttributeValidator`) | AB#7467 (follow-up of AB#7446), **warning**: an attribute assignment declared in the compiled model (type or record; interfaces are not walked) whose value type is `Record`/`RecordArray` and whose effective ownership is exported (`SeedOwned`/`TenantOwned`; assignment override over definition) reaches - through the referenced record, also from a dependency model, and nested exported record members - a member that is required (`isOptional` false), has no default value and whose effective ownership `IsExcludedFromExport()` (`RuntimeState`, `Secret`). This is the shape `RtEntityToTcDtoConverter.ConvertAttributes` drops (it evaluates record members individually). One message per member; parameters `ckElementId` (declaring type/record, versioned id), `attributeName`, `ckRecordId` (record that contains the member), `memberPath` (e.g. `States.ExternalId`), `memberOwnership`. Not reported: optional or defaulted members, anything below a record-valued attribute/member that is itself excluded (dropped as one unit, e.g. `MappingTargets`), records not reachable from an assignment of the compiled model (reported where they are used). A warning only, so existing models compile unchanged; no generated code, cache or catalog change. Tests: `ExportedRecordMemberValidatorTests`, `CkExportedRecordMemberCompileTests`. Rules: `docs/ck-semver-rules.md` "Record members and export" |
 | 139 | `RtAttributeWriteRestricted` | `RtAttributeAccessCheck` (Runtime.Engine/Exchange; raised by `ImportRtModelCommand` on every RT import path and by `BlueprintGenericCreateGuard` / `BlueprintMigrationExecutor`, not by the compiler) | AB#7767 (H3): an RT import, blueprint seed, blueprint update diff or migration step sets an attribute with `access: Hidden` or `MethodOnly` (also a record member). Parameters `rtId`, `ckTypeId`, `attributePath`; one message per value, refused before anything is written. `ReadOnly` stays importable. See "RT export and import honour `access`" above |
 | 140 | `RtIdentityOwnedWriteRestricted` | `RtIdentityOwnedWriteCheck` (Runtime.Engine/Exchange; raised by `ImportRtModelCommand` on the caller path of `ImportRt` only, not by the compiler) | AB#8042 / AB#8053: a user-initiated import sets an edge of an identity association role (`IdentityOwnedWrites`; the identity-owned User attributes are MethodOnly since System.Identity 3.0.0 and refused by 139). Parameters `rtId`, `ckTypeId`, `path`; one message per edge, refused before anything is written. See "Identity-owned User fields and identity associations" above |
+| 141 | `RtRecordMemberNotPreservable` | `ImportRtModelCommand.PreserveSecretRecordMembers` (Runtime.Engine/Exchange; caller path of `ImportRt` only, not by the compiler) | AB#8141: a caller upsert writes a record array whose record has no usable record key (none, or the key member is MethodOnly/Hidden) while a stored element holds a value in a MethodOnly/Hidden member (also nested); the elements cannot be matched, so the value would be lost. Parameters `rtId`, `ckTypeId`, `path`; refused before anything is written. With a usable key the member is carried over (omission rule, see "Omission inside records") |
 
 `InheritanceResolver.ResolveInterfacesAndMethods` also completes `AllImplementedInterfaces` (own ∪ every base
 type's declared interfaces), `AllMethods` (nearest declaration wins; `CkMethodGraph.DeclaringCkTypeId` is the

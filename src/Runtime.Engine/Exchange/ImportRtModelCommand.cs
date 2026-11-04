@@ -1269,11 +1269,16 @@ internal class ImportRtModelCommand(
             // replaces the stored one, but a seed only carries empty values for secrets (decision 9) -
             // the stored secret of the element with the same record key is kept.
             var resolveRecord = ResolveRecordFunc(runtimeRepository.TenantId);
+            // AB#8141: on the caller path the same pass also carries the stored values of record members that only a CK
+            // method may write (access MethodOnly or Hidden), so an upsert that omits such a member does not lose it.
+            // A record attribute that is itself MethodOnly or Hidden is carried over whole (see below), not walked.
             var secretRecordAttributes = ckTypeGraph!.AllAttributes.Values
                 .Where(a => !a.Ownership.IsPreservedOnUpsert() &&
+                            (!_callerImport || a.IsWritableOutsideMethod) &&
                             a.ValueType is AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray &&
                             a.ValueCkRecordId != null &&
-                            RecordHasSecretMembers(resolveRecord(a.ValueCkRecordId.ToRtCkId()), resolveRecord, []))
+                            RecordHasSecretMembers(resolveRecord(a.ValueCkRecordId.ToRtCkId()), resolveRecord, [],
+                                includeMethodOnlyMembers: _callerImport))
                 .ToList();
 
             // AB#6313: the seed-owned attributes are guarded against blanking, so a type needs the
@@ -1340,7 +1345,8 @@ internal class ImportRtModelCommand(
                 var preservedForEntity = PreserveAttributesForEntity(modelEntity, existing, flaggedAttributes,
                     value => ToTransportValue(cacheService, runtimeRepository.TenantId, value));
                 preservedForEntity += PreserveSecretRecordMembers(modelEntity, existing, secretRecordAttributes,
-                    resolveRecord);
+                    resolveRecord,
+                    _callerImport ? value => ToTransportValue(cacheService, runtimeRepository.TenantId, value) : null);
                 var guardEntries = GuardSeedOwnedAttributesForEntity(modelEntity, existing, seedOwnedAttributes,
                     value => ToTransportValue(cacheService, runtimeRepository.TenantId, value), _blankingPolicy,
                     _confirmedBlankings);
@@ -1606,10 +1612,12 @@ internal class ImportRtModelCommand(
     }
 
     /// <summary>
-    /// AB#5532: true when the record (or a nested record attribute of it) declares a Secret member.
+    /// AB#5532: true when the record (or a nested record attribute of it) declares a Secret member (AB#8141:
+    /// with <c>includeMethodOnlyMembers</c> also a member that only a CK method may write).
     /// </summary>
     internal static bool RecordHasSecretMembers(CkRecordGraph? recordGraph,
-        Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord, HashSet<string> visiting)
+        Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord, HashSet<string> visiting,
+        bool includeMethodOnlyMembers = false)
     {
         if (recordGraph == null || !visiting.Add(recordGraph.CkRecordId.ToString()))
         {
@@ -1618,14 +1626,16 @@ internal class ImportRtModelCommand(
 
         foreach (var member in recordGraph.AllAttributes.Values)
         {
-            if (member.ValueType == AttributeValueTypesDto.Secret)
+            if (member.ValueType == AttributeValueTypesDto.Secret ||
+                (includeMethodOnlyMembers && !member.IsWritableOutsideMethod))
             {
                 return true;
             }
 
             if (member.ValueType is AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray &&
                 member.ValueCkRecordId != null &&
-                RecordHasSecretMembers(resolveRecord(member.ValueCkRecordId.ToRtCkId()), resolveRecord, visiting))
+                RecordHasSecretMembers(resolveRecord(member.ValueCkRecordId.ToRtCkId()), resolveRecord, visiting,
+                    includeMethodOnlyMembers))
             {
                 return true;
             }
@@ -1642,11 +1652,29 @@ internal class ImportRtModelCommand(
     /// stored (<see cref="AsStoredSecret" />). Nested records are walked the same way. Returns the
     /// number of carried values. Pure apart from the injected resolver.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// AB#8141: with <paramref name="convertProtected" /> (the caller path of <c>ImportRt</c> only) the walk also carries the
+    /// stored value of every record member that only a CK method may write (<c>access: MethodOnly</c> or <c>Hidden</c>,
+    /// <c>!IsWritableOutsideMethod</c>) into the seed record, whatever the seed says - the record-member counterpart of the
+    /// AB#8059 omission rule: the Upsert replaces the whole record, so an omitted member would be lost. Elements are matched
+    /// as for secrets (single record by position, record array by the record key; an element without a stored counterpart is
+    /// new and has nothing to keep). A record array whose record declares no record key, or whose key member is itself not
+    /// writable outside a method, cannot be matched: the import is refused (message 141) when the seed holds an element and a
+    /// stored element holds a value in such a member. Removing an element or omitting the whole record attribute still removes
+    /// its members. <paramref name="convertProtected" /> turns a repository-shaped value into its transport shape (production:
+    /// <see cref="ToTransportValue" />).
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ExchangeException">
+    /// Message 141: a stored protected member value of a record array without a usable record key would be dropped.
+    /// </exception>
     internal static int PreserveSecretRecordMembers(RtEntityTcDto modelEntity, RtEntity existing,
         IReadOnlyList<CkTypeAttributeGraph> secretRecordAttributes,
-        Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord)
+        Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord, Func<object?, object?>? convertProtected = null)
     {
         var preserved = 0;
+        var carry = convertProtected == null ? null : new ProtectedMemberCarry(modelEntity, convertProtected);
         foreach (var attribute in secretRecordAttributes)
         {
             var modelAttribute = modelEntity.Attributes.FirstOrDefault(a => a.Id.Equals(attribute.CkAttributeId));
@@ -1657,19 +1685,23 @@ internal class ImportRtModelCommand(
             }
 
             preserved += PreserveSecretMembersInValue(modelAttribute.Value, storedValue, attribute.ValueType,
-                resolveRecord);
+                resolveRecord, carry, attribute.AttributeName);
         }
 
         return preserved;
     }
 
+    /// <summary>AB#8141: what the caller path needs to carry protected members and to name a refusal.</summary>
+    private sealed record ProtectedMemberCarry(RtEntityTcDto Entity, Func<object?, object?> Convert);
+
     private static int PreserveSecretMembersInValue(object seedValue, object storedValue,
-        AttributeValueTypesDto valueType, Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord)
+        AttributeValueTypesDto valueType, Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord,
+        ProtectedMemberCarry? carry, string path)
     {
         if (valueType == AttributeValueTypesDto.Record)
         {
             return seedValue is RtRecordTcDto seedRecord && storedValue is RtRecord storedRecord
-                ? PreserveSecretMembersInRecord(seedRecord, storedRecord, resolveRecord)
+                ? PreserveSecretMembersInRecord(seedRecord, storedRecord, resolveRecord, carry, path)
                 : 0;
         }
 
@@ -1681,23 +1713,30 @@ internal class ImportRtModelCommand(
 
         var storedElements = storedEnumerable.OfType<RtRecord>().ToList();
         var preserved = 0;
+        var index = -1;
         foreach (var element in seedElements)
         {
+            index++;
             if (element is not RtRecordTcDto seedRecord)
             {
                 continue;
             }
 
+            var elementPath = $"{path}[{index}]";
             var graph = seedRecord.CkRecordId == null ? null : resolveRecord(seedRecord.CkRecordId);
-            if (graph?.RecordKey == null)
+            var keyMember = graph?.RecordKey == null ? null : graph.AllAttributesByName.GetValueOrDefault(graph.RecordKey);
+            // AB#8141: a key the caller may not write cannot identify an element of the seed.
+            if (graph?.RecordKey == null || keyMember == null || (carry != null && !keyMember.IsWritableOutsideMethod))
             {
+                if (carry != null)
+                {
+                    EnsureNoStoredProtectedValue(storedElements, resolveRecord, carry, elementPath);
+                }
+
                 continue;
             }
 
-            var keyMember = graph.AllAttributesByName.GetValueOrDefault(graph.RecordKey);
-            var seedKey = keyMember == null
-                ? null
-                : seedRecord.Attributes.FirstOrDefault(a => a.Id.Equals(keyMember.CkAttributeId))?.Value;
+            var seedKey = seedRecord.Attributes.FirstOrDefault(a => a.Id.Equals(keyMember.CkAttributeId))?.Value;
             if (seedKey == null)
             {
                 continue;
@@ -1708,7 +1747,7 @@ internal class ImportRtModelCommand(
                 SecretWriteNormalizer.RecordKeyEquals(seedKey, storedKey));
             if (counterpart != null)
             {
-                preserved += PreserveSecretMembersInRecord(seedRecord, counterpart, resolveRecord);
+                preserved += PreserveSecretMembersInRecord(seedRecord, counterpart, resolveRecord, carry, elementPath);
             }
         }
 
@@ -1716,7 +1755,7 @@ internal class ImportRtModelCommand(
     }
 
     private static int PreserveSecretMembersInRecord(RtRecordTcDto seedRecord, RtRecord storedRecord,
-        Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord)
+        Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord, ProtectedMemberCarry? carry, string path)
     {
         var graph = seedRecord.CkRecordId == null ? null : resolveRecord(seedRecord.CkRecordId);
         if (graph == null)
@@ -1734,6 +1773,27 @@ internal class ImportRtModelCommand(
             }
 
             var seedMember = seedRecord.Attributes.FirstOrDefault(a => a.Id.Equals(member.CkAttributeId));
+
+            // AB#8141: only a CK method writes this member, so the caller's record never carries it (an explicit value was
+            // refused by the access preflight, message 139); the stored value goes into the written record.
+            if (carry != null && !member.IsWritableOutsideMethod)
+            {
+                var carried = member.ValueType == AttributeValueTypesDto.Secret
+                    ? AsStoredSecret(storedMember)
+                    : carry.Convert(storedMember);
+                if (seedMember == null)
+                {
+                    seedRecord.Attributes.Add(new RtAttributeTcDto { Id = member.CkAttributeId.ToRtCkId(), Value = carried });
+                }
+                else
+                {
+                    seedMember.Value = carried;
+                }
+
+                preserved++;
+                continue;
+            }
+
             if (member.ValueType == AttributeValueTypesDto.Secret)
             {
                 if (seedMember != null && !SecretWriteNormalizer.IsNotSetValue(seedMember.Value))
@@ -1762,11 +1822,71 @@ internal class ImportRtModelCommand(
                 seedMember?.Value != null)
             {
                 preserved += PreserveSecretMembersInValue(seedMember.Value, storedMember, member.ValueType,
-                    resolveRecord);
+                    resolveRecord, carry, $"{path}.{member.AttributeName}");
             }
         }
 
         return preserved;
+    }
+
+    /// <summary>
+    /// AB#8141: the elements of a record array cannot be matched (no usable record key), so a stored value of a member that
+    /// only a CK method may write would be dropped by the replace. Refuses the import (message 141) instead of losing it.
+    /// Nested records of the stored elements are searched too.
+    /// </summary>
+    private static void EnsureNoStoredProtectedValue(IReadOnlyList<RtRecord> storedElements,
+        Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord, ProtectedMemberCarry carry, string path)
+    {
+        foreach (var storedElement in storedElements)
+        {
+            var member = FindStoredProtectedMember(storedElement, resolveRecord, []);
+            if (member != null)
+            {
+                var ckTypeId = carry.Entity.CkTypeId?.SemanticVersionedFullName ?? string.Empty;
+                throw ExchangeException.RecordMemberNotPreservable([
+                    MessageCodes.RtRecordMemberNotPreservable($"{ckTypeId}@{carry.Entity.RtId}", carry.Entity.RtId,
+                        ckTypeId, $"{path}.{member}")
+                ]);
+            }
+        }
+    }
+
+    private static string? FindStoredProtectedMember(RtRecord record,
+        Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord, HashSet<string> visiting)
+    {
+        var graph = record.CkRecordId == null ? null : resolveRecord(record.CkRecordId);
+        if (graph == null || !visiting.Add(graph.CkRecordId.ToString()))
+        {
+            return null;
+        }
+
+        foreach (var member in graph.AllAttributes.Values)
+        {
+            if (!record.Attributes.TryGetValue(member.AttributeName, out var value) || value == null)
+            {
+                continue;
+            }
+
+            if (!member.IsWritableOutsideMethod)
+            {
+                return member.AttributeName;
+            }
+
+            var nested = value is RtRecord single
+                ? [single]
+                : value is IEnumerable many && value is not string
+                    ? many.OfType<RtRecord>().ToList()
+                    : new List<RtRecord>();
+            foreach (var nestedRecord in nested)
+            {
+                if (FindStoredProtectedMember(nestedRecord, resolveRecord, visiting) is { } inner)
+                {
+                    return $"{member.AttributeName}.{inner}";
+                }
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

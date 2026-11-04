@@ -712,12 +712,121 @@ public class CkModelUpgradeServiceTests
 
     #endregion
 
+    #region Concurrent upgrade vs. manual downgrade (AB#8265)
+
+    private void SetupMigration(string tenantId, string model, string from, string to, CancellationToken ct)
+    {
+        var fromModel = new CkModelId(model, from);
+        var toModel = new CkModelId(model, to);
+        A.CallTo(() => _migrationService.FindMigrationPathAsync(fromModel, toModel, ct))
+            .Returns(new CkMigrationPath
+            {
+                FromModel = fromModel,
+                ToModel = toModel,
+                HasBreakingChanges = false,
+                Steps = [new CkMigrationStep { FromVersion = from, ToVersion = to }]
+            });
+        A.CallTo(() => _migrationService.MigrateAsync(tenantId, fromModel, toModel, A<CkMigrationOptions>._, ct))
+            .Returns(new CkMigrationResult { Success = true, FromModel = fromModel, ToModel = toModel });
+    }
+
+    [Fact]
+    public async Task UpgradeModelsAsync_StaleSnapshotAndHistoryWrittenByOtherService_ShouldNotTreatAsDowngrade()
+    {
+        // Service A snapshotted the schema (2.30.0), then service B upgraded System.Identity to 3.0.1 and
+        // recorded it. A must neither migrate again nor rewrite the history.
+        var ct = TestContext.Current.CancellationToken;
+        const string tenantId = "tenant1";
+        var snapshotAt = DateTime.UtcNow.AddSeconds(-30);
+        var repository = SetupRepositoryWithHistory(tenantId,
+            new Dictionary<string, string> { ["System.Identity"] = "3.0.1" }, ct, DateTime.UtcNow.AddSeconds(-10));
+        SetupMigration(tenantId, "System.Identity", "2.30.0", "3.0.1", ct);
+
+        var result = await _upgradeService.UpgradeModelsAsync(tenantId,
+            [new CkModelIdVersionRange("System.Identity", "3.0.1")],
+            new CkMigrationOptions { SchemaSnapshotCapturedAtUtc = snapshotAt },
+            new Dictionary<string, string> { ["System.Identity"] = "2.30.0" }, ct);
+
+        Assert.True(result.Success);
+        Assert.Empty(result.UpgradedModels);
+        var skipped = Assert.Single(result.SkippedModels);
+        Assert.Equal("3.0.1", skipped.InstalledVersion);
+        A.CallTo(() => _migrationService.MigrateAsync(A<string>._, A<CkModelId>._, A<CkModelId>._,
+            A<CkMigrationOptions>._, A<CancellationToken>._)).MustNotHaveHappened();
+        A.CallTo(() => repository.InsertOneRtEntityAsync(A<IOctoSession>._, A<RtCkId<CkTypeId>>._, A<RtEntity>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task UpgradeModelsAsync_StaleSnapshotAndNewerTarget_ShouldMigrateOnceFromHistoryVersion()
+    {
+        // B already migrated 2.30.0 -> 3.0.1; A targets 3.1.0 and must continue from 3.0.1, not repeat 2.30.0 -> 3.0.1.
+        var ct = TestContext.Current.CancellationToken;
+        const string tenantId = "tenant1";
+        SetupRepositoryWithHistory(tenantId,
+            new Dictionary<string, string> { ["System.Identity"] = "3.0.1" }, ct, DateTime.UtcNow.AddSeconds(-10));
+        SetupMigration(tenantId, "System.Identity", "3.0.1", "3.1.0", ct);
+
+        var result = await _upgradeService.UpgradeModelsAsync(tenantId,
+            [new CkModelIdVersionRange("System.Identity", "3.1.0")],
+            new CkMigrationOptions { SchemaSnapshotCapturedAtUtc = DateTime.UtcNow.AddSeconds(-30) },
+            new Dictionary<string, string> { ["System.Identity"] = "2.30.0" }, ct);
+
+        Assert.True(result.Success);
+        Assert.Equal("3.0.1", Assert.Single(result.UpgradedModels).InstalledVersion);
+        A.CallTo(() => _migrationService.MigrateAsync(tenantId, new CkModelId("System.Identity", "3.0.1"),
+            new CkModelId("System.Identity", "3.1.0"), A<CkMigrationOptions>._, ct)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => _migrationService.MigrateAsync(A<string>._, new CkModelId("System.Identity", "2.30.0"),
+            A<CkModelId>._, A<CkMigrationOptions>._, A<CancellationToken>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task UpgradeModelsAsync_ManualDowngradeBeforeSnapshot_ShouldTrustSchemaAndMigrateForward()
+    {
+        // The history entry is older than the snapshot: the operator really downgraded the schema.
+        var ct = TestContext.Current.CancellationToken;
+        const string tenantId = "tenant1";
+        SetupRepositoryWithHistory(tenantId,
+            new Dictionary<string, string> { ["System.Identity"] = "3.0.1" }, ct, DateTime.UtcNow.AddHours(-1));
+        SetupMigration(tenantId, "System.Identity", "2.30.0", "3.0.1", ct);
+
+        var result = await _upgradeService.UpgradeModelsAsync(tenantId,
+            [new CkModelIdVersionRange("System.Identity", "3.0.1")],
+            new CkMigrationOptions { SchemaSnapshotCapturedAtUtc = DateTime.UtcNow.AddSeconds(-30) },
+            new Dictionary<string, string> { ["System.Identity"] = "2.30.0" }, ct);
+
+        Assert.True(result.Success);
+        Assert.Equal("2.30.0", Assert.Single(result.UpgradedModels).InstalledVersion);
+        A.CallTo(() => _migrationService.MigrateAsync(tenantId, new CkModelId("System.Identity", "2.30.0"),
+            new CkModelId("System.Identity", "3.0.1"), A<CkMigrationOptions>._, ct)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task UpgradeModelsAsync_StaleSnapshotWithoutCaptureTime_KeepsManualDowngradeBehavior()
+    {
+        // Callers that do not report when they took the snapshot keep the previous behavior.
+        var ct = TestContext.Current.CancellationToken;
+        const string tenantId = "tenant1";
+        SetupRepositoryWithHistory(tenantId,
+            new Dictionary<string, string> { ["System.Identity"] = "3.0.1" }, ct, DateTime.UtcNow.AddSeconds(-10));
+        SetupMigration(tenantId, "System.Identity", "2.30.0", "3.0.1", ct);
+
+        var result = await _upgradeService.UpgradeModelsAsync(tenantId,
+            [new CkModelIdVersionRange("System.Identity", "3.0.1")], null,
+            new Dictionary<string, string> { ["System.Identity"] = "2.30.0" }, ct);
+
+        Assert.Equal("2.30.0", Assert.Single(result.UpgradedModels).InstalledVersion);
+    }
+
+    #endregion
+
     #region Helper Methods
 
     private IRuntimeRepository SetupRepositoryWithHistory(
         string tenantId,
         Dictionary<string, string> modelVersions,
-        CancellationToken ct)
+        CancellationToken ct,
+        DateTime? firstEntryExecutedAt = null)
     {
         var repository = A.Fake<IRuntimeRepository>();
         var session = A.Fake<IOctoSession>();
@@ -729,7 +838,7 @@ public class CkModelUpgradeServiceTests
 
         // Create entities for each model version
         var entities = new List<RtEntity>();
-        var executedAt = DateTime.UtcNow;
+        var executedAt = firstEntryExecutedAt ?? DateTime.UtcNow;
 
         foreach (var kvp in modelVersions)
         {

@@ -94,6 +94,15 @@ public class CkMigrationOptions
     /// If true, also migrate entities not created by blueprints (user-created entities)
     /// </summary>
     public bool IncludeUserEntities { get; set; } = true;
+
+    /// <summary>
+    /// UTC time at which the caller read the schema versions it passes as <c>previouslyInstalledVersions</c> to
+    /// <see cref="ICkModelUpgradeService.UpgradeModelsAsync"/> (AB#8265). With it, the upgrade service can tell a
+    /// MigrationHistory entry that another service wrote after that snapshot (a concurrent upgrade, not a downgrade)
+    /// from an older entry that the schema really fell behind (a manual downgrade). When it is null, a
+    /// snapshot below the MigrationHistory is always treated as a manual downgrade.
+    /// </summary>
+    public DateTime? SchemaSnapshotCapturedAtUtc { get; set; }
 }
 
 /// <summary>

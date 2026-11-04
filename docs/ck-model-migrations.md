@@ -562,6 +562,21 @@ Migration history is stored as `System/MigrationHistory` runtime entities:
 | `EntitiesDeleted`  | int      | Number of deleted entities  |
 | `Errors`           | string[] | Error messages (on failure) |
 
+### Schema snapshot vs. MigrationHistory (AB#8265)
+
+`UpgradeModelsAsync(..., previouslyInstalledVersions)` receives the schema versions the caller read **before** its own
+import. The MigrationHistory decides which version is the data's real version:
+
+| Snapshot vs. history | Meaning | Behavior |
+|----------------------|---------|----------|
+| snapshot > history | The model definition was bumped, no data migration closed the gap yet | History wins, the migration runs (AB#4209) |
+| snapshot < history, history written **after** the snapshot | Another service upgraded the same model while this one was importing (rolling deployment) | INFO log; history and its row are kept, nothing is re-recorded, a migration runs only from the history version to the target (never twice) |
+| snapshot < history, history older than the snapshot (or no capture time given) | The operator manually downgraded the schema | WARN log; schema wins, the history row is re-recorded, the migration runs forward |
+
+The caller reports when it took the snapshot in `CkMigrationOptions.SchemaSnapshotCapturedAtUtc` (set by `TenantContext`
+in engine-mongodb); a 5 s clock-skew tolerance applies. Callers that leave it `null` keep the manual-downgrade
+behavior for every snapshot below the history.
+
 ## Migration Options
 
 | Option            | Default | Description                                    |
@@ -569,6 +584,7 @@ Migration history is stored as `System/MigrationHistory` runtime entities:
 | `DryRun`          | `false` | Simulate migration without making changes      |
 | `CreateBackup`    | `false` | Create a tenant backup before migrating        |
 | `ContinueOnError` | `false` | Continue with next step if a step fails        |
+| `SchemaSnapshotCapturedAtUtc` | `null` | When the caller read the schema snapshot; tells a concurrent upgrade from a manual downgrade (AB#8265) |
 
 ## Best Practices
 

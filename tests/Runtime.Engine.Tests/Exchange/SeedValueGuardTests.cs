@@ -61,6 +61,53 @@ public class SeedValueGuardTests
     }
 
     [Fact]
+    public void FilledJsonTenantValue_NonEmptySeedJsonThatEmptiesAField_IsSeedEmptiesJsonField_NotSeedEmpty()
+    {
+        // AB#8263: the seed is a non-empty JSON text (184 chars in the EnergyIQ case); only one of its
+        // string fields is empty where the tenant's is filled. That is not "the seed is empty".
+        const string tenant = """{"valueAttribute":"selfConsumptionKwh","valueMode":"query"}""";
+        const string seed = """{"valueAttribute":"","valueMode":"formula","formula":"max(0, $pv - $export)"}""";
+
+        var verdict = Decide(AttributeValueTypesDto.String, tenant, present: true, seedValue: seed);
+
+        Assert.Equal(SeedValueDecisionKind.KeepExisting, verdict.Kind);
+        Assert.Equal(RtImportBlankingReason.SeedEmptiesJsonField, verdict.Blanking);
+        Assert.Equal("$.valueAttribute", verdict.JsonPath);
+    }
+
+    [Fact]
+    public void FilledJsonTenantValue_NonEmptySeedJsonThatEmptiesAField_AllowPolicyTakesTheSeed()
+    {
+        var verdict = SeedValueGuard.Decide(AttributeValueTypesDto.String, AttributeOwnershipDto.SeedOwned,
+            existingPresent: true, existingValue: """{"A":{"B":["x","y"]}}""", seedPresent: true,
+            seedValue: """{"A":{"B":["x",""]}}""", RtImportBlankingPolicy.Allow);
+
+        Assert.Equal(SeedValueDecisionKind.TakeSeed, verdict.Kind);
+        Assert.Equal(RtImportBlankingReason.SeedEmptiesJsonField, verdict.Blanking);
+        Assert.Equal("$.A.B[1]", verdict.JsonPath);
+    }
+
+    [Fact]
+    public void FilledTenantValue_EmptyOrNullSeed_HasNoJsonPath()
+    {
+        Assert.Null(Decide(AttributeValueTypesDto.String, "{\"A\":\"x\"}", present: true, seedValue: "").JsonPath);
+        Assert.Null(Decide(AttributeValueTypesDto.String, "tenant", present: false, seedValue: null).JsonPath);
+    }
+
+    [Fact]
+    public void Records_FilledTenantRecord_DifferentNonEmptySeedRecordWithOneEmptyMember_SeedWins()
+    {
+        // AB#8263: a record seed with a non-empty member is not empty, even when another member is "".
+        var existing = new RtRecord(RecordId(), new Dictionary<string, object?> { ["Host"] = "h", ["User"] = "u" });
+
+        var verdict = Decide(AttributeValueTypesDto.Record, existing, present: true,
+            seedValue: RecordTc(("Host", "other"), ("User", "")));
+
+        Assert.Equal(SeedValueDecisionKind.TakeSeed, verdict.Kind);
+        Assert.Equal(RtImportBlankingReason.None, verdict.Blanking);
+    }
+
+    [Fact]
     public void FilledTenantValue_DifferentNonEmptySeedValue_SeedWins()
     {
         var verdict = Decide(AttributeValueTypesDto.String, "old", present: true, seedValue: "new");
@@ -234,7 +281,7 @@ public class SeedValueGuardTests
         Assert.Equal(FilledConfiguration, ValueOf(model, "AdapterConfiguration"));
         var entry = Assert.Single(entries);
         Assert.Equal("AdapterConfiguration", entry.AttributeName);
-        Assert.Equal(RtImportBlankingReason.SeedEmpty, entry.Reason);
+        Assert.Equal(RtImportBlankingReason.SeedEmptiesJsonField, entry.Reason);
         Assert.False(entry.Applied);
     }
 

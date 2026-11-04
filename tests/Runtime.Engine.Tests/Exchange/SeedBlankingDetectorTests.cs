@@ -46,7 +46,7 @@ public class SeedBlankingDetectorTests
 
         var finding = Assert.Single(findings);
         Assert.Equal("Configuration", finding.Attribute.AttributeName);
-        Assert.Equal(RtImportBlankingReason.SeedEmpty, finding.Reason);
+        Assert.Equal(RtImportBlankingReason.SeedEmptiesJsonField, finding.Reason);
     }
 
     [Fact]
@@ -106,6 +106,71 @@ public class SeedBlankingDetectorTests
         Assert.Equal("omitted", SeedBlankingDetector.Summarize(null, present: false));
         Assert.Equal("array (2 items)", SeedBlankingDetector.Summarize(new List<string> { "a", "b" }));
         Assert.DoesNotContain(Secret, SeedBlankingDetector.Summarize(FilledConfiguration));
+    }
+
+    // ---- AB#8263: a non-empty seed JSON that empties one field is not "SeedEmpty" ------------------
+
+    // The EnergyIQ.Base 1.3.0 "Eigenverbrauch" tile (widget 6a4aaf1922664f2b26c67ece): the seed switches
+    // the KPI from a query value to a formula and clears valueAttribute, the tenant still has the query wiring.
+    private const string WidgetSeedConfig =
+        """{"valueAttribute": "", "valueMode": "formula", "formula": "max(0, $pvEnergyKwh - $gridExportKwh)", "suffix": " kWh", "decimalPlaces": 1, "comparisonText": "PV-Erzeugung − Einspeisung"}""";
+
+    private const string WidgetTenantConfig =
+        """{"valueAttribute": "selfConsumptionKwh", "valueMode": "query", "suffix": " kWh", "decimalPlaces": 1, "comparisonText": "Eigenverbrauch", "aggregation": "sum", "queryRtId": "6a4aaddc22664f2b26c67ec5"}""";
+
+    [Fact]
+    public void Detect_NonEmptyJsonSeedThatEmptiesOneField_IsReportedAsSeedEmptiesJsonField_NotSeedEmpty()
+    {
+        var existing = Existing(("Configuration", WidgetTenantConfig));
+        var seed = Seed(existing.RtId, ("Configuration", WidgetSeedConfig));
+
+        var finding = Assert.Single(SeedBlankingDetector.Detect(seed, existing, Attrs));
+
+        Assert.Equal(RtImportBlankingReason.SeedEmptiesJsonField, finding.Reason);
+        Assert.NotEqual(RtImportBlankingReason.SeedEmpty, finding.Reason);
+        Assert.Equal("$.valueAttribute", finding.JsonPath);
+        Assert.Equal($"string ({WidgetSeedConfig.Length} chars), empties $.valueAttribute",
+            SeedBlankingDetector.SummarizeIncoming(finding));
+    }
+
+    [Fact]
+    public void Detect_EmptySeedValue_StaysSeedEmpty_WithoutJsonPath()
+    {
+        var existing = Existing(("Configuration", WidgetTenantConfig), ("Comment", "c"));
+        var seed = Seed(existing.RtId, ("Configuration", ""), ("Comment", null));
+
+        var findings = SeedBlankingDetector.Detect(seed, existing, Attrs);
+
+        Assert.Equal(2, findings.Count);
+        Assert.All(findings, f => Assert.Equal(RtImportBlankingReason.SeedEmpty, f.Reason));
+        Assert.All(findings, f => Assert.Null(f.JsonPath));
+        Assert.Equal("empty string", SeedBlankingDetector.SummarizeIncoming(findings[0]));
+    }
+
+    [Fact]
+    public void Detect_DifferentNonEmptyStringOrJson_WithoutEmptiedField_IsNoFinding()
+    {
+        var existing = Existing(("Configuration", WidgetTenantConfig), ("Comment", "tenant comment"));
+        var seed = Seed(existing.RtId,
+            ("Configuration", WidgetSeedConfig.Replace("\"valueAttribute\": \"\"", "\"valueAttribute\": \"pv\"")),
+            ("Comment", "seed comment"));
+
+        Assert.Empty(SeedBlankingDetector.Detect(seed, existing, Attrs));
+    }
+
+    [Fact]
+    public void Summary_OfAnEmptiedJsonField_NamesThePathButNeverAValue()
+    {
+        var existing = Existing(("Configuration", FilledConfiguration));
+        var seed = Seed(existing.RtId, ("Configuration", EmptySkeleton));
+
+        var finding = Assert.Single(SeedBlankingDetector.Detect(seed, existing, Attrs));
+        var summary = SeedBlankingDetector.SummarizeIncoming(finding);
+
+        Assert.Equal("$.EdaHttpAdapter.Host", finding.JsonPath);
+        Assert.Equal($"string ({EmptySkeleton.Length} chars), empties $.EdaHttpAdapter.Host", summary);
+        Assert.DoesNotContain(Secret, summary);
+        Assert.DoesNotContain("ponton", summary);
     }
 
     // ---- BlueprintService: option -> engine confirmation, result report --------------------------------

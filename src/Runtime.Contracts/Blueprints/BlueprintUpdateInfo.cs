@@ -249,12 +249,14 @@ public class BlueprintBlankedAttribute
     public required string AttributeName { get; set; }
 
     /// <summary>
-    /// Why the seed counts as blanking: <c>SeedEmpty</c> (the seed declares an empty value, or a JSON
-    /// text that empties a string the tenant filled), <c>SeedOmitted</c> (the seed does not declare
-    /// the attribute) or <c>ResetToDefault</c> (AB#6395: the seed does not declare an attribute that has
-    /// a CK default and the tenant's value differs from it, so the update resets it to the default;
-    /// <c>IncomingSummary</c> is then <c>default (&lt;value&gt;)</c>). Consumers must tolerate values they do
-    /// not know.
+    /// Why the seed counts as blanking: <c>SeedEmpty</c> (the seed declares an empty value: null, empty
+    /// string, empty array or empty record - never a non-empty value), <c>SeedEmptiesJsonField</c>
+    /// (AB#8263: the seed is a non-empty JSON text that empties a string field the tenant filled;
+    /// <c>IncomingSummary</c> then names the first such field, e.g. <c>string (184 chars), empties
+    /// $.valueAttribute</c>), <c>SeedOmitted</c> (the seed does not declare the attribute) or
+    /// <c>ResetToDefault</c> (AB#6395: the seed does not declare an attribute that has a CK default and
+    /// the tenant's value differs from it, so the update resets it to the default; <c>IncomingSummary</c>
+    /// is then <c>default (&lt;value&gt;)</c>). Consumers must tolerate values they do not know.
     /// </summary>
     public required string Reason { get; set; }
 
@@ -265,7 +267,8 @@ public class BlueprintBlankedAttribute
 
     /// <summary>
     /// Value-free description of what the seed carries, e.g. <c>string (110 chars)</c>, <c>empty string</c>
-    /// or <c>omitted</c>; <c>default (0)</c> for <c>ResetToDefault</c>.
+    /// or <c>omitted</c>; <c>default (0)</c> for <c>ResetToDefault</c>; for <c>SeedEmptiesJsonField</c> the
+    /// size plus the JSON path of the first emptied field (a field name, never a value).
     /// </summary>
     public string? IncomingSummary { get; set; }
 

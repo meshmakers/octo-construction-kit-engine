@@ -28,7 +28,14 @@ public enum SeedValueDecisionKind
 /// </summary>
 /// <param name="Kind">Keep the existing value or take the seed value.</param>
 /// <param name="Blanking">Why the seed counts as blanking, or <c>None</c>.</param>
-public readonly record struct SeedValueVerdict(SeedValueDecisionKind Kind, RtImportBlankingReason Blanking)
+/// <param name="JsonPath">
+/// For <see cref="RtImportBlankingReason.SeedEmptiesJsonField"/>: the JSON path of the first field the seed
+/// empties (e.g. <c>$.valueAttribute</c>, AB#8263); <c>null</c> otherwise. A field name from the seed, never a value.
+/// </param>
+public readonly record struct SeedValueVerdict(
+    SeedValueDecisionKind Kind,
+    RtImportBlankingReason Blanking,
+    string? JsonPath = null)
 {
     /// <summary>True when the seed would blank a non-empty existing value.</summary>
     public bool IsBlanking => Blanking != RtImportBlankingReason.None;
@@ -47,7 +54,7 @@ public readonly record struct SeedValueVerdict(SeedValueDecisionKind Kind, RtImp
 /// <item><term>Ownership is TenantOwned, RuntimeState or Secret</term><description>KeepExisting, not blanking (unchanged behaviour of the preserve pass)</description></item>
 /// <item><term>SeedOwned, existing value is empty</term><description>TakeSeed (nothing to lose)</description></item>
 /// <item><term>SeedOwned, existing non-empty, seed non-empty</term><description>TakeSeed (blueprint-owned change wins, also when the value differs)</description></item>
-/// <item><term>SeedOwned, existing and seed are JSON texts and the seed carries an empty string where the existing has a non-empty one</term><description>Blanking (seed empty skeleton, see below)</description></item>
+/// <item><term>SeedOwned, existing and seed are JSON texts and the seed carries an empty string where the existing has a non-empty one</term><description>Blanking with reason SeedEmptiesJsonField and the path of the first emptied field (seed empty skeleton, see below; AB#8263)</description></item>
 /// <item><term>SeedOwned, existing non-empty, seed omits the attribute, attribute has a CK default, existing equals the default</term><description>TakeSeed, no finding (the default is materialised again, nothing changes; AB#6395)</description></item>
 /// <item><term>SeedOwned, existing non-empty, seed omits the attribute, attribute has a CK default, existing differs from it</term><description>ResetToDefault: KeepExisting under Keep, TakeSeed under Allow (AB#6395)</description></item>
 /// <item><term>SeedOwned, existing non-empty, seed empty or omitted</term><description>Blanking: KeepExisting under Keep, TakeSeed under Allow</description></item>
@@ -137,19 +144,21 @@ public static class SeedValueGuard
         {
             reason = RtImportBlankingReason.SeedEmpty;
         }
-        else if (BlanksJsonLeaf(existingValue, seedValue))
+        else if (FindBlankedJsonLeaf(existingValue, seedValue) is { } jsonPath)
         {
-            reason = RtImportBlankingReason.SeedEmpty;
+            // AB#8263: the seed value itself is not empty; say which field it empties instead of "SeedEmpty".
+            return new SeedValueVerdict(KindFor(policy), RtImportBlankingReason.SeedEmptiesJsonField, jsonPath);
         }
         else
         {
             return new SeedValueVerdict(SeedValueDecisionKind.TakeSeed, RtImportBlankingReason.None);
         }
 
-        return new SeedValueVerdict(
-            policy == RtImportBlankingPolicy.Allow ? SeedValueDecisionKind.TakeSeed : SeedValueDecisionKind.KeepExisting,
-            reason);
+        return new SeedValueVerdict(KindFor(policy), reason);
     }
+
+    private static SeedValueDecisionKind KindFor(RtImportBlankingPolicy policy) =>
+        policy == RtImportBlankingPolicy.Allow ? SeedValueDecisionKind.TakeSeed : SeedValueDecisionKind.KeepExisting;
 
     /// <summary>
     /// The value the import materialises for an omitted attribute: the whole collection for
@@ -230,23 +239,30 @@ public static class SeedValueGuard
     /// True when both values are JSON texts and the seed has an empty or null string at a path where
     /// the existing value has a non-empty string. Non-JSON or non-string values never match.
     /// </summary>
-    internal static bool BlanksJsonLeaf(object? existingValue, object? seedValue)
+    internal static bool BlanksJsonLeaf(object? existingValue, object? seedValue) =>
+        FindBlankedJsonLeaf(existingValue, seedValue) != null;
+
+    /// <summary>
+    /// The JSON path (<c>$.a.b[1]</c>) of the first string the seed empties where the existing value has a
+    /// non-empty one, or <c>null</c> when both values are not JSON texts or nothing is emptied (AB#8263).
+    /// </summary>
+    internal static string? FindBlankedJsonLeaf(object? existingValue, object? seedValue)
     {
         if (existingValue is not string existingText || seedValue is not string seedText ||
             !LooksLikeJsonContainer(existingText) || !LooksLikeJsonContainer(seedText))
         {
-            return false;
+            return null;
         }
 
         try
         {
             using var existingDoc = JsonDocument.Parse(existingText);
             using var seedDoc = JsonDocument.Parse(seedText);
-            return BlanksJsonLeaf(existingDoc.RootElement, seedDoc.RootElement);
+            return FindBlankedJsonLeaf(existingDoc.RootElement, seedDoc.RootElement, "$");
         }
         catch (JsonException)
         {
-            return false;
+            return null;
         }
     }
 
@@ -256,7 +272,7 @@ public static class SeedValueGuard
         return trimmed.Length > 1 && (trimmed[0] == '{' || trimmed[0] == '[');
     }
 
-    private static bool BlanksJsonLeaf(JsonElement existing, JsonElement seed)
+    private static string? FindBlankedJsonLeaf(JsonElement existing, JsonElement seed, string path)
     {
         switch (seed.ValueKind)
         {
@@ -264,33 +280,34 @@ public static class SeedValueGuard
                 foreach (var seedProperty in seed.EnumerateObject())
                 {
                     if (existing.TryGetProperty(seedProperty.Name, out var existingProperty) &&
-                        BlanksJsonLeaf(existingProperty, seedProperty.Value))
+                        FindBlankedJsonLeaf(existingProperty, seedProperty.Value, $"{path}.{seedProperty.Name}") is { } found)
                     {
-                        return true;
+                        return found;
                     }
                 }
 
-                return false;
+                return null;
             case JsonValueKind.Array when existing.ValueKind == JsonValueKind.Array:
                 var existingItems = existing.EnumerateArray().ToList();
                 var index = 0;
                 foreach (var seedItem in seed.EnumerateArray())
                 {
-                    if (index < existingItems.Count && BlanksJsonLeaf(existingItems[index], seedItem))
+                    if (index < existingItems.Count &&
+                        FindBlankedJsonLeaf(existingItems[index], seedItem, $"{path}[{index}]") is { } found)
                     {
-                        return true;
+                        return found;
                     }
 
                     index++;
                 }
 
-                return false;
+                return null;
             case JsonValueKind.String when existing.ValueKind == JsonValueKind.String:
-                return seed.GetString()!.Length == 0 && existing.GetString()!.Length > 0;
+                return seed.GetString()!.Length == 0 && existing.GetString()!.Length > 0 ? path : null;
             case JsonValueKind.Null when existing.ValueKind == JsonValueKind.String:
-                return existing.GetString()!.Length > 0;
+                return existing.GetString()!.Length > 0 ? path : null;
             default:
-                return false;
+                return null;
         }
     }
 }

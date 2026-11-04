@@ -179,3 +179,24 @@ public sealed class ArchiveColumnAdditionFailedException : StreamDataException
         Additions = additions;
     }
 }
+
+/// <summary>
+/// An import (seed, blueprint update, <c>ImportRt</c>) committed its entities, but the formula change of one or more
+/// computed columns it declared for activated archives could not be queued (AB#8255). The archive definitions keep the
+/// live formulas, so the archives stay consistent with their tables; running the same import again retries the changes.
+/// </summary>
+public sealed class ArchiveFormulaChangeFailedException : StreamDataException
+{
+    /// <summary>Every formula change of the import with its outcome, the failed ones included.</summary>
+    public IReadOnlyList<Exchange.RtImportComputedFormulaChange> Changes { get; }
+
+    public ArchiveFormulaChangeFailedException(IReadOnlyList<Exchange.RtImportComputedFormulaChange> changes)
+        : base("The import was applied, but the formula of these computed columns could not be changed: " +
+               string.Join("; ", changes.Where(c => !c.Succeeded).Select(c =>
+                   $"{Describe(c.ArchiveRtId)}{(string.IsNullOrEmpty(c.ArchiveWellKnownName) ? string.Empty : $" ('{c.ArchiveWellKnownName}')")} column '{c.Column}': {c.Error}")) +
+               ". The columns keep their live formula. Fix the cause and run the import again to change them.",
+            changes.FirstOrDefault(c => !c.Succeeded)?.ArchiveRtId)
+    {
+        Changes = changes;
+    }
+}

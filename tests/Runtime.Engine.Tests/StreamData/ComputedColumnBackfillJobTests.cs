@@ -339,6 +339,35 @@ public class ComputedColumnBackfillJobTests
         Assert.Equal(RecomputeJobState.Failed, (await _jobs.GetAsync(job!.RtId))!.State);
     }
 
+    // AB#8255: a re-applied seed (or a repeated call) with the formula that is already being backfilled is no change.
+    [Fact]
+    public async Task FormulaChange_ToTheFormulaAlreadyInProgress_IsANoOp_AndQueuesNoSecondJob()
+    {
+        AddColumn(Active("ExportPower"));
+        var sut = NewSut();
+        var first = await sut.EnqueueUpdateComputedColumnFormulaAsync(_rt, "ExportPower", "activepower * -2", Ct);
+
+        var again = await sut.EnqueueUpdateComputedColumnFormulaAsync(_rt, "ExportPower", "activepower * -2", Ct);
+
+        Assert.NotNull(first);
+        Assert.Null(again);
+        Assert.Equal("activepower * -2", _store.Column(_rt, "ExportPower")!.PendingFormula);
+        Assert.Single(await _jobs.GetForArchiveAsync(_rt, 10));
+    }
+
+    // AB#8255: the inline variant promises a completed change when it returns; with the same formula still being
+    // backfilled it keeps refusing instead of returning early.
+    [Fact]
+    public async Task InlineFormulaChange_ToTheFormulaAlreadyInProgress_IsStillRejected()
+    {
+        AddColumn(Active("ExportPower"));
+        var sut = NewSut();
+        await sut.EnqueueUpdateComputedColumnFormulaAsync(_rt, "ExportPower", "activepower * -2", Ct);
+
+        await Assert.ThrowsAsync<ComputedColumnInvalidException>(() =>
+            sut.UpdateComputedColumnFormulaAsync(_rt, "ExportPower", "activepower * -2"));
+    }
+
     [Fact]
     public async Task FormulaChange_WhileABackfillIsQueued_IsRejected()
     {

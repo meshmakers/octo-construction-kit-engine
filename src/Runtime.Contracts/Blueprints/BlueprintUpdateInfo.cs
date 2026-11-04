@@ -495,6 +495,14 @@ public class BlueprintUpdateResult
     public List<Exchange.RtImportArchiveColumnAddition> ArchiveColumnsAdded { get; set; } = [];
 
     /// <summary>
+    /// AB#8255: the formula changes of computed columns the update queued on activated archives - the seed declared a
+    /// formula that differs from the live one, so the column runs the versioned change with backfill of
+    /// <c>UpdateComputedColumnFormula</c> instead of being overwritten. Each queued change is also listed in
+    /// <see cref="Warnings" />, a failed one in <see cref="Errors" />.
+    /// </summary>
+    public List<Exchange.RtImportComputedFormulaChange> ArchiveFormulaChanges { get; set; } = [];
+
+    /// <summary>
     /// AB#7991: the archives the update imported and what it did with each - archives the update newly created are
     /// activated (or skipped with a reason, or failed), archives that already existed are untouched - and for new
     /// rollups whether a backfill was queued. A failed activation or a backfill that was not queued is also listed in

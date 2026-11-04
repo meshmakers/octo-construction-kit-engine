@@ -58,6 +58,12 @@ internal class ImportRtModelCommand(
     private readonly ConcurrentQueue<(OctoObjectId ArchiveRtId, string? ArchiveName, ArchiveSeedColumn Column)>
         _pendingArchiveColumns = new();
     private readonly List<RtImportArchiveColumnAddition> _archiveColumnAdditions = [];
+
+    // AB#8255: formula changes the seed declares for computed columns of activated archives, applied as versioned changes
+    // with backfill through the archive lifecycle after the commit; and the outcome of each.
+    private readonly ConcurrentQueue<(OctoObjectId ArchiveRtId, string? ArchiveName, ArchiveSeedFormulaChange Change)>
+        _pendingFormulaChanges = new();
+    private readonly List<RtImportComputedFormulaChange> _archiveFormulaChanges = [];
     private IArchiveLifecycleService? _archiveLifecycle;
 
     // AB#6392: only set while a user-initiated import runs on a tenant with an opted-in policy.
@@ -83,6 +89,8 @@ internal class ImportRtModelCommand(
         _associationsCount = 0;
         _pendingArchiveColumns.Clear();
         _archiveColumnAdditions.Clear();
+        _pendingFormulaChanges.Clear();
+        _archiveFormulaChanges.Clear();
         _archiveLifecycle = null;
         _lockEnforcer = null;
         _callerImport = false;
@@ -94,6 +102,9 @@ internal class ImportRtModelCommand(
 
     /// <inheritdoc />
     public IReadOnlyList<RtImportArchiveColumnAddition> ArchiveColumnAdditions => _archiveColumnAdditions.ToArray();
+
+    /// <inheritdoc />
+    public IReadOnlyList<RtImportComputedFormulaChange> ArchiveFormulaChanges => _archiveFormulaChanges.ToArray();
 
     /// <inheritdoc />
     public RtImportBlueprintLockSummary BlueprintLockSummary => _lockEnforcer?.Summary ?? _blueprintLockSummary;
@@ -1356,6 +1367,14 @@ internal class ImportRtModelCommand(
                     {
                         _pendingArchiveColumns.Enqueue((existing.RtId, existing.RtWellKnownName, column));
                     }
+
+                    // AB#8255: the seed carries no runtime state of a column; keep the stored one (version pointer,
+                    // computed state, a formula change in progress), and turn a changed formula into a versioned change.
+                    foreach (var change in ArchiveDefinitionGuard.KeepColumnRuntimeState(
+                                 cacheService, runtimeRepository.TenantId, ckTypeGraph, existing, modelEntity))
+                    {
+                        _pendingFormulaChanges.Enqueue((existing.RtId, existing.RtWellKnownName, change));
+                    }
                 }
 
                 if (preservedForEntity > 0)
@@ -1385,7 +1404,7 @@ internal class ImportRtModelCommand(
     /// </summary>
     private async Task EnsureArchiveLifecycleAsync(string tenantId)
     {
-        if (_pendingArchiveColumns.IsEmpty || _archiveLifecycle != null)
+        if ((_pendingArchiveColumns.IsEmpty && _pendingFormulaChanges.IsEmpty) || _archiveLifecycle != null)
         {
             return;
         }
@@ -1400,6 +1419,12 @@ internal class ImportRtModelCommand(
             throw new ArchiveSchemaImmutableException(first.ArchiveRtId, first.ArchiveName, CkArchiveStatus.Activated,
                 "Columns", $"column '{first.Column.Key}' cannot be added because stream data is not available to add its storage");
         }
+
+        if (_archiveLifecycle == null && _pendingFormulaChanges.TryPeek(out var change))
+        {
+            throw new ArchiveSchemaImmutableException(change.ArchiveRtId, change.ArchiveName, CkArchiveStatus.Activated,
+                "Columns", $"the formula of computed column '{change.Change.Name}' cannot be changed because stream data is not available to backfill it");
+        }
     }
 
     /// <summary>
@@ -1412,7 +1437,7 @@ internal class ImportRtModelCommand(
     /// </summary>
     private async Task ApplyArchiveColumnAdditionsAsync()
     {
-        if (_pendingArchiveColumns.IsEmpty || _archiveLifecycle == null)
+        if ((_pendingArchiveColumns.IsEmpty && _pendingFormulaChanges.IsEmpty) || _archiveLifecycle == null)
         {
             return;
         }
@@ -1458,9 +1483,61 @@ internal class ImportRtModelCommand(
             }
         }
 
+        // AB#8255: after the additions, so a changed formula may reference a column the same seed added.
+        await ApplyArchiveFormulaChangesAsync().ConfigureAwait(false);
+
         if (_archiveColumnAdditions.Any(a => !a.Succeeded))
         {
             throw new ArchiveColumnAdditionFailedException(_archiveColumnAdditions.ToArray());
+        }
+
+        if (_archiveFormulaChanges.Any(c => !c.Succeeded))
+        {
+            throw new ArchiveFormulaChangeFailedException(_archiveFormulaChanges.ToArray());
+        }
+    }
+
+    /// <summary>
+    /// AB#8255: queues the formula changes the seed declared for computed columns of activated archives, after the import
+    /// committed (with the live formula in the definition), through <see cref="IArchiveLifecycleService.EnqueueUpdateComputedColumnFormulaAsync" />
+    /// - the versioned change with backfill of <c>UpdateComputedColumnFormula</c>. The lifecycle compares the normalised
+    /// (physical) formula, so a seed that writes the live formula in its logical spelling changes nothing and is not
+    /// reported. Every change is tried and recorded in <see cref="ArchiveFormulaChanges" />.
+    /// </summary>
+    private async Task ApplyArchiveFormulaChangesAsync()
+    {
+        var pending = _pendingFormulaChanges.ToArray();
+        _pendingFormulaChanges.Clear();
+
+        foreach (var (archiveRtId, archiveName, change) in pending)
+        {
+            try
+            {
+                var job = await _archiveLifecycle!.EnqueueUpdateComputedColumnFormulaAsync(
+                    archiveRtId, change.Name, change.Formula).ConfigureAwait(false);
+                if (job == null)
+                {
+                    // Unchanged after normalisation (or no job store wired): nothing was queued.
+                    logger.LogDebug(
+                        "Import found the formula of computed column '{Column}' on archive {ArchiveRtId} unchanged after normalisation",
+                        change.Name, archiveRtId);
+                    continue;
+                }
+
+                _archiveFormulaChanges.Add(new RtImportComputedFormulaChange(
+                    archiveRtId, archiveName, change.Name, change.Formula, job.RtId, null));
+                logger.LogInformation(
+                    "Import queued the formula change of computed column '{Column}' on activated archive {ArchiveRtId} as job {JobId}",
+                    change.Name, archiveRtId, job.RtId);
+            }
+            catch (Exception ex)
+            {
+                _archiveFormulaChanges.Add(new RtImportComputedFormulaChange(
+                    archiveRtId, archiveName, change.Name, change.Formula, null, ex.Message));
+                logger.LogError(ex,
+                    "Import could not change the formula of computed column '{Column}' on activated archive {ArchiveRtId}",
+                    change.Name, archiveRtId);
+            }
         }
     }
 

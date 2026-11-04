@@ -589,6 +589,25 @@ Removing or retyping a column of an activated archive is still refused (AB#7872)
 activated before is refused until it is enabled again. Seed computed columns declare `Path: ""` and `Required: false` (AB#8034).
 Rules: engine-mongodb `docs/streamdata-archive-concept.md` §10.
 
+### Runtime state and formula changes of existing archive columns (AB#8255)
+
+A column carries runtime state the seed never holds: the version pointer of a computed column (`ComputedVersion`; its values live
+in the physical column `{name}__v{N}` after a formula change), its `ComputedState` and a formula change in progress
+(`PendingFormula`). The import replaces the whole `Columns` list, so for every column the archive already has (an ingested column by
+its path, a computed column by its name) it carries these runtime members over from the stored column; the stored value wins, also
+when a seed names one. A re-apply with the live formula therefore leaves a computed column at its version and state.
+
+When the seed formula of a computed column of an **activated** archive differs from the live one, the definition keeps the live
+formula and the import queues the same versioned change as `UpdateComputedColumnFormula` after the commit
+(`IArchiveLifecycleService.EnqueueUpdateComputedColumnFormulaAsync`: storage `{name}__v{N+1}`, background backfill, atomic swap).
+Readers see the previous values until the backfill is done. The lifecycle compares the normalised (physical) formula, so a seed that
+writes the live formula in the logical spelling changes nothing. The update result lists queued changes in `ArchiveFormulaChanges`
+and as warnings; an install reports them as info messages. A change that cannot be queued (for example while a backfill of the
+column still runs) fails the apply after the entities are committed; the column keeps its live formula and applying again retries
+it. A seed formula equal to the change in progress (compared normalised) is no new change; a seed that drops the formula of a computed column of a guarded archive is refused. A formula change on a disabled archive that was activated
+before is refused until it is enabled again. On an archive without a table (never activated, or `Failed`) the seed formula is
+written as before and the runtime members are kept.
+
 ## Archives and rollups in a blueprint (AB#7991)
 
 A blueprint ships stream-data archives (raw, time-range, rollup) as seed entities. On **install, forced re-apply and update** the

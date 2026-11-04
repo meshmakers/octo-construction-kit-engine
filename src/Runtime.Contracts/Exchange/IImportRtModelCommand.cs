@@ -15,6 +15,14 @@ public interface IImportRtModelCommand
     IReadOnlyList<RtImportArchiveColumnAddition> ArchiveColumnAdditions => [];
 
     /// <summary>
+    ///     The formula changes of computed columns the last import queued on activated archives (AB#8255): the seed
+    ///     declared a formula that differs from the live one, and the change runs as a versioned change with backfill.
+    ///     Empty when the import changed no formula; a seed formula that equals the live one after normalisation is
+    ///     no change.
+    /// </summary>
+    IReadOnlyList<RtImportComputedFormulaChange> ArchiveFormulaChanges => [];
+
+    /// <summary>
     ///     Imports as text
     /// </summary>
     /// <param name="runtimeRepository">The runtime repository</param>

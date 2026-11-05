@@ -669,12 +669,62 @@ internal static class BlueprintEntityComparer
             return false;
         }
 
+        if (TryPairArchiveColumnsByKey(listA, listB, resolveRecord, out var pairs))
+        {
+            // AB#8332: archive columns are identified by key, not by position (the import keeps the stored order, see
+            // ArchiveDefinitionGuard.KeepColumnOrder), so a pure order difference is no change.
+            return pairs.All(pair => ValuesEqual(pair.A, pair.B, recordGraph, resolveEnum, resolveRecord));
+        }
+
         for (var i = 0; i < listA.Count; i++)
         {
             if (!ValuesEqual(listA[i], listB[i], recordGraph, resolveEnum, resolveRecord))
             {
                 return false;
             }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// AB#8332: pairs two lists of archive columns (<c>CkArchiveColumn</c>) by column key. False - compare by position - when
+    /// an element is not an archive column, has no key, or a key is duplicated or missing on the other side; a differing key
+    /// set is a change either way.
+    /// </summary>
+    private static bool TryPairArchiveColumnsByKey(List<object?> a, List<object?> b,
+        Func<RtCkId<CkRecordId>, CkRecordGraph?>? resolveRecord, out List<(RtRecordTcDto A, RtRecordTcDto B)> pairs)
+    {
+        pairs = [];
+        if (resolveRecord == null || a.Count == 0)
+        {
+            return false;
+        }
+
+        bool IsArchiveColumn(RtRecordTcDto record) =>
+            record.CkRecordId != null && resolveRecord(record.CkRecordId) is { } graph &&
+            ArchiveDefinitionGuard.KeepsRuntimeMembersOf(graph);
+
+        var byKey = new Dictionary<string, RtRecordTcDto>(StringComparer.Ordinal);
+        foreach (var item in b)
+        {
+            if (item is not RtRecordTcDto recordB || !IsArchiveColumn(recordB) ||
+                ArchiveDefinitionGuard.ColumnKeyOf(recordB) is not { } key || !byKey.TryAdd(key, recordB))
+            {
+                return false;
+            }
+        }
+
+        foreach (var item in a)
+        {
+            if (item is not RtRecordTcDto recordA || !IsArchiveColumn(recordA) ||
+                ArchiveDefinitionGuard.ColumnKeyOf(recordA) is not { } key || !byKey.Remove(key, out var recordB))
+            {
+                pairs = [];
+                return false;
+            }
+
+            pairs.Add((recordA, recordB));
         }
 
         return true;

@@ -1385,6 +1385,10 @@ internal class ImportRtModelCommand(
                     {
                         _pendingFormulaChanges.Enqueue((existing.RtId, existing.RtWellKnownName, change));
                     }
+
+                    // AB#8332: columns are identified by key, not by position. Keep the stored order, so a seed that lists
+                    // the same columns in another order (the lifecycle appends added columns) writes no change.
+                    ArchiveDefinitionGuard.KeepColumnOrder(cacheService, runtimeRepository.TenantId, ckTypeGraph, existing, modelEntity);
                 }
 
                 if (preservedForEntity > 0)

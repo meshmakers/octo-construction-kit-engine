@@ -574,6 +574,139 @@ public class BlueprintEntityComparerTests
             Seed(("Columns", new List<object?> { Column(otherRecord, "a + b", null) })), otherStored, type, v => v, ResolveEnum, Resolve));
     }
 
+    private static readonly CkId<CkRecordId> ArchiveColumnRecordId = new("System.StreamData-1.22.0/CkArchiveColumn");
+
+    /// <summary>
+    ///     AB#8332 (prod-1 energyiq): the install appended the computed columns ChargePower/DischargePower behind the
+    ///     ingested ones, while the seed lists ChargePower before DischargingPower. Archive columns are identified by key,
+    ///     so the same columns in another order - with the stored computed columns at version 0 / state 2 that the seed
+    ///     never carries - are no change.
+    /// </summary>
+    [Fact]
+    public void ArchiveColumnsInAnotherOrder_WithRuntimeStateOnlyOnTheTenant_AreNoChange()
+    {
+        var type = BuildType(RecordArrayAttr("Columns"));
+        var stored = Stored(("Columns", new List<object?>
+        {
+            ArchiveColumn(("Path", "StateOfCharge"), ("Indexed", true)),
+            ArchiveColumn(("Path", "ChargingPower"), ("Indexed", false)),
+            ArchiveColumn(("Path", "DischargingPower"), ("Indexed", false), ("ComputedVersion", 0L)),
+            ArchiveColumn(("Path", ""), ("Name", "ChargePower"), ("Formula", "if(chargingpower > 0, chargingpower, 0)"),
+                ("ResultType", 3L), ("Indexed", false), ("ComputedState", 2L), ("ComputedVersion", 0L)),
+            ArchiveColumn(("Path", ""), ("Name", "DischargePower"), ("Formula", "dischargingpower"), ("ResultType", 3L),
+                ("Indexed", false), ("ComputedState", 2L), ("ComputedVersion", 0L))
+        }));
+        var seed = Seed(("Columns", new List<object?>
+        {
+            ArchiveColumn(("Path", "StateOfCharge"), ("Indexed", "true")),
+            ArchiveColumn(("Path", "ChargingPower"), ("Indexed", "false")),
+            ArchiveColumn(("Path", ""), ("Name", "ChargePower"), ("Formula", "if(chargingpower > 0, chargingpower, 0)"),
+                ("ResultType", "3"), ("Indexed", "false")),
+            ArchiveColumn(("Path", "DischargingPower"), ("Indexed", "false")),
+            ArchiveColumn(("Path", ""), ("Name", "DischargePower"), ("Formula", "dischargingpower"), ("ResultType", "3"),
+                ("Indexed", "false"))
+        }));
+
+        Assert.Empty(BlueprintEntityComparer.Compare(seed, stored, type, v => v, ResolveEnum, ResolveArchiveColumn));
+    }
+
+    /// <summary>AB#8332: pairing by key does not hide a real change - a changed formula or a missing column still is one.</summary>
+    [Fact]
+    public void ArchiveColumnsInAnotherOrder_WithAChangedFormulaOrAMissingColumn_AreAChange()
+    {
+        var type = BuildType(RecordArrayAttr("Columns"));
+        var stored = Stored(("Columns", new List<object?>
+        {
+            ArchiveColumn(("Path", "ChargingPower")),
+            ArchiveColumn(("Path", ""), ("Name", "ChargePower"), ("Formula", "a + b"), ("ComputedState", 2L))
+        }));
+
+        var changedFormula = Seed(("Columns", new List<object?>
+        {
+            ArchiveColumn(("Path", ""), ("Name", "ChargePower"), ("Formula", "a - b")),
+            ArchiveColumn(("Path", "ChargingPower"))
+        }));
+        Assert.Single(BlueprintEntityComparer.Compare(changedFormula, stored, type, v => v, ResolveEnum, ResolveArchiveColumn));
+
+        var otherColumn = Seed(("Columns", new List<object?>
+        {
+            ArchiveColumn(("Path", ""), ("Name", "ChargePower"), ("Formula", "a + b")),
+            ArchiveColumn(("Path", "DischargingPower"))
+        }));
+        Assert.Single(BlueprintEntityComparer.Compare(otherColumn, stored, type, v => v, ResolveEnum, ResolveArchiveColumn));
+
+        var duplicateKey = Seed(("Columns", new List<object?>
+        {
+            ArchiveColumn(("Path", "ChargingPower")),
+            ArchiveColumn(("Path", "ChargingPower"))
+        }));
+        Assert.Single(BlueprintEntityComparer.Compare(duplicateKey, stored, type, v => v, ResolveEnum, ResolveArchiveColumn));
+    }
+
+    /// <summary>AB#8332: only archive columns are paired by key; the order of any other record array stays a change.</summary>
+    [Fact]
+    public void OtherRecordArraysInAnotherOrder_AreStillAChange()
+    {
+        var type = BuildType(RecordArrayAttr("Columns"));
+        var stored = Stored(("Columns", new List<object?>
+        {
+            Record(ColumnRecordId, ("AttributePath", "a")),
+            Record(ColumnRecordId, ("AttributePath", "b"))
+        }));
+        var seed = Seed(("Columns", new List<object?>
+        {
+            Record(ColumnRecordId, ("AttributePath", "b")),
+            Record(ColumnRecordId, ("AttributePath", "a"))
+        }));
+
+        Assert.Single(Compare(seed, stored, type));
+    }
+
+    private static RtRecordTcDto ArchiveColumn(params (string name, object? value)[] members)
+    {
+        var record = new RtRecordTcDto { CkRecordId = ArchiveColumnRecordId.ToRtCkId() };
+        foreach (var (name, value) in members)
+        {
+            record.Attributes.Add(new RtAttributeTcDto
+            {
+                Id = new CkId<CkAttributeId>($"System.StreamData-1.22.0/CkArchiveColumn.{name}").ToRtCkId(),
+                Value = value
+            });
+        }
+
+        return record;
+    }
+
+    private static CkRecordGraph? ResolveArchiveColumn(RtCkId<CkRecordId> id)
+    {
+        if (!string.Equals(id.ToString(), ArchiveColumnRecordId.ToRtCkId().ToString(), StringComparison.Ordinal))
+        {
+            return ResolveRecord(id);
+        }
+
+        CkTypeAttributeGraph Member(string name, AttributeValueTypesDto valueType,
+            AttributeOwnershipDto ownership = AttributeOwnershipDto.SeedOwned)
+        {
+            var attrId = new CkId<CkAttributeId>($"System.StreamData-1.22.0/CkArchiveColumn.{name}");
+            var definition = new CkAttributeGraph(attrId, new CkAttributeDto
+            {
+                AttributeId = name, ValueType = valueType, Ownership = ownership
+            });
+            return new CkTypeAttributeGraph(attrId,
+                new CkTypeAttributeDto { CkAttributeId = attrId, AttributeName = name, IsOptional = true }, definition);
+        }
+
+        return RecordGraph(ArchiveColumnRecordId,
+            Member("Path", AttributeValueTypesDto.String),
+            Member("Name", AttributeValueTypesDto.String),
+            Member("Formula", AttributeValueTypesDto.String),
+            Member("ResultType", AttributeValueTypesDto.Int),
+            Member("Indexed", AttributeValueTypesDto.Boolean),
+            Member("Required", AttributeValueTypesDto.Boolean),
+            Member("ComputedState", AttributeValueTypesDto.Int, AttributeOwnershipDto.RuntimeState),
+            Member("ComputedVersion", AttributeValueTypesDto.Int, AttributeOwnershipDto.RuntimeState));
+    }
+
     private static List<Meshmakers.Octo.Runtime.Contracts.Blueprints.BlueprintAttributeChange> Compare(
         RtEntityTcDto seed, RtEntity stored, CkTypeGraph type)
     {

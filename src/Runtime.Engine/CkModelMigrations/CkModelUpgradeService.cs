@@ -24,6 +24,7 @@ internal class CkModelUpgradeService : ICkModelUpgradeService
     private const string AttributeToVersion = "ToVersion";
     private const string AttributeExecutedAt = "ExecutedAt";
     private const string AttributeSuccess = "Success";
+    private static readonly TimeSpan SnapshotClockSkewTolerance = TimeSpan.FromSeconds(5);
     private static readonly RtCkId<CkTypeId> MigrationHistoryRtCkTypeId = new("System", "MigrationHistory");
 
 
@@ -60,8 +61,9 @@ internal class CkModelUpgradeService : ICkModelUpgradeService
             .ToDictionary(g => g.Key, g => g.First());
 
         // Get currently installed versions from MigrationHistory
-        var migrationHistoryVersions = await GetInstalledVersionsAsync(tenantId, cancellationToken)
+        var historyEntries = await GetLatestHistoryEntriesAsync(tenantId, cancellationToken)
             .ConfigureAwait(false);
+        var migrationHistoryVersions = historyEntries.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Version);
 
         // Keep track of original MigrationHistory entries to know which need to be recorded
         var hasHistoryEntry = new HashSet<string>(migrationHistoryVersions.Keys);
@@ -97,10 +99,16 @@ internal class CkModelUpgradeService : ICkModelUpgradeService
                     //      conclude "already at target" and silently skip the data migration —
                     //      the regression AB#4209 Step 1 hit when the very first data-transform
                     //      migration on Identity 2.7.0/2.8.0 -> 2.9.0 was being skipped.
-                    //  (b) schema < history — operator manually downgraded the schema (the
-                    //      historical justification for this branch). The current data really
-                    //      lives at the schema version; trust schema, drop the now-too-recent
-                    //      history entry, and let the upgrade pipeline migrate forward.
+                    //  (b) schema < history — two sub-cases, told apart by time (AB#8265):
+                    //      (b1) the history entry was written AFTER the caller took its schema snapshot:
+                    //           another service upgraded the same model in the meantime (rolling
+                    //           deployment). The snapshot is stale, not the tenant downgraded. Keep the
+                    //           history version and the existing history row; nothing is re-recorded and
+                    //           no migration runs a second time.
+                    //      (b2) the history entry is older than the snapshot: the operator manually
+                    //           downgraded the schema. The data really lives at the schema version;
+                    //           trust schema, drop the now-too-recent history entry, and let the
+                    //           upgrade pipeline migrate forward.
                     var schemaIsAhead = new CkVersion(kvp.Value)
                         .CompareTo(new CkVersion(installedVersions[kvp.Key])) > 0;
                     if (schemaIsAhead)
@@ -112,6 +120,14 @@ internal class CkModelUpgradeService : ICkModelUpgradeService
                         // Leave installedVersions[kvp.Key] at the history version; do not
                         // clear hasHistoryEntry, since the existing history row will be updated
                         // (not inserted) when the migration completes.
+                    }
+                    else if (IsHistoryWrittenAfterSnapshot(historyEntries[kvp.Key], options.SchemaSnapshotCapturedAtUtc))
+                    {
+                        _logger.LogInformation(
+                            "Schema snapshot {SchemaVersion} is older than MigrationHistory version {HistoryVersion} for CK model {CkModelName}, " +
+                            "but the history entry was recorded after the snapshot was taken: another service already upgraded the model. " +
+                            "Keeping MigrationHistory; not a manual downgrade.",
+                            kvp.Value, installedVersions[kvp.Key], kvp.Key);
                     }
                     else
                     {
@@ -443,7 +459,31 @@ internal class CkModelUpgradeService : ICkModelUpgradeService
         string tenantId,
         CancellationToken cancellationToken = default)
     {
-        var versions = new Dictionary<string, string>();
+        var latest = await GetLatestHistoryEntriesAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        return latest.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Version);
+    }
+
+    /// <summary>
+    /// A MigrationHistory entry that is newer than the caller's schema snapshot was written by someone else while
+    /// the caller was importing — a concurrent upgrade, not a manual downgrade. The tolerance absorbs clock skew
+    /// between the services and the database host.
+    /// </summary>
+    private static bool IsHistoryWrittenAfterSnapshot(HistoryEntry entry, DateTime? snapshotCapturedAtUtc)
+    {
+        return snapshotCapturedAtUtc.HasValue &&
+               entry.ExecutedAtUtc >= snapshotCapturedAtUtc.Value - SnapshotClockSkewTolerance;
+    }
+
+    private readonly record struct HistoryEntry(string Version, DateTime ExecutedAtUtc);
+
+    /// <summary>
+    /// Gets the latest successful history entry (version and execution time) per CK model.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, HistoryEntry>> GetLatestHistoryEntriesAsync(
+        string tenantId,
+        CancellationToken cancellationToken)
+    {
+        var versions = new Dictionary<string, HistoryEntry>();
 
         var repository = await _repositoryProvider.GetRepositoryAsync(tenantId, cancellationToken)
             .ConfigureAwait(false);
@@ -494,7 +534,7 @@ internal class CkModelUpgradeService : ICkModelUpgradeService
                 var latest = group.OrderByDescending(e => e.ExecutedAt).First();
                 // Normalize version string: remove brackets if present (legacy data cleanup)
                 // Old code stored "[2.0.1]" instead of "2.0.1"
-                versions[latest.ModelName] = NormalizeVersionString(latest.ToVersion);
+                versions[latest.ModelName] = new HistoryEntry(NormalizeVersionString(latest.ToVersion), latest.ExecutedAt);
             }
         }
         catch (Exception ex)

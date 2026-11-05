@@ -443,6 +443,40 @@ in the list. Remove the list when the CK language can express association write 
   attributes through rule 139 on caller and system path, the system path imports the edges as before, tenant without System.Identity
   reads the file once, version-less matching, omission preserved).
 
+#### JSON import writes its bulks inside the awaited call (AB#8325)
+
+`ImportAsync` / `ImportAsCallerAsync` with a JSON file read the entities through `IRtDeserializeStream` in bulks of 5000.
+Until AB#8325 each bulk was written by an `async void` handler of the `BulkDeserialized` event: the call returned and
+committed the transaction before the entities were written (against MongoDB the entity appeared ~3 s later), and a
+write error - message 141, the seed or archive guard, strict mandatory validation, a duplicate key - never reached the
+caller (bot-services reported the job as done). The handler also set `IsHandled` only after its first await, so the
+stream handed every pending entity out again with each further entity of a file above 5000 entities.
+
+- `IRtDeserializeStream.ReadBulksAsync(CancellationToken)` (`IAsyncEnumerable<IReadOnlyList<RtEntityTcDto>>`) is the
+  way to process bulks asynchronously: the next bulk is read only when the consumer asks for it, in file order, every
+  entity exactly once. `ImportRtModelCommand` writes each bulk with `await foreach`, so the call returns after the last
+  write, a failing bulk fails the import with the same exception as the YAML path (`ExchangeException`, inner exception
+  of the write) and nothing is committed. The first pass over the file (`CollectEntityIdsAsync`) uses the same method.
+- The import session is disposed at the end of every import method (`using var session`): a failure before the
+  commit aborts the transaction instead of leaving it open until the server times it out.
+- `BulkDeserialized` / `ReadAsync` stay for synchronous handlers only (built on `ReadBulksAsync`); never subscribe an
+  `async` handler. `RtDeserializeEventArgs.IsHandled` is no longer read.
+- The cancellation token of the import now also cancels the read of the JSON file (rollback, nothing committed).
+- **Record values in a JSON file** (found while fixing AB#8325): the stream reads an attribute value of type `object` with
+  Newtonsoft, so a record arrived as a `JObject` (a record array as a `JArray`). The import expects `RtRecordTcDto` (the YAML
+  reader's shape): a single record was silently dropped, a record array failed with an `InvalidCastException` - both
+  unseen while the write ran in the `async void` handler. `RtJsonRecordValueNormalizer` (called by the stream for every
+  entity) turns a JSON object with `ckRecordId` (and an array of only such objects) into `RtRecordTcDto`, nested records
+  included; every other value is left as the reader produced it. So the record checks of the first pass (139) and the
+  carry-over/refusal of the caller upsert (141) now see JSON records too. Not changed: `RtJsonSerializer.SerializeAsync`
+  (System.Text.Json) cannot write an `RtRecordTcDto` (the converter on `CkRecordId` does not fit the type) - a separate gap.
+- Tests: `ImportRtModelCommandJsonBulkAwaitTests` (repository that completes asynchronously, as MongoDB does: written
+  when the call returns, commit after the writes, a failing write fails the import and commits nothing),
+  `ImportRtModelCommandRecordMemberAccessTests` (`JsonCallerUpsert_*`: 141 over JSON; `JsonFileThroughTheRealStream_*`: the
+  real reader with record values), `RtDeserializeStreamBulkTests` (bulks, order, duplicates, record values).
+  The shared test double is `tests/Runtime.Engine.Tests/Exchange/FakeRtDeserializeStream.cs`. Against a real MongoDB:
+  engine-mongodb `ImportRtJsonAwaitIntegrationTests`.
+
 #### Runtime-State Preservation on Re-Import (Upsert)
 
 Any `ImportStrategy.Upsert` import maps to a full `ReplaceOne` in the

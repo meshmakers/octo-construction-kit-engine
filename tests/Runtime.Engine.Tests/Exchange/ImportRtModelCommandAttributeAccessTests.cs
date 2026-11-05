@@ -83,7 +83,7 @@ public class ImportRtModelCommandAttributeAccessTests : IDisposable
         public void JsonReturnsBulks(params RtEntityTcDto[][] bulks)
         {
             A.CallTo(() => Json.DeserializeStreamAsync(A<Stream>._, A<CancellationToken?>._))
-                .ReturnsLazily(() => Task.FromResult<IRtDeserializeStream>(new FakeDeserializeStream(bulks)));
+                .ReturnsLazily(() => Task.FromResult<IRtDeserializeStream>(new FakeRtDeserializeStream(bulks)));
         }
 
         public void NothingMayBeWritten()
@@ -91,26 +91,6 @@ public class ImportRtModelCommandAttributeAccessTests : IDisposable
             A.CallTo(() => Repository.BulkInsertRtEntitiesAsync(A<IOctoSession>._, A<IEnumerable<RtEntity>>._,
                 A<BulkOperationOptions>._)).MustNotHaveHappened();
             A.CallTo(() => Session.CommitTransactionAsync()).MustNotHaveHappened();
-        }
-    }
-
-    private sealed class FakeDeserializeStream(RtEntityTcDto[][] bulks) : IRtDeserializeStream
-    {
-        public IReadOnlyCollection<CkModelIdVersionRange> Dependencies { get; } = [];
-        public event EventHandler<RtDeserializeEventArgs>? BulkDeserialized;
-
-        public Task ReadAsync(CancellationToken? cancellationToken = null)
-        {
-            foreach (var bulk in bulks)
-            {
-                BulkDeserialized?.Invoke(this, new RtDeserializeEventArgs(bulk));
-            }
-
-            return Task.CompletedTask;
-        }
-
-        public void Dispose()
-        {
         }
     }
 
@@ -220,12 +200,7 @@ public class ImportRtModelCommandAttributeAccessTests : IDisposable
 
         await h.CreateCommand().ImportAsync(h.Repository, TempFile(), "application/json", ImportStrategy.Insert);
 
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        while (h.Written.ToArray().Length < 2 && DateTime.UtcNow < deadline)
-        {
-            await Task.Delay(20, TestContext.Current.CancellationToken);
-        }
-
+        // AB#8325: the entities are written when the call returns, no polling.
         Assert.Equal(2, h.Written.ToArray().Length);
         A.CallTo(() => h.Json.DeserializeStreamAsync(A<Stream>._, A<CancellationToken?>._))
             .MustHaveHappenedOnceExactly();

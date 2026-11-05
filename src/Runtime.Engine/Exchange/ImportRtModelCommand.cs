@@ -120,7 +120,8 @@ internal class ImportRtModelCommand(
         _lockEnforcer = null; // AB#6392: text imports are system flows
         logger.LogInformation("Importing RT entities using text started");
 
-        var session = await runtimeRepository.GetSessionAsync().ConfigureAwait(false);
+        // AB#8325: disposing the session aborts the transaction when the import fails before the commit.
+        using var session = await runtimeRepository.GetSessionAsync().ConfigureAwait(false);
         try
         {
             session.StartTransaction();
@@ -162,7 +163,8 @@ internal class ImportRtModelCommand(
             await runtimeRepository.LoadCacheForTenantAsync(cacheService).ConfigureAwait(false);
         }
 
-        var session = await runtimeRepository.GetSessionAsync().ConfigureAwait(false);
+        // AB#8325: disposing the session aborts the transaction when the import fails before the commit.
+        using var session = await runtimeRepository.GetSessionAsync().ConfigureAwait(false);
         try
         {
             session.StartTransaction();
@@ -219,7 +221,8 @@ internal class ImportRtModelCommand(
             await runtimeRepository.LoadCacheForTenantAsync(cacheService).ConfigureAwait(false);
         }
 
-        var session = await runtimeRepository.GetSessionAsync().ConfigureAwait(false);
+        // AB#8325: disposing the session aborts the transaction when the import fails before the commit.
+        using var session = await runtimeRepository.GetSessionAsync().ConfigureAwait(false);
         try
         {
             session.StartTransaction();
@@ -279,17 +282,18 @@ internal class ImportRtModelCommand(
                             .ConfigureAwait(false);
                     }
 
-                    var rtDeserializeStream = await rtJsonSerializer.DeserializeStreamAsync(stream, cancellationToken)
-                        .ConfigureAwait(false);
-                    rtDeserializeStream.BulkDeserialized += async (_, args) =>
-                    {
-                        await ImportEntityAsync(session, args.DeserializedEntities, runtimeRepository, importStrategy)
-                            .ConfigureAwait(false);
-
-                        args.IsHandled = true;
-                    };
+                    using var rtDeserializeStream = await rtJsonSerializer
+                        .DeserializeStreamAsync(stream, cancellationToken).ConfigureAwait(false);
                     ValidateCkModels(runtimeRepository.TenantId, rtDeserializeStream.Dependencies.ToList());
-                    await rtDeserializeStream.ReadAsync().ConfigureAwait(false);
+                    // AB#8325: each bulk is written inside the awaited import, in file order, before the next bulk is read.
+                    // A failing bulk (e.g. message 141, a seed or archive guard, a duplicate key) fails the import, and the
+                    // transaction is committed only after the last bulk was written. (The former async void event handler
+                    // let the call return and commit before the writes and lost their exceptions.)
+                    await foreach (var bulk in rtDeserializeStream.ReadBulksAsync(cancellationToken ?? CancellationToken.None)
+                                       .ConfigureAwait(false))
+                    {
+                        await ImportEntityAsync(session, bulk, runtimeRepository, importStrategy).ConfigureAwait(false);
+                    }
                 }
             }
 
@@ -431,26 +435,23 @@ internal class ImportRtModelCommand(
     {
         var ids = new List<(RtCkId<CkTypeId> CkTypeId, OctoObjectId RtId)>();
         await using var stream = File.OpenRead(filePath);
-        var rtDeserializeStream = await rtJsonSerializer.DeserializeStreamAsync(stream, cancellationToken)
+        using var rtDeserializeStream = await rtJsonSerializer.DeserializeStreamAsync(stream, cancellationToken)
             .ConfigureAwait(false);
-        rtDeserializeStream.BulkDeserialized += (_, args) =>
+        await foreach (var bulk in rtDeserializeStream.ReadBulksAsync(cancellationToken ?? CancellationToken.None)
+                           .ConfigureAwait(false))
         {
-            ids.AddRange(args.DeserializedEntities.Select(e => (e.CkTypeId, e.RtId)));
+            ids.AddRange(bulk.Select(e => (e.CkTypeId, e.RtId)));
             if (accessCheckTenantId != null && restrictedWrites != null)
             {
-                restrictedWrites.AddRange(RtAttributeAccessCheck.Find(cacheService, accessCheckTenantId,
-                    args.DeserializedEntities));
+                restrictedWrites.AddRange(RtAttributeAccessCheck.Find(cacheService, accessCheckTenantId, bulk));
             }
 
             if (identityOwnedWrites != null && tenantId != null)
             {
-                identityOwnedWrites.AddRange(RtIdentityOwnedWriteCheck.Find(cacheService, tenantId,
-                    args.DeserializedEntities));
+                identityOwnedWrites.AddRange(RtIdentityOwnedWriteCheck.Find(cacheService, tenantId, bulk));
             }
+        }
 
-            args.IsHandled = true;
-        };
-        await rtDeserializeStream.ReadAsync().ConfigureAwait(false);
         return ids;
     }
 

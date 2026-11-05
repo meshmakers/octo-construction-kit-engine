@@ -60,8 +60,12 @@ public class ImportRtModelCommandRecordMemberAccessTests : IDisposable
     private static readonly CkRecordGraph LooseSpecial = DerivedRecord("LooseSpecial", LooseBase, null,
         Attr("Label", null), Attr("Token", CkAttributeAccessDto.MethodOnly));
 
+    // A record without any protected member whose nested record attribute may hold the derived SpecialEntry.
+    private static readonly CkRecordGraph Wrapper = Record("Wrapper", null,
+        Attr("Note", null), Attr("Inner", null, AttributeValueTypesDto.Record, Entry.CkRecordId));
+
     private static readonly CkRecordGraph[] AllRecords =
-        [Detail, Item, Loose, HiddenKeyed, Entry, SpecialEntry, LooseBase, LooseSpecial];
+        [Detail, Item, Loose, HiddenKeyed, Entry, SpecialEntry, LooseBase, LooseSpecial, Wrapper];
 
     private static readonly CkTypeGraph Holder = Type("Holder",
         Attr("Name", null),
@@ -71,7 +75,8 @@ public class ImportRtModelCommandRecordMemberAccessTests : IDisposable
         Attr("Keyed", null, AttributeValueTypesDto.RecordArray, HiddenKeyed.CkRecordId),
         Attr("Entries", null, AttributeValueTypesDto.RecordArray, Entry.CkRecordId),
         Attr("OneEntry", null, AttributeValueTypesDto.Record, Entry.CkRecordId),
-        Attr("LooseEntries", null, AttributeValueTypesDto.RecordArray, LooseBase.CkRecordId));
+        Attr("LooseEntries", null, AttributeValueTypesDto.RecordArray, LooseBase.CkRecordId),
+        Attr("Wrapped", null, AttributeValueTypesDto.Record, Wrapper.CkRecordId));
 
     private static readonly CkTypeAttributeGraph[] AllRecordAttributes =
         Holder.AllAttributes.Values.Where(a => a.AttributeName != "Name").ToArray();
@@ -396,6 +401,31 @@ public class ImportRtModelCommandRecordMemberAccessTests : IDisposable
         Assert.Equal(141, ex.MessageNumber);
         Assert.Contains("LooseEntries[0].Token", ex.Message);
         Assert.Empty(h.Written);
+    }
+
+    [Fact]
+    public async Task CallerUpsert_NestedDerivedRecord_OmittedMethodOnlyMember_KeepsTheStoredValue()
+    {
+        // Review (CodeRabbit): Wrapper declares no protected member and its nested Inner is declared as Entry; only the stored
+        // SpecialEntry has Token. Selection and walk must both reach it.
+        var h = new Harness();
+        var storedWrapper = new RtRecord { CkRecordId = Wrapper.CkRecordId.ToRtCkId() };
+        storedWrapper.SetAttributeRawValue("Note", "stored");
+        storedWrapper.SetAttributeRawValue("Inner", StoredEntry(SpecialEntry, "a", "tok-a"));
+        var stored = h.Store(("Wrapped", storedWrapper));
+        var wrapper = new RtRecordTcDto { CkRecordId = Wrapper.CkRecordId.ToRtCkId() };
+        wrapper.Attributes.Add(new RtAttributeTcDto { Id = AttrId("Note"), Value = "new" });
+        wrapper.Attributes.Add(new RtAttributeTcDto { Id = AttrId("Inner"), Value = EntryDto(SpecialEntry, "a", "A2") });
+        h.YamlReturns(HolderDto(stored.RtId, ("Name", "n"), ("Wrapped", wrapper)));
+
+        await h.CreateCommand().ImportAsCallerAsync(h.Repository, TempFile(), ExchangeMimeTypes.MimeTypeYaml,
+            ImportStrategy.Upsert, Caller);
+
+        var written = Assert.IsType<RtRecord>(Assert.Single(h.Written).Attributes["Wrapped"]);
+        Assert.Equal("new", written.Attributes["Note"]);
+        var inner = Assert.IsType<RtRecord>(written.Attributes["Inner"]);
+        Assert.Equal("A2", inner.Attributes["Label"]);
+        Assert.Equal("tok-a", inner.Attributes["Token"]);
     }
 
     [Fact]

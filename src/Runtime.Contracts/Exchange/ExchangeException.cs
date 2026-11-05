@@ -115,6 +115,21 @@ public class ExchangeException : PersistenceException
     }
 
     /// <summary>
+    /// AB#8141: a caller upsert writes a record array whose record has no usable record key while a stored element holds a
+    /// value in a member that only a CK method may write; the elements cannot be matched, so the value would be lost.
+    /// Raised before anything is written; parameters rtId, ckTypeId, path.
+    /// </summary>
+    internal static Exception RecordMemberNotPreservable(IReadOnlyList<OperationMessage> offenders)
+    {
+        var first = offenders[0];
+        return new ExchangeException($"Import rejected [{first.MessageNumber}]: Nothing was written. {first.MessageText}",
+            first.MessageNumber)
+        {
+            Messages = offenders
+        };
+    }
+
+    /// <summary>
     /// AB#8042: a user-initiated import sets an identity association
     /// (<c>IdentityOwnedWrites</c>), which only the identity service writes. Raised before anything is written; one failure that
     /// lists every offender with its parameters (rtId, ckTypeId, path).

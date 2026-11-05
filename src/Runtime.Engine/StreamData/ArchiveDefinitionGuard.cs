@@ -281,6 +281,71 @@ internal static class ArchiveDefinitionGuard
     }
 
     /// <summary>
+    /// AB#8332: the order of <c>Columns</c> carries no meaning - a column is identified by its key (the physical name of an
+    /// ingested path, the name of a computed column), in the table and in every check of this guard. The archive lifecycle
+    /// appends a column a seed adds (<see cref="TakeColumnAdditions" />), so after an install the stored order can differ from
+    /// the seed order. This puts the columns of <paramref name="incoming" /> into the stored order: the columns the archive
+    /// already has in the order it holds them, then every other column in seed order. A re-apply then writes the list the
+    /// tenant already has, and the blueprint preview, which pairs archive columns by key as well
+    /// (<see cref="Meshmakers.Octo.Runtime.Engine.Blueprints.BlueprintEntityComparer" />), reports a pure order difference as no change.
+    /// </summary>
+    public static void KeepColumnOrder(ICkCacheService cacheService, string tenantId, CkTypeGraph ckType, RtEntity stored,
+        RtEntityTcDto incoming)
+    {
+        var attribute = incoming.Attributes.FirstOrDefault(a => NameOf(ckType, a) == ColumnsAttribute);
+        if (attribute?.Value is not IEnumerable items || attribute.Value is string)
+        {
+            return;
+        }
+
+        var seedOrder = items.Cast<object?>().ToList();
+        var ordered = OrderColumnsLike(
+            Records(ImportRtModelCommand.ToTransportValue(cacheService, tenantId, StoredValue(stored, ColumnsAttribute))),
+            seedOrder);
+        if (!ordered.SequenceEqual(seedOrder))
+        {
+            attribute.Value = ordered;
+        }
+    }
+
+    /// <summary>
+    /// AB#8332: <paramref name="seedColumns" /> in the order of <paramref name="storedColumns" /> (by column key); columns
+    /// the stored list does not have, and elements without a key, follow in seed order. A key that occurs twice in either list
+    /// leaves the seed order as it is: both duplicates would get the same rank and be moved next to each other.
+    /// </summary>
+    internal static List<object?> OrderColumnsLike(IEnumerable<RtRecordTcDto> storedColumns, IReadOnlyList<object?> seedColumns)
+    {
+        var seedKeys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in seedColumns)
+        {
+            if (item is RtRecordTcDto record && ColumnKeyOf(record) is { } key && !seedKeys.Add(key))
+            {
+                return seedColumns.ToList();
+            }
+        }
+
+        var storedOrder = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var record in storedColumns)
+        {
+            if (ColumnKeyOf(record) is { } key && !storedOrder.TryAdd(key, storedOrder.Count))
+            {
+                return seedColumns.ToList();
+            }
+        }
+
+        // OrderBy is stable: columns the archive does not have yet keep their seed order behind the stored ones.
+        return seedColumns
+            .Select((item, index) => (item, index,
+                rank: item is RtRecordTcDto record && ColumnKeyOf(record) is { } key && storedOrder.TryGetValue(key, out var position)
+                    ? position
+                    : int.MaxValue))
+            .OrderBy(x => x.rank)
+            .ThenBy(x => x.index)
+            .Select(x => x.item)
+            .ToList();
+    }
+
+    /// <summary>
     /// Sets every runtime member (<see cref="AttributeOwnershipDto.RuntimeState" />, any ownership preserved on upsert
     /// apart from secrets) of <paramref name="record" /> to the stored value; a member the stored column does not hold is
     /// removed from the seed record.
@@ -305,6 +370,13 @@ internal static class ArchiveDefinitionGuard
     /// </summary>
     public static bool KeepsRuntimeMembersOf(CkRecordGraph recordGraph)
         => string.Equals(recordGraph.CkRecordId.ToRtCkId().ToString(), ColumnRecordId, StringComparison.Ordinal);
+
+    /// <summary>
+    /// AB#8332: what identifies an archive column in the table: the physical name of an ingested path, the name of a
+    /// computed column; <c>null</c> when the record names neither (a blank name is no key either). Used to pair and order
+    /// columns; the guard's own checks keep <see cref="KeyOf" />.
+    /// </summary>
+    internal static string? ColumnKeyOf(RtRecordTcDto record) => KeyOf(record) is { } key && !string.IsNullOrWhiteSpace(key) ? key : null;
 
     private static void SetMember(RtRecordTcDto record, RtRecordTcDto storedRecord, string member, object? value)
     {

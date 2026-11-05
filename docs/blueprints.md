@@ -642,6 +642,21 @@ it. A seed formula equal to the change in progress (compared normalised) is no n
 before is refused until it is enabled again. On an archive without a table (never activated, or `Failed`) the seed formula is
 written as before and the runtime members are kept.
 
+### Order of archive columns (AB#8332)
+
+The order of `Columns` carries no meaning: a column is identified by its key (the physical name of an ingested path, the name of a
+computed column) in the table and in every check above. The archive lifecycle appends a column a seed adds, so after an install or
+update the tenant can hold the columns in another order than the seed (prod-1 `energyiq`, EnergyIQ.Base 1.3.0: the computed columns
+behind the ingested ones). Two rules keep that from turning into a change:
+
+- **Preview** (`BlueprintEntityComparer`): two lists of archive columns (`System.StreamData/CkArchiveColumn`) are paired by column key,
+  not by position. The same columns in another order, with runtime members only on the tenant side, are no change; a changed formula,
+  an added or a missing column still is. Lists without a key on every element, or with a duplicate key, compare by position as before.
+  Any other record array keeps comparing by position.
+- **Apply** (`ArchiveDefinitionGuard.KeepColumnOrder`, after `KeepColumnRuntimeState`): the import writes the columns the archive already
+  has in the stored order, then every other column in seed order. A re-apply writes the list the tenant holds; a seed cannot reorder
+  the columns of an existing archive (there is nothing to reorder for).
+
 ## Archives and rollups in a blueprint (AB#7991)
 
 A blueprint ships stream-data archives (raw, time-range, rollup) as seed entities. On **install, forced re-apply and update** the

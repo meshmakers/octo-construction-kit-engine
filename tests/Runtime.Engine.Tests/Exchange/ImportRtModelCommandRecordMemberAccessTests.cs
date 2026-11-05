@@ -14,6 +14,7 @@ using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Meshmakers.Octo.Runtime.Engine.Exchange;
 using Meshmakers.Octo.Runtime.Engine.Repositories.Query;
+using Meshmakers.Octo.Runtime.Engine.Serialization;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -30,6 +31,7 @@ namespace Meshmakers.Octo.Runtime.Engine.Tests.Exchange;
 public class ImportRtModelCommandRecordMemberAccessTests : IDisposable
 {
     private const string Tenant = "tenant-rm";
+    private const string JsonMimeType = "application/json";
     private const string ModelId = "Test-1.0.0";
     private static readonly RtCkId<CkTypeId> HolderType = new($"{ModelId}/Holder");
     private static readonly RtImportCallerContext Caller = RtImportCallerContext.UserInitiated("user-1");
@@ -403,6 +405,121 @@ public class ImportRtModelCommandRecordMemberAccessTests : IDisposable
         Assert.Empty(h.Written);
     }
 
+    // ---- JSON stream (AB#8325) --------------------------------------------------------------------------------------
+    // The JSON file is written in bulks. The repository of these tests answers asynchronously, as MongoDB does, so a bulk
+    // write that is not awaited by the import would lose the refusal and let the call return before the write.
+
+    [Fact]
+    public async Task JsonCallerUpsert_KeylessRecordArrayWithStoredValue_IsRefusedWith141_AndWritesNothing()
+    {
+        var h = new Harness(asyncRepository: true);
+        var stored = h.Store(("Loose", new List<RtRecord> { StoredLoose("l", "secret") }));
+        h.JsonReturnsBulks([HolderDto(stored.RtId, ("Name", "n"), ("Loose", new List<object> { LooseDto("l2") }))]);
+
+        var ex = await Assert.ThrowsAsync<ExchangeException>(() => h.CreateCommand().ImportAsCallerAsync(
+            h.Repository, TempFile(), JsonMimeType, ImportStrategy.Upsert, Caller));
+
+        Assert.Equal(141, ex.MessageNumber);
+        Assert.Empty(h.Written);
+        A.CallTo(() => h.Session.CommitTransactionAsync()).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task JsonCallerUpsert_KeylessArrayOfADerivedRecordWithStoredValue_IsRefusedWith141_AndWritesNothing()
+    {
+        var h = new Harness(asyncRepository: true);
+        var stored = h.Store(("LooseEntries", new List<RtRecord> { StoredEntry(LooseSpecial, null, "secret") }));
+        h.JsonReturnsBulks([HolderDto(stored.RtId, ("Name", "n"),
+            ("LooseEntries", new List<object> { EntryDto(LooseSpecial, null, "l2") }))]);
+
+        var ex = await Assert.ThrowsAsync<ExchangeException>(() => h.CreateCommand().ImportAsCallerAsync(
+            h.Repository, TempFile(), JsonMimeType, ImportStrategy.Upsert, Caller));
+
+        Assert.Equal(141, ex.MessageNumber);
+        Assert.Contains("LooseEntries[0].Token", ex.Message);
+        Assert.Empty(h.Written);
+        A.CallTo(() => h.Session.CommitTransactionAsync()).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task JsonCallerUpsert_OmittingARecordMethodOnlyMember_KeepsTheStoredValue_WhenTheCallReturns()
+    {
+        var h = new Harness(asyncRepository: true);
+        var stored = h.Store(("Items", new List<RtRecord> { StoredItem("a", "tok-a") }));
+        h.JsonReturnsBulks([HolderDto(stored.RtId, ("Name", "n"), ("Items", new List<object> { ItemDto("a", "A2") }))]);
+
+        await h.CreateCommand().ImportAsCallerAsync(h.Repository, TempFile(), JsonMimeType, ImportStrategy.Upsert,
+            Caller);
+
+        var element = Assert.Single((IEnumerable<RtRecord>)Assert.Single(h.Written).Attributes["Items"]!);
+        Assert.Equal("tok-a", element.Attributes["Token"]);
+        A.CallTo(() => h.Session.CommitTransactionAsync()).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task JsonFileThroughTheRealStream_KeylessRecordArrayWithStoredValue_IsRefusedWith141()
+    {
+        // The real JSON reader: record values arrive as record transport objects, not as JSON objects (AB#8325).
+        var h = new Harness(asyncRepository: true);
+        var stored = h.Store(("Loose", new List<RtRecord> { StoredLoose("l", "secret") }));
+        var file = await JsonFileAsync(HolderDto(stored.RtId, ("Name", "n"), ("Loose", new List<object> { LooseDto("l2") })));
+
+        var ex = await Assert.ThrowsAsync<ExchangeException>(() => h.CreateCommand(new RtJsonSerializer())
+            .ImportAsCallerAsync(h.Repository, file, JsonMimeType, ImportStrategy.Upsert, Caller));
+
+        Assert.Equal(141, ex.MessageNumber);
+        Assert.Empty(h.Written);
+    }
+
+    [Fact]
+    public async Task JsonFileThroughTheRealStream_RecordArrayByKey_KeepsTheStoredValue()
+    {
+        var h = new Harness(asyncRepository: true);
+        var stored = h.Store(("Items", new List<RtRecord> { StoredItem("a", "tok-a") }));
+        var file = await JsonFileAsync(HolderDto(stored.RtId, ("Name", "n"), ("Items", new List<object> { ItemDto("a", "A2") })));
+
+        await h.CreateCommand(new RtJsonSerializer()).ImportAsCallerAsync(h.Repository, file, JsonMimeType,
+            ImportStrategy.Upsert, Caller);
+
+        var element = Assert.Single((IEnumerable<RtRecord>)Assert.Single(h.Written).Attributes["Items"]!);
+        Assert.Equal("A2", element.Attributes["Label"]);
+        Assert.Equal("tok-a", element.Attributes["Token"]);
+    }
+
+    /// <summary>
+    ///     Writes the entities as a JSON ImportRt file (the shape an export writes; the record values as JSON objects).
+    /// </summary>
+    private async Task<string> JsonFileAsync(params RtEntityTcDto[] entities)
+    {
+        static object? Json(object? value) => value switch
+        {
+            RtRecordTcDto record => new Dictionary<string, object?>
+            {
+                ["ckRecordId"] = record.CkRecordId.ToString(),
+                ["attributes"] = record.Attributes.Select(a => new Dictionary<string, object?>
+                    { ["id"] = a.Id.ToString(), ["value"] = Json(a.Value) }).ToList()
+            },
+            IEnumerable<object> list when value is not string => list.Select(Json).ToList(),
+            _ => value
+        };
+
+        var root = new Dictionary<string, object?>
+        {
+            ["$schema"] = RtModelRootTcDto.RtSchemaUri,
+            ["dependencies"] = Array.Empty<string>(),
+            ["entities"] = entities.Select(e => new Dictionary<string, object?>
+            {
+                ["rtId"] = e.RtId.ToString(), ["ckTypeId"] = e.CkTypeId.ToString(),
+                ["attributes"] = e.Attributes.Select(a => new Dictionary<string, object?>
+                    { ["id"] = a.Id.ToString(), ["value"] = Json(a.Value) }).ToList()
+            }).ToList()
+        };
+        var file = TempFile();
+        await File.WriteAllTextAsync(file, System.Text.Json.JsonSerializer.Serialize(root),
+            TestContext.Current.CancellationToken);
+        return file;
+    }
+
     [Fact]
     public async Task CallerUpsert_NestedDerivedRecord_OmittedMethodOnlyMember_KeepsTheStoredValue()
     {
@@ -599,7 +716,7 @@ public class ImportRtModelCommandRecordMemberAccessTests : IDisposable
 
     private sealed class Harness
     {
-        public Harness()
+        public Harness(bool asyncRepository = false)
         {
             CkCache = Cache();
             A.CallTo(() => Repository.TenantId).Returns(Tenant);
@@ -614,11 +731,17 @@ public class ImportRtModelCommandRecordMemberAccessTests : IDisposable
                 .Invokes(call => Written.AddRange(call.GetArgument<IEnumerable<RtEntity>>(1)!));
             A.CallTo(() => Repository.GetRtEntitiesByIdAsync(A<IOctoSession>._, A<RtCkId<CkTypeId>>._,
                     A<IReadOnlyList<OctoObjectId>>._, A<RtEntityQueryOptions>._, A<int?>._, A<int?>._))
-                .ReturnsLazily(call =>
+                .ReturnsLazily(async call =>
                 {
+                    if (asyncRepository)
+                    {
+                        // A real database answers later: the read completes after the caller's first await.
+                        await Task.Delay(20).ConfigureAwait(false);
+                    }
+
                     var ids = call.GetArgument<IReadOnlyList<OctoObjectId>>(2)!;
                     var items = ids.Where(Stored.ContainsKey).Select(id => Stored[id]).ToList();
-                    return Task.FromResult<IResultSet<RtEntity>>(new ResultSet<RtEntity>(items, items.Count, null, null));
+                    return (IResultSet<RtEntity>)new ResultSet<RtEntity>(items, items.Count, null, null);
                 });
         }
 
@@ -644,14 +767,21 @@ public class ImportRtModelCommandRecordMemberAccessTests : IDisposable
             return entity;
         }
 
-        public ImportRtModelCommand CreateCommand() => new(NullLogger<ImportRtModelCommand>.Instance, CkCache, Yaml,
-            Json, A.Fake<IRtImportAuditTrail>(), new RtImportOptions(), Resolver, A.Fake<IAuditEventSink>());
+        public ImportRtModelCommand CreateCommand(IRtJsonSerializer? json = null) => new(
+            NullLogger<ImportRtModelCommand>.Instance, CkCache, Yaml, json ?? Json, A.Fake<IRtImportAuditTrail>(),
+            new RtImportOptions(), Resolver, A.Fake<IAuditEventSink>());
 
         public void YamlReturns(params RtEntityTcDto[] entities)
         {
             var root = new RtModelRootTcDto { Entities = entities.ToList() };
             A.CallTo(() => Yaml.DeserializeAsync(A<Stream>._, A<string>._, A<OperationResult>._))
                 .Returns(Task.FromResult(root));
+        }
+
+        public void JsonReturnsBulks(params RtEntityTcDto[][] bulks)
+        {
+            A.CallTo(() => Json.DeserializeStreamAsync(A<Stream>._, A<CancellationToken?>._))
+                .ReturnsLazily(() => Task.FromResult<IRtDeserializeStream>(new FakeRtDeserializeStream(bulks)));
         }
     }
 }

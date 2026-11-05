@@ -22,7 +22,8 @@ public class RtDeserializeEventArgs : EventArgs
     public IEnumerable<RtEntityTcDto> DeserializedEntities { get; }
 
     /// <summary>
-    ///     Set to true when the event has been handled.
+    ///     Set to true when the event has been handled. Kept for compatibility: the stream hands out every entity exactly
+    ///     once and no longer reads this flag (AB#8325).
     /// </summary>
     public bool IsHandled { get; set; }
 }

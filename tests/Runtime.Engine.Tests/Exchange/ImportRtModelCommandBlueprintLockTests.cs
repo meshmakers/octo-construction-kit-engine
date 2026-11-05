@@ -174,27 +174,7 @@ public class ImportRtModelCommandBlueprintLockTests : IDisposable
         public void JsonReturnsBulks(params RtEntityTcDto[][] bulks)
         {
             A.CallTo(() => Json.DeserializeStreamAsync(A<Stream>._, A<CancellationToken?>._))
-                .ReturnsLazily(() => Task.FromResult<IRtDeserializeStream>(new FakeDeserializeStream(bulks)));
-        }
-    }
-
-    private sealed class FakeDeserializeStream(RtEntityTcDto[][] bulks) : IRtDeserializeStream
-    {
-        public IReadOnlyCollection<CkModelIdVersionRange> Dependencies { get; } = [];
-        public event EventHandler<RtDeserializeEventArgs>? BulkDeserialized;
-
-        public Task ReadAsync(CancellationToken? cancellationToken = null)
-        {
-            foreach (var bulk in bulks)
-            {
-                BulkDeserialized?.Invoke(this, new RtDeserializeEventArgs(bulk));
-            }
-
-            return Task.CompletedTask;
-        }
-
-        public void Dispose()
-        {
+                .ReturnsLazily(() => Task.FromResult<IRtDeserializeStream>(new FakeRtDeserializeStream(bulks)));
         }
     }
 

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using Meshmakers.Common.Shared;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts;
@@ -11,7 +11,6 @@ namespace Meshmakers.Octo.Runtime.Engine.Serialization;
 internal class RtDeserializeStream : IRtDeserializeStream
 {
     private readonly List<CkModelIdVersionRange> _dependencies;
-    private readonly ConcurrentDictionary<OctoObjectId, RtEntityTcDto> _deserializedEntities = new();
     private readonly int _maxCount;
     private readonly JsonTextReader _reader;
     private readonly JsonSerializer _serializer;
@@ -39,66 +38,66 @@ internal class RtDeserializeStream : IRtDeserializeStream
 
     public async Task ReadAsync(CancellationToken? cancellationToken = null)
     {
+        await foreach (var bulk in ReadBulksAsync(cancellationToken ?? CancellationToken.None).ConfigureAwait(false))
+        {
+            BulkDeserialized?.Invoke(this, new RtDeserializeEventArgs(bulk));
+        }
+    }
+
+    public async IAsyncEnumerable<IReadOnlyList<RtEntityTcDto>> ReadBulksAsync(
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
         if (_reader.TokenType != JsonToken.PropertyName || !Equals(_reader.Value, nameof(RtModelRootTcDto.Entities).ToCamelCase()))
         {
             throw RuntimeModelParseException.InvalidPosition();
         }
 
-        while (await _reader.ReadAsync().ConfigureAwait(false))
+        // AB#8325: the bulk is handed out and the reader waits until the consumer asks for the next one. The former event
+        // path kept the entities of a bulk until a handler had set IsHandled, so a handler that set it late (an async
+        // handler after its first await) received every entity again with each further entity.
+        var bulk = new List<RtEntityTcDto>();
+        var bulkIds = new HashSet<OctoObjectId>();
+        while (await _reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             if (_reader.TokenType == JsonToken.EndArray)
             {
-                if (_deserializedEntities.Any())
-                {
-                    BulkDeserialized?.Invoke(this, new RtDeserializeEventArgs(_deserializedEntities.Values.ToArray()));
-                    _deserializedEntities.Clear();
-                }
-
-                return;
+                break;
             }
 
-            if (_reader.TokenType == JsonToken.StartArray)
+            if (_reader.TokenType != JsonToken.StartObject)
             {
                 continue;
             }
 
-            if (_reader.TokenType == JsonToken.StartObject)
+            var entity = _serializer.Deserialize<RtEntityTcDto>(_reader);
+            if (entity == null)
             {
-                var c = _serializer.Deserialize<RtEntityTcDto>(_reader);
-                if (c == null)
-                {
-                    throw RuntimeModelParseException.CannotDeserializeEntity(_reader.LineNumber);
-                }
-
-                AddEntity(c);
+                throw RuntimeModelParseException.CannotDeserializeEntity(_reader.LineNumber);
             }
+
+            RtJsonRecordValueNormalizer.Normalize(entity);
+            if (!bulkIds.Add(entity.RtId))
+            {
+                throw RuntimeModelParseException.DuplicateEntity(entity.RtId);
+            }
+
+            bulk.Add(entity);
+            if (bulk.Count >= _maxCount)
+            {
+                yield return bulk;
+                bulk = [];
+                bulkIds.Clear();
+            }
+        }
+
+        if (bulk.Count > 0)
+        {
+            yield return bulk;
         }
     }
 
     public void Dispose()
     {
-    }
-
-    private void AddEntity(RtEntityTcDto rtEntityDto)
-    {
-        if (!_deserializedEntities.TryAdd(rtEntityDto.RtId, rtEntityDto))
-        {
-            throw RuntimeModelParseException.DuplicateEntity(rtEntityDto.RtId);
-        }
-
-        if (_deserializedEntities.Count >= _maxCount)
-        {
-            var entities = _deserializedEntities.Values.ToArray();
-            var rtDeserializeEventArgs = new RtDeserializeEventArgs(entities);
-            BulkDeserialized?.Invoke(this, rtDeserializeEventArgs);
-            if (rtDeserializeEventArgs.IsHandled)
-            {
-                foreach (var entityDto in entities)
-                {
-                    _deserializedEntities.TryRemove(entityDto.RtId, out _);
-                }
-            }
-        }
     }
 
     internal async Task InitializeAsync(CancellationToken? cancellationToken = null)

@@ -208,12 +208,7 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
         await h.CreateCommand().ImportAsCallerAsync(h.Repository, TempFile(), "application/json",
             ImportStrategy.Insert, Caller);
 
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        while (h.Written.ToArray().Length < 1 && DateTime.UtcNow < deadline)
-        {
-            await Task.Delay(20, TestContext.Current.CancellationToken);
-        }
-
+        // AB#8325: the entities are written when the call returns, no polling.
         Assert.Single(h.Written.ToArray());
         A.CallTo(() => h.Json.DeserializeStreamAsync(A<Stream>._, A<CancellationToken?>._))
             .MustHaveHappenedOnceExactly();
@@ -277,12 +272,7 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
         await h.CreateCommand().ImportAsCallerAsync(h.Repository, TempFile(), "application/json",
             ImportStrategy.Upsert, Caller, blankingPolicy: RtImportBlankingPolicy.Allow);
 
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        while (h.Written.ToArray().Length < 1 && DateTime.UtcNow < deadline)
-        {
-            await Task.Delay(20, TestContext.Current.CancellationToken);
-        }
-
+        // AB#8325: the entities are written when the call returns, no polling.
         AssertStoredValuesKept(Assert.Single(h.Written.ToArray()), stored);
     }
 
@@ -479,7 +469,7 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
         public void JsonReturnsBulks(params RtEntityTcDto[][] bulks)
         {
             A.CallTo(() => Json.DeserializeStreamAsync(A<Stream>._, A<CancellationToken?>._))
-                .ReturnsLazily(() => Task.FromResult<IRtDeserializeStream>(new FakeDeserializeStream(bulks)));
+                .ReturnsLazily(() => Task.FromResult<IRtDeserializeStream>(new FakeRtDeserializeStream(bulks)));
         }
 
         public void NothingWritten()
@@ -491,23 +481,4 @@ public class ImportRtModelCommandIdentityOwnedTests : IDisposable
         }
     }
 
-    private sealed class FakeDeserializeStream(RtEntityTcDto[][] bulks) : IRtDeserializeStream
-    {
-        public IReadOnlyCollection<CkModelIdVersionRange> Dependencies { get; } = [];
-        public event EventHandler<RtDeserializeEventArgs>? BulkDeserialized;
-
-        public Task ReadAsync(CancellationToken? cancellationToken = null)
-        {
-            foreach (var bulk in bulks)
-            {
-                BulkDeserialized?.Invoke(this, new RtDeserializeEventArgs(bulk));
-            }
-
-            return Task.CompletedTask;
-        }
-
-        public void Dispose()
-        {
-        }
-    }
 }

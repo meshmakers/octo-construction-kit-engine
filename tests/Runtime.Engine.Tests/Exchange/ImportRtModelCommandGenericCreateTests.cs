@@ -187,7 +187,7 @@ public class ImportRtModelCommandGenericCreateTests : IDisposable
         public void JsonReturnsBulks(params RtEntityTcDto[][] bulks)
         {
             A.CallTo(() => Json.DeserializeStreamAsync(A<Stream>._, A<CancellationToken?>._))
-                .ReturnsLazily(() => Task.FromResult<IRtDeserializeStream>(new FakeDeserializeStream(bulks)));
+                .ReturnsLazily(() => Task.FromResult<IRtDeserializeStream>(new FakeRtDeserializeStream(bulks)));
         }
 
         public void NothingMayBeWritten()
@@ -195,26 +195,6 @@ public class ImportRtModelCommandGenericCreateTests : IDisposable
             A.CallTo(() => Repository.BulkInsertRtEntitiesAsync(A<IOctoSession>._, A<IEnumerable<RtEntity>>._,
                 A<BulkOperationOptions>._)).MustNotHaveHappened();
             A.CallTo(() => Session.CommitTransactionAsync()).MustNotHaveHappened();
-        }
-    }
-
-    private sealed class FakeDeserializeStream(RtEntityTcDto[][] bulks) : IRtDeserializeStream
-    {
-        public IReadOnlyCollection<CkModelIdVersionRange> Dependencies { get; } = [];
-        public event EventHandler<RtDeserializeEventArgs>? BulkDeserialized;
-
-        public Task ReadAsync(CancellationToken? cancellationToken = null)
-        {
-            foreach (var bulk in bulks)
-            {
-                BulkDeserialized?.Invoke(this, new RtDeserializeEventArgs(bulk));
-            }
-
-            return Task.CompletedTask;
-        }
-
-        public void Dispose()
-        {
         }
     }
 
@@ -227,19 +207,10 @@ public class ImportRtModelCommandGenericCreateTests : IDisposable
     }
 
     /// <summary>
-    ///     The bulk handler of the import is an async event handler that the fake stream cannot await, so the
-    ///     writes of a successful JSON import are awaited by polling.
+    ///     AB#8325: the JSON import writes its bulks inside the awaited call, so the entities are written when it returns.
     /// </summary>
-    private static async Task WaitForWrittenAsync(Harness h, Func<RtEntity, bool> predicate)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        while (!h.Written.ToArray().Any(predicate) && DateTime.UtcNow < deadline)
-        {
-            await Task.Delay(20);
-        }
-
+    private static void AssertWritten(Harness h, Func<RtEntity, bool> predicate) =>
         Assert.Contains(h.Written.ToArray(), new Predicate<RtEntity>(predicate));
-    }
 
     private static void AssertRefusal(ExchangeException ex, params ValueTuple<string, OctoObjectId>[] offenders)
     {
@@ -364,7 +335,7 @@ public class ImportRtModelCommandGenericCreateTests : IDisposable
         await h.CreateCommand().ImportAsCallerAsync(h.Repository, TempFile(), "application/json",
             ImportStrategy.Upsert, User);
 
-        await WaitForWrittenAsync(h, e => e.RtId == stored.RtId);
+        AssertWritten(h, e => e.RtId == stored.RtId);
         Assert.Equal("changed", h.Written.Single(e => e.RtId == stored.RtId).GetAttributeValueOrDefault("Name"));
     }
 
@@ -377,7 +348,7 @@ public class ImportRtModelCommandGenericCreateTests : IDisposable
         await h.CreateCommand().ImportAsCallerAsync(h.Repository, TempFile(), "application/json",
             ImportStrategy.Insert, User);
 
-        await WaitForWrittenAsync(h, _ => true);
+        AssertWritten(h, _ => true);
         // no first pass over the file and no read of the stored state
         A.CallTo(() => h.Json.DeserializeStreamAsync(A<Stream>._, A<CancellationToken?>._))
             .MustHaveHappenedOnceExactly();

@@ -48,12 +48,30 @@ public class ImportRtModelCommandRecordMemberAccessTests : IDisposable
     private static readonly CkRecordGraph HiddenKeyed = Record("HiddenKeyed", "Key",
         Attr("Key", CkAttributeAccessDto.MethodOnly), Attr("Label", null), Attr("Token", CkAttributeAccessDto.MethodOnly));
 
+    // Derived records (AB#8141 reopen): the declared records Entry / LooseBase have no protected member, the records derived
+    // from them add one. An element of an array or a single record attribute may hold the derived record.
+    private static readonly CkRecordGraph Entry = Record("Entry", "Key", Attr("Key", null), Attr("Label", null));
+
+    private static readonly CkRecordGraph SpecialEntry = DerivedRecord("SpecialEntry", Entry, "Key",
+        Attr("Key", null), Attr("Label", null), Attr("Token", CkAttributeAccessDto.MethodOnly));
+
+    private static readonly CkRecordGraph LooseBase = Record("LooseBase", null, Attr("Label", null));
+
+    private static readonly CkRecordGraph LooseSpecial = DerivedRecord("LooseSpecial", LooseBase, null,
+        Attr("Label", null), Attr("Token", CkAttributeAccessDto.MethodOnly));
+
+    private static readonly CkRecordGraph[] AllRecords =
+        [Detail, Item, Loose, HiddenKeyed, Entry, SpecialEntry, LooseBase, LooseSpecial];
+
     private static readonly CkTypeGraph Holder = Type("Holder",
         Attr("Name", null),
         Attr("Single", null, AttributeValueTypesDto.Record, Item.CkRecordId),
         Attr("Items", null, AttributeValueTypesDto.RecordArray, Item.CkRecordId),
         Attr("Loose", null, AttributeValueTypesDto.RecordArray, Loose.CkRecordId),
-        Attr("Keyed", null, AttributeValueTypesDto.RecordArray, HiddenKeyed.CkRecordId));
+        Attr("Keyed", null, AttributeValueTypesDto.RecordArray, HiddenKeyed.CkRecordId),
+        Attr("Entries", null, AttributeValueTypesDto.RecordArray, Entry.CkRecordId),
+        Attr("OneEntry", null, AttributeValueTypesDto.Record, Entry.CkRecordId),
+        Attr("LooseEntries", null, AttributeValueTypesDto.RecordArray, LooseBase.CkRecordId));
 
     private static readonly CkTypeAttributeGraph[] AllRecordAttributes =
         Holder.AllAttributes.Values.Where(a => a.AttributeName != "Name").ToArray();
@@ -76,7 +94,10 @@ public class ImportRtModelCommandRecordMemberAccessTests : IDisposable
     }
 
     private static CkRecordGraph? Resolve(RtCkId<CkRecordId> id) =>
-        new[] { Detail, Item, Loose, HiddenKeyed }.FirstOrDefault(r => r.CkRecordId.ToRtCkId().FullName == id.FullName);
+        AllRecords.FirstOrDefault(r => r.CkRecordId.ToRtCkId().FullName == id.FullName);
+
+    private static IEnumerable<CkRecordGraph> Derived(RtCkId<CkRecordId> id) =>
+        AllRecords.Where(r => r.BaseRecords.Any(b => b.BaseCkRecordId.ToRtCkId().FullName == id.FullName));
 
     private static Func<object?, object?> Convert(ICkCacheService cache) =>
         v => ImportRtModelCommand.ToTransportValue(cache, Tenant, v);
@@ -313,6 +334,87 @@ public class ImportRtModelCommandRecordMemberAccessTests : IDisposable
         Assert.Empty(h.Written);
     }
 
+    // ---- derived records (AB#8141 reopen) ----------------------------------------------------------------------------
+
+    [Fact]
+    public void RecordHasSecretMembers_SeesAProtectedMemberOfADerivedRecord_WhenGivenTheInheritors()
+    {
+        Assert.False(ImportRtModelCommand.RecordHasSecretMembers(Entry, Resolve, [], includeMethodOnlyMembers: true));
+        Assert.True(ImportRtModelCommand.RecordHasSecretMembers(Entry, Resolve, [], includeMethodOnlyMembers: true,
+            derivedRecords: Derived));
+        Assert.False(ImportRtModelCommand.RecordHasSecretMembers(Entry, Resolve, [], derivedRecords: Derived));
+    }
+
+    [Fact]
+    public async Task CallerUpsert_DerivedRecordInAnArray_OmittedMethodOnlyMember_KeepsTheStoredValue()
+    {
+        var h = new Harness();
+        var stored = h.Store(("Entries", new List<RtRecord>
+        {
+            StoredEntry(SpecialEntry, "a", "tok-a"), StoredEntry(Entry, "b", null)
+        }));
+        h.YamlReturns(HolderDto(stored.RtId, ("Name", "n"), ("Entries", new List<object>
+        {
+            EntryDto(SpecialEntry, "a", "A2"), EntryDto(Entry, "b", "B2")
+        })));
+
+        await h.CreateCommand().ImportAsCallerAsync(h.Repository, TempFile(), ExchangeMimeTypes.MimeTypeYaml,
+            ImportStrategy.Upsert, Caller, blankingPolicy: RtImportBlankingPolicy.Allow);
+
+        var elements = ((IEnumerable<RtRecord>)Assert.Single(h.Written).Attributes["Entries"]!).ToList();
+        Assert.Equal("A2", elements[0].Attributes["Label"]);
+        Assert.Equal("tok-a", elements[0].Attributes["Token"]);
+        Assert.False(elements[1].Attributes.TryGetValue("Token", out var none) && none != null);
+    }
+
+    [Fact]
+    public async Task CallerUpsert_DerivedRecordInASingleRecordAttribute_OmittedMethodOnlyMember_KeepsTheStoredValue()
+    {
+        var h = new Harness();
+        var stored = h.Store(("OneEntry", StoredEntry(SpecialEntry, "a", "tok-a")));
+        h.YamlReturns(HolderDto(stored.RtId, ("Name", "n"), ("OneEntry", EntryDto(SpecialEntry, "a", "A2"))));
+
+        await h.CreateCommand().ImportAsCallerAsync(h.Repository, TempFile(), ExchangeMimeTypes.MimeTypeYaml,
+            ImportStrategy.Upsert, Caller);
+
+        var written = Assert.IsType<RtRecord>(Assert.Single(h.Written).Attributes["OneEntry"]);
+        Assert.Equal("A2", written.Attributes["Label"]);
+        Assert.Equal("tok-a", written.Attributes["Token"]);
+    }
+
+    [Fact]
+    public async Task CallerUpsert_KeylessArrayOfADerivedRecordWithStoredValue_IsRefused_WithMessage141()
+    {
+        var h = new Harness();
+        var stored = h.Store(("LooseEntries", new List<RtRecord> { StoredEntry(LooseSpecial, null, "secret") }));
+        h.YamlReturns(HolderDto(stored.RtId, ("Name", "n"),
+            ("LooseEntries", new List<object> { EntryDto(LooseSpecial, null, "l2") })));
+
+        var ex = await Assert.ThrowsAsync<ExchangeException>(() => h.CreateCommand().ImportAsCallerAsync(
+            h.Repository, TempFile(), ExchangeMimeTypes.MimeTypeYaml, ImportStrategy.Upsert, Caller));
+
+        Assert.Equal(141, ex.MessageNumber);
+        Assert.Contains("LooseEntries[0].Token", ex.Message);
+        Assert.Empty(h.Written);
+    }
+
+    [Fact]
+    public void ElementThatChangesToTheBaseRecord_KeepsOnlyTheMembersOfItsNewRecord()
+    {
+        // The caller replaces a SpecialEntry by a plain Entry with the same key: like removing the element and adding a
+        // new one, the new record declares no Token, so there is nothing to carry and nothing to refuse.
+        var existing = StoredHolder();
+        existing.SetAttributeRawValue("Entries", new List<RtRecord> { StoredEntry(SpecialEntry, "a", "tok-a") });
+        var seed = Seed(existing, ("Entries", new List<object> { EntryDto(Entry, "a", "A2") }));
+        var entries = Holder.AllAttributes.Values.Where(a => a.AttributeName == "Entries").ToArray();
+
+        var count = ImportRtModelCommand.PreserveSecretRecordMembers(seed, existing, entries, Resolve, Convert(Cache()));
+
+        Assert.Equal(0, count);
+        var element = ((List<object>)seed.Attributes.Single().Value!).Cast<RtRecordTcDto>().Single();
+        Assert.Null(Member(element, "Token"));
+    }
+
     // ---- model helpers ----------------------------------------------------------------------------------------------
 
     private static RtCkId<CkAttributeId> AttrId(string name) => new CkId<CkAttributeId>($"{ModelId}/{name}").ToRtCkId();
@@ -330,6 +432,43 @@ public class ImportRtModelCommandRecordMemberAccessTests : IDisposable
     private static CkRecordGraph Record(string name, string? key, params CkTypeAttributeGraph[] attrs) =>
         new(new CkId<CkRecordId>($"{ModelId}/{name}"), false, false, [], null, [], [],
             attrs.ToDictionary(a => a.CkAttributeId, a => a), name) { RecordKey = key };
+
+    private static CkRecordGraph DerivedRecord(string name, CkRecordGraph baseRecord, string? key,
+        params CkTypeAttributeGraph[] attrs)
+    {
+        var id = new CkId<CkRecordId>($"{ModelId}/{name}");
+        return new CkRecordGraph(id, false, false, [new CkGraphRecordInheritance(id, baseRecord.CkRecordId, 0)],
+            baseRecord.CkRecordId, [], [], attrs.ToDictionary(a => a.CkAttributeId, a => a), name) { RecordKey = key };
+    }
+
+    private static RtRecord StoredEntry(CkRecordGraph record, string? key, string? token)
+    {
+        var stored = new RtRecord { CkRecordId = record.CkRecordId.ToRtCkId() };
+        if (key != null)
+        {
+            stored.SetAttributeRawValue("Key", key);
+        }
+
+        stored.SetAttributeRawValue("Label", "stored");
+        if (token != null)
+        {
+            stored.SetAttributeRawValue("Token", token);
+        }
+
+        return stored;
+    }
+
+    private static RtRecordTcDto EntryDto(CkRecordGraph record, string? key, string label)
+    {
+        var dto = new RtRecordTcDto { CkRecordId = record.CkRecordId.ToRtCkId() };
+        if (key != null)
+        {
+            dto.Attributes.Add(new RtAttributeTcDto { Id = AttrId("Key"), Value = key });
+        }
+
+        dto.Attributes.Add(new RtAttributeTcDto { Id = AttrId("Label"), Value = label });
+        return dto;
+    }
 
     private static CkTypeGraph Type(string name, params CkTypeAttributeGraph[] attrs) => new(
         new CkId<CkTypeId>($"{ModelId}/{name}"), false, false, true, [], null, null, [], [],
@@ -410,8 +549,8 @@ public class ImportRtModelCommandRecordMemberAccessTests : IDisposable
         A.CallTo(() => cache.TryGetRtCkType(Tenant, HolderType, out holder)).Returns(true)
             .AssignsOutAndRefParameters(Holder);
         A.CallTo(() => cache.GetCkTypes(Tenant)).Returns(new List<CkTypeGraph> { Holder });
-        A.CallTo(() => cache.GetCkRecords(Tenant)).Returns(new List<CkRecordGraph> { Detail, Item, Loose, HiddenKeyed });
-        foreach (var record in new[] { Detail, Item, Loose, HiddenKeyed })
+        A.CallTo(() => cache.GetCkRecords(Tenant)).Returns(AllRecords.ToList());
+        foreach (var record in AllRecords)
         {
             var rtId = record.CkRecordId.ToRtCkId();
             CkRecordGraph? ignored;

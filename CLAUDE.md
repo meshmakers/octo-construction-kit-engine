@@ -418,7 +418,13 @@ tenant restore works on MongoDB: neither is guarded.
   of the stored element included); nothing stored means nothing to lose. An explicit value for the member is still refused by 139. The
   secret-record selection (`secretRecordAttributes`) takes record attributes with such members on the caller path
   (`RecordHasSecretMembers(..., includeMethodOnlyMembers)`); a record attribute that is itself MethodOnly/Hidden is carried whole by the
-  attribute rule. The system path is unchanged. Tests: `ImportRtModelCommandRecordMemberAccessTests`.
+  attribute rule. **Derived records (AB#8141 reopen):** a record value may hold a record derived from the declared one, and a protected
+  member may exist only on the derived record. The selection therefore also looks at every record that derives from the declared record
+  (and from each nested record), taken from the `BaseRecords` chains of the tenant's records (`DerivedRecordsFunc`;
+  `CkRecordGraph.DerivedRecords` is never filled by the CK resolver and must not be relied on). The walk itself uses the record type of
+  each written element: an element whose record type the caller changes keeps only the members its new record declares (like removing
+  the element and adding a new one). The system path is unchanged. Tests: `ImportRtModelCommandRecordMemberAccessTests` (unit, fake
+  repository); against a real MongoDB with a compiled CK model: engine-mongodb `ImportRtRecordMemberPreservationIntegrationTests`.
 
 **Associations: still a list.** `IdentityOwnedWrites` (`ConstructionKit.Contracts`, public) is reduced to the association roles
 `System.Identity/AssignedRole`, `GroupMember`, `ChildGroup`, `MayActAs`, `GrantsPermission` (both directions; `IsIdentityOwnedAssociation`,

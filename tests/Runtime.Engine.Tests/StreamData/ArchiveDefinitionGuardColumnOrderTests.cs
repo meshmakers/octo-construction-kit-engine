@@ -70,6 +70,18 @@ public class ArchiveDefinitionGuardColumnOrderTests
         Assert.Equal([seed[2], seed[1], unkeyed], ordered);
     }
 
+    [Fact]
+    public void AColumnWithABlankName_HasNoKey_AndFollowsInSeedOrder()
+    {
+        var blank = Column(name: "  ");
+        Assert.Null(ArchiveDefinitionGuard.ColumnKeyOf(blank));
+
+        var seed = new List<object?> { blank, Column(name: "b"), Column(path: "a") };
+        var ordered = ArchiveDefinitionGuard.OrderColumnsLike([Column(name: "  "), Column(path: "a"), Column(name: "b")], seed);
+
+        Assert.Equal([seed[2], seed[1], blank], ordered);
+    }
+
     private static RtRecordTcDto Column(string? path = null, string? name = null)
     {
         var record = new RtRecordTcDto { CkRecordId = new CkId<CkRecordId>(ColumnRecord).ToRtCkId() };

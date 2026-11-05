@@ -318,7 +318,7 @@ internal static class ArchiveDefinitionGuard
         var seedKeys = new HashSet<string>(StringComparer.Ordinal);
         foreach (var item in seedColumns)
         {
-            if (item is RtRecordTcDto record && KeyOf(record) is { } key && !seedKeys.Add(key))
+            if (item is RtRecordTcDto record && ColumnKeyOf(record) is { } key && !seedKeys.Add(key))
             {
                 return seedColumns.ToList();
             }
@@ -327,7 +327,7 @@ internal static class ArchiveDefinitionGuard
         var storedOrder = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var record in storedColumns)
         {
-            if (KeyOf(record) is { } key && !storedOrder.TryAdd(key, storedOrder.Count))
+            if (ColumnKeyOf(record) is { } key && !storedOrder.TryAdd(key, storedOrder.Count))
             {
                 return seedColumns.ToList();
             }
@@ -336,7 +336,7 @@ internal static class ArchiveDefinitionGuard
         // OrderBy is stable: columns the archive does not have yet keep their seed order behind the stored ones.
         return seedColumns
             .Select((item, index) => (item, index,
-                rank: item is RtRecordTcDto record && KeyOf(record) is { } key && storedOrder.TryGetValue(key, out var position)
+                rank: item is RtRecordTcDto record && ColumnKeyOf(record) is { } key && storedOrder.TryGetValue(key, out var position)
                     ? position
                     : int.MaxValue))
             .OrderBy(x => x.rank)
@@ -373,9 +373,10 @@ internal static class ArchiveDefinitionGuard
 
     /// <summary>
     /// AB#8332: what identifies an archive column in the table: the physical name of an ingested path, the name of a
-    /// computed column; <c>null</c> when the record names neither.
+    /// computed column; <c>null</c> when the record names neither (a blank name is no key either). Used to pair and order
+    /// columns; the guard's own checks keep <see cref="KeyOf" />.
     /// </summary>
-    internal static string? ColumnKeyOf(RtRecordTcDto record) => KeyOf(record);
+    internal static string? ColumnKeyOf(RtRecordTcDto record) => KeyOf(record) is { } key && !string.IsNullOrWhiteSpace(key) ? key : null;
 
     private static void SetMember(RtRecordTcDto record, RtRecordTcDto storedRecord, string member, object? value)
     {

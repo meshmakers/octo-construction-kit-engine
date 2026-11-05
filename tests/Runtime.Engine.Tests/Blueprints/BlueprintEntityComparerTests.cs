@@ -641,6 +641,19 @@ public class BlueprintEntityComparerTests
             ArchiveColumn(("Path", "ChargingPower"))
         }));
         Assert.Single(BlueprintEntityComparer.Compare(duplicateKey, stored, type, v => v, ResolveEnum, ResolveArchiveColumn));
+
+        // A blank name is no key: such lists compare by position, so a reorder stays a change.
+        var blankStored = Stored(("Columns", new List<object?>
+        {
+            ArchiveColumn(("Path", ""), ("Name", " "), ("Formula", "a")),
+            ArchiveColumn(("Path", "ChargingPower"))
+        }));
+        var blankSeed = Seed(("Columns", new List<object?>
+        {
+            ArchiveColumn(("Path", "ChargingPower")),
+            ArchiveColumn(("Path", ""), ("Name", " "), ("Formula", "a"))
+        }));
+        Assert.Single(BlueprintEntityComparer.Compare(blankSeed, blankStored, type, v => v, ResolveEnum, ResolveArchiveColumn));
     }
 
     /// <summary>AB#8332: only archive columns are paired by key; the order of any other record array stays a change.</summary>

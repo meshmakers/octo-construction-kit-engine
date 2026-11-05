@@ -1272,13 +1272,16 @@ internal class ImportRtModelCommand(
             // AB#8141: on the caller path the same pass also carries the stored values of record members that only a CK
             // method may write (access MethodOnly or Hidden), so an upsert that omits such a member does not lose it.
             // A record attribute that is itself MethodOnly or Hidden is carried over whole (see below), not walked.
+            // A record value may hold a record derived from the declared one (AB#8141 reopen), so on the caller path a
+            // protected member of any derived record selects the attribute too.
+            var derivedRecords = _callerImport ? DerivedRecordsFunc(runtimeRepository.TenantId) : null;
             var secretRecordAttributes = ckTypeGraph!.AllAttributes.Values
                 .Where(a => !a.Ownership.IsPreservedOnUpsert() &&
                             (!_callerImport || a.IsWritableOutsideMethod) &&
                             a.ValueType is AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray &&
                             a.ValueCkRecordId != null &&
                             RecordHasSecretMembers(resolveRecord(a.ValueCkRecordId.ToRtCkId()), resolveRecord, [],
-                                includeMethodOnlyMembers: _callerImport))
+                                includeMethodOnlyMembers: _callerImport, derivedRecords))
                 .ToList();
 
             // AB#6313: the seed-owned attributes are guarded against blanking, so a type needs the
@@ -1612,12 +1615,32 @@ internal class ImportRtModelCommand(
     }
 
     /// <summary>
+    /// AB#8141: the records of the tenant that derive (directly or further down) from a record, computed lazily on the first
+    /// call from <see cref="CkRecordGraph.BaseRecords" /> (the full base chain of every record).
+    /// <see cref="CkRecordGraph.DerivedRecords" /> is not filled by the CK resolver and cannot be used.
+    /// </summary>
+    private Func<RtCkId<CkRecordId>, IEnumerable<CkRecordGraph>> DerivedRecordsFunc(string tenantId)
+    {
+        ILookup<string, CkRecordGraph>? byBase = null;
+        return id =>
+        {
+            byBase ??= cacheService.GetCkRecords(tenantId)
+                .SelectMany(record => record.BaseRecords.Select(b => (Base: b.BaseCkRecordId.ToRtCkId().FullName, record)))
+                .ToLookup(x => x.Base, x => x.record, StringComparer.Ordinal);
+            return byBase[id.FullName];
+        };
+    }
+
+    /// <summary>
     /// AB#5532: true when the record (or a nested record attribute of it) declares a Secret member (AB#8141:
-    /// with <c>includeMethodOnlyMembers</c> also a member that only a CK method may write).
+    /// with <c>includeMethodOnlyMembers</c> also a member that only a CK method may write). With
+    /// <paramref name="derivedRecords" /> the records derived from it (and from every nested record) count too: a record value
+    /// may hold a derived record, whose members are what is stored.
     /// </summary>
     internal static bool RecordHasSecretMembers(CkRecordGraph? recordGraph,
         Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord, HashSet<string> visiting,
-        bool includeMethodOnlyMembers = false)
+        bool includeMethodOnlyMembers = false,
+        Func<RtCkId<CkRecordId>, IEnumerable<CkRecordGraph>>? derivedRecords = null)
     {
         if (recordGraph == null || !visiting.Add(recordGraph.CkRecordId.ToString()))
         {
@@ -1635,9 +1658,20 @@ internal class ImportRtModelCommand(
             if (member.ValueType is AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray &&
                 member.ValueCkRecordId != null &&
                 RecordHasSecretMembers(resolveRecord(member.ValueCkRecordId.ToRtCkId()), resolveRecord, visiting,
-                    includeMethodOnlyMembers))
+                    includeMethodOnlyMembers, derivedRecords))
             {
                 return true;
+            }
+        }
+
+        if (derivedRecords != null)
+        {
+            foreach (var derived in derivedRecords(recordGraph.CkRecordId.ToRtCkId()))
+            {
+                if (RecordHasSecretMembers(derived, resolveRecord, visiting, includeMethodOnlyMembers, derivedRecords))
+                {
+                    return true;
+                }
             }
         }
 

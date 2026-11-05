@@ -44,6 +44,32 @@ public class ArchiveDefinitionGuardColumnOrderTests
         Assert.Equal(seed, ArchiveDefinitionGuard.OrderColumnsLike(stored, seed));
     }
 
+    [Fact]
+    public void ADuplicateKey_InTheSeedOrTheStoredList_LeavesTheSeedOrder()
+    {
+        var a1 = Column(path: "a");
+        var a2 = Column(path: "a");
+        var b = Column(name: "b");
+        var seedWithDuplicate = new List<object?> { a1, b, a2 };
+        Assert.Equal(seedWithDuplicate,
+            ArchiveDefinitionGuard.OrderColumnsLike([Column(path: "a"), Column(name: "b")], seedWithDuplicate));
+
+        var seed = new List<object?> { Column(name: "b"), Column(path: "a") };
+        Assert.Equal(seed,
+            ArchiveDefinitionGuard.OrderColumnsLike([Column(path: "a"), Column(name: "b"), Column(path: "a")], seed));
+    }
+
+    [Fact]
+    public void AColumnWithoutAKey_FollowsInSeedOrder()
+    {
+        var unkeyed = Column(path: "");
+        var seed = new List<object?> { unkeyed, Column(name: "b"), Column(path: "a") };
+
+        var ordered = ArchiveDefinitionGuard.OrderColumnsLike([Column(path: "a"), Column(name: "b")], seed);
+
+        Assert.Equal([seed[2], seed[1], unkeyed], ordered);
+    }
+
     private static RtRecordTcDto Column(string? path = null, string? name = null)
     {
         var record = new RtRecordTcDto { CkRecordId = new CkId<CkRecordId>(ColumnRecord).ToRtCkId() };

@@ -310,16 +310,26 @@ internal static class ArchiveDefinitionGuard
 
     /// <summary>
     /// AB#8332: <paramref name="seedColumns" /> in the order of <paramref name="storedColumns" /> (by column key); columns
-    /// the stored list does not have, and elements without a key, follow in seed order.
+    /// the stored list does not have, and elements without a key, follow in seed order. A key that occurs twice in either list
+    /// leaves the seed order as it is: both duplicates would get the same rank and be moved next to each other.
     /// </summary>
     internal static List<object?> OrderColumnsLike(IEnumerable<RtRecordTcDto> storedColumns, IReadOnlyList<object?> seedColumns)
     {
+        var seedKeys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in seedColumns)
+        {
+            if (item is RtRecordTcDto record && KeyOf(record) is { } key && !seedKeys.Add(key))
+            {
+                return seedColumns.ToList();
+            }
+        }
+
         var storedOrder = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var record in storedColumns)
         {
-            if (KeyOf(record) is { } key)
+            if (KeyOf(record) is { } key && !storedOrder.TryAdd(key, storedOrder.Count))
             {
-                storedOrder.TryAdd(key, storedOrder.Count);
+                return seedColumns.ToList();
             }
         }
 

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 
@@ -34,7 +35,38 @@ public interface IRtDeserializeStream : IDisposable
     ///     exactly once. The next bulk is read only when the consumer asks for it, so a consumer that awaits its work per bulk
     ///     (<c>await foreach</c>) processes the file in sequence and sees every exception of that work (AB#8325).
     /// </summary>
+    /// <remarks>
+    ///     The default implementation keeps existing implementers of this interface compatible: it reads the whole stream
+    ///     through <see cref="ReadAsync" /> and <see cref="BulkDeserialized" /> first and then hands the collected bulks out,
+    ///     so it holds all entities in memory. Implementers should override it to stream.
+    /// </remarks>
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>The bulks of deserialized entities.</returns>
-    IAsyncEnumerable<IReadOnlyList<RtEntityTcDto>> ReadBulksAsync(CancellationToken cancellationToken = default);
+    async IAsyncEnumerable<IReadOnlyList<RtEntityTcDto>> ReadBulksAsync(
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var bulks = new List<IReadOnlyList<RtEntityTcDto>>();
+
+        void Collect(object? sender, RtDeserializeEventArgs args)
+        {
+            bulks.Add(args.DeserializedEntities.ToList());
+            args.IsHandled = true;
+        }
+
+        BulkDeserialized += Collect;
+        try
+        {
+            await ReadAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            BulkDeserialized -= Collect;
+        }
+
+        foreach (var bulk in bulks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return bulk;
+        }
+    }
 }

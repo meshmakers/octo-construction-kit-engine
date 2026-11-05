@@ -150,4 +150,43 @@ public class RtDeserializeStreamBulkTests
 
         return Assert.Single(bulks);
     }
+
+    [Fact]
+    public async Task ReadBulksAsync_DefaultImplementation_HandsOutTheBulksOfAnEventOnlyImplementer()
+    {
+        IRtDeserializeStream stream = new EventOnlyStream();
+        var bulks = new List<IReadOnlyList<RtEntityTcDto>>();
+
+        await foreach (var bulk in stream.ReadBulksAsync(TestContext.Current.CancellationToken))
+        {
+            bulks.Add(bulk);
+        }
+
+        Assert.Equal([2, 1], bulks.Select(b => b.Count));
+        Assert.Equal(RtIds[..3], bulks.SelectMany(b => b).Select(e => e.RtId.ToString()));
+    }
+
+    /// <summary>An implementer written before <c>ReadBulksAsync</c> existed: only the event.</summary>
+    private sealed class EventOnlyStream : IRtDeserializeStream
+    {
+        public IReadOnlyCollection<Meshmakers.Octo.ConstructionKit.Contracts.CkModelIdVersionRange> Dependencies { get; } = [];
+
+        public event EventHandler<RtDeserializeEventArgs>? BulkDeserialized;
+
+        public Task ReadAsync(CancellationToken? cancellationToken = null)
+        {
+            BulkDeserialized?.Invoke(this, new RtDeserializeEventArgs([Entity(RtIds[0]), Entity(RtIds[1])]));
+            BulkDeserialized?.Invoke(this, new RtDeserializeEventArgs([Entity(RtIds[2])]));
+            return Task.CompletedTask;
+        }
+
+        public void Dispose()
+        {
+        }
+
+        private static RtEntityTcDto Entity(string rtId) => new()
+        {
+            RtId = Meshmakers.Octo.ConstructionKit.Contracts.OctoObjectId.Parse(rtId), CkTypeId = "Sample1/SampleType1"
+        };
+    }
 }

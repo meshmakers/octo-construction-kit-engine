@@ -457,6 +457,8 @@ stream handed every pending entity out again with each further entity of a file 
   entity exactly once. `ImportRtModelCommand` writes each bulk with `await foreach`, so the call returns after the last
   write, a failing bulk fails the import with the same exception as the YAML path (`ExchangeException`, inner exception
   of the write) and nothing is committed. The first pass over the file (`CollectEntityIdsAsync`) uses the same method.
+  The interface carries a default implementation for implementers written before it (reads the whole stream through the
+  event, then hands the bulks out; holds everything in memory) - no implementer exists in the monorepo (checked 2026-11-05).
 - The import session is disposed at the end of every import method (`using var session`): a failure before the
   commit aborts the transaction instead of leaving it open until the server times it out.
 - `BulkDeserialized` / `ReadAsync` stay for synchronous handlers only (built on `ReadBulksAsync`); never subscribe an

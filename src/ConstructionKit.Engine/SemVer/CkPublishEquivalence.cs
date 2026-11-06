@@ -33,6 +33,8 @@ public sealed record CkPublishEquivalenceResult(bool AreEquivalent, IReadOnlyLis
 ///             roles, interfaces, dependencies) carries no meaning.</item>
 ///         <item><b>compiler-stamped metadata</b>: <c>minEngineVersion</c> is derived by the compiler from the features
 ///             the model uses; a content change that needs a newer engine shows up in the content itself.</item>
+///         <item><b>acknowledgements</b> (AB#7894): <c>compatibility.acknowledge</c> is the audit trail of the release it
+///             was published with, not model structure; a rebuild of a published version may keep, drop or reword it.</item>
 ///     </list>
 ///     Adding a class: add a step to <see cref="Steps" /> with a test that changes only that aspect (equivalent) and one
 ///     that changes content next to it (still <c>OCTO-CK205</c>).
@@ -56,7 +58,9 @@ public sealed class CkPublishEquivalence
         ("element order", NormalizeOrder),
         ("compiler-stamped metadata (minEngineVersion)", NormalizeCompilerStampedMetadata),
         ("resolved dependency closure of a range-retaining model (moved inside the declared ranges)",
-            NormalizeResolvedClosure)
+            NormalizeResolvedClosure),
+        ("acknowledgements (compatibility.acknowledge, the audit trail of the published release, not model structure)",
+            NormalizeAcknowledgements)
     ];
 
     /// <summary>
@@ -256,6 +260,27 @@ public sealed class CkPublishEquivalence
         a.Dependencies = null;
         b.Dependencies = null;
         return true;
+    }
+
+    // ---- acknowledgements ------------------------------------------------------------------------------------------
+
+    /// <summary>
+    ///     AB#7894 (class 5): <c>compatibility.acknowledge</c> is not model structure (it is excluded from the diff,
+    ///     <see cref="CkModelDiffService" />) but the audit trail of the release it was published with. Under an already
+    ///     published version it is spent: a rebuild that keeps it, drops it or rewords it changes nothing a consumer can
+    ///     see, and the published file keeps its entries. Without this class a release with acknowledgements could never be
+    ///     rebuilt: with the entries the compile gate judged them stale (<c>OCTO-CK204</c>), without them the publish gate
+    ///     refused the re-publish (<c>OCTO-CK205</c>).
+    /// </summary>
+    private static bool NormalizeAcknowledgements(CkCompiledModelRoot a, CkCompiledModelRoot b)
+    {
+        var differed = !Entries(a).SequenceEqual(Entries(b));
+        a.Compatibility = null;
+        b.Compatibility = null;
+        return differed;
+
+        static IEnumerable<(string, string)> Entries(CkCompiledModelRoot model) =>
+            (model.Compatibility?.Acknowledge ?? []).Select(e => (e.Change, e.Reason));
     }
 
     // ---- compiler-stamped metadata -------------------------------------------------------------------------------

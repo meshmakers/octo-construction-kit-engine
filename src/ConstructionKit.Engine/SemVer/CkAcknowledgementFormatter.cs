@@ -1,3 +1,4 @@
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.SemVer;
 
@@ -26,8 +27,16 @@ public static class CkAcknowledgementFormatter
     ///     One finding per unacknowledged change (<c>OCTO-CK203</c>) and per stale entry (<c>OCTO-CK204</c>), without
     ///     the code prefix.
     /// </summary>
+    /// <param name="result">The acknowledgement result of the verdict.</param>
+    /// <param name="modelName">The model name for the texts.</param>
+    /// <param name="publishedRelease">
+    ///     AB#7894: the published release of exactly the declared version when the verdict compares the model with it
+    ///     (<see cref="CkPublishedRelease.IsDeclaredVersionPublished" />), otherwise null. A stale entry then belongs to
+    ///     that release, and the next step is to raise the version, not to remove the entry: removing it without a raise
+    ///     changes the content of a published version (<c>OCTO-CK205</c>).
+    /// </param>
     public static IReadOnlyList<(string Code, string Text)> GetFindings(CkAcknowledgementResult result,
-        string modelName)
+        string modelName, CkModelId? publishedRelease = null)
     {
         var findings = new List<(string, string)>();
         foreach (var missing in result.Unacknowledged)
@@ -40,6 +49,17 @@ public static class CkAcknowledgementFormatter
 
         foreach (var stale in result.Stale)
         {
+            if (publishedRelease != null)
+            {
+                findings.Add((StaleCode,
+                    $"The acknowledgement \"{stale.Change}\" of model '{modelName}' matches no change against " +
+                    $"'{publishedRelease.FullName}', which is already published under the declared version: the entry " +
+                    "belongs to that release. Raise the version in ckModel.yaml first; with the raised version, remove the " +
+                    "entry if it matches no change of the new release. Do not remove it without raising the version: a " +
+                    "published version is immutable (OCTO-CK205)."));
+                continue;
+            }
+
             findings.Add((StaleCode, stale.MatchedChange == null
                 ? $"The acknowledgement \"{stale.Change}\" of model '{modelName}' matches no change in this release. " +
                   "An acknowledgement is valid for one release only; remove the entry from compatibility.acknowledge."

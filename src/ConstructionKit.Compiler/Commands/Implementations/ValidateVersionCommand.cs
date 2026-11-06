@@ -385,10 +385,30 @@ internal class ValidateVersionCommand : CkcCommand
         AddRenameHints(classifiedChanges, warnings);
 
         // AB#6295: the acknowledge rule (OCTO-CK203/204), shared with the compile gate. Never lowers a level.
+        // AB#7894: a rebuild of the published release of the declared version is not judged again (same rule as the
+        // compile gate and the publish gate's no-op for an equivalent re-publish).
         var acknowledgement = verdict.Acknowledgement;
-        foreach (var (code, text) in CkAcknowledgementFormatter.GetFindings(acknowledgement, modelName))
+        var isRebuildOfPublishedRelease = CkPublishedRelease.IsRebuild(verdict);
+        if (isRebuildOfPublishedRelease)
         {
-            errors.Add($"{code}: {text}");
+            notes.Add(CkPublishedRelease.FormatRebuildLine(verdict));
+            if (writeChangelog)
+            {
+                notes.Add($"CHANGELOG not written: '{publishedModelId.FullName}' is already published; its section stays as released.");
+            }
+            if (!CkPublishedRelease.HaveSameAcknowledgements(verdict.BaselineModel, current))
+            {
+                warnings.Add(CkPublishedRelease.FormatAcknowledgementsDifferLine(verdict.BaselineId));
+            }
+        }
+        else
+        {
+            var publishedRelease = CkPublishedRelease.IsDeclaredVersionPublished(baseline) ? baseline.Baseline : null;
+            foreach (var (code, text) in CkAcknowledgementFormatter.GetFindings(acknowledgement, modelName,
+                         publishedRelease))
+            {
+                errors.Add($"{code}: {text}");
+            }
         }
 
         // AB#4467: --apply. Only a version that is merely too low (OCTO-CK100 and no other finding) is fixed; the
@@ -452,8 +472,9 @@ internal class ValidateVersionCommand : CkcCommand
         WriteReport(markdownReport, modelName, rootPath, baseline, declaredVersion, validationResult,
             classifiedChanges, errors, warnings, notes, acknowledgement);
 
-        // 11. Only on success and --changelog: write/replace the section of the declared version
-        if (errors.Count == 0 && writeChangelog)
+        // 11. Only on success and --changelog: write/replace the section of the declared version. Never for a rebuild of
+        //     the published release (AB#7894): diffed against itself it has no changes, and its section stays as released.
+        if (errors.Count == 0 && writeChangelog && !isRebuildOfPublishedRelease)
         {
             var note = validationResult.Verdict == CkSemVerVerdict.ValidBumpWithoutStructuralChange
                 ? "Version bump without structural model change."

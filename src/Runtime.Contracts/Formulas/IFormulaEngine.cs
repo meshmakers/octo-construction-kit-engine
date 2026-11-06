@@ -45,15 +45,24 @@ public interface IFormulaEngine
     FormulaSyntaxResult CheckSyntax(string expression, IReadOnlyCollection<string> argumentNames);
 
     /// <summary>
-    /// Evaluates the expression to a raw <see cref="double"/>. Returns <see cref="double.NaN"/> on
-    /// evaluation failure; <see cref="double.NegativeInfinity"/> is the engine's <c>null</c> sentinel.
+    /// Evaluates the expression to a raw <see cref="double"/>. Returns <see cref="double.NaN"/> when the
+    /// formula yields no value (invalid syntax, an unbound or NULL operand, a division by zero);
+    /// <see cref="double.NegativeInfinity"/> is the engine's <c>null</c> sentinel. Throws
+    /// <see cref="FormulaEvaluationException"/> when the evaluation was aborted by an exception (e.g. out of
+    /// memory) — the value is then unknown, and a caller must not store it as NULL (AB#8331).
     /// </summary>
+    /// <remarks>
+    /// Thread-safe. The parsed formula is cached per thread and reused, so evaluating the same formula for
+    /// many rows allocates almost nothing. Only the names the formula references are bound; other entries of
+    /// <paramref name="arguments"/> are ignored.
+    /// </remarks>
     double EvaluateRaw(string expression, IReadOnlyDictionary<string, double> arguments);
 
     /// <summary>
     /// Evaluates the expression and casts the <see cref="double"/> result back to
     /// <paramref name="resultType"/>. Returns <c>null</c> for the <c>null</c> sentinel
-    /// (<see cref="double.NegativeInfinity"/>) or a <see cref="double.NaN"/> result.
+    /// (<see cref="double.NegativeInfinity"/>) or a <see cref="double.NaN"/> result. Throws
+    /// <see cref="FormulaEvaluationException"/> like <see cref="EvaluateRaw"/>.
     /// </summary>
     object? Evaluate(string expression, IReadOnlyDictionary<string, double> arguments,
         FormulaResultType resultType);

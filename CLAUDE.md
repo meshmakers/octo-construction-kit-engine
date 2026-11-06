@@ -782,6 +782,17 @@ read is one request through `IGitHubTreeReader` (recursive tree, versions from f
 2 minutes away throws `GitHubRateLimitExhaustedException` ("GitHub rate limit exhausted, resets at HH:MMZ.") instead of waiting for the 5-minute `CkCompile`/`CkRestore` timeout.
 12-model wave measured with `CatalogApiBudgetTests`: 2882 -> 340 requests (docs/ck-semver-rules.md, "The API budget of the catalog reads").
 
+## Formula engine: parse once, never NULL for an exception (AB#8331)
+
+`FormulaEngine` (Runtime.Engine.Formulas) caches a parsed mXparser expression per thread and formula (`FormulaShape`, one
+`PreparedFormula` per set of identifiers the values supply) and only sets argument values per call; a fresh expression per row
+cost ~200 KiB and ran a 2 M-row backfill on prod-1 out of memory. Rules: bind only names that occur in the formula (mXparser's
+missing-argument list splits names around built-ins, `value` = `valu·e`); re-parse every 4096 evaluations (mXparser 6.1.1 leaks
+~400 B per `calculate()` of an `if` formula); an exception mXparser caught inside `calculate()` becomes
+`FormulaEvaluationException` (never NaN/NULL); `MxParserLicense.EnsureConfirmed()` confirms the use type once. Repair of an
+active computed column: `IArchiveLifecycleService.RepairComputedColumnAsync` (job marker `computed-column:repair:<name>`, run by
+the backfill drain). Details: `docs/concept-computed-columns.md` §8.3b. Tests: `FormulaEngineReuseTests`, `ComputedColumnRepairJobTests`.
+
 ## Extensible Enum Import (WI #3324)
 
 Enums marked `isExtensible: true` allow runtime additions via the customize-API. When a new

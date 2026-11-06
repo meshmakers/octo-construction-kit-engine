@@ -146,9 +146,23 @@ public interface IArchiveLifecycleService
         OctoObjectId archiveRtId, string name, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Queues a repair of an <c>Active</c> computed column as a background job (AB#8331): the job
+    /// re-evaluates the rows in <c>[from, to)</c> whose cell is NULL while an operand of the formula is not
+    /// NULL (e.g. rows that an aborted evaluation left NULL) and writes the results; the column stays
+    /// <c>Active</c> and readable. <paramref name="from"/> defaults to the first row, <paramref name="to"/>
+    /// to now. Runs on the backfill drain (<see cref="RunPendingComputedColumnBackfillsAsync"/>); follow it
+    /// with the recompute jobs of the archive. An already queued or running repair of the column is returned
+    /// as is. Throws when the column does not exist or is not <c>Active</c>. Returns <c>null</c> when no job
+    /// store is wired.
+    /// </summary>
+    Task<RecomputeJobSnapshot?> RepairComputedColumnAsync(
+        OctoObjectId archiveRtId, string name, DateTime? from = null, DateTime? to = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Runs the queued computed-column backfills of this tenant one after the other (AB#8002): every
     /// computed column in <c>Backfilling</c> or with a formula change in progress on an
-    /// <c>Activated</c> archive, oldest job first. Called by the background service, never by a
+    /// <c>Activated</c> archive, oldest job first, then the queued repairs of active columns (AB#8331). Called by the background service, never by a
     /// request, so a client disconnect cannot cancel a backfill. Returns the number of backfills that
     /// completed.
     /// </summary>

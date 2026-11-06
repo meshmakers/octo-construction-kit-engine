@@ -12,6 +12,20 @@ namespace Meshmakers.Octo.Runtime.Engine.Formulas;
 /// </summary>
 internal sealed class FormulaEngine : IFormulaEngine
 {
+    /// <summary>
+    /// Upper bound of prepared formulas kept per thread. A tenant has a handful of distinct formulas;
+    /// the bound only protects against a caller that evaluates ever new expression strings.
+    /// </summary>
+    internal const int MaxPreparedFormulasPerThread = 256;
+
+    // AB#8331: mXparser expressions are not thread-safe, so every thread keeps its own prepared copy.
+    [ThreadStatic] private static Dictionary<string, FormulaShape>? _prepared;
+
+    static FormulaEngine()
+    {
+        MxParserLicense.EnsureConfirmed();
+    }
+
     /// <inheritdoc />
     public string NormalizeTernary(string expression) => ConvertTernaryToIf(expression);
 
@@ -83,15 +97,29 @@ internal sealed class FormulaEngine : IFormulaEngine
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// AB#8331: the formula is parsed once per thread and reused (<see cref="FormulaShape"/>,
+    /// <see cref="PreparedFormula"/>); every call only sets the values of the names the formula uses. Building a fresh mXparser expression per
+    /// call — with every column of the row as an argument and the four OctoMesh extensions, each of them an
+    /// mXparser expression of its own — cost ~200 KiB of garbage and ~190 µs per row and computed column, and
+    /// a multi-million-row backfill on prod-1 ran the asset repository into an
+    /// <see cref="OutOfMemoryException"/>. Reused, an evaluation costs a few KiB and a few µs.
+    /// </remarks>
     public double EvaluateRaw(string expression, IReadOnlyDictionary<string, double> arguments)
     {
-        var expr = new OctoExpression(ConvertTernaryToIf(expression));
-        foreach (var (name, value) in arguments)
+        var cache = _prepared ??= new Dictionary<string, FormulaShape>(StringComparer.Ordinal);
+        if (!cache.TryGetValue(expression, out var shape))
         {
-            expr.addArguments(new Argument(name, value));
+            if (cache.Count >= MaxPreparedFormulasPerThread)
+            {
+                cache.Clear();
+            }
+
+            shape = new FormulaShape(expression, ConvertTernaryToIf(expression));
+            cache[expression] = shape;
         }
 
-        return expr.calculate();
+        return shape.Evaluate(arguments);
     }
 
     /// <inheritdoc />
@@ -113,9 +141,24 @@ internal sealed class FormulaEngine : IFormulaEngine
             FormulaResultType.Int => (int)result,
             FormulaResultType.Int64 => (long)result,
             FormulaResultType.Double => result,
-            FormulaResultType.DateTime => new DateTime((long)result),
+            FormulaResultType.DateTime => ToDateTimeOrNull(result),
             _ => throw new ArgumentOutOfRangeException(nameof(resultType), resultType, null)
         };
+    }
+
+    /// <summary>
+    /// Ticks outside the <see cref="DateTime"/> range are a formula result without a value (NULL), not an
+    /// error: since AB#8331 an exception from <see cref="Evaluate"/> fails the caller's write, so a bad
+    /// value must not throw here.
+    /// </summary>
+    private static DateTime? ToDateTimeOrNull(double result)
+    {
+        if (result < DateTime.MinValue.Ticks || result > DateTime.MaxValue.Ticks)
+        {
+            return null;
+        }
+
+        return new DateTime((long)result);
     }
 
     /// <summary>

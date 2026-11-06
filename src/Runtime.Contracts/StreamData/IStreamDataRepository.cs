@@ -150,6 +150,21 @@ public interface IStreamDataRepository
         BackfillComputedColumnAsync(snapshot, columnName,
             progress is null ? null : new RowsOnlyProgress(progress), cancellationToken);
 
+    /// <summary>
+    /// Repairs an <c>Active</c> computed column (AB#8331): within <c>[from, to)</c> of the archive's time
+    /// key it re-evaluates the formula for every row whose cell is NULL although at least one operand the
+    /// formula references is not NULL, and writes the result into the active physical column. Rows whose
+    /// operands are all NULL, and formulas that legitimately yield NULL (AB#8060), stay NULL. The column stays
+    /// readable throughout. Reports the rows re-evaluated and the checkpoint (end of the last completed time
+    /// slice) like the backfill, so a run cut short resumes at the checkpoint. Throws when an evaluation is
+    /// aborted by an exception (<see cref="Formulas.FormulaEvaluationException"/>) — nothing is stored as NULL
+    /// for it. The default implementation is not supported.
+    /// </summary>
+    Task RepairComputedColumnAsync(
+        ArchiveSnapshot snapshot, string columnName, DateTime from, DateTime to,
+        IProgress<ComputedColumnBackfillProgress>? progress, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This stream-data repository cannot repair computed columns.");
+
     /// <summary>Adapts a row count to <see cref="ComputedColumnBackfillProgress"/> without a checkpoint.</summary>
     private sealed class RowsOnlyProgress(IProgress<ComputedColumnBackfillProgress> inner) : IProgress<long>
     {

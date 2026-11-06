@@ -786,11 +786,12 @@ read is one request through `IGitHubTreeReader` (recursive tree, versions from f
 
 `FormulaEngine` (Runtime.Engine.Formulas) caches a parsed mXparser expression per thread and formula (`FormulaShape`, one
 `PreparedFormula` per set of identifiers the values supply) and only sets argument values per call; a fresh expression per row
-cost ~200 KiB and ran a 2 M-row backfill on prod-1 out of memory. Rules: bind only names that occur in the formula (mXparser's
-missing-argument list splits names around built-ins, `value` = `valu·e`); re-parse every 4096 evaluations (mXparser 6.1.1 leaks
-~400 B per `calculate()` of an `if` formula); an exception mXparser caught inside `calculate()` becomes
-`FormulaEvaluationException` (never NaN/NULL). Never call `License.iConfirmCommercialUse` / `iConfirmNonCommercialUse`: Meshmakers
-holds no mXparser license; the stderr warning (max 1000 per process) stays until the library is replaced. Repair of an
+cost ~200 KiB and ran a 2 M-row backfill on prod-1 out of memory. Rules: bind only names that occur in the formula (own
+identifier scan, not mXparser's missing-argument list); an exception thrown inside `calculate()` becomes
+`FormulaEvaluationException` (never NaN/NULL). **mXparser stays pinned to 4.4.2** (AB#8364): the last Simplified-BSD version;
+4.4.3+/5.x/6.x are dual-licensed and Meshmakers holds no commercial licence — never upgrade it, never call a `License.iConfirm*`
+method (`MxParser_IsTheLastBsdLicensedVersion` fails on an upgrade). 4.4.2 needs no periodic re-parse (6.1.1 leaked ~400 B per
+`if` evaluation) and writes no licence warning. Repair of an
 active computed column: `IArchiveLifecycleService.RepairComputedColumnAsync` (job marker `computed-column:repair:<name>`, run by
 the backfill drain). Details: `docs/concept-computed-columns.md` §8.3b. Tests: `FormulaEngineReuseTests`, `ComputedColumnRepairJobTests`.
 

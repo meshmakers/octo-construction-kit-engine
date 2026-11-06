@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Meshmakers.Octo.Runtime.Contracts.Formulas;
@@ -32,18 +33,69 @@ public class FormulaEngineReuseTests(ITestOutputHelper output)
     };
 
     /// <summary>
-    /// Meshmakers holds no commercial mXparser license, so the engine must not confirm a use type
-    /// (<c>License.iConfirmCommercialUse</c> / <c>iConfirmNonCommercialUse</c>). mXparser accepts one
-    /// confirmation per process, so a confirmation anywhere in the engine would show here.
+    /// Meshmakers holds no commercial mXparser licence (AB#8364). mXparser is dual-licensed from 4.4.3 on
+    /// (5.x, 6.x: commercial use needs a purchased licence); the engine ships 4.4.2, the last version under the
+    /// Simplified BSD licence. 4.4.2 has no <c>License</c> class, so nothing can confirm a use type; an upgrade
+    /// to a dual-licensed version fails here.
     /// </summary>
     [Fact]
-    public void UseType_IsNotConfirmed_WhenTheEngineIsUsed()
+    public void MxParser_IsTheLastBsdLicensedVersion()
     {
-        _engine.EvaluateRaw("1 + 1", new Dictionary<string, double>());
-        _engine.CheckSyntax("isnull(a) + now(0) * 0", ["a"]);
+        var assembly = typeof(Expression).Assembly;
 
-        Assert.False(License.checkIfUseTypeConfirmed());
+        Assert.Equal(new Version(4, 4, 2), TakeThree(assembly.GetName().Version));
+        Assert.Null(assembly.GetType("org.mariuszgromada.math.mxparser.License"));
     }
+
+    /// <summary>
+    /// mXparser 5.x/6.x wrote up to ~1000 licence warning blocks per process to the console. 4.4.2 writes
+    /// nothing: no line on stdout or stderr while formulas are checked, validated and evaluated.
+    /// </summary>
+    [Fact]
+    public void FormulaEvaluations_WriteNoLineToTheConsole()
+    {
+        var engine = new FormulaEngine();
+        var originalOut = Console.Out;
+        var originalError = Console.Error;
+        using var captured = new StringWriter();
+        Console.SetOut(captured);
+        Console.SetError(captured);
+        try
+        {
+            engine.CheckSyntax("isnull(a) + now(0) * 0 + startOfDay(0) * 0", ["a"]);
+            engine.Validate("a > 0 ? a : 0", new Dictionary<string, double> { ["a"] = 2 });
+            for (var i = 0; i < 1_000; i++)
+            {
+                engine.EvaluateRaw($"if(a > {i}, a, coalesce(b, 0))", new Dictionary<string, double> { ["a"] = i, ["b"] = double.NaN });
+            }
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+            Console.SetError(originalError);
+        }
+
+        Assert.Equal(string.Empty, captured.ToString());
+    }
+
+    /// <summary>
+    /// Dialect of 4.4.2 (AB#8364): implied multiplication and the Unicode operators came with mXparser 5.0, so a
+    /// formula must write the operator. Documented in docs/concept-computed-columns.md §8.3b.
+    /// </summary>
+    [Theory]
+    [InlineData("2x", false)]
+    [InlineData("2(x + 1)", false)]
+    [InlineData("√x", false)]
+    [InlineData("2*x", true)]
+    [InlineData("2*(x + 1)", true)]
+    [InlineData("sqrt(x)", true)]
+    public void ImpliedMultiplication_IsNotPartOfTheDialect(string formula, bool valid)
+    {
+        Assert.Equal(valid, _engine.CheckSyntax(formula, ["x"]).IsValid);
+    }
+
+    private static Version? TakeThree(Version? version) =>
+        version is null ? null : new Version(version.Major, version.Minor, version.Build);
 
     [Fact]
     public void ReusedFormula_ComputesEveryRowWithItsOwnValues()
@@ -86,8 +138,9 @@ public class FormulaEngineReuseTests(ITestOutputHelper output)
 
         Assert.Equal(rows / 200.0 * Enumerable.Range(1, 99).Sum(), sum);
         Assert.True(perEvaluation < 16 * 1024, $"Expected < 16 KiB per evaluation, measured {perEvaluation:F0} B.");
-        // mXparser 6.1.1 keeps ~400 B per calculate() of an 'if' formula on a reused expression; the engine
-        // parses again every 4096 evaluations, so a million rows must not retain ~400 MB.
+        // mXparser 6.1.1 kept ~400 B per calculate() of an 'if' formula on a reused expression (~400 MB for a
+        // million rows); 4.4.2 retains nothing (AB#8364), so the engine reuses a parsed formula without limit.
+        // This bound guards against a regression of the reuse or of mXparser.
         Assert.True(retainedMiB < 16, $"Expected < 16 MiB retained after a full collection, measured {retainedMiB:F1} MiB.");
     }
 
@@ -129,8 +182,8 @@ public class FormulaEngineReuseTests(ITestOutputHelper output)
     }
 
     /// <summary>
-    /// mXparser's list of missing arguments splits names around built-in constants under implied
-    /// multiplication (<c>value</c> = <c>valu·e</c>); the engine must bind the whole name.
+    /// mXparser 6.x split names around built-in constants under implied multiplication
+    /// (<c>value</c> = <c>valu·e</c>); the engine binds whole names from its own identifier scan.
     /// </summary>
     [Theory]
     [InlineData("value > 0")]
@@ -189,19 +242,28 @@ public class FormulaEngineReuseTests(ITestOutputHelper output)
         await Task.WhenAll(tasks);
     }
 
-    [Fact]
-    public void ExceptionInsideMxParser_IsThrown_NotReturnedAsNaN()
+    /// <summary>
+    /// mXparser 4.4.2 lets an exception from inside <c>calculate()</c> propagate (6.x returned NaN); the engine
+    /// wraps it, wherever it is raised in the formula, so no caller stores NULL for an aborted evaluation.
+    /// </summary>
+    [Theory]
+    [InlineData("boom(x)")]
+    [InlineData("if(x > 0, boom(x), 0)")]
+    [InlineData("coalesce(boom(x), 0)")]
+    [InlineData("sum(i, 1, 2, boom(x)) / 2")]
+    public void ExceptionInsideMxParser_IsThrown_NotReturnedAsNaN(string formula)
     {
         var thrower = new ThrowingFunction();
-        var prepared = PreparedFormula.Create("boom(x)", "boom(x)", new[] { "x" }, new Function("boom", thrower));
+        var prepared = PreparedFormula.Create(formula, formula, new[] { "x" }, new Function("boom", thrower));
         var row = new Dictionary<string, double> { ["x"] = 4 };
         Assert.Equal(4, prepared.Evaluate(row));
 
         thrower.Throw = true;
         var ex = Assert.Throws<FormulaEvaluationException>(() => prepared.Evaluate(row));
 
-        Assert.Equal("boom(x)", ex.Expression);
+        Assert.Equal(formula, ex.Expression);
         Assert.Contains(nameof(OutOfMemoryException), ex.Message);
+        Assert.IsType<OutOfMemoryException>(ex.InnerException);
     }
 
     [Fact]

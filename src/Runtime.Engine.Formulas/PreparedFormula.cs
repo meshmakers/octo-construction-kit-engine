@@ -13,28 +13,24 @@ namespace Meshmakers.Octo.Runtime.Engine.Formulas;
 /// <b>Which names are bound.</b> The former per-call expression bound every supplied value as an mXparser
 /// argument. A prepared formula binds the supplied names that occur as an identifier in the formula
 /// (<see cref="Identifiers"/>); the caller picks the variant for the set of identifiers the current values
-/// supply (<see cref="FormulaShape"/>). mXparser's own list of missing arguments cannot be used for this: with
-/// implied multiplication it splits an unknown name around built-in constants (<c>value</c> becomes
-/// <c>valu·e</c>). Results are therefore the same as before — an identifier that is not supplied stays
+/// supply (<see cref="FormulaShape"/>). The engine scans the identifiers itself instead of asking mXparser for
+/// its missing arguments: that list leaves out supplied names that collide with a keyword the formula uses, and
+/// mXparser 6.x split unknown names around built-in constants under implied multiplication (<c>value</c> became
+/// <c>valu·e</c>; 4.4.2 does not, AB#8364). Results are therefore the same as before — an identifier that is not supplied stays
 /// unbound (NaN for a name that is not a keyword), a supplied identifier that collides with a keyword the
 /// formula uses fails the syntax check (NaN) — with one difference: a supplied name that does not occur in
 /// the formula no longer matters. Before, a value named like a built-in (<c>e</c>, <c>pi</c>, <c>sin</c>, …)
 /// made every formula of the row NaN, because mXparser refuses duplicate keywords even when unused.
 /// </para>
 /// <para>
-/// <b>Exceptions.</b> mXparser catches every exception inside <c>calculate()</c> — an
-/// <see cref="OutOfMemoryException"/> included — and returns NaN, which a caller would store as NULL. A NaN
-/// result whose error message carries an exception is therefore turned into a
-/// <see cref="FormulaEvaluationException"/>.
+/// <b>Exceptions.</b> mXparser 4.4.2 (AB#8364) lets an exception thrown inside <c>calculate()</c> — an
+/// <see cref="OutOfMemoryException"/> included — propagate; it is wrapped into a
+/// <see cref="FormulaEvaluationException"/> (inner exception kept), so a caller never stores NULL for an
+/// aborted evaluation. (mXparser 6.x caught it and returned NaN; AB#8331 detected it in the error message.)
 /// </para>
 /// </remarks>
 internal sealed class PreparedFormula
 {
-    // mXparser renders a caught exception as "...: <SimpleTypeName>: <message>" (the surrounding text is
-    // localised, the type name is not).
-    private static readonly Regex CaughtExceptionPattern =
-        new(@"\b(?<type>[A-Za-z_][A-Za-z0-9_]*Exception): ", RegexOptions.CultureInvariant | RegexOptions.Compiled);
-
     private static readonly Regex IdentifierPattern =
         new(@"[A-Za-z_][A-Za-z0-9_]*", RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
@@ -56,14 +52,6 @@ internal sealed class PreparedFormula
 
     /// <summary>Whether the formula passed the syntax check with its names bound.</summary>
     internal bool IsValid => _compiled is not null;
-
-    /// <summary>
-    /// Evaluations since the formula was parsed. mXparser 6.1.1 never marks an expression that contains
-    /// <c>if</c> as fully compiled and appends its compiled elements on every <c>calculate()</c> (~400 bytes
-    /// each, never released); <see cref="FormulaShape"/> therefore parses the formula again after
-    /// <see cref="FormulaShape.MaxEvaluationsPerParse"/> evaluations.
-    /// </summary>
-    internal int Evaluations { get; private set; }
 
     /// <summary>The distinct identifiers of <paramref name="normalizedExpression"/>, in order of appearance.</summary>
     internal static string[] Identifiers(string normalizedExpression)
@@ -120,24 +108,19 @@ internal sealed class PreparedFormula
             return double.NaN;
         }
 
-        Evaluations++;
         for (var i = 0; i < _arguments.Length; i++)
         {
             _arguments[i].setArgumentValue(values[_boundNames[i]]);
         }
 
-        var result = _compiled.calculate();
-        if (double.IsNaN(result))
+        try
         {
-            var error = _compiled.getErrorMessage();
-            var caught = CaughtExceptionPattern.Match(error);
-            if (caught.Success)
-            {
-                throw new FormulaEvaluationException(_expression,
-                    $"Evaluating formula '{_expression}' was aborted by {caught.Groups["type"].Value}: {error}");
-            }
+            return _compiled.calculate();
         }
-
-        return result;
+        catch (Exception ex)
+        {
+            throw new FormulaEvaluationException(_expression,
+                $"Evaluating formula '{_expression}' was aborted by {ex.GetType().Name}: {ex.Message}", ex);
+        }
     }
 }

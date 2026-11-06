@@ -461,28 +461,37 @@ logical→physical name pointer atomically on completion.
 - **Fix: parse once per thread.** `FormulaEngine` keeps a thread-static cache of `FormulaShape` per formula
   string (≤ 256 per thread); a shape holds one `PreparedFormula` per set of identifiers the row supplies
   (≤ 32), and an evaluation only sets the argument values. Measured: **~3 KiB and ~1.7 µs per evaluation**
-  (1,000,000-row test `FormulaEngineReuseTests.MillionRows_AllocateOnlyAFewKiBPerEvaluation`). A reused
-  expression is parsed again every 4096 evaluations: mXparser 6.1.1 never marks an expression with `if` as
-  fully compiled and appends its compiled elements on every `calculate()` (~400 B each, never released), so
-  without the re-parse a reused `if` formula would retain ~400 MB per million rows. Results are
+  (1,000,000-row test `FormulaEngineReuseTests.MillionRows_AllocateOnlyAFewKiBPerEvaluation`). Results are
   unchanged (AB#8060 NULL semantics included) except that a row value whose name does not occur in the
   formula is ignored — before, a column named like a built-in (`e`, `pi`, `sin`) made every formula of the
-  row NULL.
-- **No silent NULL.** mXparser catches every exception inside `calculate()` and returns NaN. The engine
-  detects a caught exception in the expression's error message and throws `FormulaEvaluationException`
-  (Runtime.Contracts). `ApplyComputedColumns` no longer catches: ingest fails the write (the producer
+  row NULL. The engine finds the names with its own identifier scan, not with mXparser's missing-argument
+  list (that list leaves out a supplied name that collides with a keyword; mXparser 6.x also split names
+  around built-in constants, `value` = `valu·e`).
+- **No silent NULL.** An exception thrown inside mXparser's `calculate()` (e.g. `OutOfMemoryException`)
+  becomes a `FormulaEvaluationException` (Runtime.Contracts, inner exception kept). `ApplyComputedColumns`
+  no longer catches: ingest fails the write (the producer
   retries), the backfill retries the page once and then fails the job with the column, the time slice and
   the last written key in the reason; the column ends `Failed` like any failed backfill and is retried with
   `retryComputedColumnBackfill` (the job resumes at nothing — a backfill rewrites every row).
-- **License warning (not suppressed).** mXparser 6.x is dual-licensed and prints a ten-line
-  "License - use type not confirmed" warning to stderr (`Console.Error`, no switch or output hook) on every
-  `calculate()` and every call of an extension `Function`/`Argument` — capped by mXparser at 1000 warnings
-  per process (the "exactly 1000×" of the incident). Parsing once does not reduce it: the check runs in
-  `calculate()`, so the cap is reached after a few hundred evaluations (~10,000 stderr lines per process).
-  Meshmakers holds no commercial mXparser license, so the engine does **not** call
-  `License.iConfirmCommercialUse` (nor `iConfirmNonCommercialUse`, which would be untrue as well); the
-  test `UseType_IsNotConfirmed_WhenTheEngineIsUsed` guards this. The warning goes away with the planned
-  replacement of mXparser. (The first version of AB#8331 confirmed commercial use; removed.)
+- **mXparser 4.4.2, BSD-licensed (AB#8364).** mXparser is dual-licensed from 4.4.3 on (5.x, 6.x: commercial
+  use needs a purchased licence); Meshmakers holds none. The engine therefore ships **4.4.2**, the last
+  version under the Simplified BSD licence (`LICENSE.txt` in the nupkg), until mXparser is replaced. Never
+  raise the version and never call a `License.iConfirm*` method (4.4.2 has no `License` class). The test
+  `MxParser_IsTheLastBsdLicensedVersion` fails on an upgrade; `FormulaEvaluations_WriteNoLineToTheConsole`
+  guards that no licence text reaches stdout/stderr. Differences to the 6.1.1 that AB#8331 shipped first:
+  - 6.x wrote a ten-line "License - use type not confirmed" warning to stderr on every `calculate()`
+    (capped at 1000 per process, ~10,000 lines); 4.4.2 writes nothing.
+  - 6.x caught every exception inside `calculate()` and returned NaN, so the engine had to find the
+    exception type in the error message; 4.4.2 lets it propagate and the engine wraps it.
+  - 6.1.1 never marked an expression with `if` as fully compiled and kept ~400 B per `calculate()`, so the
+    engine parsed a reused formula again every 4096 evaluations; 4.4.2 retains nothing and the re-parse
+    is gone. Measured on 4.4.2: 1,000,000 evaluations of `if(activepower > 0, activepower, 0)` allocate
+    ~2.1 KiB each and retain < 1 MiB after a full collection; 2,000,000 rows × 3 computed columns (`if`,
+    `coalesce`, arithmetic with `sqrt`) ~1.7 KiB per evaluation, nothing retained, working set 63 → 72 MiB.
+  - **Dialect:** implied multiplication (`2x`, `2(x + 1)`) and the Unicode operators (`√`, `∑`, …) came with
+    mXparser 5.0 and are invalid on 4.4.2 — write `2*x`, `sqrt(x)`. Everything the OctoMesh formulas use
+    (`if`/ternary, `coalesce`, `isnull`, `now`, `startOfDay`, `null`, comparisons, `&&`/`||`, math
+    functions) is unchanged (`ImpliedMultiplication_IsNotPartOfTheDialect`).
 - **Repair of an active column.** `IArchiveLifecycleService.RepairComputedColumnAsync(archive, name, from?, to?)`
   (GraphQL `repairComputedColumn`) queues a repair job on the recompute-job mechanism: marker
   `computed-column:repair:<name>` (`RecomputeJobSnapshot.IsComputedColumnRepair`), range `[from, to)` (default

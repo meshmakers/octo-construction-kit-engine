@@ -12,13 +12,6 @@ internal sealed class FormulaShape
     /// <summary>Formulas with more identifiers are evaluated without caching variants.</summary>
     internal const int MaxIdentifiers = 64;
 
-    /// <summary>
-    /// Evaluations after which a variant is parsed again: bounds the growth of mXparser's compiled elements
-    /// for formulas with <c>if</c> (see <see cref="PreparedFormula.Evaluations"/>) to ~1.6 MB per variant while
-    /// the parse (~200 KiB) costs ~50 bytes per evaluation.
-    /// </summary>
-    internal const int MaxEvaluationsPerParse = 4096;
-
     /// <summary>Upper bound of variants kept per formula; rows that keep changing their columns only cost speed.</summary>
     internal const int MaxVariants = 32;
 
@@ -52,7 +45,7 @@ internal sealed class FormulaShape
             }
         }
 
-        if (!_variants.TryGetValue(mask, out var variant) || variant.Evaluations >= MaxEvaluationsPerParse)
+        if (!_variants.TryGetValue(mask, out var variant))
         {
             var bound = new List<string>();
             for (var i = 0; i < _identifiers.Length; i++)
@@ -63,7 +56,7 @@ internal sealed class FormulaShape
                 }
             }
 
-            if (variant is null && _variants.Count >= MaxVariants)
+            if (_variants.Count >= MaxVariants)
             {
                 _variants.Clear();
             }

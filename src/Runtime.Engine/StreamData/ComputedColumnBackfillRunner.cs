@@ -155,12 +155,22 @@ public sealed class ComputedColumnBackfillRunner
     public async Task<int> DrainAsync(CancellationToken cancellationToken)
     {
         var queue = new List<(OctoObjectId ArchiveRtId, string Column, RecomputeJobSnapshot? Job)>();
+        var repairs = new List<RecomputeJobSnapshot>();
         await foreach (var archive in _store.EnumerateAsync().WithCancellation(cancellationToken))
         {
             if (archive.Status != CkArchiveStatus.Activated)
             {
                 // A disabled archive keeps its queued columns; they run once it is activated again.
                 continue;
+            }
+
+            // AB#8331: queued repairs of active columns. One job-store read per archive that has an active
+            // computed column; archives without one cost nothing.
+            if (_jobStore is not null
+                && archive.Columns.Any(c => c.IsComputed && c.ComputedState == ComputedColumnState.Active))
+            {
+                var archiveJobs = await _jobStore.GetForArchiveAsync(archive.RtId, JobHistoryScan);
+                repairs.AddRange(archiveJobs.Where(j => j.IsComputedColumnRepair && j.IsActive && !IsLive(j)));
             }
 
             foreach (var column in archive.Columns)
@@ -215,7 +225,164 @@ public sealed class ComputedColumnBackfillRunner
             }
         }
 
+        // Repairs after the backfills, oldest first. Re-checked right before running like a backfill.
+        foreach (var repair in repairs.OrderBy(j => j.RtId.ToString(), StringComparer.Ordinal))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var current = _jobStore is null ? null : await _jobStore.GetAsync(repair.RtId);
+            if (current is null || !current.IsActive || IsLive(current))
+            {
+                continue;
+            }
+
+            var result = await RunRepairAsync(current, cancellationToken);
+            if (result.State == RecomputeJobState.Completed)
+            {
+                completed++;
+            }
+        }
+
         return completed;
+    }
+
+    /// <summary>
+    /// Persists a new repair job for an active computed column over <c>[from, to)</c> (AB#8331), or returns
+    /// <c>null</c> without a job store.
+    /// </summary>
+    public async Task<RecomputeJobSnapshot?> CreateRepairJobAsync(
+        OctoObjectId archiveRtId, string columnName, DateTime from, DateTime to)
+    {
+        if (_jobStore is null)
+        {
+            return null;
+        }
+
+        var job = RecomputeJobSnapshot.ForComputedColumnRepair(
+            archiveRtId, columnName, from, to, RecomputeTrigger.Manual, _clock());
+        var rtId = await _jobStore.CreateAsync(job);
+        return job with { RtId = rtId };
+    }
+
+    /// <summary>The newest active (Pending / Running) repair job of a column, or <c>null</c> (AB#8331).</summary>
+    public async Task<RecomputeJobSnapshot?> GetActiveRepairJobAsync(OctoObjectId archiveRtId, string columnName)
+    {
+        if (_jobStore is null)
+        {
+            return null;
+        }
+
+        var jobs = await _jobStore.GetForArchiveAsync(archiveRtId, JobHistoryScan);
+        return jobs.FirstOrDefault(j => j.IsActive && j.IsComputedColumnRepair
+                                        && string.Equals(j.ComputedColumnName, columnName, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Runs one repair job (AB#8331): re-evaluates the NULL cells of the active column whose operands are not
+    /// NULL in <c>[RangeStart, RangeEnd)</c> of the job. The job's <see cref="RecomputeJobSnapshot.RangeStart"/>
+    /// is the checkpoint: a run cut short resumes there. The column state is never changed — a failed repair
+    /// leaves the column Active with the cells it had; the job records the failure and how far it got.
+    /// Cancellation hands the job back as Pending and is thrown.
+    /// </summary>
+    public async Task<RecomputeJobSnapshot> RunRepairAsync(RecomputeJobSnapshot job, CancellationToken cancellationToken)
+    {
+        var columnName = job.ComputedColumnName
+                         ?? throw new ArgumentException("Not a computed-column repair job.", nameof(job));
+        var archiveRtId = job.ArchiveRtId;
+        var startedAt = _clock();
+        var resumeFrom = job.RangeStart;
+        var rowsBefore = job.RowsProcessed ?? 0;
+        job = (await UpdateJobAsync(job, j => j with
+        {
+            State = RecomputeJobState.Running,
+            StartedAt = startedAt,
+            FinishedAt = null,
+            DurationMs = null,
+            ErrorReason = null,
+            LastProgressAt = startedAt,
+        }))!;
+
+        var progress = new RowProgress(rowsBefore, resumeFrom);
+        using var heartbeatStop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var heartbeat = RunHeartbeatAsync(job, progress, heartbeatStop.Token);
+        try
+        {
+            var snapshot = await _store.GetAsync(archiveRtId) ?? throw new ArchiveNotFoundException(archiveRtId);
+            if (snapshot.Status != CkArchiveStatus.Activated)
+            {
+                throw new ArchiveNotActivatedException(archiveRtId, snapshot.Status);
+            }
+
+            var column = FindComputed(snapshot, columnName)
+                ?? throw new InvalidOperationException(
+                    $"Computed column '{columnName}' no longer exists on archive {archiveRtId}.");
+            if (column.ComputedState != ComputedColumnState.Active)
+            {
+                throw new InvalidOperationException(
+                    $"Computed column '{columnName}' on archive {archiveRtId} is {column.ComputedState}, not Active; its backfill writes every row.");
+            }
+
+            _logger.LogInformation(
+                "Repair of computed column '{Column}' on archive {Archive} runs over [{From:O}, {To:O}).",
+                columnName, archiveRtId, resumeFrom, job.RangeEnd);
+            await _repository.RepairComputedColumnAsync(snapshot, columnName, resumeFrom, job.RangeEnd, progress, cancellationToken);
+
+            await StopHeartbeatAsync(heartbeatStop, heartbeat);
+            var finishedAt = _clock();
+            job = (await UpdateJobAsync(job, j => j with
+            {
+                State = RecomputeJobState.Completed,
+                RowsProcessed = progress.RowsAsInt,
+                RangeStart = progress.CompletedThrough ?? j.RangeStart,
+                FinishedAt = finishedAt,
+                DurationMs = (int)(finishedAt - startedAt).TotalMilliseconds,
+                LastProgressAt = finishedAt,
+            }))!;
+            _logger.LogInformation(
+                "Computed column '{Column}' on archive {Archive} repaired ({Rows} rows re-evaluated, {DurationMs} ms).",
+                columnName, archiveRtId, progress.Rows, (int)(finishedAt - startedAt).TotalMilliseconds);
+            return job;
+        }
+        catch (Exception interruption) when (cancellationToken.IsCancellationRequested)
+        {
+            await StopHeartbeatAsync(heartbeatStop, heartbeat);
+            await UpdateJobAsync(job, j => j with
+            {
+                State = RecomputeJobState.Pending,
+                StartedAt = null,
+                RowsProcessed = progress.RowsAsInt,
+                RangeStart = progress.CompletedThrough ?? j.RangeStart,
+                LastProgressAt = _clock(),
+                ErrorReason = "Interrupted by a shutdown; the repair resumes from its checkpoint on the next start.",
+            });
+            if (interruption is OperationCanceledException)
+            {
+                throw;
+            }
+
+            throw new OperationCanceledException(
+                $"Repair of computed column '{columnName}' interrupted by shutdown.", interruption, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            await StopHeartbeatAsync(heartbeatStop, heartbeat);
+            var finishedAt = _clock();
+            var checkpoint = progress.CompletedThrough ?? resumeFrom;
+            var reason =
+                $"Repair of computed column '{columnName}' failed; rows from {checkpoint:O} to {job.RangeEnd:O} are not repaired " +
+                $"(re-queue the repair to continue there): {ex.Message}";
+            job = (await UpdateJobAsync(job, j => j with
+            {
+                State = RecomputeJobState.Failed,
+                RowsProcessed = progress.RowsAsInt,
+                RangeStart = checkpoint,
+                FinishedAt = finishedAt,
+                DurationMs = (int)(finishedAt - startedAt).TotalMilliseconds,
+                ErrorReason = reason,
+                LastProgressAt = finishedAt,
+            }))!;
+            _logger.LogError(ex, "Repair of computed column '{Column}' on archive {Archive} failed.", columnName, archiveRtId);
+            return job;
+        }
     }
 
     /// <summary>
@@ -450,7 +617,8 @@ public sealed class ComputedColumnBackfillRunner
 
         var jobs = await _jobStore.GetForArchiveAsync(archiveRtId, JobHistoryScan);
         return jobs
-            .Where(j => j.IsActive && string.Equals(j.ComputedColumnName, columnName, StringComparison.Ordinal))
+            .Where(j => j.IsActive && !j.IsComputedColumnRepair
+                        && string.Equals(j.ComputedColumnName, columnName, StringComparison.Ordinal))
             .ToList();
     }
 

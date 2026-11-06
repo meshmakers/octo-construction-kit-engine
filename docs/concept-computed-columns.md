@@ -175,8 +175,10 @@ of another computed column. mXparser binds each referenced name as an `Argument`
 > **Status: implemented (Phase 3).** `CrateDbStreamDataRepository` takes `IFormulaEngine` and
 > evaluates computed columns on every ingest path (single / batch / time-range) via
 > `BuildComputedPlan` → `ApplyComputedColumns`, writing the result into the row under the computed
-> column's physical name. Per-row failures (exception / NaN / null sentinel) store `NULL` and log a
-> warning — the insert never fails. Plan building topologically sorts computed-vs-computed
+> column's physical name. A formula that yields no value (NaN / null sentinel, a NULL operand) stores
+> `NULL` — the insert never fails for bad data. **An evaluation aborted by an exception** (out of memory,
+> any `FormulaEvaluationException`) is **not** stored as `NULL` since AB#8331: the write fails and the
+> caller retries, because the value is unknown, not empty (see §8.3b). Plan building topologically sorts computed-vs-computed
 > dependencies (`TopologicalSort`); the common no-computed-column archive pays nothing (empty plan).
 >
 > **Binding-name decision (important):** a formula binds to columns by their **physical CrateDB
@@ -439,6 +441,50 @@ logical→physical name pointer atomically on completion.
 - **Disable / delete** fail the archive's queued backfill jobs; the columns stay queued and get a new
   job once the archive is activated again.
 
+### §8.3b Bounded memory, no silent NULL, repair (AB#8331)
+
+> **Status: implemented 2026-11-06.** On prod-1 energyiq (release 3.5.62) the backfills of
+> `ImportPower`/`ExportPower` (GridConnectionArchive, ~1.79 M rows) and `ChargePower`/`DischargePower`
+> (BatteryStorageArchive, ~2.31 M rows) ran into a `System.OutOfMemoryException` in
+> `ApplyComputedColumns` 40 s after they started; the catch-all stored `NULL` for the row (3 rows of
+> `ImportPower` stayed NULL with `ActivePower` set), a second OOM hit an unrelated Mongo query in the same
+> second. The pod used ~1.0 of its 2 GiB limit (GC heap hard limit 75 % = 1.5 GiB) and was not OOMKilled.
+
+- **Root cause: a new mXparser expression per row.** `FormulaEngine.EvaluateRaw` built an `OctoExpression`
+  per call and bound *every* numeric column of the row as an `Argument`. Each `OctoExpression` creates its
+  four extensions (`now`, `startOfDay`, `isnull`, `null`) — every `Function`/`Argument` is an mXparser
+  expression of its own with its own keyword list. Measured: **~200 KiB garbage and ~190 µs per row and
+  computed column**; at ~2,100 rows/s that is ~0.4 GiB/s of short-lived allocations on ~0.9 CPU, which drove
+  the GC against the 1.5 GiB hard limit until an allocation failed. (Page size and LOH were not the cause:
+  pages hold 1000 rows, no allocation per evaluation reached the LOH.)
+- **Fix: parse once per thread.** `FormulaEngine` keeps a thread-static cache of `FormulaShape` per formula
+  string (≤ 256 per thread); a shape holds one `PreparedFormula` per set of identifiers the row supplies
+  (≤ 32), and an evaluation only sets the argument values. Measured: **~3 KiB and ~1.7 µs per evaluation**
+  (1,000,000-row test `FormulaEngineReuseTests.MillionRows_AllocateOnlyAFewKiBPerEvaluation`). A reused
+  expression is parsed again every 4096 evaluations: mXparser 6.1.1 never marks an expression with `if` as
+  fully compiled and appends its compiled elements on every `calculate()` (~400 B each, never released), so
+  without the re-parse a reused `if` formula would retain ~400 MB per million rows. Results are
+  unchanged (AB#8060 NULL semantics included) except that a row value whose name does not occur in the
+  formula is ignored — before, a column named like a built-in (`e`, `pi`, `sin`) made every formula of the
+  row NULL.
+- **No silent NULL.** mXparser catches every exception inside `calculate()` and returns NaN. The engine
+  detects a caught exception in the expression's error message and throws `FormulaEvaluationException`
+  (Runtime.Contracts). `ApplyComputedColumns` no longer catches: ingest fails the write (the producer
+  retries), the backfill retries the page once and then fails the job with the column, the time slice and
+  the last written key in the reason; the column ends `Failed` like any failed backfill and is retried with
+  `retryComputedColumnBackfill` (the job resumes at nothing — a backfill rewrites every row).
+- **License.** `MxParserLicense.EnsureConfirmed()` confirms the use type once per process (static
+  constructors of `FormulaEngine` and `OctoExpression`). Before, mXparser printed a ten-line warning per
+  `calculate()` (capped by mXparser at 1000 — the "exactly 1000×" of the incident).
+- **Repair of an active column.** `IArchiveLifecycleService.RepairComputedColumnAsync(archive, name, from?, to?)`
+  (GraphQL `repairComputedColumn`) queues a repair job on the recompute-job mechanism: marker
+  `computed-column:repair:<name>` (`RecomputeJobSnapshot.IsComputedColumnRepair`), range `[from, to)` (default
+  first row … now), visible in `recomputeJobsFor` / `list_recompute_jobs`. The backfill drain runs queued repairs
+  after the backfills (one job-store read per archive with an active computed column). The repository walks the
+  range in time slices and re-evaluates only rows whose cell is NULL while at least one operand the formula
+  references is not NULL; the column stays `Active` and readable. `RangeStart` is the checkpoint (resume after a
+  restart); a failed repair keeps the column untouched and names the unrepaired range in the job.
+
 ### §8.4 Open items to verify during implementation
 
 1. Exact location of the logical→physical column projection on the read path (D-7.2).
@@ -548,6 +594,7 @@ mutating an *active* archive is special, add explicit mutations alongside the ex
 | `addComputedColumn(archiveRtId, name, formula, indexed)` | Validate, `ALTER ADD COLUMN`, start backfill, `Pending → Active`. |
 | `updateComputedColumnFormula(archiveRtId, name, formula)` | Validate, backfill new physical column, atomic swap. |
 | `removeComputedColumn(archiveRtId, name)` | Drop from logical schema + physical column; revalidate dependent rollups. |
+| `repairComputedColumn(rtId, name, from?, to?)` | Queue a repair job: re-evaluate NULL cells whose operands are not NULL in `[from, to)`; column stays Active (AB#8331). |
 
 - A path-enumeration extension lets the Studio list the archive's existing columns as
   candidate operands and validate a draft formula live.
@@ -566,7 +613,10 @@ columns, routing each through the backfill lifecycle (§8).
 
 | Situation | Behaviour |
 |---|---|
-| Per-row formula error / NaN at ingest | Store `NULL` for that cell, emit audit warning. Insert succeeds. |
+| Per-row formula yields no value (NaN / null) at ingest | Store `NULL` for that cell. Insert succeeds. |
+| Evaluation aborted by an exception (OOM, …) at ingest | Insert fails, nothing stored as `NULL` (AB#8331). |
+| Evaluation aborted by an exception during a backfill | Page retried once, then the job fails with the slice in the reason (AB#8331). |
+| Active column has NULL cells with non-NULL operands | `repairComputedColumn` re-evaluates exactly those rows (AB#8331). |
 | Backfill fails mid-run | `ComputedState = Failed`, new physical column dropped, readers keep previous state. |
 | Formula references a removed column | Caught at edit time (§9); a column removal revalidates dependents. |
 | Cyclic dependency | Rejected at edit time (§9). |

@@ -58,15 +58,39 @@ public sealed record RecomputeJobSnapshot(
     public const string ComputedColumnMarkerPrefix = "computed-column:";
 
     /// <summary>
-    /// The computed column a backfill job works on, or <c>null</c> for a rollup recompute job.
+    /// Follows <see cref="ComputedColumnMarkerPrefix"/> in the marker of a computed-column <b>repair</b> job
+    /// (AB#8331): <c>computed-column:repair:&lt;column&gt;</c>. Column names never contain a colon, so the
+    /// marker is unambiguous; a repair job counts as a computed-column job everywhere (rollup orchestrator,
+    /// recompute-jobs query) and reports its column in <see cref="ComputedColumnName"/>.
     /// </summary>
-    public string? ComputedColumnName =>
-        StagingTableName is { } marker && marker.StartsWith(ComputedColumnMarkerPrefix, StringComparison.Ordinal)
-            ? marker.Substring(ComputedColumnMarkerPrefix.Length)
-            : null;
+    public const string ComputedColumnRepairMarker = "repair:";
 
-    /// <summary>Whether this job is a computed-column backfill rather than a rollup recompute.</summary>
+    /// <summary>
+    /// The computed column a backfill or repair job works on, or <c>null</c> for a rollup recompute job.
+    /// </summary>
+    public string? ComputedColumnName
+    {
+        get
+        {
+            if (StagingTableName is not { } marker || !marker.StartsWith(ComputedColumnMarkerPrefix, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            var name = marker.Substring(ComputedColumnMarkerPrefix.Length);
+            return name.StartsWith(ComputedColumnRepairMarker, StringComparison.Ordinal)
+                ? name.Substring(ComputedColumnRepairMarker.Length)
+                : name;
+        }
+    }
+
+    /// <summary>Whether this job is a computed-column job (backfill or repair) rather than a rollup recompute.</summary>
     public bool IsComputedColumnBackfill => ComputedColumnName is not null;
+
+    /// <summary>Whether this job repairs NULL cells of an active computed column (AB#8331).</summary>
+    public bool IsComputedColumnRepair =>
+        StagingTableName is { } marker
+        && marker.StartsWith(ComputedColumnMarkerPrefix + ComputedColumnRepairMarker, StringComparison.Ordinal);
 
     /// <summary>Whether the job is still waiting or running (Pending / Running / Swapping).</summary>
     public bool IsActive => State is RecomputeJobState.Pending or RecomputeJobState.Running or RecomputeJobState.Swapping;
@@ -83,4 +107,15 @@ public sealed record RecomputeJobSnapshot(
         new(OctoObjectId.Empty, archiveRtId, state, trigger, DateTime.UnixEpoch, createdAt, null,
             null, null, state == RecomputeJobState.Running ? createdAt : null, null, null, null,
             ComputedColumnMarkerPrefix + columnName, createdAt);
+
+    /// <summary>
+    /// A new, not yet persisted computed-column repair job (AB#8331) over <c>[from, to)</c>. While the job
+    /// runs, <see cref="RangeStart"/> advances to the repair's checkpoint like a backfill's.
+    /// </summary>
+    public static RecomputeJobSnapshot ForComputedColumnRepair(
+        OctoObjectId archiveRtId, string columnName, DateTime from, DateTime to, RecomputeTrigger trigger,
+        DateTime createdAt) =>
+        new(OctoObjectId.Empty, archiveRtId, RecomputeJobState.Pending, trigger, from, to, null,
+            null, null, null, null, null, null,
+            ComputedColumnMarkerPrefix + ComputedColumnRepairMarker + columnName, createdAt);
 }

@@ -583,6 +583,51 @@ public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
     }
 
     /// <inheritdoc />
+    public async Task<RecomputeJobSnapshot?> RepairComputedColumnAsync(
+        OctoObjectId archiveRtId, string name, DateTime? from = null, DateTime? to = null,
+        CancellationToken cancellationToken = default)
+    {
+        var snapshot = await LoadAsync(archiveRtId);
+        if (snapshot.Status != CkArchiveStatus.Activated)
+        {
+            throw new InvalidArchiveStateTransitionException(archiveRtId, snapshot.Status,
+                "repair a computed column on");
+        }
+
+        var target = snapshot.Columns.FirstOrDefault(
+            c => c.IsComputed && string.Equals(c.Name, name, StringComparison.Ordinal))
+            ?? throw new InvalidOperationException(
+                $"Computed column '{name}' does not exist on archive {archiveRtId}.");
+
+        if (target.ComputedState != ComputedColumnState.Active)
+        {
+            throw new ComputedColumnInvalidException(archiveRtId, name,
+                $"computed column '{name}' is {target.ComputedState}, not Active; a repair only fills NULL cells of an " +
+                "active column. Use retryComputedColumnBackfill for a column whose backfill did not complete.");
+        }
+
+        var rangeStart = from ?? DateTime.UnixEpoch;
+        var rangeEnd = to ?? _clock();
+        if (rangeEnd <= rangeStart)
+        {
+            throw new ComputedColumnInvalidException(archiveRtId, name,
+                $"the repair range [{rangeStart:O}, {rangeEnd:O}) is empty.");
+        }
+
+        var active = await _backfillRunner.GetActiveRepairJobAsync(archiveRtId, name);
+        if (active is not null)
+        {
+            return active;
+        }
+
+        var job = await _backfillRunner.CreateRepairJobAsync(archiveRtId, name, rangeStart, rangeEnd);
+        _logger.LogInformation(
+            "Repair of computed column '{Column}' on archive {Archive} over [{From:O}, {To:O}) queued as job {JobId}.",
+            name, archiveRtId, rangeStart, rangeEnd, job?.RtId);
+        return job;
+    }
+
+    /// <inheritdoc />
     public Task<int> RunPendingComputedColumnBackfillsAsync(CancellationToken cancellationToken) =>
         _backfillRunner.DrainAsync(cancellationToken);
 

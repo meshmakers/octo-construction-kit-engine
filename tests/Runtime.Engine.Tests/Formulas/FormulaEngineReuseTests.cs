@@ -13,7 +13,7 @@ namespace Meshmakers.Octo.Runtime.Engine.Tests.Formulas;
 /// AB#8331: a computed-column backfill of ~2 M rows on prod-1 ran the asset repository out of memory
 /// because every evaluation built a new mXparser expression (~200 KiB garbage per row). The engine now
 /// parses a formula once per thread and reuses it; exceptions inside mXparser are no longer turned into
-/// a silent NaN; the mXparser use type is confirmed once.
+/// a silent NaN.
 /// <remarks>
 /// Not run in parallel with other collections: the retained-memory assertion reads the process-wide live heap.
 /// </remarks>
@@ -31,12 +31,18 @@ public class FormulaEngineReuseTests(ITestOutputHelper output)
         ["frequency"] = 50,
     };
 
+    /// <summary>
+    /// Meshmakers holds no commercial mXparser license, so the engine must not confirm a use type
+    /// (<c>License.iConfirmCommercialUse</c> / <c>iConfirmNonCommercialUse</c>). mXparser accepts one
+    /// confirmation per process, so a confirmation anywhere in the engine would show here.
+    /// </summary>
     [Fact]
-    public void LicenseIsConfirmed_OnceTheEngineIsUsed()
+    public void UseType_IsNotConfirmed_WhenTheEngineIsUsed()
     {
         _engine.EvaluateRaw("1 + 1", new Dictionary<string, double>());
+        _engine.CheckSyntax("isnull(a) + now(0) * 0", ["a"]);
 
-        Assert.True(MxParserLicense.IsConfirmed);
+        Assert.False(License.checkIfUseTypeConfirmed());
     }
 
     [Fact]

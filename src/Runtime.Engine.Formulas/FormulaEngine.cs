@@ -21,11 +21,6 @@ internal sealed class FormulaEngine : IFormulaEngine
     // AB#8331: mXparser expressions are not thread-safe, so every thread keeps its own prepared copy.
     [ThreadStatic] private static Dictionary<string, FormulaShape>? _prepared;
 
-    static FormulaEngine()
-    {
-        MxParserLicense.EnsureConfirmed();
-    }
-
     /// <inheritdoc />
     public string NormalizeTernary(string expression) => ConvertTernaryToIf(expression);
 

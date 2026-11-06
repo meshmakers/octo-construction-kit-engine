@@ -474,9 +474,15 @@ logical→physical name pointer atomically on completion.
   retries), the backfill retries the page once and then fails the job with the column, the time slice and
   the last written key in the reason; the column ends `Failed` like any failed backfill and is retried with
   `retryComputedColumnBackfill` (the job resumes at nothing — a backfill rewrites every row).
-- **License.** `MxParserLicense.EnsureConfirmed()` confirms the use type once per process (static
-  constructors of `FormulaEngine` and `OctoExpression`). Before, mXparser printed a ten-line warning per
-  `calculate()` (capped by mXparser at 1000 — the "exactly 1000×" of the incident).
+- **License warning (not suppressed).** mXparser 6.x is dual-licensed and prints a ten-line
+  "License - use type not confirmed" warning to stderr (`Console.Error`, no switch or output hook) on every
+  `calculate()` and every call of an extension `Function`/`Argument` — capped by mXparser at 1000 warnings
+  per process (the "exactly 1000×" of the incident). Parsing once does not reduce it: the check runs in
+  `calculate()`, so the cap is reached after a few hundred evaluations (~10,000 stderr lines per process).
+  Meshmakers holds no commercial mXparser license, so the engine does **not** call
+  `License.iConfirmCommercialUse` (nor `iConfirmNonCommercialUse`, which would be untrue as well); the
+  test `UseType_IsNotConfirmed_WhenTheEngineIsUsed` guards this. The warning goes away with the planned
+  replacement of mXparser. (The first version of AB#8331 confirmed commercial use; removed.)
 - **Repair of an active column.** `IArchiveLifecycleService.RepairComputedColumnAsync(archive, name, from?, to?)`
   (GraphQL `repairComputedColumn`) queues a repair job on the recompute-job mechanism: marker
   `computed-column:repair:<name>` (`RecomputeJobSnapshot.IsComputedColumnRepair`), range `[from, to)` (default

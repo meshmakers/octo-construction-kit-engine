@@ -789,7 +789,8 @@ read is one request through `IGitHubTreeReader` (recursive tree, versions from f
 cost ~200 KiB and ran a 2 M-row backfill on prod-1 out of memory. Rules: bind only names that occur in the formula (mXparser's
 missing-argument list splits names around built-ins, `value` = `valu·e`); re-parse every 4096 evaluations (mXparser 6.1.1 leaks
 ~400 B per `calculate()` of an `if` formula); an exception mXparser caught inside `calculate()` becomes
-`FormulaEvaluationException` (never NaN/NULL); `MxParserLicense.EnsureConfirmed()` confirms the use type once. Repair of an
+`FormulaEvaluationException` (never NaN/NULL). Never call `License.iConfirmCommercialUse` / `iConfirmNonCommercialUse`: Meshmakers
+holds no mXparser license; the stderr warning (max 1000 per process) stays until the library is replaced. Repair of an
 active computed column: `IArchiveLifecycleService.RepairComputedColumnAsync` (job marker `computed-column:repair:<name>`, run by
 the backfill drain). Details: `docs/concept-computed-columns.md` §8.3b. Tests: `FormulaEngineReuseTests`, `ComputedColumnRepairJobTests`.
 

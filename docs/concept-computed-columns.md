@@ -248,15 +248,16 @@ The mXparser dialect already in field use (`OctoExpression`):
 
 | Category | Allowed |
 |---|---|
-| Arithmetic | `+ - * / ^ %`, parentheses |
-| Comparison / logic | `< <= > >= == !=`, `&&`, `\|\|`, mXparser boolean operators |
+| Arithmetic | `+ - * / ^`, `#` (modulo; `%` is a percent suffix), parentheses |
+| Comparison / logic | `< <= > >= == !=`, `&&`, `\|\|`, `~` (not), mXparser boolean operators |
 | Conditional | `if(cond, a, b)`; C-style `cond ? a : b` sugar (translated to `if`) |
 | Built-in functions | mXparser math functions, plus Octo extensions `now(addMinutes)`, `startOfDay(dayCount)`, `isnull(x)` |
 | Null | NULL operands bind `NaN` and propagate (AB#8060); `coalesce(x, default, …)` / `isnull(x)` handle them; the `null` constant (`-Infinity`) produces NULL on purpose; NaN / `null` result → SQL NULL |
 | Operands | bound arguments by column name; numeric, boolean (0/1), and DateTime (ticks) columns can all feed a formula — only `String` columns cannot be referenced |
 | Result | `double` internally, **cast back to the declared `ResultType`** (`Boolean` / `Int` / `Int64` / `Double` / `DateTime`); stored nullable. No `String` result. |
 
-Start small, documented exactly as above; anything outside is a syntax error caught by §9.
+The table names the commonly used forms, not every construct mXparser 4.4.2 accepts (e.g. `n!`, `[true]`); anything
+the parser does not accept is a syntax error caught by §9. Syntax of mXparser 5.0+ that 4.4.2 rejects: §8.3b, "Dialect".
 
 Because both operands and result span boolean / integer / double / DateTime (everything that
 round-trips through a `double` — booleans as 0/1, DateTimes as ticks), the only CK primitive a
@@ -488,10 +489,18 @@ logical→physical name pointer atomically on completion.
     is gone. Measured on 4.4.2: 1,000,000 evaluations of `if(activepower > 0, activepower, 0)` allocate
     ~2.1 KiB each and retain < 1 MiB after a full collection; 2,000,000 rows × 3 computed columns (`if`,
     `coalesce`, arithmetic with `sqrt`) ~1.7 KiB per evaluation, nothing retained, working set 63 → 72 MiB.
-  - **Dialect:** implied multiplication (`2x`, `2(x + 1)`) and the Unicode operators (`√`, `∑`, …) came with
-    mXparser 5.0 and are invalid on 4.4.2 — write `2*x`, `sqrt(x)`. Everything the OctoMesh formulas use
+  - **Dialect:** syntax added in mXparser 5.0 and later is invalid on 4.4.2 (verified against both versions):
+    implied multiplication (`2x`, `2 x`, `x y`, `2(x+1)`, `(x+1)2`, `x(x)`, `2pi`) — write `2*x`, `2*pi`;
+    double signs (`2+-3`, `x--1`) — write `2+(-3)`; Unicode operators and constants (`√`, `∑`, `≠`, `≤`,
+    `×`, `÷`, `π`, …) — write `sqrt(x)`, `!=`, `<=`, `*`, `/`, `pi`; the operators `:` (division, write
+    `x/y`), `\` (integer division) and bitwise `@~&`, `@~|`, `@~^`; the function `lg` (write `log10(x)`) and
+    the Student/Chi²/F-Snedecor distributions (`pStud`, `cStud`, `qStud`, `rStud`, `pChi2`, `cChi2`,
+    `qChi2`, `rChi2`, `pFSned`, `cFSned`, `qFSned`, `rFSned`). Everything the OctoMesh formulas use
     (`if`/ternary, `coalesce`, `isnull`, `now`, `startOfDay`, `null`, comparisons, `&&`/`||`, math
-    functions) is unchanged (`ImpliedMultiplication_IsNotPartOfTheDialect`).
+    functions) is unchanged (`ImpliedMultiplication_IsNotPartOfTheDialect`). Not new, but often misread:
+    modulo is `#` or `mod(a, b)` (`%` is a percent suffix), negation is `~` (`!` is the factorial), the
+    boolean constants are `[true]`/`[false]`. User-facing list: octo-documentation, *Formula
+    Expressions*, section "Not supported".
 - **Repair of an active column.** `IArchiveLifecycleService.RepairComputedColumnAsync(archive, name, from?, to?)`
   (GraphQL `repairComputedColumn`) queues a repair job on the recompute-job mechanism: marker
   `computed-column:repair:<name>` (`RecomputeJobSnapshot.IsComputedColumnRepair`), range `[from, to)` (default

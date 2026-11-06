@@ -93,6 +93,20 @@ public sealed class CkPublishEquivalenceTests : IDisposable
     }
 
     [Fact]
+    public async Task Reordered_acknowledgements_are_no_difference_like_in_the_compile_gate()
+    {
+        await _h.SeedAsync(WithAcknowledgements(Published(), ("K1", "r1"), ("K2", "r2")));
+
+        var result = await _h.EvaluateAsync(WithAcknowledgements(Model(), ("K2", "r2"), ("K1", "r1")));
+
+        Assert.Equal(CkPublishGateDecision.AlreadyPublished, result.Decision);
+        Assert.Empty(Warnings(result));
+        Assert.True(CkPublishedRelease.HaveSameAcknowledgements(
+            WithAcknowledgements(Published(), ("K1", "r1"), ("K2", "r2")),
+            WithAcknowledgements(Model(), ("K2", "r2"), ("K1", "r1"))));
+    }
+
+    [Fact]
     public async Task Changed_acknowledgements_next_to_a_real_content_change_are_still_CK205()
     {
         await _h.SeedAsync(WithAcknowledgements(Published(), ("EnumValue:State-1/B#Added", "v1")));

@@ -274,13 +274,11 @@ public sealed class CkPublishEquivalence
     /// </summary>
     private static bool NormalizeAcknowledgements(CkCompiledModelRoot a, CkCompiledModelRoot b)
     {
-        var differed = !Entries(a).SequenceEqual(Entries(b));
+        // One definition of "same acknowledgements" for every gate (order and surrounding blanks do not count).
+        var differed = !CkPublishedRelease.HaveSameAcknowledgements(a, b);
         a.Compatibility = null;
         b.Compatibility = null;
         return differed;
-
-        static IEnumerable<(string, string)> Entries(CkCompiledModelRoot model) =>
-            (model.Compatibility?.Acknowledge ?? []).Select(e => (e.Change, e.Reason));
     }
 
     // ---- compiler-stamped metadata -------------------------------------------------------------------------------

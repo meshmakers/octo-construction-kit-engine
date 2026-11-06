@@ -14,7 +14,10 @@ namespace Meshmakers.Octo.Runtime.Engine.Tests.Formulas;
 /// because every evaluation built a new mXparser expression (~200 KiB garbage per row). The engine now
 /// parses a formula once per thread and reuses it; exceptions inside mXparser are no longer turned into
 /// a silent NaN; the mXparser use type is confirmed once.
-/// </summary>
+/// <remarks>
+/// Not run in parallel with other collections: the retained-memory assertion reads the process-wide live heap.
+/// </remarks>
+[Collection(FormulaMemoryCollection.Name)]
 public class FormulaEngineReuseTests(ITestOutputHelper output)
 {
     private readonly FormulaEngine _engine = new();
@@ -211,4 +214,12 @@ public class FormulaEngineReuseTests(ITestOutputHelper output)
 
         public FunctionExtension clone() => this;
     }
+}
+
+/// <summary>Runs memory measurements alone, so other test collections cannot move the process-wide live heap.</summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class FormulaMemoryCollection
+{
+    /// <summary>Collection name.</summary>
+    public const string Name = "Formula memory measurements";
 }

@@ -231,9 +231,10 @@ attributes are flattened into the per-row column dictionary and before the INSER
      | `Boolean` | `result != 0` |
      | `DateTime` | `new DateTime((long)result)` — ticks; `now()` / `startOfDay()` already return ticks |
 
-     A parse/eval exception → store `NULL` + emit an audit warning (the insert is **not**
-     failed — computed columns are best-effort and nullable, mirroring
-     `ApplyDataPointMappingsNode`'s fall-back philosophy).
+     A formula that cannot produce a value (invalid syntax, NaN, a NULL operand) → store `NULL`;
+     the insert succeeds (computed columns are nullable, mirroring `ApplyDataPointMappingsNode`).
+     A `FormulaEvaluationException` (evaluation aborted, e.g. out of memory; AB#8331) → the write
+     fails and nothing is stored as `NULL` (see §8.3b).
 2. Add the computed value to the row's column list. The existing multi-row
    `INSERT … ON CONFLICT DO UPDATE` handles the rest unchanged.
 

@@ -782,6 +782,17 @@ read is one request through `IGitHubTreeReader` (recursive tree, versions from f
 2 minutes away throws `GitHubRateLimitExhaustedException` ("GitHub rate limit exhausted, resets at HH:MMZ.") instead of waiting for the 5-minute `CkCompile`/`CkRestore` timeout.
 12-model wave measured with `CatalogApiBudgetTests`: 2882 -> 340 requests (docs/ck-semver-rules.md, "The API budget of the catalog reads").
 
+## Load by rtId to use it: archived counts as not found (AB#8355)
+
+The default delete archives an entity (`rtState = Archived`, the document stays). List queries filter archived entities,
+but `IRuntimeRepository.GetRtEntityByRtIdAsync` returns the document whatever its state, and some callers rely on that
+(restore, history, import) - its semantics stay unchanged. A caller that loads an entity by rtId in order to **use** it
+(execute a persisted query, run a configuration) calls `RuntimeRepositoryExtensions.GetActiveRtEntityByRtIdAsync`
+(`Runtime.Contracts/Repositories`, generic by `OctoObjectId` and by `RtEntityId`) instead: `null` for a missing or an archived
+entity; an entity without `rtState` (written before it existed) counts as active. It is an extension method, not an interface
+member, so engine-mongodb and other implementers need no change. Users: asset-repo `PersistedQueryLookup`, mesh-adapter
+`GetQueryById@1`, the MCP persisted-query tools. Tests: `RuntimeRepositoryExtensionsTests`.
+
 ## Formula engine: parse once, never NULL for an exception (AB#8331)
 
 `FormulaEngine` (Runtime.Engine.Formulas) caches a parsed mXparser expression per thread and formula (`FormulaShape`, one

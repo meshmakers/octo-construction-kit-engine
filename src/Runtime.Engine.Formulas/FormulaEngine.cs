@@ -141,9 +141,24 @@ internal sealed class FormulaEngine : IFormulaEngine
             FormulaResultType.Int => (int)result,
             FormulaResultType.Int64 => (long)result,
             FormulaResultType.Double => result,
-            FormulaResultType.DateTime => new DateTime((long)result),
+            FormulaResultType.DateTime => ToDateTimeOrNull(result),
             _ => throw new ArgumentOutOfRangeException(nameof(resultType), resultType, null)
         };
+    }
+
+    /// <summary>
+    /// Ticks outside the <see cref="DateTime"/> range are a formula result without a value (NULL), not an
+    /// error: since AB#8331 an exception from <see cref="Evaluate"/> fails the caller's write, so a bad
+    /// value must not throw here.
+    /// </summary>
+    private static DateTime? ToDateTimeOrNull(double result)
+    {
+        if (result < DateTime.MinValue.Ticks || result > DateTime.MaxValue.Ticks)
+        {
+            return null;
+        }
+
+        return new DateTime((long)result);
     }
 
     /// <summary>

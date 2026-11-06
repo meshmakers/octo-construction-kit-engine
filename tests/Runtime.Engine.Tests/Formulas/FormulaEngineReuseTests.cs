@@ -152,6 +152,15 @@ public class FormulaEngineReuseTests(ITestOutputHelper output)
         }
     }
 
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("1e300")]
+    public void DateTimeResultOutsideTheRange_IsNull_NotAnException(string formula)
+    {
+        // Since AB#8331 an exception fails the caller's write; a bad value must stay a NULL cell.
+        Assert.Null(_engine.Evaluate(formula, new Dictionary<string, double>(), FormulaResultType.DateTime));
+    }
+
     [Fact]
     public void InvalidSyntax_StaysNaN()
     {

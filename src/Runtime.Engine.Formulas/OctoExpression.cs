@@ -22,12 +22,6 @@ public class OctoExpression : Expression
     private readonly Function _startOfDayFunction = new("startOfDay", new StartOfDayFunction());
     private readonly Function _isNullFunction = new("isnull", new IsNullFunction());
 
-    static OctoExpression()
-    {
-        // AB#8331: confirm the mXparser use type before the first element is created.
-        MxParserLicense.EnsureConfirmed();
-    }
-
     /// <summary>
     /// Creates an expression for <paramref name="expressionString"/> with the OctoMesh
     /// functions and constants registered.

@@ -256,8 +256,8 @@ The mXparser dialect already in field use (`OctoExpression`):
 | Operands | bound arguments by column name; numeric, boolean (0/1), and DateTime (ticks) columns can all feed a formula — only `String` columns cannot be referenced |
 | Result | `double` internally, **cast back to the declared `ResultType`** (`Boolean` / `Int` / `Int64` / `Double` / `DateTime`); stored nullable. No `String` result. |
 
-Start small, documented exactly as above; anything outside is a syntax error caught by §9. Syntax of mXparser 5.0+
-that 4.4.2 rejects: §8.3b, "Dialect".
+The table names the commonly used forms, not every construct mXparser 4.4.2 accepts (e.g. `n!`, `[true]`); anything
+the parser does not accept is a syntax error caught by §9. Syntax of mXparser 5.0+ that 4.4.2 rejects: §8.3b, "Dialect".
 
 Because both operands and result span boolean / integer / double / DateTime (everything that
 round-trips through a `double` — booleans as 0/1, DateTimes as ticks), the only CK primitive a

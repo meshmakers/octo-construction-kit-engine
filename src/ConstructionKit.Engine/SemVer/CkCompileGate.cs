@@ -186,10 +186,25 @@ public class CkCompileGate
             messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Info, null, $"Acknowledged change: {line}"));
         }
 
-        if (isHardGate)
+        if (isHardGate && CkPublishedRelease.IsRebuild(verdict))
+        {
+            // AB#7894: a rebuild of the published release of the declared version (the CI rebuild of a released commit).
+            // Its acknowledgements were judged when it was published; judged against itself every entry would be stale
+            // (OCTO-CK204), and removing them would change a published version (OCTO-CK205 in the publish gate).
+            messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Info, null,
+                CkPublishedRelease.FormatRebuildLine(verdict)));
+            if (!CkPublishedRelease.HaveSameAcknowledgements(verdict.BaselineModel, current))
+            {
+                messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Warning, null,
+                    CkPublishedRelease.FormatAcknowledgementsDifferLine(verdict.BaselineId)));
+            }
+        }
+        else if (isHardGate)
         {
             AddErrors(messages, verdict, modelName, declared, modelPath);
-            foreach (var (code, text) in CkAcknowledgementFormatter.GetFindings(verdict.Acknowledgement, modelName))
+            var publishedRelease = CkPublishedRelease.IsDeclaredVersionPublished(resolution) ? resolution.Baseline : null;
+            foreach (var (code, text) in CkAcknowledgementFormatter.GetFindings(verdict.Acknowledgement, modelName,
+                         publishedRelease))
             {
                 messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Error, code, text));
             }

@@ -12,7 +12,8 @@ public class CkCompatibilityDto
     /// <summary>
     ///     Explicit acknowledgements of changes that need one (a security-sensitive access tightening, a unique index
     ///     on a stable base). Valid for exactly the release they are in: an entry that matches no change of the release
-    ///     is stale and fails the build (<c>OCTO-CK204</c>).
+    ///     is stale and fails the build (<c>OCTO-CK204</c>). A rebuild of the published release that carries them is not
+    ///     judged again, and a re-publish of that version that only changes the entries is a no-op (AB#7894).
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
     public List<CkAcknowledgeDto>? Acknowledge { get; set; }

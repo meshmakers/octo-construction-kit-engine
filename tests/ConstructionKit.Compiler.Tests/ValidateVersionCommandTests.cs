@@ -772,6 +772,43 @@ public sealed class ValidateVersionCommandTests : IDisposable
         }
     }
 
+    /// <summary>
+    ///     AB#7894: after the acknowledged Minor 2.5.0 is published, ValidateVersion of the same commit (the CI rebuild)
+    ///     agrees with the compile gate and the publish gate: a rebuild of the published release, with or without its
+    ///     entries, is valid, and the CHANGELOG section of the release is not overwritten with an empty diff.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ValidateVersion_ARebuildOfThePublishedAcknowledgedMinorIsValid(bool keepEntries)
+    {
+        WriteAcknowledgeSource("2.4.0", "ReadOnly");
+        await PublishBaselineAsync();
+        WriteAcknowledgeSource("2.5.0", "Hidden", "Accepted risk R13");
+        await RunAsync("-p", _sourceDir, "-o", _reportPath, "-cl");
+        await PublishBaselineAsync();
+        var changelogPath = Path.Combine(_sourceDir, "CHANGELOG.md");
+        var releasedChangelog = await File.ReadAllTextAsync(changelogPath, TestContext.Current.CancellationToken);
+
+        WriteAcknowledgeSource("2.5.0", "Hidden", keepEntries ? "Accepted risk R13" : null);
+        await RunAsync("-p", _sourceDir, "-o", _reportPath, "-cl");
+
+        var report = ReadReport();
+        Assert.Contains("a rebuild of the published release", report);
+        Assert.DoesNotContain("OCTO-CK204", report);
+        Assert.Equal(!keepEntries, report.Contains("differ from those of the published release"));
+        Assert.Equal(releasedChangelog,
+            await File.ReadAllTextAsync(changelogPath, TestContext.Current.CancellationToken));
+
+        var current = await _serviceProvider.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(_sourceDir, new OperationResult());
+        var gate = await _serviceProvider.GetRequiredService<CkCompileGate>().RunAsync(current, CkBaselineSource.Remote);
+        Assert.False(gate.HasErrors);
+        var publishGate = await _serviceProvider.GetRequiredService<CkPublishGate>()
+            .EvaluateAsync(InMemoryPublishedCatalog.Name, current);
+        Assert.Equal(CkPublishGateDecision.AlreadyPublished, publishGate.Decision);
+    }
+
     private static string[] GatePublishCodes(CkPublishGateResult result) =>
         result.Messages.Where(m => m.Code != null && m.Severity == CkCompileGateSeverity.Error)
             .Select(m => m.Code!).ToArray();

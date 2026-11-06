@@ -61,6 +61,65 @@ public sealed class CkPublishEquivalenceTests : IDisposable
         Assert.Equal(0, _h.Stub.PublishCount);
     }
 
+    private static CkCompiledModelRoot WithAcknowledgements(CkCompiledModelRoot model,
+        params (string Change, string Reason)[] entries)
+    {
+        model.Compatibility = new CkCompatibilityDto
+        {
+            Acknowledge = entries.Select(e => new CkAcknowledgeDto { Change = e.Change, Reason = e.Reason }).ToList()
+        };
+        return model;
+    }
+
+    [Theory]
+    [InlineData(true, false)] // entries removed after the publish
+    [InlineData(false, true)] // entries added to a published version
+    [InlineData(true, true)] // entries reworded
+    public async Task Changed_acknowledgements_under_a_published_version_are_a_no_op_with_a_warning(
+        bool publishedHasEntries, bool currentHasEntries)
+    {
+        // AB#7894: compatibility.acknowledge is the audit trail of the release, not model structure.
+        var published = publishedHasEntries ? WithAcknowledgements(Published(), ("EnumValue:State-1/B#Added", "v1")) : Published();
+        var current = currentHasEntries ? WithAcknowledgements(Model(), ("EnumValue:State-1/B#Added", "v2")) : Model();
+        await _h.SeedAsync(published);
+
+        var result = await _h.EvaluateAsync(current);
+        await _h.PublishAsync(current, force: true);
+
+        Assert.Equal(CkPublishGateDecision.AlreadyPublished, result.Decision);
+        Assert.False(result.HasErrors);
+        Assert.Contains("acknowledgements", Assert.Single(Warnings(result)));
+        Assert.Equal(0, _h.Stub.PublishCount);
+    }
+
+    [Fact]
+    public async Task Reordered_acknowledgements_are_no_difference_like_in_the_compile_gate()
+    {
+        await _h.SeedAsync(WithAcknowledgements(Published(), ("K1", "r1"), ("K2", "r2")));
+
+        var result = await _h.EvaluateAsync(WithAcknowledgements(Model(), ("K2", "r2"), ("K1", "r1")));
+
+        Assert.Equal(CkPublishGateDecision.AlreadyPublished, result.Decision);
+        Assert.Empty(Warnings(result));
+        Assert.True(CkPublishedRelease.HaveSameAcknowledgements(
+            WithAcknowledgements(Published(), ("K1", "r1"), ("K2", "r2")),
+            WithAcknowledgements(Model(), ("K2", "r2"), ("K1", "r1"))));
+    }
+
+    [Fact]
+    public async Task Changed_acknowledgements_next_to_a_real_content_change_are_still_CK205()
+    {
+        await _h.SeedAsync(WithAcknowledgements(Published(), ("EnumValue:State-1/B#Added", "v1")));
+        var changed = Model();
+        changed.Enums![0].Values!.Add(new CkEnumValueDto { Key = 2, Name = "C" });
+
+        var result = await _h.EvaluateAsync(changed);
+
+        Assert.Equal(CkPublishGateDecision.Refused, result.Decision);
+        Assert.Equal("OCTO-CK205", GateHarness.ErrorCodes(result).First());
+        Assert.Equal(0, _h.Stub.PublishCount);
+    }
+
     [Theory]
     [InlineData(AttributeOwnershipDto.TenantOwned)]
     [InlineData(AttributeOwnershipDto.Secret)]

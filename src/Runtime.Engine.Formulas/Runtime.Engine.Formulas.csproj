@@ -15,7 +15,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="MathParser.org-mXparser" Version="6.1.1" />
+        <PackageReference Include="MathParser.org-mXparser" Version="4.4.2" />
     </ItemGroup>
 
     <ItemGroup>

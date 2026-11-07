@@ -300,6 +300,67 @@ public class CkEngineVersionTests(ITestOutputHelper output) : CkV2ResolverTestBa
         Assert.True(CkEngineVersion.CheckModel(model, "loc", new OperationResult(), previous));
     }
 
+    // ── execution.mode (AB#6925) ────────────────────────────────────────────────────
+
+    [Fact]
+    public void RequiredMinEngineVersion_RaisedOnlyWhenAMethodSetsExecutionMode_AlsoWhenItIsSync()
+    {
+        var plain = Model();
+        Assert.Equal(CkEngineVersion.CkV2MinEngineVersion, CkEngineVersion.GetRequiredMinEngineVersion(plain));
+
+        var asyncModel = Model();
+        Type(asyncModel, "Principal").Methods!.Single(m => m.MethodId == "ChangePassword-1").Execution =
+            new CkMethodExecutionDto { TimeoutSeconds = 20, Mode = CkMethodModes.Async };
+        Assert.Equal(CkEngineVersion.ExecutionModeMinEngineVersion,
+            CkEngineVersion.GetRequiredMinEngineVersion(asyncModel));
+        Assert.True(Version.Parse(CkEngineVersion.ExecutionModeMinEngineVersion) >
+                    Version.Parse(CkEngineVersion.DataAccessMinEngineVersion));
+
+        // An explicit 'sync' is still the key: an engine that predates it cannot tell the author meant it.
+        var syncModel = Model();
+        Type(syncModel, "Principal").Methods!.Single(m => m.MethodId == "ChangePassword-1").Execution =
+            new CkMethodExecutionDto { Mode = CkMethodModes.Sync };
+        Assert.Equal(CkEngineVersion.ExecutionModeMinEngineVersion,
+            CkEngineVersion.GetRequiredMinEngineVersion(syncModel));
+
+        // Execution options without the key (timeout, idempotency) keep the model's other minimum.
+        var withoutKey = Model();
+        Type(withoutKey, "Principal").Methods!.Single(m => m.MethodId == "ChangePassword-1").Execution =
+            new CkMethodExecutionDto { TimeoutSeconds = 20, Idempotent = true };
+        Assert.Equal(CkEngineVersion.CkV2MinEngineVersion, CkEngineVersion.GetRequiredMinEngineVersion(withoutKey));
+
+        // An interface method counts, and the higher of two markers wins.
+        var onInterface = Model();
+        (onInterface.Interfaces ??= []).Add(new CkInterfaceDto
+        {
+            InterfaceId = "Runners-1",
+            Methods = [new() { MethodId = "Run-1", Execution = new() { TimeoutSeconds = 20, Mode = CkMethodModes.Async } }]
+        });
+        Type(onInterface, "Principal").Methods!.Single(m => m.MethodId == "ChangePassword-1").Authorization!.DataAccess =
+            CkMethodDataAccessDto.Read;
+        var expected = new[] { CkEngineVersion.DataAccessMinEngineVersion, CkEngineVersion.ExecutionModeMinEngineVersion }
+            .Select(Version.Parse).Max()!.ToString();
+        Assert.Equal(expected, CkEngineVersion.GetRequiredMinEngineVersion(onInterface));
+    }
+
+    [Fact]
+    public void Code126_ModelWithExecutionMode_IsRefusedByAnEngineThatPredatesTheField()
+    {
+        // The last version without the field would drop the key and run an async method as sync.
+        var model = Model();
+        Type(model, "Principal").Methods!.Single(m => m.MethodId == "ChangePassword-1").Execution =
+            new CkMethodExecutionDto { TimeoutSeconds = 20, Mode = CkMethodModes.Async };
+        model.MinEngineVersion = CkEngineVersion.GetRequiredMinEngineVersion(model);
+        var operationResult = new OperationResult();
+        var previous = Version.Parse(CkEngineVersion.ExecutionModeMinEngineVersion);
+        var predating = new Version(previous.Major, previous.Minor, previous.Build - 1);
+
+        Assert.False(CkEngineVersion.CheckModel(model, "loc", operationResult, predating));
+        Assert.Equal(126, Assert.Single(operationResult.Messages).MessageNumber);
+
+        Assert.True(CkEngineVersion.CheckModel(model, "loc", new OperationResult(), previous));
+    }
+
     // ── sensitive method result (AB#7006) ───────────────────────────────────────────
 
     [Fact]

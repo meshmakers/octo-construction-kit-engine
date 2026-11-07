@@ -386,7 +386,10 @@ public class CkMethodExecutionDto
     ///     CK v2 Phase 3 (AB#6925): whether a call returns the result (<see cref="CkMethodModes.Sync" />) or an
     ///     operation handle (<see cref="CkMethodModes.Async" />), see <see cref="CkMethodModes" />. <c>null</c>
     ///     (omitted) means <see cref="CkMethodModes.Sync" />, so models that do not use the key serialize
-    ///     byte-identically. The mode is part of the invocation contract (rule 122, SemVer row M19). An unknown value,
+    ///     byte-identically. A model that sets the key on any method carries a raised <c>minEngineVersion</c>
+    ///     (<c>CkEngineVersion.ExecutionModeMinEngineVersion</c>), so an older engine refuses it with message 126
+    ///     instead of running an async method as sync. The mode is part of the invocation contract (rule 122, SemVer
+    ///     row M19). An unknown value,
     ///     <c>async</c> together with a <see cref="CkMethodHandlers.Pipeline" /> handler, or the key in a model without
     ///     <c>ckLanguage: 2</c> is reported by the compiler (message 142), not by the schema.
     /// </summary>

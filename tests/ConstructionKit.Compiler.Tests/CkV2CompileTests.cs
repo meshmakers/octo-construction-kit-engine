@@ -215,6 +215,8 @@ public sealed class CkV2CompileTests : IDisposable
         var plainYaml = await ToYamlAsync(_fixture, plain);
         Assert.DoesNotContain("handler", plainYaml);
         Assert.Null(plain.Types!.Single(t => t.TypeId.Name == "Account").Methods!.Single().Execution);
+        Assert.Equal(CkEngineVersion.CkV2MinEngineVersion, plain.MinEngineVersion);
+        Assert.Contains($"minEngineVersion: {CkEngineVersion.CkV2MinEngineVersion}", plainYaml);
 
         var compiled = await _fixture.CompileAndPublishAsync(_fixture.WriteSource("ks", "KitchenSink-1.0.0",
             ["System-[2.5,3.0)"], KitchenSinkWithHandler(
@@ -298,6 +300,14 @@ public sealed class CkV2CompileTests : IDisposable
         Assert.False(operationResult.HasErrors, string.Join("; ", operationResult.Messages));
         Assert.Equal(CkMethodModes.Async,
             readBack.Types!.Single(t => t.TypeId.Name == "Account").Methods!.Single().Execution!.Mode);
+
+        // minEngineVersion is raised, so an engine that predates the field refuses the model (message 126) instead
+        // of running the async method as sync.
+        Assert.Equal(CkEngineVersion.ExecutionModeMinEngineVersion, compiled.MinEngineVersion);
+        Assert.Contains($"minEngineVersion: {CkEngineVersion.ExecutionModeMinEngineVersion}", yaml);
+        var refusal = new OperationResult();
+        Assert.False(CkEngineVersion.CheckModel(compiled, "ks", refusal, new Version(3, 5, 40)));
+        Assert.Equal(126, Assert.Single(refusal.Messages).MessageNumber);
 
         // The resolved graph carries it; the methods of the other types keep the default.
         var graph = await _fixture.Services.GetRequiredService<ICatalogModelResolver>()

@@ -1686,10 +1686,14 @@ change), classifier row **M19** (sync ↔ async = Major; on an interface method 
 only for the non-default; (8) — (no generated code depends on it); (9) `Types.md` and `Interfaces.md` mark a non-default method
 `(mode: async)`; (10) **follow-up AB#6926** (engine-mongodb `CkMethodExecution` map + `CkModelReflectionComparer` gate — until
 then a tenant document drops the value on import); (11) **follow-up AB#6926** (asset-repo CK meta); (12) optional, Studio.
-**minEngineVersion:** not raised (like `handler`): a model using the key needs the CK v2 engine (`CkV2MinEngineVersion`); the
-runtime that produces operation handles is F3.6 (AB#8443 ff.). Tests: `CkV2MethodResolverTests` (`Code142_*`, `Code122_*Mode*`),
-`CkV2CompileTests.MethodMode_*`, `CkV2GraphJsonRoundTripTests.AsyncMode_*`, `CkV2SchemaTests`, `MethodRowTests.M19_*`,
-`InterfaceRowTests.I12_*` (case `mode changed`).
+**minEngineVersion:** `CkEngineVersion.GetRequiredMinEngineVersion` raises the value to `ExecutionModeMinEngineVersion` for a
+model in which any type **or interface** method sets `execution.mode` (also `sync`; the maximum with the other markers; models
+without the key keep their minimum and compile byte-identically), so an older CK v2 engine refuses the model with message 126
+instead of dropping the key and running an `async` method as sync (decision Odin, AB#6925). The constant must equal the number of
+the release that first ships the field (the next patch after the last `r3.5.x` tag at merge time; `3.5.67` when `r3.5.66` was the
+last tag). The runtime that produces operation handles is F3.6 (AB#8443 ff.). Tests: `CkV2MethodResolverTests` (`Code142_*`,
+`Code122_*Mode*`), `CkV2CompileTests.MethodMode_*`, `CkV2GraphJsonRoundTripTests.AsyncMode_*`, `CkV2SchemaTests`,
+`MethodRowTests.M19_*`, `InterfaceRowTests.I12_*` (case `mode changed`), `CkEngineVersionTests` (`*ExecutionMode*`).
 
 **Method `authorization.dataAccess` (AB#7036, F3.4b) touch points**, same numbering (the field lives on `CkMethodAuthorizationDto`,
 next to `roles` / `allowSelf` / `scopes`; enum `CkMethodDataAccessDto` `Read` | `Write`, PascalCase like `visibility`; nullable, omitted =

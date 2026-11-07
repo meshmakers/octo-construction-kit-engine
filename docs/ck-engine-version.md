@@ -9,6 +9,18 @@ AB#6390 (Feature AB#5686, Epic AB#5584). Source: `src/ConstructionKit.Engine/Ver
 | `ckLanguage: 1`, no range retention, v1 dependencies | not written (output byte-identical to before) |
 | `ckLanguage: 2` or range-retaining | `3.5.1` (`CkEngineVersion.CkV2MinEngineVersion`) |
 | v1 model on a dependency that carries one | the highest value of its resolved dependencies |
+| a type or interface method uses a key that an older CK v2 engine would drop silently | the highest of the matching feature minimums below and the values above |
+
+Feature minimums (`CkEngineVersion.GetRequiredMinEngineVersion`; each one is the first libs release that ships the key):
+
+| A method sets | `minEngineVersion` | Why an older engine must refuse the model |
+|---------------|--------------------|-------------------------------------------|
+| `replacesGenericCreate: true` (AB#7024) | `3.5.34` (`ReplacesGenericCreateMinEngineVersion`) | it would serve the generic create of the type |
+| `result.sensitive: true` (AB#7006) | `3.5.36` (`SensitiveResultMinEngineVersion`) | it would log, audit and trace a secret result |
+| `authorization.dataAccess`, also `Write` (AB#7036) | `3.5.40` (`DataAccessMinEngineVersion`) | it would treat a `Read` method as `Write` |
+| `execution.mode`, also `sync` (AB#6925) | `3.5.67` (`ExecutionModeMinEngineVersion`) | it would run an `async` method as sync |
+
+Models that use none of these keys keep their other minimum and compile byte-identically.
 
 `3.5.1` is the first libs release with the full CK v2 Phase 1 reader. The value is a constant, not the compiling
 engine's version, so compile output does not depend on the build configuration. A model that was published earlier

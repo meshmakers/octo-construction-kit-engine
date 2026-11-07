@@ -536,18 +536,6 @@ internal class InheritanceResolver : IInheritanceResolver
     }
 
     /// <summary>
-    ///     M-6 (AB#6877, message 131): <c>execution.handler</c> is <c>service</c> or <c>pipeline</c>. A pipeline method
-    ///     declares an explicit <c>timeoutSeconds</c> (the pipeline run is bounded by it, the platform default is not
-    ///     a safe choice for a long-running pipeline) and is declared on a type, never on an interface: the pipeline
-    ///     binds by the well-known name equal to one qualified method id (<c>Model/Type.Method-1</c>), which an
-    ///     interface method — implemented by many types — does not have. A type that implements the interface
-    ///     redeclares the method with <c>handler: pipeline</c> itself (execution is not part of the invocation
-    ///     contract, rule 122).
-    ///     AB#7004 (message 132, OD-9 Option A): a pipeline method has no <c>sensitive</c> parameter. A pipeline
-    ///     execution stores its input, so the compiler refuses the combination; the pipeline handler runtime refuses
-    ///     such a method as well (defence in depth). A sensitive RESULT is not covered (no result-sensitivity flag).
-    /// </summary>
-    /// <summary>
     ///     M-9 (AB#6925, message 142): <c>execution.mode</c> is <c>sync</c> or <c>async</c> (exact, lower-case — the
     ///     schema has no <c>enum</c> so the message names the method). <c>async</c> requires a service handler: a pipeline
     ///     handler answers synchronously only (Phase 3), and asynchronous methods are limited to service handlers of bot
@@ -578,6 +566,19 @@ internal class InheritanceResolver : IInheritanceResolver
                 $"answers synchronously only; use 'handler: {CkMethodHandlers.Service}' for an asynchronous method"));
         }
     }
+
+    /// <summary>
+    ///     M-6 (AB#6877, message 131): <c>execution.handler</c> is <c>service</c> or <c>pipeline</c>. A pipeline method
+    ///     declares an explicit <c>timeoutSeconds</c> (the pipeline run is bounded by it, the platform default is not
+    ///     a safe choice for a long-running pipeline) and is declared on a type, never on an interface: the pipeline
+    ///     binds by the well-known name equal to one qualified method id (<c>Model/Type.Method-1</c>), which an
+    ///     interface method — implemented by many types — does not have. A type that implements the interface
+    ///     redeclares the method with <c>handler: pipeline</c> itself (execution is not part of the invocation
+    ///     contract, rule 122).
+    ///     AB#7004 (message 132, OD-9 Option A): a pipeline method has no <c>sensitive</c> parameter. A pipeline
+    ///     execution stores its input, so the compiler refuses the combination; the pipeline handler runtime refuses
+    ///     such a method as well (defence in depth). A sensitive RESULT is not covered (no result-sensitivity flag).
+    /// </summary>
 
     private static void ValidateMethodHandler(CkMethodDto method, object ckTypeId, string location,
         OperationResult operationResult, bool isInterfaceMethod)

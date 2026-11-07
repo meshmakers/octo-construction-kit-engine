@@ -77,6 +77,7 @@ public class CkV2SchemaTests
                 execution:
                   timeoutSeconds: 15
                   idempotent: false
+                  mode: async
               - methodId: Unlock-1
               - methodId: CreateMany-2
                 kind: Static
@@ -190,6 +191,10 @@ public class CkV2SchemaTests
         Assert.Equal(CkMethodDataAccessDto.Write, CkMethodAuthorization.Resolve(changePassword.Authorization));
         Assert.Equal(CkMethodDataAccessDto.Write, CkMethodAuthorization.Resolve(minimal.Authorization));
         Assert.Equal(CkMethodHandlers.Service, CkMethodHandlers.Effective(changePassword.Execution.Handler));
+        // AB#6925: the mode is read as authored; an omitted key stays null (default 'sync').
+        Assert.Equal(CkMethodModes.Async, changePassword.Execution.Mode);
+        Assert.Null(user.Methods[2].Execution!.Mode);
+        Assert.Equal(CkMethodModes.Sync, CkMethodModes.Effective(user.Methods[2].Execution!.Mode));
     }
 
     [Theory]
@@ -209,6 +214,7 @@ public class CkV2SchemaTests
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        execution: { timeoutSeconds: 0 }\n", "timeout below minimum")]
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        execution: { timeoutSeconds: 301 }\n", "timeout above maximum")]
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        execution: { handler: 3 }\n", "handler is a string")]
+    [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        execution: { mode: 3 }\n", "mode is a string")]
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        replacesGenericCreate: yes please\n", "replacesGenericCreate is a boolean")]
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        authorization: { dataAccess: Delete }\n", "unknown dataAccess value")]
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        authorization: { dataAccess: read }\n", "dataAccess is PascalCase")]
@@ -676,6 +682,7 @@ internal static class CkV2Assert
         Assert.Equal(expected.Execution?.TimeoutSeconds, actual.Execution?.TimeoutSeconds);
         Assert.Equal(expected.Execution?.Idempotent, actual.Execution?.Idempotent);
         Assert.Equal(expected.Execution?.Handler, actual.Execution?.Handler);
+        Assert.Equal(expected.Execution?.Mode, actual.Execution?.Mode);
         Assert.Equal(expected.ReplacesGenericCreate, actual.ReplacesGenericCreate);
     }
 }

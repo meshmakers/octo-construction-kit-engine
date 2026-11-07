@@ -814,4 +814,174 @@ public class CkV2MethodResolverTests(ITestOutputHelper output) : CkV2ResolverTes
 
         Assert.Contains(operationResult.Messages, m => m.MessageNumber == 90 && m.MessageText.Contains("replacesGenericCreate"));
     }
+
+    // ── execution.mode (AB#6925, message 142) ─────────────────────────────────────
+
+    [Theory]
+    [InlineData(CkMethodModes.Async)]
+    [InlineData(CkMethodModes.Sync)]
+    public void Code142_KnownModeWithServiceHandler_OK_AndReachesTheGraph(string mode)
+    {
+        var model = Model();
+        Type(model, "Tag").Methods =
+        [
+            new() { MethodId = "Export-1", Execution = new() { TimeoutSeconds = 30, Mode = mode } }
+        ];
+
+        var operationResult = new OperationResult();
+        var graph = Resolve(model, operationResult);
+
+        Assert.Empty(operationResult.Messages);
+        var method = graph.Types[$"{M}/Tag"].AllMethods["Export-1"];
+        Assert.Equal(mode, method.Mode);
+        Assert.Equal(mode == CkMethodModes.Async, method.IsAsync);
+        Assert.Equal(CkMethodHandlers.Service, method.Handler);
+    }
+
+    [Fact]
+    public void Code142_OmittedMode_IsSync()
+    {
+        var graph = Resolve(Model(), new OperationResult());
+
+        var method = graph.Types[$"{M}/Account"].AllMethods["ChangePassword-1"];
+        Assert.Equal(CkMethodModes.Sync, method.Mode);
+        Assert.False(method.IsAsync);
+    }
+
+    [Theory]
+    [InlineData("Async")]
+    [InlineData("ASYNC")]
+    [InlineData("background")]
+    [InlineData("")]
+    public void Code142_UnknownModeValue(string mode)
+    {
+        var model = Model();
+        Type(model, "Tag").Methods = [new() { MethodId = "Export-1", Execution = new() { Mode = mode } }];
+
+        var message = Assert.Single(ResolveExpectingOnly(model, 142));
+        Assert.Contains("Export-1", message.MessageText);
+        Assert.Contains("unknown mode", message.MessageText);
+    }
+
+    [Fact]
+    public void Code142_AsyncWithPipelineHandler_IsRefused_NamingTheMethod()
+    {
+        var model = Model();
+        Type(model, "Tag").Methods =
+        [
+            new()
+            {
+                MethodId = "Export-1",
+                Execution = new() { TimeoutSeconds = 60, Handler = CkMethodHandlers.Pipeline, Mode = CkMethodModes.Async }
+            }
+        ];
+
+        var message = Assert.Single(ResolveExpectingOnly(model, 142));
+        Assert.Contains("Export-1", message.MessageText);
+        Assert.Contains("pipeline", message.MessageText);
+    }
+
+    [Fact]
+    public void Code142_SyncWithPipelineHandler_OK()
+    {
+        var model = Model();
+        Type(model, "Tag").Methods =
+        [
+            new()
+            {
+                MethodId = "Export-1",
+                Execution = new() { TimeoutSeconds = 60, Handler = CkMethodHandlers.Pipeline, Mode = CkMethodModes.Sync }
+            }
+        ];
+
+        ResolveExpectingNoMessages(model);
+    }
+
+    [Fact]
+    public void Code142_AsyncTogetherWithIdempotent_Compiles()
+    {
+        // AB#6925 / AB#7896: an idempotent async method skips the idempotency key store as a sync one does; the
+        // combination is allowed.
+        var model = Model();
+        Type(model, "Tag").Methods =
+        [
+            new() { MethodId = "Export-1", Execution = new() { Mode = CkMethodModes.Async, Idempotent = true } }
+        ];
+
+        var operationResult = new OperationResult();
+        var graph = Resolve(model, operationResult);
+
+        Assert.Empty(operationResult.Messages);
+        var method = graph.Types[$"{M}/Tag"].AllMethods["Export-1"];
+        Assert.True(method.IsAsync);
+        Assert.True(method.Definition.Execution!.Idempotent);
+    }
+
+    [Fact]
+    public void Code142_ModeInACkLanguage1Model_NamesTheMethod()
+    {
+        var model = Model();
+        model.CkLanguage = 1;
+        Type(model, "Tag").Methods = [new() { MethodId = "Export-1", Execution = new() { Mode = CkMethodModes.Async } }];
+
+        var operationResult = new OperationResult();
+        Resolve(model, operationResult);
+
+        var message = Assert.Single(operationResult.Messages, m => m.MessageNumber == 142);
+        Assert.Contains("Export-1", message.MessageText);
+        Assert.Contains("ckLanguage: 2", message.MessageText);
+        Assert.Contains(operationResult.Messages, m => m.MessageNumber == 90 && m.MessageText.Contains("methods"));
+    }
+
+    [Fact]
+    public void Code142_AsyncInterfaceMethod_OK_AndTheImplementingTypeKeepsTheMode()
+    {
+        var model = Model();
+        (model.Interfaces ??= []).Add(new CkInterfaceDto
+        {
+            InterfaceId = "Exportable-1",
+            Methods = [new() { MethodId = "Export-1", Execution = new() { Mode = CkMethodModes.Async } }]
+        });
+        var tag = Type(model, "Tag");
+        tag.Implements = [$"{M}/Exportable-1"];
+        tag.Methods = [new() { MethodId = "Export-1", Execution = new() { TimeoutSeconds = 20, Mode = CkMethodModes.Async } }];
+
+        ResolveExpectingNoMessages(model);
+    }
+
+    [Theory]
+    [InlineData(CkMethodModes.Async, null)]
+    [InlineData(CkMethodModes.Async, CkMethodModes.Sync)]
+    [InlineData(null, CkMethodModes.Async)]
+    public void Code122_RedeclaringAnInterfaceMethodWithAnotherMode_IsRefused(string? interfaceMode, string? typeMode)
+    {
+        var model = Model();
+        (model.Interfaces ??= []).Add(new CkInterfaceDto
+        {
+            InterfaceId = "Exportable-1",
+            Methods = [new() { MethodId = "Export-1", Execution = new() { Mode = interfaceMode } }]
+        });
+        var tag = Type(model, "Tag");
+        tag.Implements = [$"{M}/Exportable-1"];
+        tag.Methods = [new() { MethodId = "Export-1", Execution = new() { Mode = typeMode } }];
+
+        var message = Assert.Single(ResolveExpectingOnly(model, 122));
+        Assert.Contains("mode", message.MessageText);
+    }
+
+    [Fact]
+    public void Code122_RedeclaringWithTheDefaultModeStatedExplicitly_IsNoConflict()
+    {
+        var model = Model();
+        (model.Interfaces ??= []).Add(new CkInterfaceDto
+        {
+            InterfaceId = "Exportable-1",
+            Methods = [new() { MethodId = "Export-1" }]
+        });
+        var tag = Type(model, "Tag");
+        tag.Implements = [$"{M}/Exportable-1"];
+        tag.Methods = [new() { MethodId = "Export-1", Execution = new() { Mode = CkMethodModes.Sync } }];
+
+        ResolveExpectingNoMessages(model);
+    }
 }

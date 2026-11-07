@@ -539,6 +539,14 @@ internal class ElementResolver : IElementResolver
                 Report(key, "authorization.dataAccess", $"{key}.{method.MethodId}");
             }
 
+            // AB#6925: 'execution.mode' in a model without ckLanguage 2 is reported with its own code (142) naming the
+            // method, in addition to the 90 for 'methods' above.
+            foreach (var method in (ckType.Methods ?? []).Where(m => m.Execution?.Mode != null))
+            {
+                operationResult.AddMessage(MessageCodes.CkMethodModeInvalid(originFileResolver.Resolve(key),
+                    method.MethodId, key, $"'execution.mode' requires 'ckLanguage: 2' (the model declares ckLanguage {ckLanguage})"));
+            }
+
             CheckAccess(key, key, ckType.Attributes);
         }
 

@@ -1420,7 +1420,7 @@ Notes:
   `ReadWrite`, visibility `Public`, derivable `Any`) through a `JsonTypeInfo` modifier in `CkCache` (`OmitCkV2Defaults`), so v1 caches stay
   byte-identical; reading tolerates the missing keys (trailing defaulted `[JsonConstructor]` parameters on
   `CkTypeGraph`, init setter on `CkTypeAttributeGraph.Access`).
-- Message codes for CK v2: 90–113 and 118–141 are in use (table below); **spare: 111, 114–117**. Range
+- Message codes for CK v2: 90–113 and 118–142 are in use (table below); **spare: 111, 114–117**. Range
   retention (F0.2) has no message codes of its own — its failures are `ModelValidationException`s and the
   unbound-reference diagnostic is the source-generator diagnostic OM1004.
   Warnings (e.g. 110, 124) of a successful compile are printed by `octo-ckc -c compile` (to **stderr**, also with
@@ -1497,6 +1497,7 @@ exists in Industry.Basic-2.6.0. Check the model prefix of the reference."). `OCT
 | 139 | `RtAttributeWriteRestricted` | `RtAttributeAccessCheck` (Runtime.Engine/Exchange; raised by `ImportRtModelCommand` on every RT import path and by `BlueprintGenericCreateGuard` / `BlueprintMigrationExecutor`, not by the compiler) | AB#7767 (H3): an RT import, blueprint seed, blueprint update diff or migration step sets an attribute with `access: Hidden` or `MethodOnly` (also a record member). Parameters `rtId`, `ckTypeId`, `attributePath`; one message per value, refused before anything is written. `ReadOnly` stays importable. See "RT export and import honour `access`" above |
 | 140 | `RtIdentityOwnedWriteRestricted` | `RtIdentityOwnedWriteCheck` (Runtime.Engine/Exchange; raised by `ImportRtModelCommand` on the caller path of `ImportRt` only, not by the compiler) | AB#8042 / AB#8053: a user-initiated import sets an edge of an identity association role (`IdentityOwnedWrites`; the identity-owned User attributes are MethodOnly since System.Identity 3.0.0 and refused by 139). Parameters `rtId`, `ckTypeId`, `path`; one message per edge, refused before anything is written. See "Identity-owned User fields and identity associations" above |
 | 141 | `RtRecordMemberNotPreservable` | `ImportRtModelCommand.PreserveSecretRecordMembers` (Runtime.Engine/Exchange; caller path of `ImportRt` only, not by the compiler) | AB#8141: a caller upsert writes a record array whose record has no usable record key (none, or the key member is MethodOnly/Hidden) while a stored element holds a value in a MethodOnly/Hidden member (also nested); the elements cannot be matched, so the value would be lost. Parameters `rtId`, `ckTypeId`, `path`; refused before anything is written. With a usable key the member is carried over (omission rule, see "Omission inside records") |
+| 142 | `CkMethodModeInvalid` | `InheritanceResolver.ValidateMethodMode` (M-9) + `ElementResolver.CheckCkLanguage` | AB#6925: `execution.mode` of a method (type or interface) is not `sync` or `async` (exact, lower-case — the schema has no `enum` so the compiler names the method), `async` together with `handler: pipeline` (a pipeline handler answers synchronously only, `pipelineMethodHandlers.md`; decision OD-10 limits async in Phase 3 to service handlers of bot job types), or the key in a model without `ckLanguage: 2` (reported in addition to the 90 for `methods`, naming the method). Parameters `methodId`, `ckTypeId`, `reason`. `async` + `idempotent: true` is allowed (an idempotent async method skips the idempotency key store as a sync one does, AB#7896). The mode is part of the invocation contract (rule 122) |
 
 `InheritanceResolver.ResolveInterfacesAndMethods` also completes `AllImplementedInterfaces` (own ∪ every base
 type's declared interfaces), `AllMethods` (nearest declaration wins; `CkMethodGraph.DeclaringCkTypeId` is the
@@ -1581,7 +1582,7 @@ that gate is green.
 | 3 | DTO | `CkModelPropertiesDto.CkLanguage` | `CkInterfaceDto`, `CkElementsRootDto`, `CkModelRootBase` | `CkTypeDto.Implements` | `CkTypeAttributeDto.Access` | `CkTypeDto.Methods` + `CkMethodDto` family | `CkVisibilityDto` / `CkDerivableDto` on the 7 element DTOs | `CkInterfaceDto`, `CkInterfaceAssociationDto`, `CkTypeAssociationDto.TargetCkInterfaceId` |
 | 4 | Compiler hand-copies | `CompilerService` candidate, `CatalogModelResolver` | same + `interfaces/` loop | `CompilerService` type copy | by reference | `CompilerService` type copy | `CompilerService` type copy (others by reference) | by reference |
 | 5 | Graph + `[JsonConstructor]` | `CkCacheRoot.Models` (set in `ElementResolver` / `AppendModel`) | `CkInterfaceGraph`, `CkModelGraph`, `CkCacheRoot`, cache getters | `CkTypeGraph` | `CkTypeAttributeGraph` (init setter) | `CkTypeGraph` + `CkMethodGraph` | settable effective properties, set by `CkModelGraph.ApplyCkV2Modifiers` | `CkInterfaceGraph` (defaulted `[JsonConstructor]` params), `CkInterfaceAssociationGraph`, `CkInterfaceMethodGraph`, `CkTypeAssociationGraph` |
-| 6 | Resolvers + codes | 90/91, 126 | 92–94, 118–124, 127 | 95–99, 121, 124 | 90, 99, 105–108 | 100–104, 122, 125, 131–135 | 90, 112, 113, 129 | 90, 118–124, 128 |
+| 6 | Resolvers + codes | 90/91, 126 | 92–94, 118–124, 127 | 95–99, 121, 124 | 90, 99, 105–108 | 100–104, 122, 125, 131–135, 142 | 90, 112, 113, 129 | 90, 118–124, 128 |
 | 7 | SemVer diff + classifier rule + row test (gate: `CkSemVerClassificationGuardTests`, mandatory) | yes | yes | yes | yes | yes | yes (`CkModelDiffService.DiffModifiers`) | yes |
 | 8 | Source generator | — | yes (ids + `IRt<Name>`) | yes (explicit impls) | — | yes (ids, parameter/result records) | `sealed` (v2; no `abstract`, E-M3) | `IRt<Name>` (extends = interface inheritance) |
 | 9 | Docs generator | — | yes | yes | — | yes | yes (non-default only) | yes |
@@ -1669,6 +1670,26 @@ marker (fail-open: nothing would be redacted). The constant must equal the numbe
 (the next patch after the last `r3.5.x` tag at merge time). Tests: `CkV2MethodResolverTests` (`Code134_*`, `Code122_*`),
 `CkV2CompileTests.SensitiveResult_*`, `CkV2GraphJsonRoundTripTests.SensitiveResult_*`, `CkV2GeneratedContractsTests`,
 `CkEngineVersionTests`, `MethodRowTests.M17_*`, `CkV2SchemaTests`.
+
+**`execution.mode` (AB#6925, F3.6) touch points**, same numbering (the field lives in `CkMethodExecutionDto`, next to
+`timeoutSeconds` / `idempotent` / `handler`; values `sync` (default) and `async`, the string constants of `CkMethodModes`;
+`null` = omitted = `sync`, so existing models serialize byte-identically; `async` means a call returns an operation handle once
+the handler has accepted the work, and `timeoutSeconds` bounds that accept step, not the operation — decision OD-5,
+`methodConsistency.md`): (1) method schema `CkMethodExecution.mode` (plain string, no `enum`: an unknown value is message 142
+with the method id, not a schema error); (2) compiled schema via the shared `$ref`; (3) `CkMethodExecutionDto.Mode` (`string?`,
+`OmitNull`); (4) copied by reference with `Methods`; (5) `CkMethodGraph.Mode` / `IsAsync` (`[JsonIgnore]`, derived from the
+serialized definition); (6) message 142 (unknown value, `async` + `handler: pipeline`, the key in a `ckLanguage` 1 model) and rule
+122: the mode is part of the **invocation contract** (`CkMethodContract`, effective value, reason `mode 'x' vs 'y'`), so a type
+that redeclares an interface method keeps its mode; (7) diff property `mode` (effective value, so adding `mode: sync` is no
+change), classifier row **M19** (sync ↔ async = Major; on an interface method also I12, `mode` is in
+`CkMethodContract.MethodProperties`), guard probe `CkMethodExecutionDto.Mode`, the method `signature` summary shows `, mode async`
+only for the non-default; (8) — (no generated code depends on it); (9) `Types.md` and `Interfaces.md` mark a non-default method
+`(mode: async)`; (10) **follow-up AB#6926** (engine-mongodb `CkMethodExecution` map + `CkModelReflectionComparer` gate — until
+then a tenant document drops the value on import); (11) **follow-up AB#6926** (asset-repo CK meta); (12) optional, Studio.
+**minEngineVersion:** not raised (like `handler`): a model using the key needs the CK v2 engine (`CkV2MinEngineVersion`); the
+runtime that produces operation handles is F3.6 (AB#8443 ff.). Tests: `CkV2MethodResolverTests` (`Code142_*`, `Code122_*Mode*`),
+`CkV2CompileTests.MethodMode_*`, `CkV2GraphJsonRoundTripTests.AsyncMode_*`, `CkV2SchemaTests`, `MethodRowTests.M19_*`,
+`InterfaceRowTests.I12_*` (case `mode changed`).
 
 **Method `authorization.dataAccess` (AB#7036, F3.4b) touch points**, same numbering (the field lives on `CkMethodAuthorizationDto`,
 next to `roles` / `allowSelf` / `scopes`; enum `CkMethodDataAccessDto` `Read` | `Write`, PascalCase like `visibility`; nullable, omitted =

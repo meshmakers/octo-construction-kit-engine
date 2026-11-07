@@ -56,6 +56,36 @@ public static class CkMethodHandlers
 }
 
 /// <summary>
+///     The execution modes of a CK method (CK v2 Phase 3, AB#6925), the values of
+///     <see cref="CkMethodExecutionDto.Mode" />. The values are lower-case, exactly as authored; any other value is
+///     rejected by the compiler (message 142).
+/// </summary>
+public static class CkMethodModes
+{
+    /// <summary>
+    ///     The call returns the result of the method (default; the key is usually omitted).
+    /// </summary>
+    public const string Sync = "sync";
+
+    /// <summary>
+    ///     The call returns an operation handle once the handler has accepted the work; the result is read through the
+    ///     handle later. <see cref="CkMethodExecutionDto.TimeoutSeconds" /> bounds the accept step (the time until the
+    ///     handle is returned), not the operation. Only service handlers may be asynchronous (message 142).
+    /// </summary>
+    public const string Async = "async";
+
+    /// <summary>
+    ///     True for a supported mode (ordinal, lower-case).
+    /// </summary>
+    public static bool IsKnown(string? mode) => mode is Sync or Async;
+
+    /// <summary>
+    ///     The effective mode: <paramref name="mode" />, or <see cref="Sync" /> when omitted.
+    /// </summary>
+    public static string Effective(string? mode) => mode ?? Sync;
+}
+
+/// <summary>
 ///     A method declared on a CK type or interface (CK v2, AB#5669) — a definition only, there is no invocation
 ///     runtime yet. Methods are inherited by derived and implementing types; a derived type must not re-declare an
 ///     inherited method id, and a type must not redeclare an interface method with another signature.
@@ -351,4 +381,15 @@ public class CkMethodExecutionDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
     public string? Handler { get; set; }
+
+    /// <summary>
+    ///     CK v2 Phase 3 (AB#6925): whether a call returns the result (<see cref="CkMethodModes.Sync" />) or an
+    ///     operation handle (<see cref="CkMethodModes.Async" />), see <see cref="CkMethodModes" />. <c>null</c>
+    ///     (omitted) means <see cref="CkMethodModes.Sync" />, so models that do not use the key serialize
+    ///     byte-identically. The mode is part of the invocation contract (rule 122, SemVer row M19). An unknown value,
+    ///     <c>async</c> together with a <see cref="CkMethodHandlers.Pipeline" /> handler, or the key in a model without
+    ///     <c>ckLanguage: 2</c> is reported by the compiler (message 142), not by the schema.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
+    public string? Mode { get; set; }
 }

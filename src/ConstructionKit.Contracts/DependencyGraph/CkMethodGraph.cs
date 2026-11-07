@@ -39,6 +39,19 @@ public sealed record CkMethodGraph(CkId<CkTypeId> DeclaringCkTypeId, CkMethodDto
     public string Handler => CkMethodHandlers.Effective(Definition.Execution?.Handler);
 
     /// <summary>
+    ///     The effective execution mode, see <see cref="CkMethodModes" /> (AB#6925). <c>async</c>: a call returns an
+    ///     operation handle once the handler has accepted the work; <see cref="TimeoutSeconds" /> bounds that accept step.
+    /// </summary>
+    [JsonIgnore]
+    public string Mode => CkMethodModes.Effective(Definition.Execution?.Mode);
+
+    /// <summary>
+    ///     True when <see cref="Mode" /> is <see cref="CkMethodModes.Async" /> (AB#6925).
+    /// </summary>
+    [JsonIgnore]
+    public bool IsAsync => Mode == CkMethodModes.Async;
+
+    /// <summary>
     ///     AB#7024: true when this static method replaces the generic create of <see cref="DeclaringCkTypeId" /> and
     ///     of every type derived from it (the refusal itself is enforced by the asset repository).
     /// </summary>

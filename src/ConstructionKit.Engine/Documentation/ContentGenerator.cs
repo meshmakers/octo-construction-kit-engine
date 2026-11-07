@@ -351,7 +351,7 @@ internal class ContentGenerator(
                 var parameters = string.Join(", ", (method.Definition.Parameters ?? []).Select(p =>
                     $"{p.Name}{(p.IsOptional ? "?" : "")}: {p.ValueType}"));
                 await outputFile.WriteLineAsync(
-                        $"| {method.Definition.MethodId}{(method.Visibility == CkVisibilityDto.Internal ? " (internal)" : "")}{HandlerMarker(method.Definition)}{ReplacesGenericCreateMarker(method.Definition)}{DataAccessMarker(method)} | {method.Definition.Kind} | {parameters} | " +
+                        $"| {method.Definition.MethodId}{(method.Visibility == CkVisibilityDto.Internal ? " (internal)" : "")}{HandlerMarker(method.Definition)}{ModeMarker(method.Definition)}{ReplacesGenericCreateMarker(method.Definition)}{DataAccessMarker(method)} | {method.Definition.Kind} | {parameters} | " +
                         $"{ResultText(method.Definition)} | {method.DeclaringCkTypeId.ToRtCkId().SemanticVersionedFullName} |")
                     .ConfigureAwait(false);
             }
@@ -386,6 +386,15 @@ internal class ContentGenerator(
     private static string HandlerMarker(CkMethodDto method) =>
         CkMethodHandlers.Effective(method.Execution?.Handler) is var handler && handler != CkMethodHandlers.Service
             ? $" (handler: {handler})"
+            : "";
+
+    /// <summary>
+    ///     AB#6925: <c> (mode: async)</c> for a method whose call returns an operation handle; empty for the default
+    ///     (<c>sync</c>), so the documentation of existing models is unchanged.
+    /// </summary>
+    private static string ModeMarker(CkMethodDto method) =>
+        CkMethodModes.Effective(method.Execution?.Mode) is var mode && mode != CkMethodModes.Sync
+            ? $" (mode: {mode})"
             : "";
 
     /// <summary>
@@ -480,7 +489,7 @@ internal class ContentGenerator(
                     var parameters = string.Join(", ", (method.Definition.Parameters ?? []).Select(p =>
                         $"{p.Name}{(p.IsOptional ? "?" : "")}: {p.ValueType}"));
                     await outputFile.WriteLineAsync(
-                            $"| {method.Definition.MethodId}{(method.Visibility == CkVisibilityDto.Internal ? " (internal)" : "")} | " +
+                            $"| {method.Definition.MethodId}{(method.Visibility == CkVisibilityDto.Internal ? " (internal)" : "")}{ModeMarker(method.Definition)} | " +
                             $"{method.Definition.Kind} | {parameters} | {ResultText(method.Definition)} | " +
                             $"{method.DeclaringCkInterfaceId.ToRtCkId().FullName} |")
                         .ConfigureAwait(false);

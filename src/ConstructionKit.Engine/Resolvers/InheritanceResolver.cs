@@ -512,6 +512,7 @@ internal class InheritanceResolver : IInheritanceResolver
             }
 
             ValidateMethodHandler(method, ckTypeId, location, operationResult, isInterfaceMethod);
+            ValidateMethodMode(method, ckTypeId, location, operationResult);
             ValidateMethodReplacesGenericCreate(method, ckTypeId, location, operationResult, isInterfaceMethod,
                 isAbstractType);
             ValidateMethodDataAccess(method, ckTypeId, location, operationResult);
@@ -535,6 +536,38 @@ internal class InheritanceResolver : IInheritanceResolver
     }
 
     /// <summary>
+    ///     M-9 (AB#6925, message 142): <c>execution.mode</c> is <c>sync</c> or <c>async</c> (exact, lower-case — the
+    ///     schema has no <c>enum</c> so the message names the method). <c>async</c> requires a service handler: a pipeline
+    ///     handler answers synchronously only (Phase 3), and asynchronous methods are limited to service handlers of bot
+    ///     job types (decision OD-10). <c>async</c> together with <c>idempotent: true</c> is allowed: an idempotent
+    ///     method skips the idempotency key store for async calls as for sync ones (AB#7896). The mode of an interface
+    ///     method is part of the invocation contract, so a redeclaring type keeps it (rule 122).
+    /// </summary>
+    private static void ValidateMethodMode(CkMethodDto method, object ckTypeId, string location,
+        OperationResult operationResult)
+    {
+        var mode = method.Execution?.Mode;
+        if (mode == null)
+        {
+            return;
+        }
+
+        if (!CkMethodModes.IsKnown(mode))
+        {
+            operationResult.AddMessage(MessageCodes.CkMethodModeInvalid(location, method.MethodId, ckTypeId,
+                $"unknown mode '{mode}' — use '{CkMethodModes.Sync}' or '{CkMethodModes.Async}' (lower-case)"));
+            return;
+        }
+
+        if (mode == CkMethodModes.Async && method.Execution?.Handler == CkMethodHandlers.Pipeline)
+        {
+            operationResult.AddMessage(MessageCodes.CkMethodModeInvalid(location, method.MethodId, ckTypeId,
+                $"'{CkMethodModes.Async}' is not allowed with 'handler: {CkMethodHandlers.Pipeline}' — a pipeline handler " +
+                $"answers synchronously only; use 'handler: {CkMethodHandlers.Service}' for an asynchronous method"));
+        }
+    }
+
+    /// <summary>
     ///     M-6 (AB#6877, message 131): <c>execution.handler</c> is <c>service</c> or <c>pipeline</c>. A pipeline method
     ///     declares an explicit <c>timeoutSeconds</c> (the pipeline run is bounded by it, the platform default is not
     ///     a safe choice for a long-running pipeline) and is declared on a type, never on an interface: the pipeline
@@ -546,6 +579,7 @@ internal class InheritanceResolver : IInheritanceResolver
     ///     execution stores its input, so the compiler refuses the combination; the pipeline handler runtime refuses
     ///     such a method as well (defence in depth). A sensitive RESULT is not covered (no result-sensitivity flag).
     /// </summary>
+
     private static void ValidateMethodHandler(CkMethodDto method, object ckTypeId, string location,
         OperationResult operationResult, bool isInterfaceMethod)
     {

@@ -80,6 +80,41 @@ public class CkV2GraphJsonRoundTripTests(ITestOutputHelper output) : CkV2Resolve
     }
 
     [Fact]
+    public async Task AsyncMode_SurvivesTheCacheJson_AndDefaultMethodsCarryNoModeKey()
+    {
+        var model = Model();
+        Type(model, "Tag").Methods =
+        [
+            new() { MethodId = "Export-1", Execution = new() { TimeoutSeconds = 20, Mode = CkMethodModes.Async, Idempotent = true } }
+        ];
+        var operationResult = new OperationResult();
+        var graph = Resolve(model, operationResult);
+        Assert.Empty(operationResult.Messages);
+
+        var cache = await RoundTripAsync(graph);
+
+        var export = cache.GetRtCkType("target", new RtCkId<CkTypeId>($"{M}/Tag")).AllMethods["Export-1"];
+        Assert.Equal(CkMethodModes.Async, export.Mode);
+        Assert.True(export.IsAsync);
+        Assert.True(export.Definition.Execution!.Idempotent);
+        Assert.Equal(20, export.TimeoutSeconds);
+        var changePassword = cache.GetRtCkType("target", new RtCkId<CkTypeId>($"{M}/Account")).AllMethods["ChangePassword-1"];
+        Assert.Equal(CkMethodModes.Sync, changePassword.Mode);
+
+        // A model that does not use the key writes none into the cache JSON.
+        var plainSource = new CkCacheService(NullLogger<CkCacheService>.Instance);
+        plainSource.CreateTenant("plain");
+        plainSource.LoadCkModelGraph("plain", Resolve(Model(), new OperationResult()));
+        using var stream = new MemoryStream();
+        await plainSource.SaveCacheAsync("plain", stream);
+        var json = Encoding.UTF8.GetString(stream.ToArray());
+        // (The kitchen sink has a parameter named 'mode', so the check looks for the execution values.)
+        Assert.DoesNotContain("\"mode\":\"sync\"", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\"mode\":\"async\"", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\"isAsync\"", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task PipelineHandler_SurvivesTheCacheJson_AndDefaultMethodsCarryNoHandlerKey()
     {
         var model = Model();

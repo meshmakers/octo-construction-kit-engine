@@ -743,6 +743,12 @@
       "number": 141,
       "level": "ERROR",
       "text": "Import refused: the entity '{rtId}' of type '{ckTypeId}' writes a record array without a usable record key, and a stored element holds a value in '{path}', which only a CK method may write (access Hidden or MethodOnly); the elements cannot be matched, so the value would be lost. Declare a recordKey the caller may write, or leave the record array out"
+    },
+    {
+      "key": "CkMethodModeInvalid",
+      "number": 142,
+      "level": "ERROR",
+      "text": "Method '{methodId}' of '{ckTypeId}' declares an invalid 'execution.mode': {reason}"
     }
   ]
 }

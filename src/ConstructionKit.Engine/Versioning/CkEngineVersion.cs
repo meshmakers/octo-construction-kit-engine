@@ -52,6 +52,17 @@ public static class CkEngineVersion
     /// </summary>
     public const string DataAccessMinEngineVersion = "3.5.40";
 
+    /// <summary>
+    ///     The lowest engine version that reads a method's <c>execution.mode</c> (AB#6925): the first libs release that
+    ///     contains the field. An older CK v2 engine would drop the unknown key silently and run an <c>async</c> method
+    ///     as a synchronous call, so a model that sets the key on any method (also <c>sync</c>) carries this value as
+    ///     <c>minEngineVersion</c> and older engines refuse it with message 126. Models that do not use the key keep
+    ///     their other minimum and compile byte-identically. <b>Must equal the number of the release that first ships
+    ///     the field</b> (the next patch after the last <c>r3.5.x</c> tag at merge time); raise it before merging when a
+    ///     release was cut in between.
+    /// </summary>
+    public const string ExecutionModeMinEngineVersion = "3.5.67";
+
     private static readonly Version? RunningVersion = ReadRunningVersion(typeof(CkEngineVersion).Assembly);
 
     // Test seam (AB#6274): never set outside tests, so production always reads RunningVersion.
@@ -81,7 +92,9 @@ public static class CkEngineVersion
     /// <summary>
     ///     The <c>minEngineVersion</c> the compiler writes for a model: <see cref="CkV2MinEngineVersion" /> for a
     ///     <c>ckLanguage: 2</c> or range-retaining model, <see cref="ReplacesGenericCreateMinEngineVersion" /> when a
-    ///     method sets <c>replacesGenericCreate</c>, otherwise <c>null</c> (v1 output unchanged).
+    ///     method sets <c>replacesGenericCreate</c>, the higher feature minimum when a method marks its result
+    ///     <c>sensitive</c>, declares <c>authorization.dataAccess</c> or sets <c>execution.mode</c>, otherwise
+    ///     <c>null</c> (v1 output unchanged).
     /// </summary>
     public static string? GetRequiredMinEngineVersion(CkCompiledModelRoot model)
     {
@@ -99,7 +112,13 @@ public static class CkEngineVersion
         var usesDataAccess =
             model.Types?.Any(t => t.Methods?.Any(m => m.Authorization?.DataAccess != null) == true) == true ||
             model.Interfaces?.Any(i => i.Methods?.Any(m => m.Authorization?.DataAccess != null) == true) == true;
-        return usesDataAccess ? Max([required, DataAccessMinEngineVersion]) : required;
+        required = usesDataAccess ? Max([required, DataAccessMinEngineVersion]) : required;
+        // AB#6925: a model that sets 'execution.mode' on any method needs an engine that knows it; an older engine
+        // would run an async method as sync.
+        var usesExecutionMode =
+            model.Types?.Any(t => t.Methods?.Any(m => m.Execution?.Mode != null) == true) == true ||
+            model.Interfaces?.Any(i => i.Methods?.Any(m => m.Execution?.Mode != null) == true) == true;
+        return usesExecutionMode ? Max([required, ExecutionModeMinEngineVersion]) : required;
     }
 
     /// <summary>

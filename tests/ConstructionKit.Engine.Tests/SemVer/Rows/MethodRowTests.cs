@@ -5,7 +5,7 @@ using static Meshmakers.Octo.ConstructionKit.Engine.Tests.SemVer.Rows.RowTestSup
 namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.SemVer.Rows;
 
 /// <summary>
-///     AB#6268 rows M1–M17: per-field verdict for method changes, for a type method and an interface method alike.
+///     AB#6268 rows M1–M19: per-field verdict for method changes, for a type method and an interface method alike.
 /// </summary>
 public class MethodRowTests
 {
@@ -148,6 +148,25 @@ public class MethodRowTests
 
         // An omitted key equals the default: declaring 'service' explicitly is no change.
         Assert.Equal(CkSemVerLevel.None, Required(Change(owner, m => m.Execution!.Handler = CkMethodHandlers.Service)));
+    }
+
+    [Theory]
+    [InlineData("type")]
+    [InlineData("interface")]
+    public void M19_ModeChanged_IsMajor_AddingTheDefaultIsNoChange(string owner)
+    {
+        // sync -> async and back: Major both ways (the response shape changes for every caller).
+        var toAsync = Change(owner, m => m.Execution!.Mode = CkMethodModes.Async);
+        Assert.Equal(CkSemVerLevel.Major, Required(toAsync));
+        Assert.Contains(toAsync, c => c.Change is { Property: "mode", ChangeKind: CkModelChangeKind.Modified } &&
+                                      c.Reason.Contains("row M19"));
+
+        var asyncBaseline = Model();
+        Method(asyncBaseline, owner).Execution!.Mode = CkMethodModes.Async;
+        Assert.Equal(CkSemVerLevel.Major, Level(asyncBaseline, Model()));
+
+        // An omitted key equals the default: declaring 'sync' explicitly is no change.
+        Assert.Equal(CkSemVerLevel.None, Required(Change(owner, m => m.Execution!.Mode = CkMethodModes.Sync)));
     }
 
     [Theory]

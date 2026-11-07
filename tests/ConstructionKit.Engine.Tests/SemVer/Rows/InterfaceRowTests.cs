@@ -185,7 +185,7 @@ public class InterfaceRowTests
     [
         "optional parameter added", "required parameter added", "parameter removed", "parameter type changed",
         "parameter required to optional", "parameter optional to required", "sensitive changed", "result changed",
-        "kind changed", "error added", "error removed"
+        "kind changed", "error added", "error removed", "mode changed"
     ];
 
     [Theory]
@@ -230,6 +230,10 @@ public class InterfaceRowTests
                 break;
             case "error added":
                 method.Errors!.Add(new CkMethodErrorDto { Code = "LOCKED" });
+                break;
+            case "mode changed":
+                // AB#6925: the execution mode is part of the invocation contract.
+                method.Execution!.Mode = CkMethodModes.Async;
                 break;
             default:
                 method.Errors!.RemoveAt(0);

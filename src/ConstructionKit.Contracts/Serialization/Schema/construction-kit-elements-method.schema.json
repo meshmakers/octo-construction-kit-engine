@@ -219,6 +219,10 @@
         "handler": {
           "type": "string",
           "description": "Who implements the method (AB#6877): 'service' (default; a service registers a handler) or 'pipeline' (the deployed pipeline whose well-known name equals the qualified method id handles the call). 'pipeline' requires an explicit timeoutSeconds and is not allowed on interface methods. Other values are rejected by the compiler (message 131)."
+        },
+        "mode": {
+          "type": "string",
+          "description": "Execution mode (AB#6925): 'sync' (default; the call returns the result) or 'async' (the call returns an operation handle once the handler has accepted the work; timeoutSeconds then bounds the accept step, not the operation). 'async' requires a service handler. Part of the invocation contract: changing it is a major change. Other values are rejected by the compiler (message 142)."
         }
       },
       "additionalProperties": false

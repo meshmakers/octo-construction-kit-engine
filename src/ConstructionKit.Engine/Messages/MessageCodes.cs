@@ -397,6 +397,9 @@ internal static class MessageCodes
     internal static OperationMessage RtRecordMemberNotPreservable(string? location, object rtId, object ckTypeId, object path) =>
         GetMessage("RtRecordMemberNotPreservable", location, rtId, ckTypeId, path);
 
+    internal static OperationMessage CkMethodModeInvalid(string? location, object methodId, object ckTypeId, object reason) =>
+        GetMessage("CkMethodModeInvalid", location, methodId, ckTypeId, reason);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1142,6 +1145,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  141, "Import refused: the entity '{rtId}' of type '{ckTypeId}' writes a record array without a usable record key, and a stored element holds a value in '{path}', which only a CK method may write (access Hidden or MethodOnly); the elements cannot be matched, so the value would be lost. Declare a recordKey the caller may write, or leave the record array out",
                  new [] {"rtId", "ckTypeId", "path"})
+        },
+        {
+            "CkMethodModeInvalid",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 142, "Method '{methodId}' of '{ckTypeId}' declares an invalid 'execution.mode': {reason}",
+                 new [] {"methodId", "ckTypeId", "reason"})
         },
     };
 }

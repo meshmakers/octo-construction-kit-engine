@@ -20,16 +20,20 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.SemVer;
 ///             <c>sensitive</c> (a redeclaration must not drop the redaction of a result the interface declares
 ///             sensitive, AB#7006);
 ///         </item>
-///         <item><c>errors</c>: the set of error codes (ordinal).</item>
+///         <item><c>errors</c>: the set of error codes (ordinal);</item>
+///         <item>
+///             <c>execution.mode</c> (effective value, AB#6925): sync or async changes the response shape (result or
+///             operation handle).
+///         </item>
 ///     </list>
-///     Not part of the contract: descriptions, <c>authorization</c>, <c>execution</c>, visibility (rule 129) and the
-///     order of parameters and errors. When a type redeclares an interface method, the type's own authorization and
-///     execution apply.
+///     Not part of the contract: descriptions, <c>authorization</c>, the rest of <c>execution</c> (timeout, idempotent,
+///     handler), visibility (rule 129) and the order of parameters and errors. When a type redeclares an interface
+///     method, the type's own authorization and execution apply, with the mode of the interface method.
 /// </summary>
 public static class CkMethodContract
 {
     /// <summary>Method-level diff properties (<see cref="CkModelDiffService" />) that belong to the contract.</summary>
-    public static IReadOnlyCollection<string> MethodProperties { get; } = ["kind", "result", "resultSensitive"];
+    public static IReadOnlyCollection<string> MethodProperties { get; } = ["kind", "result", "resultSensitive", "mode"];
 
     /// <summary>Parameter-level diff properties that belong to the contract (plus parameter added / removed).</summary>
     public static IReadOnlyCollection<string> ParameterProperties { get; } =
@@ -59,6 +63,13 @@ public static class CkMethodContract
         if (declared.Kind != redeclared.Kind)
         {
             return $"kind '{declared.Kind}' vs '{redeclared.Kind}'";
+        }
+
+        var declaredMode = CkMethodModes.Effective(declared.Execution?.Mode);
+        var redeclaredMode = CkMethodModes.Effective(redeclared.Execution?.Mode);
+        if (declaredMode != redeclaredMode)
+        {
+            return $"mode '{declaredMode}' vs '{redeclaredMode}'";
         }
 
         var declaredParameters = (declared.Parameters ?? []).GroupBy(p => p.Name, StringComparer.Ordinal)

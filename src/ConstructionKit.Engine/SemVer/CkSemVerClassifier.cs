@@ -581,6 +581,12 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 return (CkSemVerLevel.Major,
                     "method handler kind changed (service ↔ pipeline) — the implementation moves to another runtime, " +
                     "publish a new method version instead (row M15)");
+            case "mode":
+                // AB#6925 row M19: sync <-> async changes the response shape (result vs. operation handle) for every
+                // caller; the mode is part of the invocation contract (rule 122, row I12 on interface methods).
+                return (CkSemVerLevel.Major,
+                    "method execution mode changed (sync ↔ async) — callers receive a result instead of an operation " +
+                    "handle or the other way round; publish a new method version instead (row M19)");
             case "timeoutSeconds":
                 return (CkSemVerLevel.Minor, "method timeout changed — behavioural change, no contract break (row M11)");
             case "authorization":

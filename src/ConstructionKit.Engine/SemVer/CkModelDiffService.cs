@@ -141,7 +141,7 @@ public class CkModelDiffService : ICkModelDiffService
             [typeof(CkMethodExecutionDto)] =
             [
                 nameof(CkMethodExecutionDto.TimeoutSeconds), nameof(CkMethodExecutionDto.Idempotent),
-                nameof(CkMethodExecutionDto.Handler)
+                nameof(CkMethodExecutionDto.Handler), nameof(CkMethodExecutionDto.Mode)
             ]
         };
 
@@ -238,7 +238,7 @@ public class CkModelDiffService : ICkModelDiffService
         Element(CkModelElementKind.TypeInterface);
         string[] methodProperties =
         [
-            "description", "signature", "visibility", "kind", "replacesGenericCreate", "result", "resultSensitive", "timeoutSeconds", "idempotent", "handler", "authorization",
+            "description", "signature", "visibility", "kind", "replacesGenericCreate", "result", "resultSensitive", "timeoutSeconds", "idempotent", "handler", "mode", "authorization",
             "roles", "scopes", "allowSelf", "dataAccess"
         ];
         Element(CkModelElementKind.TypeMethod, methodProperties);
@@ -592,6 +592,11 @@ public class CkModelDiffService : ICkModelDiffService
                 AddModified(methodChanges, kind, id, "handler",
                     CkMethodHandlers.Effective(baselineMethod.Execution?.Handler),
                     CkMethodHandlers.Effective(currentMethod.Execution?.Handler));
+                // AB#6925: the effective mode; an omitted key equals 'sync', so adding the key with the default value
+                // is no change.
+                AddModified(methodChanges, kind, id, "mode",
+                    CkMethodModes.Effective(baselineMethod.Execution?.Mode),
+                    CkMethodModes.Effective(currentMethod.Execution?.Mode));
                 // AB#6338: a block added or removed is ONE change carrying both blocks (FormatAuthorization), so the
                 // classifier can compare them under default-deny; the field lines are only emitted when both versions
                 // declare a block (no contradictory "removed — looser" + "narrowed" lines).
@@ -708,6 +713,10 @@ public class CkModelDiffService : ICkModelDiffService
                // AB#6877: only a non-default handler is rendered, so the signature of existing methods is unchanged.
                (CkMethodHandlers.Effective(method.Execution?.Handler) is var handler && handler != CkMethodHandlers.Service
                    ? $", handler {handler}"
+                   : "") +
+               // AB#6925: only a non-default mode is rendered, so the signature of existing methods is unchanged.
+               (CkMethodModes.Effective(method.Execution?.Mode) is var mode && mode != CkMethodModes.Sync
+                   ? $", mode {mode}"
                    : "") +
                // AB#7024: only a set flag is rendered, so the signature of existing methods is unchanged.
                (method.ReplacesGenericCreate ? ", replaces generic create" : "");

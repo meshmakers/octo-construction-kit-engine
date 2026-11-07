@@ -269,6 +269,72 @@ public sealed class CkV2CompileTests : IDisposable
     }
 
     [Fact]
+    public async Task MethodMode_Async_ReachesCompiledOutputRoundTripGraphAndDocs_AndDefaultStaysByteIdentical()
+    {
+        await PublishSystemAsync(_fixture);
+
+        // Golden: a model that does not use the key serializes without any 'mode' member, and adding nothing changes
+        // nothing: the plain model compiles to the same YAML as before the field existed (no 'mode', no 'execution').
+        var plain = await _fixture.CompileAsync(_fixture.WriteSource("plain", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], KitchenSinkFiles(), ckLanguage: 2));
+        var plainYaml = await ToYamlAsync(_fixture, plain);
+        Assert.DoesNotContain("mode:", plainYaml);
+        Assert.Null(plain.Types!.Single(t => t.TypeId.Name == "Account").Methods!.Single().Execution);
+
+        // async together with idempotent: true compiles (AB#7896: an idempotent async method skips the key store).
+        var compiled = await _fixture.CompileAndPublishAsync(_fixture.WriteSource("ks", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], KitchenSinkWithHandler(
+                "          timeoutSeconds: 20\n          idempotent: true\n          mode: async\n"), ckLanguage: 2));
+
+        // Compiled model, serialized YAML and read-back carry the value.
+        var unlock = compiled.Types!.Single(t => t.TypeId.Name == "Account").Methods!.Single();
+        Assert.Equal(CkMethodModes.Async, unlock.Execution!.Mode);
+        Assert.True(unlock.Execution.Idempotent);
+        var yaml = await ToYamlAsync(_fixture, compiled);
+        Assert.Contains("mode: async", yaml);
+        var operationResult = new OperationResult();
+        var readBack = await _fixture.Services.GetRequiredService<ICkSerializer>()
+            .DeserializeCompiledModelRootAsync(yaml, "ks.yaml", operationResult);
+        Assert.False(operationResult.HasErrors, string.Join("; ", operationResult.Messages));
+        Assert.Equal(CkMethodModes.Async,
+            readBack.Types!.Single(t => t.TypeId.Name == "Account").Methods!.Single().Execution!.Mode);
+
+        // The resolved graph carries it; the methods of the other types keep the default.
+        var graph = await _fixture.Services.GetRequiredService<ICatalogModelResolver>()
+            .HardResolveAsync(compiled, new OriginFileResolver("-"), new OperationResult());
+        var account = graph.Types[new CkId<CkTypeId>("KitchenSink-1.0.0/Account")];
+        Assert.True(account.AllMethods["Unlock-1"].IsAsync);
+        Assert.Equal(CkMethodModes.Sync, account.AllMethods["ChangePassword-1"].Mode);
+
+        // Docs generator: a non-default mode is listed, default methods are not marked.
+        var docs = Path.Combine(_fixture.Root, "docs-mode");
+        await _fixture.Services.GetRequiredService<Engine.Documentation.IContentGenerator>()
+            .GenerateTypesMarkdownTable(graph, docs, compiled.ModelId, "1.0.0", "/docs/");
+        var types = await File.ReadAllTextAsync(
+            Directory.GetFiles(docs, "*.md", SearchOption.AllDirectories).Single(f => f.EndsWith("Types.md")),
+            TestContext.Current.CancellationToken);
+        Assert.Contains("| Unlock-1 (mode: async) |", types);
+        Assert.Contains("| ChangePassword-1 | Instance |", types);
+    }
+
+    [Theory]
+    [InlineData("          timeoutSeconds: 30\n          handler: pipeline\n          mode: async\n", "pipeline")]
+    [InlineData("          mode: later\n", "unknown mode")]
+    public async Task MethodMode_Invalid_FailsWith142NamingTheMethod(string execution, string expectedText)
+    {
+        await PublishSystemAsync(_fixture);
+
+        var operationResult = new OperationResult();
+        await Assert.ThrowsAnyAsync<Exception>(() => _fixture.Services.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(_fixture.WriteSource("ks", "KitchenSink-1.0.0", ["System-[2.5,3.0)"],
+                KitchenSinkWithHandler(execution), ckLanguage: 2), operationResult));
+
+        var message = Assert.Single(operationResult.Messages, m => m.MessageNumber == 142);
+        Assert.Contains("Unlock-1", message.MessageText);
+        Assert.Contains(expectedText, message.MessageText);
+    }
+
+    [Fact]
     public async Task MethodHandler_SensitiveParameterWithPipeline_FailsWith132_AndServiceStaysAllowed()
     {
         // AB#7004 (OD-9): the kitchen sink's ChangePassword-1 has the sensitive parameter 'newPassword'.

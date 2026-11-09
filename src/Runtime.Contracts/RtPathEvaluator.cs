@@ -225,8 +225,23 @@ public static class RtPathEvaluator
     public static void SetValue(ICkCacheService ckCacheService, string tenantId, RtTypeWithAttributes root,
         IEnumerable<PathTerm> path, object? value)
     {
+        SetValue(ckCacheService, tenantId, root, path, value, RtPathNullHandling.KeepMissingRecords);
+    }
+
+    /// <summary>
+    /// Sets the value of an attribute path
+    /// </summary>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">Tenant id</param>
+    /// <param name="root">The root object</param>
+    /// <param name="path">Path of attributes to be evaluated</param>
+    /// <param name="value">Value to be set</param>
+    /// <param name="nullHandling">What a <c>null</c> value does on a path through a record that does not exist yet</param>
+    public static void SetValue(ICkCacheService ckCacheService, string tenantId, RtTypeWithAttributes root,
+        IEnumerable<PathTerm> path, object? value, RtPathNullHandling nullHandling)
+    {
         var pathList = path.ToList();
-        SetValueByPath(ckCacheService, tenantId, root, pathList, value);
+        SetValueByPath(ckCacheService, tenantId, root, pathList, value, nullHandling);
     }
 
     /// <summary>
@@ -240,8 +255,23 @@ public static class RtPathEvaluator
     public static void SetValue(ICkCacheService ckCacheService, string tenantId, RtTypeWithAttributes root, string path,
         object? value)
     {
+        SetValue(ckCacheService, tenantId, root, path, value, RtPathNullHandling.KeepMissingRecords);
+    }
+
+    /// <summary>
+    /// Sets the value of an attribute path
+    /// </summary>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">Tenant id</param>
+    /// <param name="root">The root object</param>
+    /// <param name="path">Path of attributes to be evaluated</param>
+    /// <param name="value">Value to be set</param>
+    /// <param name="nullHandling">What a <c>null</c> value does on a path through a record that does not exist yet</param>
+    public static void SetValue(ICkCacheService ckCacheService, string tenantId, RtTypeWithAttributes root, string path,
+        object? value, RtPathNullHandling nullHandling)
+    {
         var tokens = TokenizePath(path);
-        SetValueByPath(ckCacheService, tenantId, root, tokens, value);
+        SetValueByPath(ckCacheService, tenantId, root, tokens, value, nullHandling);
     }
 
     /// <summary>
@@ -728,14 +758,24 @@ public static class RtPathEvaluator
 
     private static void SetValueByPath(ICkCacheService ckCacheService, string tenantId,
         RtTypeWithAttributes rtTypeWithAttributes,
-        List<PathTerm> tokens, object? setValue)
+        List<PathTerm> tokens, object? setValue, RtPathNullHandling nullHandling)
     {
         var evaluatedPath = MapPath(ckCacheService, tenantId, rtTypeWithAttributes, tokens,
             AttributeValueResolveFlags.Default);
 
-        if (setValue != null)
+        // AB#8625: an explicit null may create the missing records of its path (opt-in), so the member
+        // holds an explicit null instead of staying missing. The default keeps the AB#1988 rule.
+        var createRecordsForNull = setValue == null && nullHandling == RtPathNullHandling.CreateMissingRecords;
+        if (setValue == null)
+        {
+            // Validate before any record is created, so a refused null leaves the entity unchanged.
+            EnsureNullAllowed(evaluatedPath.Last(), tokens, createRecordsForNull);
+        }
+
+        if (setValue != null || createRecordsForNull)
         {
             RtRecord? lastRecord = null;
+            var targetTuple = evaluatedPath[^1];
             foreach (var tuple in evaluatedPath)
             {
                 if (tuple.Term?.Type == PathType.Attribute)
@@ -744,6 +784,12 @@ public static class RtPathEvaluator
                     {
                         tupleLocator.RtTypeWithAttributes ??= lastRecord;
 
+                        // For a null the addressed attribute itself is not materialised (it is set to null below).
+                        if (setValue == null && ReferenceEquals(tuple, targetTuple))
+                        {
+                            continue;
+                        }
+
                         if (tupleLocator.Value == null && tupleLocator.CkTypeAttributeGraph != null
                                                        && tupleLocator.CkTypeAttributeGraph.ValueCkRecordId != null
                                                        && tupleLocator.CkTypeAttributeGraph?.ValueType ==
@@ -751,6 +797,13 @@ public static class RtPathEvaluator
                         {
                             if (tupleLocator.RtTypeWithAttributes == null)
                             {
+                                if (setValue == null)
+                                {
+                                    // No parent to hold the record (e.g. a navigation without target): the
+                                    // null is dropped as before.
+                                    return;
+                                }
+
                                 throw InvalidPathException.PathNotSettableBecauseNull(tokens);
                             }
 
@@ -874,6 +927,16 @@ public static class RtPathEvaluator
                             pathTupleLocator.RtTypeWithAttributes, pathTuple.Term);
                     }
 
+                    if (setValue == null)
+                    {
+                        // AB#8625: an explicit null clears an optional enum attribute; a required one is
+                        // refused by EnsureNullAllowed before anything was changed.
+                        pathTupleLocator.RtTypeWithAttributes.SetAttributeValue(
+                            pathTupleLocator.CkTypeAttributeGraph.AttributeName,
+                            pathTupleLocator.CkTypeAttributeGraph.ValueType, null);
+                        break;
+                    }
+
                     var ckEnumGraph =
                         ckCacheService.GetCkEnum(tenantId, pathTupleLocator.CkTypeAttributeGraph.ValueCkEnumId);
 
@@ -924,6 +987,31 @@ public static class RtPathEvaluator
                         pathTupleLocator.CkTypeAttributeGraph.ValueType, setValue);
                     break;
             }
+        }
+    }
+
+    /// <summary>
+    /// AB#8625: a null on an enum attribute that is not optional is refused with an error naming the path.
+    /// Only locators that will be written are checked: without <paramref name="createRecordsForNull" /> a
+    /// member of a missing record is not written (the null is dropped), so it is not refused either.
+    /// </summary>
+    private static void EnsureNullAllowed(PathTuple target, List<PathTerm> tokens, bool createRecordsForNull)
+    {
+        foreach (var locator in target.Locators)
+        {
+            if (locator.CkTypeAttributeGraph is not { ValueType: AttributeValueTypesDto.Enum, IsOptional: false }
+                attribute)
+            {
+                continue;
+            }
+
+            if (locator.RtTypeWithAttributes == null && !createRecordsForNull)
+            {
+                continue;
+            }
+
+            throw InvalidPathException.NullNotAllowedOnRequiredEnum(tokens, attribute.AttributeName,
+                attribute.ValueCkEnumId);
         }
     }
 

@@ -201,6 +201,16 @@ public class InvalidPathException : PersistenceException
 
 
 
+    internal static Exception NullNotAllowedOnRequiredEnum(List<PathTerm> tokens, string attributeName,
+        CkId<CkEnumId>? valueCkEnumId)
+    {
+        return new InvalidPathException(
+            $"Path '{GetPath(tokens)}' cannot be set to null: the enum attribute '{attributeName}' " +
+            $"(CkEnumId '{valueCkEnumId}') is not optional. Send a value of the enum or leave the attribute out.");
+    }
+
+    private static string GetPath(List<PathTerm> tokens) => RtPathEvaluator.GetPath(tokens);
+
     internal static Exception InvalidEnumValueType(CkId<CkEnumId> valueCkEnumId, string name)
     {
         return new InvalidPathException(

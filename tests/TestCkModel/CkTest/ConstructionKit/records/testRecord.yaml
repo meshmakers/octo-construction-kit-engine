@@ -8,6 +8,13 @@ records:
       - id: ${this}/DataCount
         name: DataCount
         isOptional: true
+      # AB#8625: explicit null on enum members of a record (optional and required)
+      - id: ${this}/ConnectionState
+        name: ConnectionState
+        isOptional: true
+      - id: ${this}/ConnectionState-2
+        name: RequiredConnectionState
+        isOptional: false
   - recordId: TestRecord-2
     attributes:
       - id: ${this}/Designation

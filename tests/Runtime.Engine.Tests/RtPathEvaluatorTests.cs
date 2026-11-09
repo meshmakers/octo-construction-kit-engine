@@ -1127,6 +1127,223 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
 
     #endregion SetValue
 
+    #region SetValue explicit null (AB#8625)
+
+    private static RtEntity NewSensor(Dictionary<string, object?>? extra = null)
+    {
+        var d = new Dictionary<string, object?>
+        {
+            { "Designation", "Test" },
+            { "ConnectionState", 1 }
+        };
+        foreach (var kvp in extra ?? [])
+        {
+            d[kvp.Key] = kvp.Value;
+        }
+
+        return new RtEntity(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d);
+    }
+
+    private static RtRecord NewTestRecord(Dictionary<string, object?> attributes) =>
+        new(TestCkIds.RtCkTestRecordRecordId, attributes);
+
+    [Theory]
+    [InlineData(RtPathNullHandling.KeepMissingRecords)]
+    [InlineData(RtPathNullHandling.CreateMissingRecords)]
+    public async Task SetValue_OptionalEnum_Null_SetsExplicitNull(RtPathNullHandling nullHandling)
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtEntity = NewSensor(new Dictionary<string, object?> { { "OptionalConnectionState", 2 } });
+
+        RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, "OptionalConnectionState", null,
+            nullHandling);
+
+        Assert.True(rtEntity.Attributes.TryGetValue("OptionalConnectionState", out var value));
+        Assert.Null(value);
+    }
+
+    [Fact]
+    public async Task SetValue_OptionalEnum_Null_DefaultOverload_SetsExplicitNull()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtEntity = NewSensor();
+
+        RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, "OptionalConnectionState", null);
+
+        Assert.True(rtEntity.Attributes.TryGetValue("OptionalConnectionState", out var value));
+        Assert.Null(value);
+    }
+
+    [Theory]
+    [InlineData("Connected", 2)]
+    [InlineData("broken", 3)]
+    [InlineData(1, 1)]
+    public async Task SetValue_OptionalEnum_Value_StillSetsTheKey(object input, int expectedKey)
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtEntity = NewSensor();
+
+        RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, "OptionalConnectionState", input,
+            RtPathNullHandling.CreateMissingRecords);
+
+        Assert.Equal(expectedKey, rtEntity.Attributes["OptionalConnectionState"]);
+    }
+
+    [Theory]
+    [InlineData(RtPathNullHandling.KeepMissingRecords)]
+    [InlineData(RtPathNullHandling.CreateMissingRecords)]
+    public async Task SetValue_RequiredEnum_Null_IsRefusedWithThePath(RtPathNullHandling nullHandling)
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtEntity = NewSensor();
+
+        var ex = Assert.Throws<InvalidPathException>(() => RtPathEvaluator.SetValue(ckCacheService,
+            fixture.TenantId, rtEntity, "ConnectionState", null, nullHandling));
+
+        Assert.Contains("'connectionState' cannot be set to null", ex.Message);
+        Assert.Contains("is not optional", ex.Message);
+        Assert.Equal(1, rtEntity.Attributes["ConnectionState"]);
+    }
+
+    [Fact]
+    public async Task SetValue_Enum_Missing_StaysMissing()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtEntity = NewSensor();
+
+        RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, "Designation", "other",
+            RtPathNullHandling.CreateMissingRecords);
+
+        Assert.False(rtEntity.Attributes.ContainsKey("OptionalConnectionState"));
+        Assert.False(rtEntity.Attributes.ContainsKey("RecordTest"));
+    }
+
+    [Fact]
+    public async Task SetValue_MissingRecord_Null_CreateMissingRecords_CreatesRecordWithExplicitNull()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtEntity = NewSensor();
+
+        RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, "RecordTest.Designation", null,
+            RtPathNullHandling.CreateMissingRecords);
+
+        var record = Assert.IsType<RtRecord>(rtEntity.Attributes["RecordTest"]);
+        Assert.Equal(TestCkIds.RtCkTestRecordRecordId, record.CkRecordId);
+        Assert.True(record.Attributes.TryGetValue("Designation", out var value));
+        Assert.Null(value);
+        Assert.Single(record.Attributes);
+    }
+
+    [Fact]
+    public async Task SetValue_MissingRecord_OptionalEnumMember_Null_CreateMissingRecords_CreatesRecordWithExplicitNull()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtEntity = NewSensor();
+
+        RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, "RecordTest.ConnectionState", null,
+            RtPathNullHandling.CreateMissingRecords);
+
+        var record = Assert.IsType<RtRecord>(rtEntity.Attributes["RecordTest"]);
+        Assert.True(record.Attributes.TryGetValue("ConnectionState", out var value));
+        Assert.Null(value);
+    }
+
+    [Fact]
+    public async Task SetValue_MissingRecord_RequiredEnumMember_Null_CreateMissingRecords_IsRefusedAndCreatesNothing()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtEntity = NewSensor();
+
+        var ex = Assert.Throws<InvalidPathException>(() => RtPathEvaluator.SetValue(ckCacheService,
+            fixture.TenantId, rtEntity, "RecordTest.RequiredConnectionState", null,
+            RtPathNullHandling.CreateMissingRecords));
+
+        Assert.Contains("'recordTest.requiredConnectionState' cannot be set to null", ex.Message);
+        Assert.False(rtEntity.Attributes.ContainsKey("RecordTest"));
+    }
+
+    [Theory]
+    [InlineData("RecordTest.Designation")]
+    [InlineData("RecordTest.ConnectionState")]
+    [InlineData("RecordTest.RequiredConnectionState")]
+    public async Task SetValue_MissingRecord_Null_DefaultOverload_KeepsTheRecordMissing(string path)
+    {
+        // AB#1988: query-row creates must not create empty records for empty cells; the default is unchanged.
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtEntity = NewSensor();
+
+        RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, path, null);
+
+        Assert.False(rtEntity.Attributes.ContainsKey("RecordTest"));
+    }
+
+    [Theory]
+    [InlineData(RtPathNullHandling.KeepMissingRecords)]
+    [InlineData(RtPathNullHandling.CreateMissingRecords)]
+    public async Task SetValue_ExistingRecord_Null_SetsMemberNullAndKeepsTheOthers(RtPathNullHandling nullHandling)
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var record = NewTestRecord(new Dictionary<string, object?>
+        {
+            { "Designation", "inner" }, { "ConnectionState", 2 }, { "DataCount", 5 }
+        });
+        var rtEntity = NewSensor(new Dictionary<string, object?> { { "RecordTest", record } });
+
+        RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, "RecordTest.ConnectionState", null,
+            nullHandling);
+        RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, "RecordTest.Designation", null,
+            nullHandling);
+
+        Assert.Same(record, rtEntity.Attributes["RecordTest"]);
+        Assert.Null(record.Attributes["ConnectionState"]);
+        Assert.Null(record.Attributes["Designation"]);
+        Assert.Equal(5, record.Attributes["DataCount"]);
+    }
+
+    [Fact]
+    public async Task SetValue_ExistingRecord_RequiredEnumMember_Null_IsRefused()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var record = NewTestRecord(new Dictionary<string, object?> { { "RequiredConnectionState", 1 } });
+        var rtEntity = NewSensor(new Dictionary<string, object?> { { "RecordTest", record } });
+
+        Assert.Throws<InvalidPathException>(() => RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId,
+            rtEntity, "RecordTest.RequiredConnectionState", null));
+
+        Assert.Equal(1, record.Attributes["RequiredConnectionState"]);
+    }
+
+    [Theory]
+    [InlineData(RtPathNullHandling.KeepMissingRecords)]
+    [InlineData(RtPathNullHandling.CreateMissingRecords)]
+    public async Task SetValue_MissingRecord_Value_CreatesTheRecordAsBefore(RtPathNullHandling nullHandling)
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtEntity = NewSensor();
+
+        RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, "RecordTest.ConnectionState",
+            "Connected", nullHandling);
+
+        var record = Assert.IsType<RtRecord>(rtEntity.Attributes["RecordTest"]);
+        Assert.Equal(2, record.Attributes["ConnectionState"]);
+        Assert.Single(record.Attributes);
+    }
+
+    [Fact]
+    public async Task SetValue_RecordAttribute_Null_CreateMissingRecords_SetsTheRecordNull()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtEntity = NewSensor();
+
+        RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, "RecordTest", null,
+            RtPathNullHandling.CreateMissingRecords);
+
+        Assert.True(rtEntity.Attributes.TryGetValue("RecordTest", out var value));
+        Assert.Null(value);
+    }
+
+    #endregion SetValue explicit null (AB#8625)
+
     #region TokenizeAndGetNavigationPair
 
     [Fact]

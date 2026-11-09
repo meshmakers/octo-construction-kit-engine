@@ -801,6 +801,15 @@ read is one request through `IGitHubTreeReader` (recursive tree, versions from f
 2 minutes away throws `GitHubRateLimitExhaustedException` ("GitHub rate limit exhausted, resets at HH:MMZ.") instead of waiting for the 5-minute `CkCompile`/`CkRestore` timeout.
 12-model wave measured with `CatalogApiBudgetTests`: 2882 -> 340 requests (docs/ck-semver-rules.md, "The API budget of the catalog reads").
 
+## `RtPathEvaluator.SetValue` and explicit null (AB#8625)
+
+A `null` on an **optional** enum attribute sets it to null; on a **required** enum (`isOptional: false`) it is refused
+with an `InvalidPathException` that names the path, before anything is changed. A `null` on a sub-path of a record that
+does not exist yet (`Amount.Value` without `Amount`) is dropped by default (AB#1988: query-row cells must not create empty
+records); the overloads with `RtPathNullHandling.CreateMissingRecords` create the record with that member explicitly null
+(used by the mesh adapter's `CreateUpdateInfo@1`, so an explicit null reaches an archive as null, AB#8622). Rules and
+table: `docs/rt-path-evaluator-set-value.md`. Tests: `RtPathEvaluatorTests`, region `SetValue explicit null (AB#8625)`.
+
 ## Load by rtId to use it: archived counts as not found (AB#8355)
 
 The default delete archives an entity (`rtState = Archived`, the document stays). List queries filter archived entities,

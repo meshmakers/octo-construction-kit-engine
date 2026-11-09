@@ -112,6 +112,25 @@ When modifying CK models:
 3. After changes, recompile the model using the compiler
 4. Generated code will be created based on the model definitions
 
+### JSON schema publish path (AB#8522)
+
+The JSON schemas a model's `$schema` points to (`https://schemas.meshmakers.cloud/<file>`) are served from the files in
+`src/ConstructionKit.Contracts/Serialization/Schema/`, `src/ConstructionKit.Contracts/BlueprintCatalogs/Serialization/Schema/`
+and `src/Runtime.Contracts/Serialization/Schema/`. A schema change reaches model authors only along this path:
+
+1. **Image** - this repository's CI builds `meshmakers/octo-schema-provider` (nginx, `src/ConstructionKit.SchemaProvider/Dockerfile`
+   copies the three schema folders flat into the web root) and tags it with the libs version (`3.5.x.0`).
+2. **helm-core train** - `start-helm-core-release-train` (def 193, `octo-mesh-deployment/pipelines/release-helm-core-train.yml`)
+   packages the chart `octo-mesh-schema-provider` (repo `octo-helm-core`) with `AppVersion` = libs tier + `.0`, i.e. the image above.
+3. **CD prod-1** - `octo-mesh-schema-provider-CD` (def 213, `octo-mesh-deployment/pipelines/deploy-octo-mesh-schema-provider.yml`)
+   runs after every train run on `main`, waits for the approval on the environment `prod-1-schema-provider` and deploys the single
+   global instance on prod-1. Its smoke step fails unless every `*.json` file of the running image answers 200 at the public host,
+   byte-identical.
+
+So a new schema key (a new meta-model field) is usable in catalog models only after a libs release **and** the next helm-core train
+with an approved CD run. Until then the served schema rejects the key (`additionalProperties: false`). Before 2026-11-09 the CD trigger
+filtered `refs/tags/r*`, which no train run matches, so schemas.meshmakers.cloud stayed on the 2026-06-28 deployment (AB#8522).
+
 ## JSON Serialization & Newtonsoft Parity
 
 The Rt-model serialization rules are split across two canonical options bundles, both in
@@ -1684,8 +1703,12 @@ that redeclares an interface method keeps its mode; (7) diff property `mode` (ef
 change), classifier row **M19** (sync ↔ async = Major; on an interface method also I12, `mode` is in
 `CkMethodContract.MethodProperties`), guard probe `CkMethodExecutionDto.Mode`, the method `signature` summary shows `, mode async`
 only for the non-default; (8) — (no generated code depends on it); (9) `Types.md` and `Interfaces.md` mark a non-default method
-`(mode: async)`; (10) **follow-up AB#6926** (engine-mongodb `CkMethodExecution` map + `CkModelReflectionComparer` gate — until
-then a tenant document drops the value on import); (11) **follow-up AB#6926** (asset-repo CK meta); (12) optional, Studio.
+`(mode: async)`; (10) engine-mongodb, AB#6926: the value is persisted inside the embedded
+`CkMethodDto.Execution` (class map `CkMethodExecutionDto`, `SetIgnoreIfNull`, covered by the reflection gate); an undeclared
+mode is left out of the document and a document written before the field reads back as `null`, i.e. the effective mode `sync`
+(`CkMethodModes.Effective`); (11) asset-repo CK meta `CkMethodExecution.mode: String!` (effective value), AB#6926; (12) optional,
+Studio. **Schema:** the method schema reaches model authors only through the schema publish path (see "JSON schema publish
+path" under "Working with Construction Kit Models"), AB#8522.
 **minEngineVersion:** `CkEngineVersion.GetRequiredMinEngineVersion` raises the value to `ExecutionModeMinEngineVersion` for a
 model in which any type **or interface** method sets `execution.mode` (also `sync`; the maximum with the other markers; models
 without the key keep their minimum and compile byte-identically), so an older CK v2 engine refuses the model with message 126

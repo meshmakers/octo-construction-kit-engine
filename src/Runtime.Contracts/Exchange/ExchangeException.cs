@@ -181,6 +181,19 @@ public class ExchangeException : PersistenceException
         return new ExchangeException($"Value '{value}' is out of range for CkEnum '{typeAttributeGraph.ValueCkEnumId}'.");
     }
 
+    /// <summary>
+    /// AB#8684: an Upsert replaces the whole stored entity; without the stored entities the runtime state, the tenant-owned
+    /// values and the creation stamp cannot be carried over, so the import stops instead of overwriting them with the
+    /// seed (nothing was written).
+    /// </summary>
+    internal static Exception StoredStateNotReadable(string tenantId, string ckTypeId, Exception innerException)
+    {
+        return new ExchangeException(
+            $"Import rejected: the stored entities of type '{ckTypeId}' in tenant '{tenantId}' could not be read, so " +
+            "their runtime state, tenant-owned values and creation stamp cannot be kept by the upsert. Nothing was " +
+            $"written; retry the import. Cause: {innerException.Message}", innerException);
+    }
+
     internal static Exception BulkImportError(Exception innerException)
     {
         return new ExchangeException($"Bulk import failed: {innerException.Message}", innerException);

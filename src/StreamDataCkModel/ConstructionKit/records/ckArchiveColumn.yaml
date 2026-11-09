@@ -1,6 +1,7 @@
 $schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
 records:
   - recordId: CkArchiveColumn
+    derivable: Any
     description: "Single column definition inside a CkArchive. Either an ingested column (Path set) or a computed column (Formula set): a formula referencing other columns of the same row by name, producing a typed value."
     attributes:
       - id: ${this}/CkArchiveColumn.Path

@@ -1000,6 +1000,31 @@ Generated C# (Octo.Sdk generator): `IRtNamed`, `IRtDescribable`, `IRtEnableable`
 Tests: `SystemInterfacesTests` (Compiler.Tests: members, per-type table, no index added, Minor against 2.5.0 and 2.6.0, probe model that implements all four, rule 121 and the missing-`Name` error for `Hierarchical-1`),
 `EmbeddedCkModelResourceTests.SystemCkModel_GeneratesTheFourInterfaces_AndTheQueryTypesImplementThem` (Runtime.Engine.Tests).
 
+## System.StreamData on ckLanguage 2 (AB#8597, Epic AB#5584 F4.3)
+
+`src/StreamDataCkModel` is **System.StreamData-1.23.0**, `ckLanguage: 2`, the first ckLanguage 2 release of the model and a **Minor** against
+the ckLanguage 1 release 1.22.0 (`ValidateVersion`: only "ckLanguage changed '1' → '2'"). The rules of the System migration above apply:
+
+- **Every type and record declares `derivable: Any`** (`Archive`, `RawArchive`, `RollupArchive`, `TimeRangeArchive`, `RecomputeJob` and the six
+  `Ck*` records). Without it the ckLanguage 2 default `Model` is a Major (row T6) and a model deriving from `Archive` fails with message 113.
+  A **new** type or record defaults to `Model`; give it `derivable: Any` when other models should derive from it.
+- **minEngineVersion 3.5.1, `ck-models/v3/` only** — unchanged against 1.18.0–1.22.0, which were already range-retaining.
+- **No interface.** No type carries `System/Name`, `System/Description`, `System/Enabled` or a `System/ParentChild` role, so none implements
+  `Named-1`, `Describable-1`, `Enableable-1` or `Hierarchical-1`. (Raising the System floor to 2.7 would be allowed as a Minor, row D1:
+  1.22.0 resolved System 2.8.0.)
+- **No access modifier.** The archive state (`Archive.Status`, `FirstActivatedAt`, the recompute fields, `RollupArchive.LastAggregatedBucketEnd`,
+  `FrozenUntil`, `LastRunError*`, `RecomputeJob.*`) is written by the services, but none of it is `securitySensitive`, so `ReadOnly` would be a
+  **Major** (row T7; the first-release exception T7a needs the marker in the candidate, and marking state "sensitive" to pass the gate would
+  misuse it). Blueprint seeds also write `Archive.Status` through `ImportRt` (e.g. `Samples.Photovoltaics`). Making the state read-only for
+  clients is therefore a 2.0 decision or goes through CK methods (the StreamData method stories of F4.3). 1.23.0 used up the T7a exception
+  of the model: from 1.24.0 on the baseline is ckLanguage 2 and row T7 applies unchanged.
+- **Dependents.** No CK model depends on System.StreamData (`ValidateCascade`: 0 dependents); blueprints and seeds pin `System.StreamData-[1.x,2.0)`.
+- **Proof.** The compiled 1.23.0 equals the published 1.22.0 after removing the version, `ckLanguage`, `minEngineVersion`, `derivable` and the
+  model description. Tests: `StreamDataCkLanguage2Tests` (Compiler.Tests: version, language, minEngineVersion 3.5.1 pinned, v3 root, `derivable:
+  Any` on every element, nothing tightened or implemented, Minor against a ckLanguage 1 copy of the sources, negative control without
+  `derivable: Any` = `OCTO-CK200`, a dependent model derives from `Archive` and `CkArchiveColumn` without message 113). The Mongo round-trip gate
+  (`CkMetaModelReflectionGateTests` in engine-mongodb) covers the model through the package.
+
 ## CK Model Publishing Lanes (CI)
 
 This repo publishes its CK models (`System`, `System.Files`, `System.StreamData`) from **inside the build**, not from a dedicated publish

@@ -1,6 +1,7 @@
 $schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
 records:
   - recordId: CkRollupAggregation
+    derivable: Any
     description: "Single aggregation definition for a CkRollupArchive. Maps a source archive column (SourcePath) to one or more storage columns via Function. AVG materialises as two stored columns (sum + count); the other functions map 1:1."
     attributes:
       - id: ${this}/CkRollupAggregation.SourcePath

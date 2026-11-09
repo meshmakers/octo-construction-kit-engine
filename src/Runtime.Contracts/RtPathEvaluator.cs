@@ -769,7 +769,7 @@ public static class RtPathEvaluator
         if (setValue == null)
         {
             // Validate before any record is created, so a refused null leaves the entity unchanged.
-            EnsureNullAllowed(evaluatedPath.Last(), tokens, createRecordsForNull);
+            EnsureNullAllowed(evaluatedPath, tokens, createRecordsForNull);
         }
 
         if (setValue != null || createRecordsForNull)
@@ -992,12 +992,16 @@ public static class RtPathEvaluator
 
     /// <summary>
     /// AB#8625: a null on an enum attribute that is not optional is refused with an error naming the path.
-    /// Only locators that will be written are checked: without <paramref name="createRecordsForNull" /> a
-    /// member of a missing record is not written (the null is dropped), so it is not refused either.
+    /// Only locators that will be written are checked: a member of a missing parent is written only when
+    /// <paramref name="createRecordsForNull" /> is set and every missing parent is a record that
+    /// <see cref="SetValueByPath" /> creates. Otherwise (default mode, or a missing parent that is a record
+    /// array or a navigation term) the null is dropped, so it is not refused either.
     /// </summary>
-    private static void EnsureNullAllowed(PathTuple target, List<PathTerm> tokens, bool createRecordsForNull)
+    private static void EnsureNullAllowed(List<PathTuple> evaluatedPath, List<PathTerm> tokens,
+        bool createRecordsForNull)
     {
-        foreach (var locator in target.Locators)
+        var targetIndex = evaluatedPath.Count - 1;
+        foreach (var locator in evaluatedPath[targetIndex].Locators)
         {
             if (locator.CkTypeAttributeGraph is not { ValueType: AttributeValueTypesDto.Enum, IsOptional: false }
                 attribute)
@@ -1005,7 +1009,8 @@ public static class RtPathEvaluator
                 continue;
             }
 
-            if (locator.RtTypeWithAttributes == null && !createRecordsForNull)
+            if (locator.RtTypeWithAttributes == null &&
+                (!createRecordsForNull || !MissingParentIsCreated(evaluatedPath, targetIndex)))
             {
                 continue;
             }
@@ -1013,6 +1018,31 @@ public static class RtPathEvaluator
             throw InvalidPathException.NullNotAllowedOnRequiredEnum(tokens, attribute.AttributeName,
                 attribute.ValueCkEnumId);
         }
+    }
+
+    /// <summary>
+    /// Whether <see cref="SetValueByPath" /> creates a holder for the locators of tuple
+    /// <paramref name="tupleIndex" /> that have none: only when the parent term is an attribute of value type
+    /// <see cref="AttributeValueTypesDto.Record" /> that either has a holder itself or gets one the same way.
+    /// Mirrors the record creation loop of <see cref="SetValueByPath" />.
+    /// </summary>
+    private static bool MissingParentIsCreated(List<PathTuple> evaluatedPath, int tupleIndex)
+    {
+        if (tupleIndex < 1)
+        {
+            return false;
+        }
+
+        var parent = evaluatedPath[tupleIndex - 1];
+        if (parent.Term?.Type != PathType.Attribute)
+        {
+            return false;
+        }
+
+        return parent.Locators.Any(l =>
+            l.Value == null
+            && l.CkTypeAttributeGraph is { ValueType: AttributeValueTypesDto.Record, ValueCkRecordId: not null }
+            && (l.RtTypeWithAttributes != null || MissingParentIsCreated(evaluatedPath, tupleIndex - 1)));
     }
 
     private static List<PathTuple> MapPath(ICkCacheService ckCacheService, string tenantId,

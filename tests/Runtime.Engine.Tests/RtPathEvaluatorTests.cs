@@ -1263,6 +1263,23 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
     }
 
     [Theory]
+    [InlineData("RecordArrayTests.RequiredConnectionState")]
+    [InlineData("RecordArrayTests[0].RequiredConnectionState")]
+    public async Task SetValue_MissingRecordArray_RequiredEnumMember_Null_CreateMissingRecords_IsDroppedNotRefused(
+        string path)
+    {
+        // The missing parent is a record array, not a record: SetValue does not create it, so the null is
+        // dropped and must not be refused as a null on a required enum.
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtEntity = NewSensor();
+
+        RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, path, null,
+            RtPathNullHandling.CreateMissingRecords);
+
+        Assert.False(rtEntity.Attributes.ContainsKey("RecordArrayTests"));
+    }
+
+    [Theory]
     [InlineData("RecordTest.Designation")]
     [InlineData("RecordTest.ConnectionState")]
     [InlineData("RecordTest.RequiredConnectionState")]

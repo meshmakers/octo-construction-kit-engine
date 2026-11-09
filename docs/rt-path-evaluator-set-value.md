@@ -43,7 +43,9 @@ Why `CreateMissingRecords` exists: a pipeline (`CreateUpdateInfo@1`) that sends 
 `Amount.Value` must reach the archive as null, not as missing. The caller opts in.
 
 Not changed in either mode: a null on an existing record sets the member to null and keeps the other members;
-a null whose parent cannot exist (for example a navigation without a target) is dropped; a null on the record
+a null whose missing parent is not a record that `SetValue` creates (a navigation without a target, a missing
+record array, `RecordArrayTests[0].Member` or `RecordArrayTests.Member`) is dropped, and so is not refused on a
+required enum either; a null on the record
 attribute itself (`Amount = null`) sets the record to null.
 
 Tests: `tests/Runtime.Engine.Tests/RtPathEvaluatorTests.cs`, region `SetValue explicit null (AB#8625)`.

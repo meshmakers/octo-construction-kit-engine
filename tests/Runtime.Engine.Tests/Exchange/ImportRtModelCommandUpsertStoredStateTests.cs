@@ -184,6 +184,18 @@ public class ImportRtModelCommandUpsertStoredStateTests
     }
 
     [Fact]
+    public async Task Upsert_StoredReadCancelled_StaysACancellation()
+    {
+        var h = new Harness();
+        A.CallTo(() => h.Repository.GetRtEntitiesByIdAsync(A<IOctoSession>._, Rt(TypeId),
+                A<IReadOnlyList<OctoObjectId>>._, A<RtEntityQueryOptions>._, A<int?>._, A<int?>._))
+            .ThrowsAsync(new OperationCanceledException());
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => h.UpsertAsync(SeedDto(OctoObjectId.GenerateNewId())));
+        Assert.Empty(h.Written);
+    }
+
+    [Fact]
     public async Task Upsert_TypeMissingInReloadingCache_ReloadsTheCacheOnce()
     {
         var h = new Harness();

@@ -48,8 +48,10 @@ internal class ImportRtModelCommand(
 
     // AB#8684: creation stamp of the entities an Upsert replaces. The full ReplaceOne writes a new document, so without
     // these an update of an existing entity got the import time as its creation date (every blueprint update looked
-    // like a recreation of all seeded entities).
-    private readonly ConcurrentDictionary<OctoObjectId, (DateTime? CreatedAt, string? CreatedBy)> _existingCreation = new();
+    // like a recreation of all seeded entities). Keyed by type and rtId: the stored entity read for one type never stamps
+    // an entity of another type that reuses the id.
+    private readonly ConcurrentDictionary<(RtCkId<CkTypeId> CkTypeId, OctoObjectId RtId), (DateTime? CreatedAt, string? CreatedBy)>
+        _existingCreation = new();
     private RtImportBlankingPolicy _blankingPolicy = RtImportBlankingPolicy.Keep;
     private IReadOnlyCollection<RtImportBlankingConfirmation>? _confirmedBlankings;
 
@@ -505,7 +507,7 @@ internal class ImportRtModelCommand(
             rtEntity.RtChangedDateTime = modelRtEntity.RtChangedDateTime ?? DateTime.UtcNow;
             // AB#8684: an Upsert of an existing entity keeps its creation stamp unless the model carries one (an export
             // does, a seed does not).
-            _existingCreation.TryGetValue(modelRtEntity.RtId, out var existingCreation);
+            _existingCreation.TryGetValue((modelRtEntity.CkTypeId, modelRtEntity.RtId), out var existingCreation);
             rtEntity.RtCreationDateTime = modelRtEntity.RtCreationDateTime ?? existingCreation.CreatedAt ?? DateTime.UtcNow;
             rtEntity.RtWellKnownName = modelRtEntity.RtWellKnownName;
             rtEntity.RtCreatedBy = modelRtEntity.RtCreatedBy ?? existingCreation.CreatedBy;
@@ -1343,7 +1345,7 @@ internal class ImportRtModelCommand(
                     existingEntities = await runtimeRepository.GetRtEntitiesByIdAsync(
                         session, typeGroup.Key, rtIds, RtEntityQueryOptions.Create()).ConfigureAwait(false);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     // AB#8684: proceeding with the imported values would replace the runtime state (a deployed
                     // pipeline's DeploymentState), the tenant-owned values and the creation stamp of every stored
@@ -1365,7 +1367,7 @@ internal class ImportRtModelCommand(
                     continue;
                 }
 
-                _existingCreation[modelEntity.RtId] = (existing.RtCreationDateTime, existing.RtCreatedBy);
+                _existingCreation[(typeGroup.Key, modelEntity.RtId)] = (existing.RtCreationDateTime, existing.RtCreatedBy);
 
                 var preservedForEntity = PreserveAttributesForEntity(modelEntity, existing, flaggedAttributes,
                     value => ToTransportValue(cacheService, runtimeRepository.TenantId, value));

@@ -327,6 +327,113 @@ public sealed class CkV2CompileTests : IDisposable
         Assert.Contains("| ChangePassword-1 | Instance |", types);
     }
 
+    // ── writeAccess (AB#8574) ───────────────────────────────────────────────────────
+
+    private static Dictionary<string, string> KitchenSinkWithWriteAccess(string block)
+    {
+        var files = KitchenSinkFiles();
+        files["types/types.yaml"] = files["types/types.yaml"].Replace(
+            "  - typeId: Principal\n    isAbstract: true\n",
+            "  - typeId: Principal\n    isAbstract: true\n" + block);
+        Assert.Contains(block, files["types/types.yaml"]);
+        return files;
+    }
+
+    [Fact]
+    public async Task WriteAccess_ReachesCompiledOutputRoundTripGraphAndDocs_AndPlainModelStaysWithoutIt()
+    {
+        await PublishSystemAsync(_fixture);
+
+        // Golden: a model without the key serializes without any 'writeAccess' member and keeps its minEngineVersion.
+        var plain = await _fixture.CompileAsync(_fixture.WriteSource("plain-wa", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], KitchenSinkFiles(), ckLanguage: 2));
+        var plainYaml = await ToYamlAsync(_fixture, plain);
+        Assert.DoesNotContain("writeAccess", plainYaml);
+        Assert.All(plain.Types!, t => Assert.Null(t.WriteAccess));
+        Assert.Equal(CkEngineVersion.CkV2MinEngineVersion, plain.MinEngineVersion);
+
+        var compiled = await _fixture.CompileAndPublishAsync(_fixture.WriteSource("ks-wa", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], KitchenSinkWithWriteAccess(
+                "    writeAccess:\n      principals: [ Interactive ]\n      channels: [ System.Ai/KnowledgeTools ]\n"),
+            ckLanguage: 2));
+
+        // Compiled model, serialized YAML and read-back carry the block.
+        var principal = compiled.Types!.Single(t => t.TypeId.Name == "Principal");
+        Assert.Equal([CkWritePrincipals.Interactive], principal.WriteAccess!.Principals!);
+        Assert.Equal(["System.Ai/KnowledgeTools"], principal.WriteAccess.Channels!);
+        Assert.Null(compiled.Types!.Single(t => t.TypeId.Name == "Account").WriteAccess);
+        var yaml = await ToYamlAsync(_fixture, compiled);
+        Assert.Contains("writeAccess:", yaml);
+        var operationResult = new OperationResult();
+        var readBack = await _fixture.Services.GetRequiredService<ICkSerializer>()
+            .DeserializeCompiledModelRootAsync(yaml, "ks.yaml", operationResult);
+        Assert.False(operationResult.HasErrors, string.Join("; ", operationResult.Messages));
+        Assert.Equal(["System.Ai/KnowledgeTools"],
+            readBack.Types!.Single(t => t.TypeId.Name == "Principal").WriteAccess!.Channels!);
+
+        // minEngineVersion is raised, so an engine that predates the field refuses the model (message 126) instead of
+        // ignoring the restriction.
+        Assert.Equal(CkEngineVersion.WriteAccessMinEngineVersion, compiled.MinEngineVersion);
+        Assert.Contains($"minEngineVersion: {CkEngineVersion.WriteAccessMinEngineVersion}", yaml);
+        var refusal = new OperationResult();
+        Assert.False(CkEngineVersion.CheckModel(compiled, "ks", refusal, new Version(3, 5, 70)));
+        Assert.Equal(126, Assert.Single(refusal.Messages).MessageNumber);
+
+        // The resolved graph carries the declared block on the declaring type only; the derived type inherits it at
+        // runtime through its base chain.
+        var graph = await _fixture.Services.GetRequiredService<ICatalogModelResolver>()
+            .HardResolveAsync(compiled, new OriginFileResolver("-"), new OperationResult());
+        Assert.NotNull(graph.Types[new CkId<CkTypeId>("KitchenSink-1.0.0/Principal")].WriteAccess);
+        var account = graph.Types[new CkId<CkTypeId>("KitchenSink-1.0.0/Account")];
+        Assert.Null(account.WriteAccess);
+        Assert.Contains(account.BaseTypes, b => b.BaseCkTypeId == new CkId<CkTypeId>("KitchenSink-1.0.0/Principal"));
+
+        // Docs generator: the block is listed on the declaring type.
+        var docs = Path.Combine(_fixture.Root, "docs-wa");
+        await _fixture.Services.GetRequiredService<Engine.Documentation.IContentGenerator>()
+            .GenerateTypesMarkdownTable(graph, docs, compiled.ModelId, "1.0.0", "/docs/");
+        var types = await File.ReadAllTextAsync(
+            Directory.GetFiles(docs, "*.md", SearchOption.AllDirectories).Single(f => f.EndsWith("Types.md")),
+            TestContext.Current.CancellationToken);
+        Assert.Contains("Write access: principals `Interactive`; channels `System.Ai/KnowledgeTools`", types);
+    }
+
+    [Theory]
+    [InlineData("    writeAccess:\n      principals: [ Robot ]\n", 143, "unknown principal kind 'Robot'")]
+    [InlineData("    writeAccess:\n      channels: [ claude-agent-gerald-wks-1 ]\n", 143, "invalid channel")]
+    [InlineData("    writeAccess:\n      principals: []\n", 143, "'principals' is an empty list")]
+    [InlineData("    writeAccess:\n      principals: [ Interactive ]\n      clients: [ x ]\n", 27, "clients")]
+    public async Task WriteAccess_Invalid_FailsToCompile(string block, int messageNumber, string expectedText)
+    {
+        await PublishSystemAsync(_fixture);
+
+        var operationResult = new OperationResult();
+        await Assert.ThrowsAnyAsync<Exception>(() => _fixture.Services.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(_fixture.WriteSource("ks-wa-bad", "KitchenSink-1.0.0", ["System-[2.5,3.0)"],
+                KitchenSinkWithWriteAccess(block), ckLanguage: 2), operationResult));
+
+        var message = Assert.Single(operationResult.Messages, m => m.MessageNumber == messageNumber);
+        Assert.Contains(expectedText, message.MessageText);
+    }
+
+    [Fact]
+    public async Task WriteAccess_InACkLanguage1Model_FailsWith90()
+    {
+        await PublishSystemAsync(_fixture);
+
+        var files = new Dictionary<string, string>
+        {
+            ["types/types.yaml"] = "types:\n  - typeId: Note\n    derivedFromCkTypeId: ${System}/Entity\n" +
+                                   "    writeAccess:\n      principals: [ Interactive ]\n"
+        };
+        var operationResult = new OperationResult();
+        await Assert.ThrowsAnyAsync<Exception>(() => _fixture.Services.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(_fixture.WriteSource("v1-wa", "Notes-1.0.0", ["System-[2.5,3.0)"], files),
+                operationResult));
+
+        Assert.Contains(operationResult.Messages, m => m.MessageNumber == 90 && m.MessageText.Contains("writeAccess"));
+    }
+
     [Theory]
     [InlineData("          timeoutSeconds: 30\n          handler: pipeline\n          mode: async\n", "pipeline")]
     [InlineData("          mode: later\n", "unknown mode")]

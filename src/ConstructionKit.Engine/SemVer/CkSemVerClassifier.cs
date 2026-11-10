@@ -259,6 +259,9 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 (CkSemVerLevel.Patch, "computed display values change only, no data/schema break"),
             { ElementKind: CkModelElementKind.Type, Property: "ownerAttributePath" } =>
                 (CkSemVerLevel.Minor, "ownership semantics for owned-only data permissions change"),
+            // AB#8574 row T8: who may write entities of the type changes; Mark() adds the behavioural note and the
+            // acknowledge.
+            { ElementKind: CkModelElementKind.Type, Property: "writeAccess" } => ClassifyWriteAccessChange(change),
 
             // ── Attribute definitions ───────────────────────────────────────────────────────
             // AB#5528 decision 2: String -> Secret keeps stored data readable - readers accept the
@@ -1202,6 +1205,19 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             };
         }
 
+        // AB#8574 (row T8): a changed write restriction changes which callers may write entities of the type, in either
+        // direction (restricted: client callers outside the block are refused; widened: more callers may write). It stays
+        // Minor, is listed as behavioural and must be acknowledged with a security reason.
+        if (change is { ElementKind: CkModelElementKind.Type, Property: "writeAccess" })
+        {
+            return classified with
+            {
+                IsBehavioural = true,
+                RequiresAcknowledge = true,
+                Reason = classified.Reason + "; requires acknowledge with a security reason (row T8)"
+            };
+        }
+
         // AB#7006 (row M17): withdrawing the sensitive marker of a result removes a redaction (audit, logs, traces);
         // it stays Minor but must be acknowledged with a security reason. Marking a result sensitive needs nothing.
         // On an interface method the change is already Major (row I12) and not acknowledgeable.
@@ -1220,6 +1236,40 @@ public class CkSemVerClassifier : ICkSemVerClassifier
         return isBehavioural || requiresAcknowledge
             ? classified with { IsBehavioural = isBehavioural, RequiresAcknowledge = requiresAcknowledge }
             : classified;
+    }
+
+    /// <summary>
+    ///     AB#8574 row T8: a type's <c>writeAccess</c> block added, removed or changed. Always Minor (the shape of the
+    ///     data and the API do not change); the reason says whether the set of admitted writers shrank (restricted),
+    ///     grew (widened) or both.
+    /// </summary>
+    private static (CkSemVerLevel, string) ClassifyWriteAccessChange(CkModelChange change)
+    {
+        var before = CkModelDiffService.ParseWriteAccess(change.OldValue);
+        var after = CkModelDiffService.ParseWriteAccess(change.NewValue);
+        string direction;
+        if (before == null)
+        {
+            direction = "security: write access restricted (writeAccess added) — callers outside the block are refused";
+        }
+        else if (after == null)
+        {
+            direction = "security: write access widened (writeAccess removed) — every caller may write again";
+        }
+        else if (after.IsSubsetOf(before))
+        {
+            direction = "security: write access restricted — fewer principal kinds or channels may write";
+        }
+        else if (after.IsSupersetOf(before))
+        {
+            direction = "security: write access widened — more principal kinds or channels may write";
+        }
+        else
+        {
+            direction = "security: write access changed — principal kinds or channels were added and removed";
+        }
+
+        return (CkSemVerLevel.Minor, direction + " (row T8)");
     }
 
     private static string OwnerTypeOfIndex(string elementId)

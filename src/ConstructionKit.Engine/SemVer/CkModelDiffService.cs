@@ -46,8 +46,10 @@ public class CkModelDiffService : ICkModelDiffService
                 nameof(CkTypeDto.EnableChangeStreamPreAndPostImages), nameof(CkTypeDto.Description),
                 nameof(CkTypeDto.DisplayNameRule), nameof(CkTypeDto.DisplayDescriptionRule),
                 nameof(CkTypeDto.OwnerAttributePath), nameof(CkTypeDto.Implements), nameof(CkTypeDto.Methods),
-                nameof(CkTypeDto.Visibility), nameof(CkTypeDto.Derivable)
+                nameof(CkTypeDto.Visibility), nameof(CkTypeDto.Derivable), nameof(CkTypeDto.WriteAccess)
             ],
+            // AB#8574: compared as one canonical value of the type (property "writeAccess", row T8).
+            [typeof(CkTypeWriteAccessDto)] = [nameof(CkTypeWriteAccessDto.Principals), nameof(CkTypeWriteAccessDto.Channels)],
             [typeof(CkTypeWithAttributesDto)] = [nameof(CkTypeWithAttributesDto.Attributes)],
             [typeof(CkAttributeDto)] =
             [
@@ -222,7 +224,7 @@ public class CkModelDiffService : ICkModelDiffService
         Element(CkModelElementKind.Dependency, "version");
         Element(CkModelElementKind.Type, "derivedFromCkTypeId", "isFinal", "isAbstract", "isCollectionRoot",
             "enableChangeStreamPreAndPostImages", "description", "displayNameRule", "displayDescriptionRule",
-            "ownerAttributePath", "visibility", "derivable");
+            "ownerAttributePath", "visibility", "derivable", "writeAccess");
         foreach (var assignmentKind in new[]
                  {
                      CkModelElementKind.TypeAttribute, CkModelElementKind.RecordAttribute,
@@ -450,6 +452,9 @@ public class CkModelDiffService : ICkModelDiffService
                     baselineType.DisplayDescriptionRule, currentType.DisplayDescriptionRule);
                 AddModified(typeChanges, CkModelElementKind.Type, id, "ownerAttributePath",
                     baselineType.OwnerAttributePath, currentType.OwnerAttributePath);
+                // AB#8574 row T8
+                AddModified(typeChanges, CkModelElementKind.Type, id, "writeAccess",
+                    FormatWriteAccess(baselineType.WriteAccess), FormatWriteAccess(currentType.WriteAccess));
 
                 DiffAttributeAssignments(typeChanges, CkModelElementKind.TypeAttribute, id,
                     baselineType.Attributes, currentType.Attributes, modelName);
@@ -985,6 +990,35 @@ public class CkModelDiffService : ICkModelDiffService
             Property = property, OldValue = oldValue, NewValue = newValue
         });
     }
+
+    /// <summary>
+    ///     AB#8574: the canonical value of a type's <c>writeAccess</c> block for the diff: the principal kinds and the
+    ///     channels (prefixed <c>channel:</c>), ordinal-sorted and comma-separated, e.g.
+    ///     <c>Interactive, channel:System.Ai/KnowledgeTools</c>; <c>null</c> when the type declares no block
+    ///     (unrestricted). Order and duplicates do not count as a change. <see cref="ParseWriteAccess" /> is the inverse.
+    /// </summary>
+    internal static string? FormatWriteAccess(CkTypeWriteAccessDto? writeAccess)
+    {
+        if (writeAccess == null)
+        {
+            return null;
+        }
+
+        var entries = (writeAccess.Principals ?? []).Concat((writeAccess.Channels ?? []).Select(c => WriteAccessChannelPrefix + c))
+            .Distinct(StringComparer.Ordinal).OrderBy(e => e, StringComparer.Ordinal);
+        return string.Join(", ", entries);
+    }
+
+    /// <summary>
+    ///     AB#8574: the entries of a value written by <see cref="FormatWriteAccess" />; <c>null</c> for an unrestricted
+    ///     type (no block).
+    /// </summary>
+    internal static HashSet<string>? ParseWriteAccess(string? value) =>
+        value == null
+            ? null
+            : new HashSet<string>(value.Split([", "], StringSplitOptions.RemoveEmptyEntries), StringComparer.Ordinal);
+
+    private const string WriteAccessChannelPrefix = "channel:";
 
     private static void AddModified(List<CkModelChange> changes, CkModelElementKind elementKind, string elementId,
         string property, bool oldValue, bool newValue)

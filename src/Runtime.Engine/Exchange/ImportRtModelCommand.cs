@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
+using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 using Meshmakers.Octo.Runtime.Contracts;
@@ -16,6 +17,7 @@ using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.StreamData;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Meshmakers.Octo.Runtime.Engine.Secrets;
+using Meshmakers.Octo.Runtime.Engine.Security;
 using Microsoft.Extensions.Logging;
 using YamlDotNet.Core;
 
@@ -249,6 +251,7 @@ internal class ImportRtModelCommand(
                     ValidateCkModels(runtimeRepository.TenantId, rtModelRootDto.Dependencies);
                     PreflightAttributeAccess(runtimeRepository.TenantId, rtModelRootDto.Entities);
                     PreflightIdentityOwnedWrites(runtimeRepository.TenantId, caller, rtModelRootDto.Entities);
+                    PreflightTypeWriteAccess(runtimeRepository.TenantId, caller, rtModelRootDto.Entities);
                     await PreflightGenericCreateAsync(session, runtimeRepository, caller,
                         rtModelRootDto.Entities.Select(e => (e.CkTypeId, e.RtId))).ConfigureAwait(false);
                     await PreflightBlueprintLockAsync(session, runtimeRepository, importStrategy,
@@ -274,16 +277,24 @@ internal class ImportRtModelCommand(
                     var checkIdentityOwned = caller != null &&
                                              RtIdentityOwnedWriteCheck.TenantHasIdentityModel(cacheService,
                                                  runtimeRepository.TenantId);
-                    if (checkGenericCreate || checkBlueprintLock || checkAttributeAccess || checkIdentityOwned)
+                    // AB#8574: the type write restriction (writeAccess), caller path only.
+                    var checkTypeWriteAccess = caller != null &&
+                                               TypeWriteAccessGuard.TenantHasRestrictedType(cacheService,
+                                                   runtimeRepository.TenantId);
+                    if (checkGenericCreate || checkBlueprintLock || checkAttributeAccess || checkIdentityOwned ||
+                        checkTypeWriteAccess)
                     {
                         var restrictedWrites = new List<RestrictedAttributeWrite>();
                         var identityOwnedWrites = new List<IdentityOwnedWrite>();
+                        var typeWriteRefusals = new List<OperationMessage>();
                         var entityIds = await CollectEntityIdsAsync(filePath, cancellationToken,
                                 checkAttributeAccess ? runtimeRepository.TenantId : null, restrictedWrites,
-                                checkIdentityOwned ? identityOwnedWrites : null, runtimeRepository.TenantId)
+                                checkIdentityOwned ? identityOwnedWrites : null, runtimeRepository.TenantId,
+                                checkTypeWriteAccess ? caller : null, typeWriteRefusals)
                             .ConfigureAwait(false);
                         ThrowIfAttributeAccessRefused(runtimeRepository.TenantId, restrictedWrites);
                         ThrowIfIdentityOwnedWritesRefused(runtimeRepository.TenantId, caller, identityOwnedWrites);
+                        ThrowIfTypeWriteAccessRefused(runtimeRepository.TenantId, caller, typeWriteRefusals);
                         await PreflightGenericCreateAsync(session, runtimeRepository, caller, entityIds)
                             .ConfigureAwait(false);
                         await PreflightBlueprintLockAsync(session, runtimeRepository, importStrategy, entityIds)
@@ -407,6 +418,39 @@ internal class ImportRtModelCommand(
         ThrowIfIdentityOwnedWritesRefused(tenantId, caller, RtIdentityOwnedWriteCheck.Find(cacheService, tenantId, entities));
     }
 
+    /// <summary>
+    /// AB#8574: a user-initiated import (caller path only) cannot write entities, or association edges at either end, of a
+    /// type whose <c>writeAccess</c> block does not admit the initiating caller (<see cref="RtImportCallerContext.PrincipalKind" />,
+    /// <see cref="RtImportCallerContext.WriteChannel" />; an unknown principal kind is refused). Runs over the whole entity list
+    /// before the first write and fails the whole file with one <see cref="ExchangeException"/> (message 144) that lists every
+    /// offender. The system path (no caller: blueprint seed, <c>ImportModelAsync</c>, <c>ImportTextAsync</c>) is not checked.
+    /// </summary>
+    private void PreflightTypeWriteAccess(string tenantId, RtImportCallerContext? caller,
+        IReadOnlyCollection<RtEntityTcDto> entities)
+    {
+        if (caller == null || !TypeWriteAccessGuard.TenantHasRestrictedType(cacheService, tenantId))
+        {
+            return;
+        }
+
+        ThrowIfTypeWriteAccessRefused(tenantId, caller, TypeWriteAccessGuard.Find(cacheService, tenantId,
+            caller.PrincipalKind, caller.WriteChannel, TypeWriteAccessGuard.TargetsOf(entities)));
+    }
+
+    private void ThrowIfTypeWriteAccessRefused(string tenantId, RtImportCallerContext? caller,
+        IReadOnlyList<OperationMessage> refusals)
+    {
+        if (refusals.Count == 0)
+        {
+            return;
+        }
+
+        logger.LogWarning(
+            "Import into '{TenantId}' rejected: {Count} write(s) of types whose writeAccess does not admit the caller (subject '{SubjectId}', principal {PrincipalKind}, channel {WriteChannel})",
+            tenantId, refusals.Count, caller?.SubjectId, caller?.PrincipalKind, caller?.WriteChannel ?? "none");
+        throw ExchangeException.TypeWriteAccessDenied(refusals);
+    }
+
     private void ThrowIfIdentityOwnedWritesRefused(string tenantId, RtImportCallerContext? caller,
         IReadOnlyList<IdentityOwnedWrite> offenders)
     {
@@ -439,7 +483,8 @@ internal class ImportRtModelCommand(
     private async Task<List<(RtCkId<CkTypeId> CkTypeId, OctoObjectId RtId)>> CollectEntityIdsAsync(string filePath,
         CancellationToken? cancellationToken, string? accessCheckTenantId = null,
         List<RestrictedAttributeWrite>? restrictedWrites = null, List<IdentityOwnedWrite>? identityOwnedWrites = null,
-        string? tenantId = null)
+        string? tenantId = null, RtImportCallerContext? typeWriteAccessCaller = null,
+        List<OperationMessage>? typeWriteRefusals = null)
     {
         var ids = new List<(RtCkId<CkTypeId> CkTypeId, OctoObjectId RtId)>();
         await using var stream = File.OpenRead(filePath);
@@ -457,6 +502,13 @@ internal class ImportRtModelCommand(
             if (identityOwnedWrites != null && tenantId != null)
             {
                 identityOwnedWrites.AddRange(RtIdentityOwnedWriteCheck.Find(cacheService, tenantId, bulk));
+            }
+
+            if (typeWriteAccessCaller != null && typeWriteRefusals != null && tenantId != null)
+            {
+                typeWriteRefusals.AddRange(TypeWriteAccessGuard.Find(cacheService, tenantId,
+                    typeWriteAccessCaller.PrincipalKind, typeWriteAccessCaller.WriteChannel,
+                    TypeWriteAccessGuard.TargetsOf(bulk)));
             }
         }
 

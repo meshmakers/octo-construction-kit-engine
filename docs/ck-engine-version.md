@@ -20,6 +20,10 @@ Feature minimums (`CkEngineVersion.GetRequiredMinEngineVersion`; each one is the
 | `authorization.dataAccess`, also `Write` (AB#7036) | `3.5.40` (`DataAccessMinEngineVersion`) | it would treat a `Read` method as `Write` |
 | `execution.mode`, also `sync` (AB#6925) | `3.5.67` (`ExecutionModeMinEngineVersion`) | it would run an `async` method as sync |
 
+| A type declares | `minEngineVersion` | Why an older engine must refuse the model |
+|-----------------|--------------------|-------------------------------------------|
+| `writeAccess` (AB#8574, `ck-type-write-access.md`) | `3.5.71` (`WriteAccessMinEngineVersion`) | it would ignore the restriction and let every caller write the type |
+
 Models that use none of these keys keep their other minimum and compile byte-identically.
 
 `3.5.1` is the first libs release with the full CK v2 Phase 1 reader. The value is a constant, not the compiling

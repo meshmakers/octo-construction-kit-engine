@@ -123,4 +123,14 @@ public class CkTypeDto : CkTypeWithAttributesDto
     [YamlMember(Alias = "derivable", DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public CkDerivableDto? Derivable { get; set; }
+
+    /// <summary>
+    ///     CK v2 (AB#8574): restricts writes of runtime entities of this type (and of derived types) to the listed
+    ///     principal kinds and trusted in-process channels, see <see cref="CkTypeWriteAccessDto" />. <c>null</c>
+    ///     (omitted) means unrestricted, so models that do not use the key serialize byte-identically. Requires
+    ///     <c>ckLanguage: 2</c> and raises the model's <c>minEngineVersion</c>.
+    /// </summary>
+    [YamlMember(Alias = "writeAccess", DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CkTypeWriteAccessDto? WriteAccess { get; set; }
 }

@@ -162,6 +162,9 @@
             "Any"
           ],
           "description": "CK v2 (F1.1-S4): Model = only the declaring model may derive from this element. Omitted = Model in a ckLanguage: 2 model, Any in a v1 model. Requires ckLanguage: 2."
+        },
+        "writeAccess": {
+          "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-type.schema.json#/definitions/CkTypeWriteAccess"
         }
       },
       "additionalProperties": false,
@@ -332,6 +335,31 @@
             "Any"
           ],
           "description": "CK v2 (F1.1-S4): Model = only the declaring model may derive from this element. Omitted = Model in a ckLanguage: 2 model, Any in a v1 model. Requires ckLanguage: 2."
+        },
+        "writeAccess": {
+          "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-type.schema.json#/definitions/CkTypeWriteAccess"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CkTypeWriteAccess": {
+      "type": "object",
+      "title": "CkTypeWriteAccess",
+      "description": "CK v2 (AB#8574): restricts writes of runtime entities of the type (and of derived types) to the listed principal kinds and trusted in-process channels. A write is allowed when the caller's principal kind is listed in 'principals' or the session carries one of the 'channels'. System sessions and blueprint seeds are never restricted. Requires ckLanguage: 2; the compiler validates the values (message 143).",
+      "properties": {
+        "principals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Principal kinds that may write: 'Interactive' (a signed-in user) and/or 'Client' (a client-credentials service principal)."
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Trusted in-process write channels '<namespace>/<name>', e.g. 'System.Ai/KnowledgeTools'. A channel is set on the session by service code, never from a token or header."
         }
       },
       "additionalProperties": false

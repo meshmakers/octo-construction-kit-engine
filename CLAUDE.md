@@ -1011,7 +1011,7 @@ Tests: `SystemInterfacesTests` (Compiler.Tests: members, per-type table, no inde
 
 ## System.StreamData on ckLanguage 2 (AB#8597, Epic AB#5584 F4.3)
 
-`src/StreamDataCkModel` is **System.StreamData-1.23.0**, `ckLanguage: 2`, the first ckLanguage 2 release of the model and a **Minor** against
+`src/StreamDataCkModel` is **System.StreamData-1.24.0** (archive lifecycle methods, below); 1.23.0 was the first ckLanguage 2 release of the model and a **Minor** against
 the ckLanguage 1 release 1.22.0 (`ValidateVersion`: only "ckLanguage changed '1' → '2'"). The rules of the System migration above apply:
 
 - **Every type and record declares `derivable: Any`** (`Archive`, `RawArchive`, `RollupArchive`, `TimeRangeArchive`, `RecomputeJob` and the six
@@ -1033,6 +1033,33 @@ the ckLanguage 1 release 1.22.0 (`ValidateVersion`: only "ckLanguage changed '1'
   Any` on every element, nothing tightened or implemented, Minor against a ckLanguage 1 copy of the sources, negative control without
   `derivable: Any` = `OCTO-CK200`, a dependent model derives from `Archive` and `CkArchiveColumn` without message 113). The Mongo round-trip gate
   (`CkMetaModelReflectionGateTests` in engine-mongodb) covers the model through the package.
+
+### Archive lifecycle methods (System.StreamData 1.24.0, AB#8598)
+
+1.24.0 adds the archive lifecycle as CK methods (Minor against 1.23.0, no acknowledgement, `minEngineVersion` unchanged 3.5.1). They
+replace the hand-written `streamData` GraphQL mutations of octo-asset-repo-services, which stay and are deprecated there:
+
+| Method | Kind | Result | Mutation it replaces |
+|---|---|---|---|
+| `Archive.Activate-1` | instance | `ArchiveTransitionResult` | `activateArchive` |
+| `Archive.Disable-1` | instance | `ArchiveTransitionResult` | `disableArchive` |
+| `Archive.Enable-1` | instance | `ArchiveTransitionResult` | `enableArchive` |
+| `Archive.RetryActivation-1` | instance | `ArchiveTransitionResult` | `retryArchiveActivation` |
+| `Archive.DeleteArchive-1` | instance | Boolean | `deleteArchive` (`Delete` is a reserved method name, message 102) |
+| `TimeRangeArchive.CreateArchive-1` | static, parameter `archive: TimeRangeArchiveCreateInput` | String (rtId) | `createTimeRangeArchive` |
+| `RollupArchive.CreateArchive-1` | static, parameter `archive: RollupArchiveCreateInput` | String (rtId) | `createRollupArchive` |
+
+- The instance methods sit on the abstract `Archive`; the concrete archive types inherit them (`CkTypeGraph.AllMethods`).
+- Every method: role `StreamDataAdmin`, explicit timeout, the STREAMDATA_* error codes of the mutations plus `STREAMDATA_NOT_ENABLED`.
+- The parameter and result records (`records/archiveMethodRecords.yaml`) and their attributes (`attributes/archiveMethodAttributes.yaml`,
+  `isRuntimeState: true`) take the ckLanguage 2 default `derivable: Model`. Their shapes equal the mutation input/result types.
+- No `replacesGenericCreate`: blueprints seed `TimeRangeArchive` / `RollupArchive` through `ImportRt` (SmartMeterInsights.Base,
+  EnergyCommunity.Base, voest-app), which the flag would refuse (message 136).
+- **Handlers cannot use the generated `{Type}{Method}Parameters` for the create methods:** the generated `Rt{Record}Record` holds a record
+  array as `IAttributeValueList<T>` (an interface), which the method JSON (System.Text.Json) cannot bind. octo-asset-repo-services binds
+  the parameter to plain classes with the same members (see its CLAUDE.md); the gap is tracked as a Bug.
+- Tests: `StreamDataCkLanguage2Tests` (`ArchiveLifecycleMethods_CarryTheContractOfTheMutations`, `StreamData_1_24_0_AgainstTheMethodlessRelease_1_23_0_IsAMinor_WithoutAcknowledgement`;
+  the ckLanguage 1 baseline copy strips the `methods:` blocks and the method-only files).
 
 ## CK Model Publishing Lanes (CI)
 

@@ -24,11 +24,22 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
 
     private static readonly string[] ExpectedTypes = ["Archive", "RawArchive", "RecomputeJob", "RollupArchive", "TimeRangeArchive"];
 
-    private static readonly string[] ExpectedRecords =
+    /// <summary>The records of 1.22.0: each declares <c>derivable: Any</c>.</summary>
+    private static readonly string[] PreExistingRecords =
     [
         "CkArchiveColumn", "CkArchiveConflictKey", "CkArchiveDirtyWindow", "CkArchiveRecomputeRange", "CkRollupAggregation",
         "CkRollupSourceReference"
     ];
+
+    /// <summary>
+    ///     The parameter and result records of the archive lifecycle methods (AB#8598, 1.24.0). New records keep the ckLanguage 2
+    ///     default <c>derivable: Model</c>: they are method inputs and answers, not extension points.
+    /// </summary>
+    internal static readonly string[] MethodRecords =
+        ["ArchiveColumnSpec", "ArchiveTransitionResult", "RollupArchiveCreateInput", "TimeRangeArchiveCreateInput"];
+
+    /// <summary>The files that hold only the method records and their attributes (AB#8598).</summary>
+    internal static readonly string[] MethodOnlyFiles = ["records/archiveMethodRecords.yaml", "attributes/archiveMethodAttributes.yaml"];
 
     private readonly InMemoryPublishedCatalog _published = new();
     private readonly CkCompileFixture _fixture;
@@ -89,11 +100,53 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
     private static string RemoveLine(string yaml, string line) =>
         string.Join("\n", yaml.Split('\n').Where(l => l.Trim() != line));
 
-    /// <summary>The ckLanguage 1 System.StreamData: same sources without the language key and the explicit modifiers.</summary>
+    /// <summary>
+    ///     Removes every <c>methods:</c> block (the block ends at the next line that is not deeper indented). Methods need
+    ///     <c>ckLanguage: 2</c>, so a ckLanguage 1 copy of the sources must not carry them (AB#8598).
+    /// </summary>
+    internal static string RemoveMethods(string yaml)
+    {
+        var result = new List<string>();
+        int? blockIndent = null;
+        foreach (var line in yaml.Split('\n'))
+        {
+            var indent = line.Length - line.TrimStart().Length;
+            if (blockIndent is { } open)
+            {
+                if (line.Trim().Length == 0 || indent > open)
+                {
+                    continue;
+                }
+
+                blockIndent = null;
+            }
+
+            if (line.Trim() == "methods:")
+            {
+                blockIndent = indent;
+                continue;
+            }
+
+            result.Add(line);
+        }
+
+        return string.Join("\n", result);
+    }
+
+    /// <summary>
+    ///     The ckLanguage 1 System.StreamData: same sources without the language key, the explicit modifiers and the CK methods
+    ///     with their records (methods exist only in ckLanguage 2).
+    /// </summary>
     private string CopyV1StreamData(string version) =>
         CopyStreamData($"streamdata-v1-{version}", (path, yaml) => path == "ckModel.yaml"
             ? RemoveLine(SetVersion(yaml, version), "ckLanguage: 2")
-            : RemoveLine(yaml, "derivable: Any"));
+            : MethodOnlyFiles.Contains(path)
+                ? RemoveElementsOf(yaml)
+                : RemoveMethods(RemoveLine(yaml, "derivable: Any")));
+
+    /// <summary>Keeps only the schema line of a method-only file, so the copy holds none of its elements.</summary>
+    internal static string RemoveElementsOf(string yaml) =>
+        yaml.Split('\n')[0] + (yaml.Contains("\nrecords:", StringComparison.Ordinal) ? "\nrecords: []\n" : "\nattributes: []\n");
 
     /// <summary>System.StreamData depends on System; the real System goes into the fixture's local catalog first.</summary>
     private async Task PublishSystemAsync()
@@ -136,12 +189,13 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         result.Messages.Where(m => m.Severity == CkCompileGateSeverity.Error).Select(m => m.Code ?? "").ToArray();
 
     [Fact]
-    public async Task StreamData_Is_1_23_0_OnCkLanguage2_WithMinEngineVersion351_AndPublishedToTheV3RootOnly()
+    public async Task StreamData_Is_1_24_0_OnCkLanguage2_WithMinEngineVersion351_AndPublishedToTheV3RootOnly()
     {
         var compiled = await CompileStreamDataAsync(RealStreamDataSource());
 
         Assert.Equal("System.StreamData", compiled.ModelId.Name);
-        Assert.Equal(new Version(1, 23, 0), new Version(compiled.ModelId.Version.ToString()));
+        // 1.23.0 (AB#8597) raised the language; 1.24.0 (AB#8598) adds the archive lifecycle methods.
+        Assert.Equal(new Version(1, 24, 0), new Version(compiled.ModelId.Version.ToString()));
         Assert.Equal(2, compiled.EffectiveCkLanguage);
         // Pinned exactly: a higher value means every service below it can no longer import System.StreamData. A feature that
         // raises it (e.g. an Archive method with execution.mode) is a deliberate rollout decision and updates this assertion.
@@ -156,9 +210,13 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         var compiled = await CompileStreamDataAsync(RealStreamDataSource());
 
         Assert.Equal(ExpectedTypes, compiled.Types!.Select(t => t.TypeId.Name).Order());
-        Assert.Equal(ExpectedRecords, compiled.Records!.Select(r => r.RecordId.Name).Order());
+        Assert.Equal(PreExistingRecords.Concat(MethodRecords).Order(StringComparer.Ordinal),
+            compiled.Records!.Select(r => r.RecordId.Name).Order(StringComparer.Ordinal));
         Assert.All(compiled.Types!, t => Assert.True(t.Derivable == CkDerivableDto.Any, $"{t.TypeId.Name}: {t.Derivable}"));
-        Assert.All(compiled.Records!, r => Assert.True(r.Derivable == CkDerivableDto.Any, $"{r.RecordId.Name}: {r.Derivable}"));
+        Assert.All(compiled.Records!.Where(r => PreExistingRecords.Contains(r.RecordId.Name)),
+            r => Assert.True(r.Derivable == CkDerivableDto.Any, $"{r.RecordId.Name}: {r.Derivable}"));
+        Assert.All(compiled.Records!.Where(r => MethodRecords.Contains(r.RecordId.Name)),
+            r => Assert.Equal(CkDerivableDto.Model, CkModifiers.ResolveDerivable(r.Derivable, 2)));
         Assert.All(compiled.Types!, t => Assert.Equal(CkVisibilityDto.Public, CkModifiers.ResolveVisibility(t.Visibility)));
         Assert.All(compiled.Records!, r => Assert.Equal(CkVisibilityDto.Public, CkModifiers.ResolveVisibility(r.Visibility)));
     }
@@ -187,7 +245,7 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
     }
 
     [Fact]
-    public async Task StreamData_1_23_0_AgainstTheCkLanguage1Release_1_22_0_IsAMinor_NotAMajor()
+    public async Task StreamData_AgainstTheCkLanguage1Release_1_22_0_IsAMinor_NotAMajor()
     {
         await PublishBaselineAsync();
 
@@ -238,5 +296,95 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
 
         Assert.DoesNotContain(result.Messages, m => m.MessageNumber == 113);
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Messages));
+    }
+
+    // ---------- AB#8598 (1.24.0): archive lifecycle methods -------------------------------------------------------------
+
+    /// <summary>The error codes of the streamData mutations (asset repository) plus STREAMDATA_NOT_ENABLED, on every method.</summary>
+    private static readonly string[] ArchiveMethodErrorCodes =
+    [
+        "STREAMDATA_ACTIVATION_FAILED", "STREAMDATA_ARCHIVE_NOT_ACTIVATED", "STREAMDATA_ARCHIVE_NOT_FOUND", "STREAMDATA_ERROR",
+        "STREAMDATA_INVALID_TRANSITION", "STREAMDATA_NOT_ENABLED", "STREAMDATA_PATH_INVALID", "STREAMDATA_SCHEMA_IMMUTABLE"
+    ];
+
+    /// <summary>
+    ///     AB#8598: the seven streamData mutations have a CK method each. The lifecycle methods sit on the abstract
+    ///     <c>Archive</c> (every concrete archive inherits them), the create methods are static on the two archive types that have
+    ///     a create mutation. Role StreamDataAdmin (the role the mutations check), every STREAMDATA_* code of the mutations, an
+    ///     explicit timeout, and no replacesGenericCreate (blueprints seed archives through ImportRt).
+    /// </summary>
+    [Fact]
+    public async Task ArchiveLifecycleMethods_CarryTheContractOfTheMutations()
+    {
+        var compiled = await CompileStreamDataAsync(RealStreamDataSource());
+        var types = compiled.Types!.ToDictionary(t => t.TypeId.Name);
+
+        var archive = types["Archive"].Methods!.ToDictionary(m => m.MethodId);
+        Assert.Equal(["Activate-1", "DeleteArchive-1", "Disable-1", "Enable-1", "RetryActivation-1"],
+            archive.Keys.Order(StringComparer.Ordinal));
+        foreach (var id in new[] { "Activate-1", "Disable-1", "Enable-1", "RetryActivation-1" })
+        {
+            Assert.Equal(CkMethodKindDto.Instance, archive[id].Kind);
+            Assert.Empty(archive[id].Parameters ?? []);
+            Assert.Equal(AttributeValueTypesDto.Record, archive[id].Result!.ValueType);
+            Assert.Equal("ArchiveTransitionResult", archive[id].Result!.ValueCkRecordId!.ElementId.Name);
+        }
+
+        Assert.Equal(AttributeValueTypesDto.Boolean, archive["DeleteArchive-1"].Result!.ValueType);
+        Assert.True(archive["Activate-1"].Execution!.Idempotent, "activateArchive is idempotent on Activated");
+
+        var creates = new[] { ("TimeRangeArchive", "TimeRangeArchiveCreateInput"), ("RollupArchive", "RollupArchiveCreateInput") };
+        foreach (var (type, input) in creates)
+        {
+            var create = Assert.Single(types[type].Methods!);
+            Assert.Equal("CreateArchive-1", create.MethodId);
+            Assert.Equal(CkMethodKindDto.Static, create.Kind);
+            var parameter = Assert.Single(create.Parameters!);
+            Assert.Equal(("archive", AttributeValueTypesDto.Record, input),
+                (parameter.Name, parameter.ValueType, parameter.ValueCkRecordId!.ElementId.Name));
+            Assert.Equal(AttributeValueTypesDto.String, create.Result!.ValueType);
+        }
+
+        Assert.Null(types["RawArchive"].Methods);
+        Assert.Null(types["RecomputeJob"].Methods);
+
+        var all = archive.Values.Concat(types["TimeRangeArchive"].Methods!).Concat(types["RollupArchive"].Methods!).ToList();
+        Assert.Equal(7, all.Count);
+        Assert.All(all, m =>
+        {
+            Assert.Equal(["StreamDataAdmin"], m.Authorization!.Roles!);
+            Assert.Equal(ArchiveMethodErrorCodes, m.Errors!.Select(e => e.Code).Order(StringComparer.Ordinal));
+            Assert.True(m.Execution!.TimeoutSeconds is > 0, m.MethodId);
+            Assert.Null(m.Execution.Mode);
+            Assert.False(m.ReplacesGenericCreate, m.MethodId);
+            Assert.DoesNotContain(m.Parameters ?? [], p => p.Sensitive);
+        });
+    }
+
+    /// <summary>
+    ///     AB#8598: 1.24.0 against 1.23.0 (ckLanguage 2, the same sources without the methods and their records) is a Minor
+    ///     without acknowledgement: methods and records are additions only.
+    /// </summary>
+    [Fact]
+    public async Task StreamData_1_24_0_AgainstTheMethodlessRelease_1_23_0_IsAMinor_WithoutAcknowledgement()
+    {
+        var baseline = CopyStreamData("streamdata-1.23.0", (path, yaml) => path == "ckModel.yaml"
+            ? SetVersion(yaml, "1.23.0")
+            : MethodOnlyFiles.Contains(path)
+                ? RemoveElementsOf(yaml)
+                : RemoveMethods(yaml));
+        var compiled = await CompileStreamDataAsync(baseline);
+        Assert.Equal(2, compiled.EffectiveCkLanguage);
+        Assert.All(compiled.Types!, t => Assert.True(t.Methods is null || t.Methods.Count == 0, t.TypeId.Name));
+        await _fixture.Services.GetRequiredService<ICatalogService>().PublishAsync(InMemoryPublishedCatalog.Name, compiled,
+            new OriginFileResolver(baseline), isForced: true);
+
+        var result = await RunGateAsync(RealStreamDataSource());
+
+        Assert.Empty(Errors(result));
+        Assert.Contains("1.23.0", result.Verdict!.BaselineId.ToString());
+        Assert.Equal(CkSemVerLevel.Minor, result.Verdict.RequiredLevel);
+        Assert.DoesNotContain(result.Verdict.ClassifiedChanges, c => c.Level == CkSemVerLevel.Major);
+        Assert.DoesNotContain(result.Verdict.ClassifiedChanges, c => c.RequiresAcknowledge);
     }
 }

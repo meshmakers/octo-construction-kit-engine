@@ -1,0 +1,93 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+# AB#8598 (System.StreamData 1.24.0, Feature AB#5697 F4.3) — members of the parameter and result records of the archive
+# lifecycle CK methods (records/archiveMethodRecords.yaml). They are never stored on an entity: a caller sends them as
+# method input, the asset repository answers with them, so they are runtime state (never seeded, never exported) by
+# construction. The shapes equal the input and result types of the streamData GraphQL mutations the methods replace
+# (createTimeRangeArchive, createRollupArchive, ArchiveTransitionResult), so a client that switches reads and sends the
+# same fields.
+attributes:
+  # ---------- ArchiveTransitionResult -------------------------------------------------------------
+  - id: ArchiveMethod.ArchiveRtId
+    description: "Method result member: runtime id of the archive the transition was applied to."
+    valueType: String
+    isRuntimeState: true
+  - id: ArchiveMethod.Status
+    description: "Method result member: lifecycle status of the archive after the transition."
+    valueType: Enum
+    valueCkEnumId: ${this}/CkArchiveStatus
+    isRuntimeState: true
+  - id: ArchiveMethod.Transition
+    description: "Method result member: name of the transition that ran (Activate, Disable, Enable, RetryActivation)."
+    valueType: String
+    isRuntimeState: true
+  # ---------- shared create input ---------------------------------------------------------------
+  - id: ArchiveMethod.RtWellKnownName
+    description: "Method input member: optional well-known name of the new archive."
+    valueType: String
+    isRuntimeState: true
+  # ---------- TimeRangeArchiveCreateInput / ArchiveColumnSpec --------------------------------------
+  - id: ArchiveMethod.TargetCkTypeId
+    description: "Method input member: CK type id (e.g. 'Energy/MeteringPoint') whose attribute paths the archive captures."
+    valueType: String
+    isRuntimeState: true
+  - id: ArchiveMethod.Columns
+    description: "Method input member: the columns of the new archive (attribute path, indexed, required). At least one."
+    valueType: RecordArray
+    valueCkRecordId: ${this}/ArchiveColumnSpec
+    isRuntimeState: true
+  - id: ArchiveMethod.PeriodMs
+    description: "Method input member: optional advisory window length of a time-range archive in milliseconds."
+    valueType: Int64
+    isRuntimeState: true
+  - id: ArchiveMethod.ColumnPath
+    description: "Method input member: attribute path on the target CK type (e.g. 'Amount.Value')."
+    valueType: String
+    isRuntimeState: true
+  - id: ArchiveMethod.ColumnIndexed
+    description: "Method input member: whether the physical column is indexed."
+    valueType: Boolean
+    isRuntimeState: true
+  - id: ArchiveMethod.ColumnRequired
+    description: "Method input member: whether a row must carry a value in this column."
+    valueType: Boolean
+    isRuntimeState: true
+  # ---------- RollupArchiveCreateInput -----------------------------------------------------------
+  - id: ArchiveMethod.SourceArchiveRtId
+    description: "Method input member: DEPRECATED single unbounded source archive (runtime id); declare Sources instead. Supply exactly one of SourceArchiveRtId and Sources."
+    valueType: String
+    isRuntimeState: true
+  - id: ArchiveMethod.Sources
+    description: "Method input member: the source archives of the rollup, each with an optional validity span (AB#5157). Supply exactly one of Sources and SourceArchiveRtId."
+    valueType: RecordArray
+    valueCkRecordId: ${this}/CkRollupSourceReference
+    isRuntimeState: true
+  - id: ArchiveMethod.BucketSizeMs
+    description: "Method input member: width of the aggregation bucket in milliseconds."
+    valueType: Int64
+    isRuntimeState: true
+  - id: ArchiveMethod.WatermarkLagMs
+    description: "Method input member: how long the rollup waits after a bucket end before it aggregates the bucket, in milliseconds."
+    valueType: Int64
+    isRuntimeState: true
+  - id: ArchiveMethod.BucketAlignment
+    description: "Method input member: bucket alignment of the rollup; omitted = FixedSize."
+    valueType: Enum
+    valueCkEnumId: ${this}/BucketAlignment
+    isRuntimeState: true
+  - id: ArchiveMethod.ReferenceTimeZone
+    description: "Method input member: IANA time-zone id for calendar alignments (e.g. 'Europe/Vienna')."
+    valueType: String
+    isRuntimeState: true
+  - id: ArchiveMethod.CarryLookbackMs
+    description: "Method input member: optional carry look-back of the rollup in milliseconds."
+    valueType: Int64
+    isRuntimeState: true
+  - id: ArchiveMethod.DayStartOffsetMs
+    description: "Method input member: optional local start of the day in milliseconds after midnight (e.g. a gas day at 06:00)."
+    valueType: Int64
+    isRuntimeState: true
+  - id: ArchiveMethod.Aggregations
+    description: "Method input member: the aggregations of the rollup (source path, function, optional target column name and comparison value). At least one."
+    valueType: RecordArray
+    valueCkRecordId: ${this}/CkRollupAggregation
+    isRuntimeState: true

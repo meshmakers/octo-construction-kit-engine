@@ -1,0 +1,70 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+# AB#8598 (System.StreamData 1.24.0) — the parameter and result records of the archive lifecycle CK methods. Each record has
+# the shape of the GraphQL type of the streamData mutation the method replaces. New records take the ckLanguage 2 default
+# `derivable: Model`: they are method inputs and answers, not extension points.
+records:
+  - recordId: ArchiveTransitionResult
+    description: "Result of Archive.Activate, Disable, Enable and RetryActivation: the archive, its status after the transition and the transition that ran (the shape of the ArchiveTransitionResult of the streamData mutations)."
+    isFinal: true
+    attributes:
+      - id: ${this}/ArchiveMethod.ArchiveRtId
+        name: ArchiveRtId
+      - id: ${this}/ArchiveMethod.Status
+        name: Status
+      - id: ${this}/ArchiveMethod.Transition
+        name: Transition
+  - recordId: ArchiveColumnSpec
+    description: "One column of a new archive in TimeRangeArchive.CreateArchive: attribute path, indexed, required."
+    isFinal: true
+    attributes:
+      - id: ${this}/ArchiveMethod.ColumnPath
+        name: Path
+      - id: ${this}/ArchiveMethod.ColumnIndexed
+        name: Indexed
+      - id: ${this}/ArchiveMethod.ColumnRequired
+        name: Required
+  - recordId: TimeRangeArchiveCreateInput
+    description: "Input of TimeRangeArchive.CreateArchive (the input of the createTimeRangeArchive mutation)."
+    isFinal: true
+    attributes:
+      - id: ${this}/ArchiveMethod.RtWellKnownName
+        name: RtWellKnownName
+        isOptional: true
+      - id: ${this}/ArchiveMethod.TargetCkTypeId
+        name: TargetCkTypeId
+      - id: ${this}/ArchiveMethod.Columns
+        name: Columns
+      - id: ${this}/ArchiveMethod.PeriodMs
+        name: PeriodMs
+        isOptional: true
+  - recordId: RollupArchiveCreateInput
+    description: "Input of RollupArchive.CreateArchive (the input of the createRollupArchive mutation). Supply exactly one of Sources and the deprecated SourceArchiveRtId."
+    isFinal: true
+    attributes:
+      - id: ${this}/ArchiveMethod.RtWellKnownName
+        name: RtWellKnownName
+        isOptional: true
+      - id: ${this}/ArchiveMethod.SourceArchiveRtId
+        name: SourceArchiveRtId
+        isOptional: true
+      - id: ${this}/ArchiveMethod.Sources
+        name: Sources
+        isOptional: true
+      - id: ${this}/ArchiveMethod.BucketSizeMs
+        name: BucketSizeMs
+      - id: ${this}/ArchiveMethod.WatermarkLagMs
+        name: WatermarkLagMs
+      - id: ${this}/ArchiveMethod.BucketAlignment
+        name: BucketAlignment
+        isOptional: true
+      - id: ${this}/ArchiveMethod.ReferenceTimeZone
+        name: ReferenceTimeZone
+        isOptional: true
+      - id: ${this}/ArchiveMethod.CarryLookbackMs
+        name: CarryLookbackMs
+        isOptional: true
+      - id: ${this}/ArchiveMethod.DayStartOffsetMs
+        name: DayStartOffsetMs
+        isOptional: true
+      - id: ${this}/ArchiveMethod.Aggregations
+        name: Aggregations

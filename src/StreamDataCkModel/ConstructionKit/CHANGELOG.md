@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.24.0 - 2026-11-10
+
+_Required bump level: minor._
+
+### Added
+
+- Archive lifecycle as CK methods (AB#8598, Feature AB#5697 F4.3), handled by the asset repository (`handler: service`, in-process):
+  - `Archive.Activate-1`, `Archive.Disable-1`, `Archive.Enable-1`, `Archive.RetryActivation-1` (instance, result record
+    `ArchiveTransitionResult`) and `Archive.DeleteArchive-1` (instance, result Boolean) on the abstract `Archive`, inherited by
+    `RawArchive`, `TimeRangeArchive` and `RollupArchive`;
+  - `TimeRangeArchive.CreateArchive-1` and `RollupArchive.CreateArchive-1` (static, parameter `archive` with the records
+    `TimeRangeArchiveCreateInput` / `RollupArchiveCreateInput`, result the runtime id as String).
+  - Records `ArchiveTransitionResult`, `ArchiveColumnSpec`, `TimeRangeArchiveCreateInput`, `RollupArchiveCreateInput` and their
+    attributes `ArchiveMethod.*` (runtime state: never stored on an entity).
+- Every method declares role `StreamDataAdmin` (the role the streamData mutations check), an explicit `timeoutSeconds`, `idempotent`
+  (only `Activate-1` is idempotent) and the error codes of the mutations (`STREAMDATA_ARCHIVE_NOT_FOUND`, `STREAMDATA_ARCHIVE_NOT_ACTIVATED`,
+  `STREAMDATA_INVALID_TRANSITION`, `STREAMDATA_SCHEMA_IMMUTABLE`, `STREAMDATA_PATH_INVALID`, `STREAMDATA_ACTIVATION_FAILED`,
+  `STREAMDATA_ERROR`) plus `STREAMDATA_NOT_ENABLED`.
+
+### Compatibility
+
+- Additive, a Minor against 1.23.0 (no acknowledgement). `minEngineVersion` stays 3.5.1 (no `execution.mode`, no `dataAccess`,
+  no `replacesGenericCreate`). No access change: the archive state stays `ReadWrite` in 1.x (decision of AB#8597); blueprints keep
+  creating archives through `ImportRt`, so no method replaces the generic create.
+
 ## 1.23.0 - 2026-11-09
 
 _Required bump level: minor._

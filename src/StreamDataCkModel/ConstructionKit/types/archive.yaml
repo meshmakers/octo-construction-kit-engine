@@ -46,3 +46,104 @@ types:
       - id: ${this}/Archive.LastRecomputeFailureReason
         name: LastRecomputeFailureReason
         isOptional: true
+    # AB#8598 (1.24.0, Feature AB#5697 F4.3): the archive lifecycle as CK methods, handled by the asset repository in-process
+    # (execution.handler service; the asset repository owns stream data). They replace the streamData GraphQL mutations
+    # activateArchive, disableArchive, enableArchive, retryArchiveActivation and deleteArchive, which stay and are deprecated.
+    # Roles, input, result and error codes equal the mutations: role StreamDataAdmin, the same STREAMDATA_* codes. Declared on
+    # the abstract base, so RawArchive, TimeRangeArchive and RollupArchive inherit them. Widening the roles later is a Minor,
+    # narrowing them a Major.
+    methods:
+      - methodId: Activate-1
+        description: "Provisions the CrateDB table and transitions the archive to Activated. Allowed from Created, Disabled and Failed; idempotent on Activated (mutation streamData.activateArchive)."
+        result:
+          valueType: Record
+          valueCkRecordId: ${this}/ArchiveTransitionResult
+        errors:
+          - { code: STREAMDATA_ARCHIVE_NOT_FOUND, description: "An archive the call needs does not exist (as the mutation)." }
+          - { code: STREAMDATA_ARCHIVE_NOT_ACTIVATED, description: "An archive the call needs is not activated (as the mutation)." }
+          - { code: STREAMDATA_INVALID_TRANSITION, description: "The transition is not allowed from the current status; parameters fromStatus and attemptedTransition (as the mutation)." }
+          - { code: STREAMDATA_SCHEMA_IMMUTABLE, description: "The archive schema cannot change in its current state (as the mutation)." }
+          - { code: STREAMDATA_PATH_INVALID, description: "A column path does not resolve on the target CK type; parameter path (as the mutation)." }
+          - { code: STREAMDATA_ACTIVATION_FAILED, description: "Provisioning the CrateDB table failed; the archive is Failed and RetryActivation applies (as the mutation)." }
+          - { code: STREAMDATA_ERROR, description: "Any other stream-data rule refused the call; parameter message carries the engine text (as the mutation)." }
+          - { code: STREAMDATA_NOT_ENABLED, description: "Stream data is not enabled for the tenant (the mutation answers this as a generic error)." }
+        authorization:
+          roles: [ StreamDataAdmin ]
+        execution:
+          timeoutSeconds: 120
+          idempotent: true
+      - methodId: Disable-1
+        description: "Transitions the archive to Disabled. Allowed only from Activated; the CrateDB table and its data are kept (mutation streamData.disableArchive)."
+        result:
+          valueType: Record
+          valueCkRecordId: ${this}/ArchiveTransitionResult
+        errors:
+          - { code: STREAMDATA_ARCHIVE_NOT_FOUND, description: "An archive the call needs does not exist (as the mutation)." }
+          - { code: STREAMDATA_ARCHIVE_NOT_ACTIVATED, description: "An archive the call needs is not activated (as the mutation)." }
+          - { code: STREAMDATA_INVALID_TRANSITION, description: "The transition is not allowed from the current status; parameters fromStatus and attemptedTransition (as the mutation)." }
+          - { code: STREAMDATA_SCHEMA_IMMUTABLE, description: "The archive schema cannot change in its current state (as the mutation)." }
+          - { code: STREAMDATA_PATH_INVALID, description: "A column path does not resolve on the target CK type; parameter path (as the mutation)." }
+          - { code: STREAMDATA_ACTIVATION_FAILED, description: "Provisioning the CrateDB table failed; the archive is Failed and RetryActivation applies (as the mutation)." }
+          - { code: STREAMDATA_ERROR, description: "Any other stream-data rule refused the call; parameter message carries the engine text (as the mutation)." }
+          - { code: STREAMDATA_NOT_ENABLED, description: "Stream data is not enabled for the tenant (the mutation answers this as a generic error)." }
+        authorization:
+          roles: [ StreamDataAdmin ]
+        execution:
+          timeoutSeconds: 60
+          idempotent: false
+      - methodId: Enable-1
+        description: "Transitions the archive from Disabled back to Activated and re-validates the column paths against the current CK model (mutation streamData.enableArchive)."
+        result:
+          valueType: Record
+          valueCkRecordId: ${this}/ArchiveTransitionResult
+        errors:
+          - { code: STREAMDATA_ARCHIVE_NOT_FOUND, description: "An archive the call needs does not exist (as the mutation)." }
+          - { code: STREAMDATA_ARCHIVE_NOT_ACTIVATED, description: "An archive the call needs is not activated (as the mutation)." }
+          - { code: STREAMDATA_INVALID_TRANSITION, description: "The transition is not allowed from the current status; parameters fromStatus and attemptedTransition (as the mutation)." }
+          - { code: STREAMDATA_SCHEMA_IMMUTABLE, description: "The archive schema cannot change in its current state (as the mutation)." }
+          - { code: STREAMDATA_PATH_INVALID, description: "A column path does not resolve on the target CK type; parameter path (as the mutation)." }
+          - { code: STREAMDATA_ACTIVATION_FAILED, description: "Provisioning the CrateDB table failed; the archive is Failed and RetryActivation applies (as the mutation)." }
+          - { code: STREAMDATA_ERROR, description: "Any other stream-data rule refused the call; parameter message carries the engine text (as the mutation)." }
+          - { code: STREAMDATA_NOT_ENABLED, description: "Stream data is not enabled for the tenant (the mutation answers this as a generic error)." }
+        authorization:
+          roles: [ StreamDataAdmin ]
+        execution:
+          timeoutSeconds: 60
+          idempotent: false
+      - methodId: RetryActivation-1
+        description: "Retries the activation after a failed table provisioning. Allowed only from Failed (mutation streamData.retryArchiveActivation)."
+        result:
+          valueType: Record
+          valueCkRecordId: ${this}/ArchiveTransitionResult
+        errors:
+          - { code: STREAMDATA_ARCHIVE_NOT_FOUND, description: "An archive the call needs does not exist (as the mutation)." }
+          - { code: STREAMDATA_ARCHIVE_NOT_ACTIVATED, description: "An archive the call needs is not activated (as the mutation)." }
+          - { code: STREAMDATA_INVALID_TRANSITION, description: "The transition is not allowed from the current status; parameters fromStatus and attemptedTransition (as the mutation)." }
+          - { code: STREAMDATA_SCHEMA_IMMUTABLE, description: "The archive schema cannot change in its current state (as the mutation)." }
+          - { code: STREAMDATA_PATH_INVALID, description: "A column path does not resolve on the target CK type; parameter path (as the mutation)." }
+          - { code: STREAMDATA_ACTIVATION_FAILED, description: "Provisioning the CrateDB table failed; the archive is Failed and RetryActivation applies (as the mutation)." }
+          - { code: STREAMDATA_ERROR, description: "Any other stream-data rule refused the call; parameter message carries the engine text (as the mutation)." }
+          - { code: STREAMDATA_NOT_ENABLED, description: "Stream data is not enabled for the tenant (the mutation answers this as a generic error)." }
+        authorization:
+          roles: [ StreamDataAdmin ]
+        execution:
+          timeoutSeconds: 120
+          idempotent: false
+      - methodId: DeleteArchive-1
+        description: "Drops the CrateDB table of the archive (idempotent) and deletes the archive entity. Destructive: the stored history is lost. Allowed from every status; the result is true (mutation streamData.deleteArchive). Named DeleteArchive because Delete is reserved for the generic delete."
+        result:
+          valueType: Boolean
+        errors:
+          - { code: STREAMDATA_ARCHIVE_NOT_FOUND, description: "An archive the call needs does not exist (as the mutation)." }
+          - { code: STREAMDATA_ARCHIVE_NOT_ACTIVATED, description: "An archive the call needs is not activated (as the mutation)." }
+          - { code: STREAMDATA_INVALID_TRANSITION, description: "The transition is not allowed from the current status; parameters fromStatus and attemptedTransition (as the mutation)." }
+          - { code: STREAMDATA_SCHEMA_IMMUTABLE, description: "The archive schema cannot change in its current state (as the mutation)." }
+          - { code: STREAMDATA_PATH_INVALID, description: "A column path does not resolve on the target CK type; parameter path (as the mutation)." }
+          - { code: STREAMDATA_ACTIVATION_FAILED, description: "Provisioning the CrateDB table failed; the archive is Failed and RetryActivation applies (as the mutation)." }
+          - { code: STREAMDATA_ERROR, description: "Any other stream-data rule refused the call; parameter message carries the engine text (as the mutation)." }
+          - { code: STREAMDATA_NOT_ENABLED, description: "Stream data is not enabled for the tenant (the mutation answers this as a generic error)." }
+        authorization:
+          roles: [ StreamDataAdmin ]
+        execution:
+          timeoutSeconds: 120
+          idempotent: false

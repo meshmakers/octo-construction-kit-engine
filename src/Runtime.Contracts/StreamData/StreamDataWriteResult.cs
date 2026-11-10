@@ -19,18 +19,19 @@ public enum StreamDataSkipReason
     /// <summary>
     /// A ranking column of the archive's conflict precedence decided against this row (for example a measurement
     /// against an estimate): the first key, in the archive's order, in which the stored row differs from the write
-    /// is a column key (AB#8637). Also reported against a stored manual value when a column key placed before
-    /// <see cref="ArchiveConflictKey.OriginKey" /> decided. A normal outcome for automated deliveries.
+    /// is a column key (AB#8637). Also reported against a stored manual value when a ranking column that the write
+    /// sends comes before <see cref="ArchiveConflictKey.OriginKey" /> and decides against the write. A normal outcome
+    /// for automated deliveries.
     /// </summary>
     LowerPrecedence = 1,
 
     /// <summary>
     /// The origin key (<see cref="ArchiveConflictKey.OriginKey" />) decided: the stored row is a manual value, the
     /// write automated, and no column key before the origin key differs (AB#8637). With the default origin-first
-    /// precedence an automated delivery therefore never replaces a manual value; when the archive places a column key
-    /// before the origin key, that key decides first and the reason is <see cref="LowerPrecedence" />. A ranking
-    /// column the write does not send keeps its stored value and ties (AB#8622). Never reported when the archive
-    /// ignores the origin.
+    /// precedence an automated delivery therefore never replaces a manual value. A ranking column placed before the
+    /// origin key decides first only when the write sends it and it differs: against the write the reason is
+    /// <see cref="LowerPrecedence" />, in favour of the write the row is stored. A ranking column the write does not
+    /// send keeps its stored value and ties (AB#8622). Never reported when the archive ignores the origin.
     /// </summary>
     ManualValueProtected = 2
 }

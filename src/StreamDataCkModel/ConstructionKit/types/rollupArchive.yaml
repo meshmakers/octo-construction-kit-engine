@@ -46,3 +46,28 @@ types:
       - id: ${this}/RollupArchive.ConsecutiveRunFailures
         name: ConsecutiveRunFailures
         isOptional: true
+    # AB#8598 (1.24.0, Feature AB#5697 F4.3): create as a static CK method, handled by the asset repository (replaces the
+    # createRollupArchive mutation, which stays and is deprecated). Not replacesGenericCreate: blueprints seed rollups through
+    # ImportRt (e.g. SmartMeterInsights.Base, EnergyCommunity.Base, voest-app), so the generic create stays.
+    methods:
+      - methodId: CreateArchive-1
+        kind: Static
+        description: "Creates a rollup archive in status Created; its target type and columns are derived from the source archive(s) and the aggregations. Returns the runtime id (mutation streamData.createRollupArchive)."
+        parameters:
+          - { name: archive, valueType: Record, valueCkRecordId: "${this}/RollupArchiveCreateInput", description: "The rollup to create: sources, bucket size, watermark lag, aggregations and the optional alignment settings (the input of createRollupArchive)." }
+        result:
+          valueType: String
+        errors:
+          - { code: STREAMDATA_ARCHIVE_NOT_FOUND, description: "A source archive does not exist (as the mutation)." }
+          - { code: STREAMDATA_ARCHIVE_NOT_ACTIVATED, description: "An archive the call needs is not activated (as the mutation)." }
+          - { code: STREAMDATA_INVALID_TRANSITION, description: "The transition is not allowed from the current status (as the mutation)." }
+          - { code: STREAMDATA_SCHEMA_IMMUTABLE, description: "The archive schema cannot change in its current state (as the mutation)." }
+          - { code: STREAMDATA_PATH_INVALID, description: "A column path does not resolve on the target CK type; parameter path (as the mutation)." }
+          - { code: STREAMDATA_ACTIVATION_FAILED, description: "Provisioning a CrateDB table failed (as the mutation)." }
+          - { code: STREAMDATA_ERROR, description: "Any other stream-data rule refused the input; parameter message carries the engine text (as the mutation)." }
+          - { code: STREAMDATA_NOT_ENABLED, description: "Stream data is not enabled for the tenant (the mutation answers this as a generic error)." }
+        authorization:
+          roles: [ StreamDataAdmin ]
+        execution:
+          timeoutSeconds: 60
+          idempotent: false

@@ -111,6 +111,10 @@ types:
         isOptional: true
       - id: ${this}/IsEnabled
         name: IsEnabled
+      # AB#8625: an optional enum next to the required ConnectionState
+      - id: ${this}/ConnectionState-2
+        name: OptionalConnectionState
+        isOptional: true
       - id: ${this}/RecordTest
         name: RecordTest
         isOptional: true

@@ -16,6 +16,7 @@ using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Meshmakers.Octo.Runtime.Engine.Exchange;
 using Meshmakers.Octo.Runtime.Engine.Repositories.Query;
 
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using Xunit;
@@ -75,7 +76,7 @@ public class ImportRtModelCommandUpsertStoredStateTests
 
     private sealed class Harness
     {
-        public Harness()
+        public Harness(ILogger<ImportRtModelCommand>? logger = null)
         {
             var graph = Graph();
             A.CallTo(() => Repository.TenantId).Returns(Tenant);
@@ -93,7 +94,7 @@ public class ImportRtModelCommandUpsertStoredStateTests
             A.CallTo(() => Repository.BulkInsertRtEntitiesAsync(A<IOctoSession>._, A<IEnumerable<RtEntity>>._,
                     A<BulkOperationOptions>._))
                 .Invokes(call => Written.AddRange(call.GetArgument<IEnumerable<RtEntity>>(1)!));
-            Command = new ImportRtModelCommand(NullLogger<ImportRtModelCommand>.Instance, CkCache,
+            Command = new ImportRtModelCommand(logger ?? NullLogger<ImportRtModelCommand>.Instance, CkCache,
                 A.Fake<IRtYamlSerializer>(), A.Fake<IRtJsonSerializer>(), A.Fake<IRtImportAuditTrail>(),
                 new RtImportOptions(), A.Fake<IDataPermissionResolver>(), A.Fake<IAuditEventSink>());
         }
@@ -196,19 +197,61 @@ public class ImportRtModelCommandUpsertStoredStateTests
     }
 
     [Fact]
-    public async Task Upsert_TypeMissingInReloadingCache_ReloadsTheCacheOnce()
+    public async Task Upsert_TypeMissingInStaleCacheAfterTenantUpdate_ReloadsOnceAndKeepsDeploymentState()
     {
+        // AB#8684 (test-2 reset 24.10.): after a tenant update the loaded cache misses the type on the first lookup.
         var h = new Harness();
         var rtId = OctoObjectId.GenerateNewId();
         h.Stored(new RtEntity(Rt(TypeId), rtId, new Dictionary<string, object?> { ["State"] = "Deployed" }));
+        var graph = Graph();
         CkTypeGraph? outGraph;
-        A.CallTo(() => h.CkCache.TryGetRtCkType(Tenant, Rt(TypeId), out outGraph)).Returns(false);
-        A.CallTo(() => h.CkCache.IsTenantLoaded(Tenant)).ReturnsNextFromSequence(true, false);
+        A.CallTo(() => h.CkCache.TryGetRtCkType(Tenant, Rt(TypeId), out outGraph)).Returns(false).Once()
+            .Then.Returns(true).AssignsOutAndRefParameters(graph);
 
         await h.UpsertAsync(SeedDto(rtId));
 
         A.CallTo(() => h.Repository.LoadCacheForTenantAsync(h.CkCache)).MustHaveHappenedOnceExactly();
-        // A cache that was reloading is no reason to skip the preservation.
+        // The seed value UNDEPLOYED must not overwrite the stored state.
         Assert.Equal("Deployed", Assert.Single(h.Written).GetAttributeStringValueOrDefault("State"));
+    }
+
+    [Fact]
+    public async Task Upsert_TypeStillMissingAfterReload_AbortsWithoutWriteAndLogsTenantTypeAndCount()
+    {
+        var logger = new CapturingLogger();
+        var h = new Harness(logger);
+        h.Stored(new RtEntity(Rt(TypeId), OctoObjectId.GenerateNewId(),
+            new Dictionary<string, object?> { ["State"] = "Deployed" }));
+        CkTypeGraph? outGraph;
+        A.CallTo(() => h.CkCache.TryGetRtCkType(Tenant, Rt(TypeId), out outGraph)).Returns(false);
+
+        var act = () => h.UpsertAsync(SeedDto(OctoObjectId.GenerateNewId()), SeedDto(OctoObjectId.GenerateNewId()));
+
+        var exception = await Assert.ThrowsAsync<ExchangeException>(act);
+        Assert.Contains(TypeId, exception.Message);
+        Assert.Contains(Tenant, exception.Message);
+        Assert.Contains("Nothing was written", exception.Message);
+        A.CallTo(() => h.Repository.LoadCacheForTenantAsync(h.CkCache)).MustHaveHappenedOnceExactly();
+        Assert.Empty(h.Written);
+        A.CallTo(() => h.Repository.BulkInsertRtEntitiesAsync(A<IOctoSession>._, A<IEnumerable<RtEntity>>._,
+            A<BulkOperationOptions>._)).MustNotHaveHappened();
+
+        var error = Assert.Single(logger.Entries,
+            e => e.Level == LogLevel.Error && e.Message.StartsWith("Import stopped before any write"));
+        Assert.Contains(TypeId, error.Message);
+        Assert.Contains(Tenant, error.Message);
+        Assert.Contains("2 imported entity", error.Message);
+    }
+
+    private sealed class CapturingLogger : ILogger<ImportRtModelCommand>
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter) => Entries.Add((logLevel, formatter(state, exception)));
     }
 }

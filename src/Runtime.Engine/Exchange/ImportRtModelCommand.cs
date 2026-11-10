@@ -1274,17 +1274,26 @@ internal class ImportRtModelCommand(
         {
             // Look up the CK type to find which attributes are flagged. AB#8684: a type that cannot be resolved here is
             // never skipped (skipping let the seed values replace the stored runtime state). The tenant's cache may be
-            // in the middle of a reload (a CK change invalidates it while a blueprint applies its seed), so it is loaded
-            // once; GetRtCkType then throws for a type the tenant really does not know - before anything is written,
-            // like the import loop below would.
-            if (!cacheService.TryGetRtCkType(runtimeRepository.TenantId, typeGroup.Key, out var ckTypeGraph))
+            // in the middle of a reload or stale after a tenant update (a CK change invalidates it while a blueprint
+            // applies its seed), so it is reloaded once; a type the tenant still does not know stops the import - before
+            // anything is written.
+            if (!cacheService.TryGetRtCkType(runtimeRepository.TenantId, typeGroup.Key, out var ckTypeGraph) ||
+                ckTypeGraph == null)
             {
-                if (!cacheService.IsTenantLoaded(runtimeRepository.TenantId))
-                {
-                    await runtimeRepository.LoadCacheForTenantAsync(cacheService).ConfigureAwait(false);
-                }
+                await runtimeRepository.LoadCacheForTenantAsync(cacheService).ConfigureAwait(false);
 
-                ckTypeGraph = cacheService.GetRtCkType(runtimeRepository.TenantId, typeGroup.Key);
+                if (!cacheService.TryGetRtCkType(runtimeRepository.TenantId, typeGroup.Key, out ckTypeGraph) ||
+                    ckTypeGraph == null)
+                {
+                    var entityCount = typeGroup.Count();
+                    logger.LogError(
+                        "Import stopped before any write: CK type '{CkTypeId}' of {EntityCount} imported entity(ies) " +
+                        "is unknown in tenant '{TenantId}' even after reloading the CK cache; the stored runtime state " +
+                        "(e.g. DeploymentState) cannot be preserved",
+                        typeGroup.Key, entityCount, runtimeRepository.TenantId);
+                    throw ExchangeException.CkTypeNotResolvableForUpsert(runtimeRepository.TenantId,
+                        typeGroup.Key.ToString(), entityCount);
+                }
             }
 
             // Materialize the preserved-attribute set once per type.

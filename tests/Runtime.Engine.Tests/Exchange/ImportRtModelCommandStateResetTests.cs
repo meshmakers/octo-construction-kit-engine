@@ -112,6 +112,9 @@ public class ImportRtModelCommandStateResetTests
             A.CallTo(() => CkCache.EnsureModelIdRanges(tenant, A<IEnumerable<CkModelIdVersionRange>>._))
                 .Returns(new List<CkModelIdVersionRange>());
             A.CallTo(() => CkCache.GetRtCkType(tenant, Rt(TypeId))).Returns(graph);
+            CkTypeGraph? outGraph;
+            A.CallTo(() => CkCache.TryGetRtCkType(tenant, Rt(TypeId), out outGraph)).Returns(true)
+                .AssignsOutAndRefParameters(graph);
             A.CallTo(() => Repository.CreateTransientRtEntityByRtCkIdAsync(A<RtCkId<CkTypeId>>._))
                 .ReturnsLazily(call => Task.FromResult(new RtEntity(call.GetArgument<RtCkId<CkTypeId>>(0)!,
                     OctoObjectId.GenerateNewId())));

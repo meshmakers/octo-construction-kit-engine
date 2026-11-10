@@ -1055,9 +1055,9 @@ replace the hand-written `streamData` GraphQL mutations of octo-asset-repo-servi
   `isRuntimeState: true`) take the ckLanguage 2 default `derivable: Model`. Their shapes equal the mutation input/result types.
 - No `replacesGenericCreate`: blueprints seed `TimeRangeArchive` / `RollupArchive` through `ImportRt` (SmartMeterInsights.Base,
   EnergyCommunity.Base, voest-app), which the flag would refuse (message 136).
-- **Handlers cannot use the generated `{Type}{Method}Parameters` for the create methods:** the generated `Rt{Record}Record` holds a record
-  array as `IAttributeValueList<T>` (an interface), which the method JSON (System.Text.Json) cannot bind. octo-asset-repo-services binds
-  the parameter to plain classes with the same members (see its CLAUDE.md); the gap is tracked as a Bug.
+- **The create-method handlers bind `archive` to plain classes**, not to the generated `{Type}{Method}Parameters`: the generated
+  `Rt{Record}Record` holds a record array as `IAttributeValueList<T>` (an interface), which the method JSON (System.Text.Json) cannot
+  bind. The plain classes in octo-asset-repo-services have the same members as the records (AB#8707).
 - Tests: `StreamDataCkLanguage2Tests` (`ArchiveLifecycleMethods_CarryTheContractOfTheMutations`, `StreamData_1_24_0_AgainstTheMethodlessRelease_1_23_0_IsAMinor_WithoutAcknowledgement`;
   the ckLanguage 1 baseline copy strips the `methods:` blocks and the method-only files).
 

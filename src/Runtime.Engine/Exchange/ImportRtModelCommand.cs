@@ -45,6 +45,13 @@ internal class ImportRtModelCommand(
 
     private readonly IRtSerializer _rtYamlSerializer = rtYamlSerializer;
     private readonly ConcurrentQueue<RtImportGuardEntry> _guardEntries = new();
+
+    // AB#8684: creation stamp of the entities an Upsert replaces. The full ReplaceOne writes a new document, so without
+    // these an update of an existing entity got the import time as its creation date (every blueprint update looked
+    // like a recreation of all seeded entities). Keyed by type and rtId: the stored entity read for one type never stamps
+    // an entity of another type that reuses the id.
+    private readonly ConcurrentDictionary<(RtCkId<CkTypeId> CkTypeId, OctoObjectId RtId), (DateTime? CreatedAt, string? CreatedBy)>
+        _existingCreation = new();
     private RtImportBlankingPolicy _blankingPolicy = RtImportBlankingPolicy.Keep;
     private IReadOnlyCollection<RtImportBlankingConfirmation>? _confirmedBlankings;
 
@@ -83,6 +90,7 @@ internal class ImportRtModelCommand(
         _entityImportIds.Clear();
         _mandatoryViolations.Clear();
         _guardEntries.Clear();
+        _existingCreation.Clear();
         // A failed import can leave unflushed items behind; they belong to no later import.
         _importEntityQueue.Clear();
         _importAssociationQueue.Clear();
@@ -497,9 +505,12 @@ internal class ImportRtModelCommand(
                 .ConfigureAwait(false);
             rtEntity.RtId = modelRtEntity.RtId;
             rtEntity.RtChangedDateTime = modelRtEntity.RtChangedDateTime ?? DateTime.UtcNow;
-            rtEntity.RtCreationDateTime = modelRtEntity.RtCreationDateTime ?? DateTime.UtcNow;
+            // AB#8684: an Upsert of an existing entity keeps its creation stamp unless the model carries one (an export
+            // does, a seed does not).
+            _existingCreation.TryGetValue((modelRtEntity.CkTypeId, modelRtEntity.RtId), out var existingCreation);
+            rtEntity.RtCreationDateTime = modelRtEntity.RtCreationDateTime ?? existingCreation.CreatedAt ?? DateTime.UtcNow;
             rtEntity.RtWellKnownName = modelRtEntity.RtWellKnownName;
-            rtEntity.RtCreatedBy = modelRtEntity.RtCreatedBy;
+            rtEntity.RtCreatedBy = modelRtEntity.RtCreatedBy ?? existingCreation.CreatedBy;
             rtEntity.RtState = modelRtEntity.RtState;
 
             // Atomic check-and-insert across Parallel.ForEachAsync workers; HashSet is not
@@ -1235,6 +1246,12 @@ internal class ImportRtModelCommand(
     /// are logged and listed in <see cref="GuardEntries"/>. This is what would have protected the EDA
     /// adapter configuration blanked by an EdaIntegration update (AB#6310).
     /// </para>
+    /// <para>
+    /// AB#8684: the pass also records the creation stamp (<c>RtCreationDateTime</c>, <c>RtCreatedBy</c>) of every stored
+    /// entity, so the replace keeps it, and it never falls back to the imported values: when the CK type cannot be
+    /// resolved (after one cache reload) or the stored entities cannot be read, the import is stopped before anything
+    /// is written.
+    /// </para>
     /// </remarks>
     private async Task PreserveRuntimeStateAttributesAsync(IOctoSession session,
         IReadOnlyList<RtEntityTcDto> modelRtEntities, IRuntimeRepository runtimeRepository)
@@ -1255,12 +1272,28 @@ internal class ImportRtModelCommand(
 
         foreach (var typeGroup in entitiesByType)
         {
-            // Look up the CK type to find which attributes are flagged. If the type isn't in
-            // the cache the import would fail downstream anyway — let it surface there with
-            // the existing error path instead of swallowing it here.
-            if (!cacheService.TryGetRtCkType(runtimeRepository.TenantId, typeGroup.Key, out var ckTypeGraph))
+            // Look up the CK type to find which attributes are flagged. AB#8684: a type that cannot be resolved here is
+            // never skipped (skipping let the seed values replace the stored runtime state). The tenant's cache may be
+            // in the middle of a reload or stale after a tenant update (a CK change invalidates it while a blueprint
+            // applies its seed), so it is reloaded once; a type the tenant still does not know stops the import - before
+            // anything is written.
+            if (!cacheService.TryGetRtCkType(runtimeRepository.TenantId, typeGroup.Key, out var ckTypeGraph) ||
+                ckTypeGraph == null)
             {
-                continue;
+                await runtimeRepository.LoadCacheForTenantAsync(cacheService).ConfigureAwait(false);
+
+                if (!cacheService.TryGetRtCkType(runtimeRepository.TenantId, typeGroup.Key, out ckTypeGraph) ||
+                    ckTypeGraph == null)
+                {
+                    var entityCount = typeGroup.Count();
+                    logger.LogError(
+                        "Import stopped before any write: CK type '{CkTypeId}' of {EntityCount} imported entity(ies) " +
+                        "is unknown in tenant '{TenantId}' even after reloading the CK cache; the stored runtime state " +
+                        "(e.g. DeploymentState) cannot be preserved",
+                        typeGroup.Key, entityCount, runtimeRepository.TenantId);
+                    throw ExchangeException.CkTypeNotResolvableForUpsert(runtimeRepository.TenantId,
+                        typeGroup.Key.ToString(), entityCount);
+                }
             }
 
             // Materialize the preserved-attribute set once per type.
@@ -1301,12 +1334,8 @@ internal class ImportRtModelCommand(
                 seedOwnedAttributes = seedOwnedAttributes.Except(methodOnly).ToList();
             }
 
-            if (flaggedAttributes.Count == 0 && secretRecordAttributes.Count == 0 && seedOwnedAttributes.Count == 0)
-            {
-                // Cheap fast path: this type has no attributes, nothing to preserve or guard.
-                continue;
-            }
-
+            // AB#8684: no fast path for a type without attributes any more - the stored entities are read for every
+            // type, because the creation stamp of an existing entity is kept as well (see _existingCreation).
             var modelEntities = typeGroup.ToList();
             var rtIds = modelEntities.Select(e => e.RtId).ToList();
 
@@ -1325,14 +1354,15 @@ internal class ImportRtModelCommand(
                     existingEntities = await runtimeRepository.GetRtEntitiesByIdAsync(
                         session, typeGroup.Key, rtIds, RtEntityQueryOptions.Create()).ConfigureAwait(false);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    // Don't fail the whole import — if we can't look up existing entities the
-                    // import will still proceed with the imported values (i.e. the old behaviour).
-                    logger.LogWarning(ex,
-                        "Failed to look up existing entities of type {CkTypeId} for runtime-state preservation; falling back to imported values",
+                    // AB#8684: proceeding with the imported values would replace the runtime state (a deployed
+                    // pipeline's DeploymentState), the tenant-owned values and the creation stamp of every stored
+                    // entity of the type with the seed's. Stop the import instead; the transaction writes nothing.
+                    logger.LogError(ex,
+                        "Failed to look up existing entities of type {CkTypeId} for runtime-state preservation; the import is stopped",
                         typeGroup.Key);
-                    continue;
+                    throw ExchangeException.StoredStateNotReadable(runtimeRepository.TenantId, typeGroup.Key.ToString(), ex);
                 }
 
                 existingByRtId = existingEntities.Items.ToDictionary(e => e.RtId);
@@ -1345,6 +1375,8 @@ internal class ImportRtModelCommand(
                     // New entity — let the imported value land as-is.
                     continue;
                 }
+
+                _existingCreation[(typeGroup.Key, modelEntity.RtId)] = (existing.RtCreationDateTime, existing.RtCreatedBy);
 
                 var preservedForEntity = PreserveAttributesForEntity(modelEntity, existing, flaggedAttributes,
                     value => ToTransportValue(cacheService, runtimeRepository.TenantId, value));

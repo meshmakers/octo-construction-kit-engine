@@ -1073,7 +1073,7 @@ targets, which do not re-enter the publish path from a test step.
 
 **System models are published automatically from main (AB#7343, default flipped by AB#8718).** The shared catalogs are published by the
 `validate-and-publish-ck-versions.yml` step of `azure-pipelines.yml`, not by the dotnet build. The pipeline parameter
-`publishSystemCkModels` (boolean, **default true** since 2026-11-10) feeds the template parameter `publishOnMain` (`tpl-v1.8.0`):
+`publishSystemCkModels` (boolean, **default true** since 2026-11-10) feeds the template parameter `publishOnMain` (`tpl-v1.8.0` and later; pinned: `tpl-v1.11.0`):
 a main build runs ValidateVersion, the schema compile and the cascade check, which still refuse a breaking change declared as
 minor, and publishes the System models; an already-published version is a no-op. The gate was introduced as default false after
 System-2.6.0 reached `construction-kit-libraries-build` on 2026-10-23 before the re-pin (AB#6708); CK v2 range retention

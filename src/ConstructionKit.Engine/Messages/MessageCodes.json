@@ -749,6 +749,18 @@
       "number": 142,
       "level": "ERROR",
       "text": "Method '{methodId}' of '{ckTypeId}' declares an invalid 'execution.mode': {reason}"
+    },
+    {
+      "key": "CkTypeWriteAccessInvalid",
+      "number": 143,
+      "level": "ERROR",
+      "text": "Type '{ckTypeId}' declares an invalid 'writeAccess': {reason}"
+    },
+    {
+      "key": "RtTypeWriteAccessDenied",
+      "number": 144,
+      "level": "ERROR",
+      "text": "Write refused: the {operation} of entity '{rtId}' of type '{ckTypeId}' is restricted by the 'writeAccess' of type '{restrictingCkTypeId}'. The caller is principal '{principalKind}' on channel '{channel}'; only the principals [{principals}] or the channels [{channels}] may write it"
     }
   ]
 }

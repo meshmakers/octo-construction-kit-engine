@@ -151,6 +151,27 @@ public class ExchangeException : PersistenceException
         };
     }
 
+    /// <summary>
+    /// AB#8574: a user-initiated import writes entities (or association edges) of a type whose <c>writeAccess</c> block does
+    /// not admit the initiating caller. Raised before anything is written; one failure that lists every offender (message
+    /// 144 with the type, the restricting type, the caller's principal kind and channel, and the admitted ones).
+    /// </summary>
+    internal static Exception TypeWriteAccessDenied(IReadOnlyList<OperationMessage> offenders)
+    {
+        var first = offenders[0];
+        return new ExchangeException(
+            $"Import rejected [{first.MessageNumber}]: {offenders.Count} write" +
+            (offenders.Count == 1 ? "" : "s") +
+            " cannot be made by the initiating caller because the type restricts its writers (writeAccess). " +
+            $"Nothing was written. {string.Join("; ", offenders.Take(MaxOffendersInMessage).Select(o => o.MessageText))}" +
+            (offenders.Count > MaxOffendersInMessage
+                ? $"; and {offenders.Count - MaxOffendersInMessage} more (see Messages)"
+                : string.Empty), first.MessageNumber)
+        {
+            Messages = offenders
+        };
+    }
+
     internal static Exception AttributeNotFound<TKey>(RtCkId<CkAttributeId> modelAttributeId, string elementType, CkId<TKey> ckId)
         where TKey : IComparable<TKey>, ICkElementId
     {

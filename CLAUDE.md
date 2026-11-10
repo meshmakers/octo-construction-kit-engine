@@ -1777,6 +1777,27 @@ equal the number of the release that first ships the field (the next patch after
 the last tag). Tests: `CkV2MethodResolverTests` (`Code135_*`), `CkV2CompileTests.DataAccess_*`, `CkV2GraphJsonRoundTripTests.DataAccess_*`,
 `CkV2GeneratedContractsTests`, `CkEngineVersionTests`, `MethodRowTests.M18_*`, `CkV2SchemaTests`.
 
+**Type `writeAccess` (AB#8574) touch points**, same numbering (the block lives on `CkTypeDto.WriteAccess`,
+`CkTypeWriteAccessDto { Principals, Channels }`, constants `CkWritePrincipals`; `null` = omitted = unrestricted, so
+existing models serialize byte-identically; full description `docs/ck-type-write-access.md`): (1) type schema
+`CkType.writeAccess` / `CkCompiledType.writeAccess` -> shared definition `CkTypeWriteAccess` (`additionalProperties:
+false`, values as plain strings: an unknown value is message 143, an unknown key message 27; needs a **schema release**);
+(2) compiled schema, same definition; (3) `CkTypeDto.WriteAccess` (`OmitNull`, `JsonIgnore(WhenWritingNull)`);
+(4) `CompilerService` type copy; (5) `CkTypeGraph.WriteAccess` (declared block only, trailing `[JsonConstructor]` parameter,
+omitted from the cache JSON when null; the runtime walks `BaseTypes` and requires every block of the chain to admit);
+(6) message 143 (`ElementResolver.CheckWriteAccess`) and 90 in a v1 model; runtime message 144; (7) diff property
+`writeAccess` (canonical sorted set, `CkModelDiffService.FormatWriteAccess`), classifier row **T8** (Minor +
+`requiresAcknowledge`, behavioural, reason restricted / widened / changed), guard probes `CkTypeDto.WriteAccess`,
+`CkTypeWriteAccessDto.Principals` / `.Channels`; (8) —; (9) `Types.md` line "Write access: …" on the declaring type;
+(10) engine-mongodb `CkType.WriteAccess` (embedded DTO, reflection gate) — **required**: without it a tenant drops the
+block and does not enforce it; (11) asset-repo CK meta and (12) Studio: follow-up, not needed for enforcement.
+**minEngineVersion:** `CkEngineVersion.WriteAccessMinEngineVersion` (`3.5.71`) for a model in which any type declares the
+block; must equal the release that first ships the field. **Enforcement:** `TypeWriteAccessGuard` in
+`RuntimeRepositoryBase.ApplyChangesGuardedAsync` (every non-system session, every tenant, before the data-permission guard),
+the bulk import paths for non-system sessions, and the caller path of `ImportRtModelCommand`. `RtSecurityContext.PrincipalKind`
+(default `Unknown`, refused by restricted types) and `RtSecurityContext.WriteChannel` (set only by service code,
+`WithWriteChannel`) carry the caller; `RtImportCallerContext` has the same two properties. Tests: see the doc.
+
 **`securitySensitive` (AB#6269) touch points**, same numbering: (1) attribute schema `CkAttribute.securitySensitive`;
 (2) compiled schema via the shared `$ref`; (3) `CkAttributeDto.SecuritySensitive` (`bool?`, omitted when null); (4) copied
 by reference; (5) `CkAttributeGraph.SecuritySensitive`, omitted from the cache JSON while false (`OmitCkV2Defaults`);
@@ -1803,6 +1824,7 @@ System context and bypasses everything. The rules live in exactly one place:
 | `DataSecurityFilterFactory` | `Runtime.Engine/Security` | read filter: classifies with the evaluator, the query renders the ownership predicate; denied reads behave as not found |
 | `DataPermissionRules` | `Runtime.Engine/Security` (internal) | shared by guard and evaluator: type classification, ownership predicate (`RtCreatedBy` or `CkType.ownerAttributePath`, fail closed), audit events |
 | `DataPermissionWriteGuard` | `Runtime.Engine/Security` (internal) | the write/delete funnel in `RuntimeRepositoryBase`: read visibility first (AB#7126), then batch write/delete checks per change set, atomic rejection, blueprint lock |
+| `TypeWriteAccessGuard` | `Runtime.Engine/Security` (internal) | AB#8574: model-declared type write restriction (`writeAccess`: principal kinds and in-process channels), checked for every non-system session before the policy guard, on tenants with and without policies; message 144 (`docs/ck-type-write-access.md`) |
 | `IRtDataPermissionEvaluator` | `Runtime.Contracts/DataPermissions` (impl. `RtDataPermissionEvaluator`, registered singleton) | **the public question** "may this caller read / write / delete this entity (or type)?" |
 
 `IRtDataPermissionEvaluator` is the only public way to ask (a gateway or any caller-bound surface must not copy

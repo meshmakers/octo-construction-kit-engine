@@ -89,6 +89,55 @@ public class PublicSurfaceRowTests
     }
 
     [Theory]
+    [InlineData(null, "Interactive", "restricted (writeAccess added)")]
+    [InlineData("Interactive", null, "widened (writeAccess removed)")]
+    [InlineData("Interactive,Client", "Interactive", "write access restricted —")]
+    [InlineData("Interactive", "Interactive,channel:System.Ai/Tools", "write access widened —")]
+    [InlineData("Interactive", "Client", "write access changed")]
+    public void T8_WriteAccessChanged_IsMinor_Behavioural_RequiresAcknowledge(string? before, string? after,
+        string expectedReason)
+    {
+        var baseline = Model();
+        Machine(baseline).WriteAccess = Block(before);
+        var current = Model();
+        Machine(current).WriteAccess = Block(after);
+
+        var change = Assert.Single(Classify(baseline, current));
+        Assert.Equal(CkSemVerLevel.Minor, change.Level);
+        Assert.True(change.IsBehavioural);
+        Assert.True(change.RequiresAcknowledge);
+        Assert.Contains(expectedReason, change.Reason);
+        Assert.Contains("row T8", change.Reason);
+    }
+
+    [Fact]
+    public void T8_WriteAccessReordered_IsNoChange()
+    {
+        var baseline = Model();
+        Machine(baseline).WriteAccess = new CkTypeWriteAccessDto { Principals = ["Client", "Interactive"] };
+        var current = Model();
+        Machine(current).WriteAccess = new CkTypeWriteAccessDto { Principals = ["Interactive", "Client"] };
+
+        Assert.Empty(Classify(baseline, current));
+    }
+
+    private static CkTypeWriteAccessDto? Block(string? entries)
+    {
+        if (entries == null)
+        {
+            return null;
+        }
+
+        var parts = entries.Split(',');
+        var channels = parts.Where(p => p.StartsWith("channel:")).Select(p => p["channel:".Length..]).ToList();
+        var principals = parts.Where(p => !p.StartsWith("channel:")).ToList();
+        return new CkTypeWriteAccessDto
+        {
+            Principals = principals.Count > 0 ? principals : null, Channels = channels.Count > 0 ? channels : null
+        };
+    }
+
+    [Theory]
     [InlineData(null, CkAttributeAccessDto.ReadOnly, CkSemVerLevel.Major)]
     [InlineData(CkAttributeAccessDto.ReadOnly, CkAttributeAccessDto.MethodOnly, CkSemVerLevel.Major)]
     [InlineData(CkAttributeAccessDto.MethodOnly, CkAttributeAccessDto.Hidden, CkSemVerLevel.Major)]

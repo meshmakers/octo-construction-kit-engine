@@ -63,6 +63,17 @@ public static class CkEngineVersion
     /// </summary>
     public const string ExecutionModeMinEngineVersion = "3.5.67";
 
+    /// <summary>
+    ///     The lowest engine version that reads and enforces a type's <c>writeAccess</c> block (AB#8574): the first libs
+    ///     release that contains the field. An older engine would drop the unknown key silently and let every caller
+    ///     write entities of a type that restricts its writers (fail-open), so a model that declares the block on any type
+    ///     carries this value as <c>minEngineVersion</c> and older engines refuse it with message 126. Models that do not
+    ///     use the key keep their other minimum and compile byte-identically. <b>Must equal the number of the release
+    ///     that first ships the field</b> (the next patch after the last <c>r3.5.x</c> tag at merge time); raise it before
+    ///     merging when a release was cut in between.
+    /// </summary>
+    public const string WriteAccessMinEngineVersion = "3.5.71";
+
     private static readonly Version? RunningVersion = ReadRunningVersion(typeof(CkEngineVersion).Assembly);
 
     // Test seam (AB#6274): never set outside tests, so production always reads RunningVersion.
@@ -93,7 +104,8 @@ public static class CkEngineVersion
     ///     The <c>minEngineVersion</c> the compiler writes for a model: <see cref="CkV2MinEngineVersion" /> for a
     ///     <c>ckLanguage: 2</c> or range-retaining model, <see cref="ReplacesGenericCreateMinEngineVersion" /> when a
     ///     method sets <c>replacesGenericCreate</c>, the higher feature minimum when a method marks its result
-    ///     <c>sensitive</c>, declares <c>authorization.dataAccess</c> or sets <c>execution.mode</c>, otherwise
+    ///     <c>sensitive</c>, declares <c>authorization.dataAccess</c> or sets <c>execution.mode</c>, or a type declares
+    ///     <c>writeAccess</c>, otherwise
     ///     <c>null</c> (v1 output unchanged).
     /// </summary>
     public static string? GetRequiredMinEngineVersion(CkCompiledModelRoot model)
@@ -118,7 +130,11 @@ public static class CkEngineVersion
         var usesExecutionMode =
             model.Types?.Any(t => t.Methods?.Any(m => m.Execution?.Mode != null) == true) == true ||
             model.Interfaces?.Any(i => i.Methods?.Any(m => m.Execution?.Mode != null) == true) == true;
-        return usesExecutionMode ? Max([required, ExecutionModeMinEngineVersion]) : required;
+        required = usesExecutionMode ? Max([required, ExecutionModeMinEngineVersion]) : required;
+        // AB#8574: a model that restricts the writers of any type needs an engine that enforces it; an older engine would
+        // ignore the restriction.
+        var usesWriteAccess = model.Types?.Any(t => t.WriteAccess != null) == true;
+        return usesWriteAccess ? Max([required, WriteAccessMinEngineVersion]) : required;
     }
 
     /// <summary>

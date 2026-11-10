@@ -41,6 +41,7 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         DisplayDescriptionRuleDeclared = !string.IsNullOrWhiteSpace(ckTypeDto.DisplayDescriptionRule);
         OwnerAttributePath = ckTypeDto.OwnerAttributePath;
         OwnerAttributePathDeclared = !string.IsNullOrWhiteSpace(ckTypeDto.OwnerAttributePath);
+        WriteAccess = ckTypeDto.WriteAccess;
         _baseTypes = [];
         _derivedTypes = [];
         BaseTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_baseTypes);
@@ -80,6 +81,7 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     /// <param name="allImplementedInterfaces">CK v2: interfaces including inherited ones</param>
     /// <param name="definedMethods">CK v2: methods declared on this type</param>
     /// <param name="allMethods">CK v2: methods including inherited ones, keyed by method id</param>
+    /// <param name="writeAccess">AB#8574: the write restriction declared on this type (not inherited)</param>
     [JsonConstructor]
     public CkTypeGraph(CkId<CkTypeId> ckTypeId, bool isAbstract, bool isFinal, bool isCollectionRoot,
         IReadOnlyCollection<CkGraphTypeInheritance> baseTypes,
@@ -94,9 +96,11 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         IReadOnlyCollection<CkId<CkInterfaceId>>? declaredImplements = null,
         IReadOnlyCollection<CkId<CkInterfaceId>>? allImplementedInterfaces = null,
         IReadOnlyCollection<CkMethodDto>? definedMethods = null,
-        IReadOnlyDictionary<string, CkMethodGraph>? allMethods = null)
+        IReadOnlyDictionary<string, CkMethodGraph>? allMethods = null,
+        CkTypeWriteAccessDto? writeAccess = null)
         : base(definedAttributes, allAttributes)
     {
+        WriteAccess = writeAccess;
         // CK v2: trailing + defaulted, STJ binds by name; a cache written before CK v2 has none of these keys.
         DeclaredImplements = declaredImplements?.ToList() ?? [];
         AllImplementedInterfaces = allImplementedInterfaces?.ToList() ?? [];
@@ -229,6 +233,14 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     /// </summary>
     [JsonIgnore]
     public bool OwnerAttributePathDeclared { get; }
+
+    /// <summary>
+    ///     AB#8574: the write restriction declared on this type itself (<c>writeAccess</c>); <c>null</c> when the type
+    ///     declares none. Not merged with the base types: a write is checked against every block along the
+    ///     inheritance chain (this type and each of <see cref="BaseTypes" />), all of which must allow it.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CkTypeWriteAccessDto? WriteAccess { get; }
 
     /// <summary>
     ///     CK v2 (AB#5667): the interfaces declared on this type (<c>implements</c>), without inherited ones.

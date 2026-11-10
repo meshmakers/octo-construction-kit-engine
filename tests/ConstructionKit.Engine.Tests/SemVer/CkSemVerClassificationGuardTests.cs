@@ -56,6 +56,7 @@ public class CkSemVerClassificationGuardTests
         typeof(CkMethodErrorDto),
         typeof(CkMethodAuthorizationDto),
         typeof(CkMethodExecutionDto),
+        typeof(CkTypeWriteAccessDto),
         // CK v2 range retention (AB#6271)
         typeof(CkModelDependencyDto)
     ];
@@ -84,7 +85,7 @@ public class CkSemVerClassificationGuardTests
     /// </summary>
     internal static readonly IReadOnlyList<string> ExpectedRuleRows =
     [
-        .. Rows("N", 5), .. Rows("I", 12), .. Rows("M", 19), .. Rows("T", 7), .. Rows("E", 2), .. Rows("R", 2),
+        .. Rows("N", 5), .. Rows("I", 12), .. Rows("M", 19), .. Rows("T", 8), .. Rows("E", 2), .. Rows("R", 2),
         .. Rows("A", 3), .. Rows("B", 4), .. Rows("D", 8)
     ];
 
@@ -511,6 +512,11 @@ public class CkSemVerClassificationGuardTests
             }
         ];
         serialized.Methods = [CkV2TestModels.CreateFullMethod()];
+        // AB#8574: a declared block, so the probes can change and remove it.
+        Machine(model).WriteAccess = new CkTypeWriteAccessDto
+        {
+            Principals = [CkWritePrincipals.Interactive], Channels = ["Probe/Channel"]
+        };
         model.DependencyRanges = [new CkModelDependencyDto { Range = "Base-[1.2,2.0)", Floor = "1.2.3" }];
         return model;
     }
@@ -571,6 +577,9 @@ public class CkSemVerClassificationGuardTests
             ["CkTypeDto.Methods"] = m => Machine(m).Methods!.Add(new CkMethodDto { MethodId = "Extra-1" }),
             ["CkTypeDto.Visibility"] = m => Machine(m).Visibility = CkVisibilityDto.Internal,
             ["CkTypeDto.Derivable"] = m => Machine(m).Derivable = CkDerivableDto.Model,
+            ["CkTypeDto.WriteAccess"] = m => Machine(m).WriteAccess = null,
+            ["CkTypeWriteAccessDto.Principals"] = m => Machine(m).WriteAccess!.Principals = [CkWritePrincipals.Client],
+            ["CkTypeWriteAccessDto.Channels"] = m => Machine(m).WriteAccess!.Channels = ["Other/Channel"],
             ["CkTypeWithAttributesDto.Attributes"] = m => Machine(m).Attributes!.Add(new CkTypeAttributeDto
             {
                 CkAttributeId = $"{M}/SerialNumber", AttributeName = "Extra", IsOptional = true

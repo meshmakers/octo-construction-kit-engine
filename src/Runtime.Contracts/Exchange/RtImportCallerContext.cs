@@ -25,6 +25,19 @@ public sealed record RtImportCallerContext
     public bool EnforceBlueprintLock { get; init; }
 
     /// <summary>
+    ///     AB#8574: the kind of principal that initiated the import. Entities (and association edges) of a type with a
+    ///     <c>writeAccess</c> block are refused unless this kind or <see cref="WriteChannel" /> is admitted by the block;
+    ///     <see cref="RtPrincipalKind.Unknown" /> is refused (fail closed). Types without the block ignore it.
+    /// </summary>
+    public RtPrincipalKind PrincipalKind { get; init; } = RtPrincipalKind.Unknown;
+
+    /// <summary>
+    ///     AB#8574: the trusted in-process write channel of the import, set only by service code (never from caller
+    ///     input), see <see cref="RtSecurityContext.WriteChannel" />.
+    /// </summary>
+    public string? WriteChannel { get; init; }
+
+    /// <summary>
     ///     Creates the context of an import initiated by a user or client through an API route. A missing subject
     ///     never turns the import into a system import: the protection is applied regardless.
     /// </summary>
@@ -32,6 +45,17 @@ public sealed record RtImportCallerContext
     public static RtImportCallerContext UserInitiated(string? subjectId)
     {
         return new RtImportCallerContext { SubjectId = subjectId, EnforceBlueprintLock = true };
+    }
+
+    /// <summary>
+    ///     Creates the context of an import initiated by a user or client through an API route whose principal kind is
+    ///     known (AB#8574).
+    /// </summary>
+    /// <param name="subjectId">Subject id of the caller, if known</param>
+    /// <param name="principalKind">Whether the caller is a signed-in user or a client-credentials service</param>
+    public static RtImportCallerContext UserInitiated(string? subjectId, RtPrincipalKind principalKind)
+    {
+        return UserInitiated(subjectId) with { PrincipalKind = principalKind };
     }
 }
 

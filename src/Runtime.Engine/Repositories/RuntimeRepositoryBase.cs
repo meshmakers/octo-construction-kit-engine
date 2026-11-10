@@ -548,7 +548,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <summary>
-    ///     The single write funnel with data-permission enforcement (AB#4973): system sessions and
+    ///     The single write funnel with data-permission enforcement (AB#4973) and the type write restriction
+    ///     (<c>writeAccess</c>, AB#8574): system sessions and
     ///     tenants without policies pass through untouched (dormant guarantee); denied changes reject
     ///     the whole set atomically with a <see cref="RuntimeRepositoryException" />.
     /// </summary>
@@ -558,6 +559,16 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         BulkRtMutationOptions options, OperationResult? operationResult = null, bool checkArchiveDefinitions = false)
     {
         var securityContext = session.GetSecurityContext();
+        if (!securityContext.IsSystem)
+        {
+            // AB#8574: the model-declared type write restriction holds on every tenant, with or without data policies.
+            // It judges the type only (never a stored entity), so it reveals nothing about existence (AB#7126).
+            var writeAccessResult = new OperationResult();
+            TypeWriteAccessGuard.Check(cacheService, TenantId, securityContext, entityUpdateInfoList,
+                associationUpdateInfoList, writeAccessResult);
+            RuntimeRepositoryException.ThrowIfOperationResultError(writeAccessResult);
+        }
+
         if (!securityContext.IsSystem && _dataPermissionResolver != null)
         {
             var policyTable = await _dataPermissionResolver.GetPolicyTableAsync(this).ConfigureAwait(false);
@@ -1197,7 +1208,9 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         IEnumerable<RtEntity> rtEntityList, BulkOperationOptions options)
     {
         var results = new List<IBulkImportResult>();
-        foreach (var groupedEntities in rtEntityList.GroupBy(x => x.CkTypeId))
+        var rtEntities = rtEntityList as IReadOnlyCollection<RtEntity> ?? rtEntityList.ToList();
+        await ThrowIfTypeWriteRestrictedAsync(session, TypeWriteAccessGuard.TargetsOf(rtEntities)).ConfigureAwait(false);
+        foreach (var groupedEntities in rtEntities.GroupBy(x => x.CkTypeId))
         {
             if (groupedEntities.Key == null)
             {
@@ -1240,8 +1253,34 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public async Task<IBulkImportResult> BulkRtAssociationsAsync(IOctoSession session,
         IEnumerable<RtAssociation> rtAssociations, BulkOperationOptions options)
     {
-        return await RepositoryDataSource.RtAssociations.BulkImportAsync(session, rtAssociations, options)
+        var associations = rtAssociations as IReadOnlyCollection<RtAssociation> ?? rtAssociations.ToList();
+        await ThrowIfTypeWriteRestrictedAsync(session, TypeWriteAccessGuard.TargetsOf(associations)).ConfigureAwait(false);
+        return await RepositoryDataSource.RtAssociations.BulkImportAsync(session, associations, options)
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     AB#8574: the bulk import paths bypass the write funnel; a caller-scoped (non-system) session is held to the
+    ///     type write restriction here as well. The RT import runs them on a system session and checks the initiating
+    ///     caller itself (<c>ImportRtModelCommand</c>).
+    /// </summary>
+    private async Task ThrowIfTypeWriteRestrictedAsync(IOctoSession session, IEnumerable<TypeWriteTarget> targets)
+    {
+        var securityContext = session.GetSecurityContext();
+        if (securityContext.IsSystem)
+        {
+            return;
+        }
+
+        var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
+        var result = new OperationResult();
+        foreach (var refusal in TypeWriteAccessGuard.Find(cacheService, TenantId, securityContext.PrincipalKind,
+                     securityContext.WriteChannel, targets))
+        {
+            result.AddMessage(refusal);
+        }
+
+        RuntimeRepositoryException.ThrowIfOperationResultError(result);
     }
 
     /// <inheritdoc />

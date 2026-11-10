@@ -347,7 +347,9 @@ public class CompilerService : ICompilerService
                                 Methods = ckTypeDto.Methods,
                                 // F1.1-S4
                                 Visibility = ckTypeDto.Visibility,
-                                Derivable = ckTypeDto.Derivable
+                                Derivable = ckTypeDto.Derivable,
+                                // AB#8574
+                                WriteAccess = ckTypeDto.WriteAccess
                             };
 
                             if (types.ContainsKey(ckCompiledTypeDto.TypeId))

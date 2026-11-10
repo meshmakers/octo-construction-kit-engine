@@ -287,6 +287,7 @@ internal class ContentGenerator(
 
             await AddTitle(outputFile, null, type.CkTypeId.ElementId.SemanticVersionedFullName).ConfigureAwait(false);
             await WriteCkV2Modifiers(outputFile, type.Visibility, type.Derivable).ConfigureAwait(false);
+            await WriteWriteAccess(outputFile, type.WriteAccess).ConfigureAwait(false);
             await _inheritanceHelpers.AddHierarchy(outputFile, type, directoryPath).ConfigureAwait(false);
             if (type.Description != null)
             {
@@ -324,6 +325,33 @@ internal class ContentGenerator(
             await outputFile.WriteLineAsync($"Derivable: `{derivable}`").ConfigureAwait(false);
             await outputFile.WriteLineAsync().ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    ///     AB#8574: the <c>writeAccess</c> block declared on the type (not the inherited ones), only when present, so the
+    ///     documentation of a type without it is unchanged.
+    /// </summary>
+    private static async Task WriteWriteAccess(StreamWriter outputFile, CkTypeWriteAccessDto? writeAccess)
+    {
+        if (writeAccess == null)
+        {
+            return;
+        }
+
+        var parts = new List<string>();
+        if (writeAccess.Principals is { Count: > 0 })
+        {
+            parts.Add("principals " + string.Join(", ", writeAccess.Principals.Select(p => $"`{p}`")));
+        }
+
+        if (writeAccess.Channels is { Count: > 0 })
+        {
+            parts.Add("channels " + string.Join(", ", writeAccess.Channels.Select(c => $"`{c}`")));
+        }
+
+        await outputFile.WriteLineAsync($"Write access: {string.Join("; ", parts)} (derived types inherit it)")
+            .ConfigureAwait(false);
+        await outputFile.WriteLineAsync().ConfigureAwait(false);
     }
 
     /// <summary>

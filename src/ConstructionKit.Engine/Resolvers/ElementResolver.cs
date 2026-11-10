@@ -30,6 +30,9 @@ internal class ElementResolver : IElementResolver
         // F1.4-S2 (review L15): generated method names must be unique per model.
         CheckGeneratedMethodNames(modelRootBase, originFileResolver, operationResult);
 
+        // AB#8574: type-level write restriction (143).
+        CheckWriteAccess(modelRootBase, originFileResolver, operationResult);
+
         if (modelRootBase.Interfaces != null)
         {
             ResolveInterfaces(modelRootBase, ckModelGraph, variableResolver, originFileResolver, operationResult);
@@ -403,6 +406,65 @@ internal class ElementResolver : IElementResolver
     }
 
     /// <summary>
+    ///     AB#8574: message 143 for an invalid <c>writeAccess</c> block of a type: a block that admits nothing (neither
+    ///     principals nor channels), an empty list, an unknown principal kind (only <c>Interactive</c> and <c>Client</c>,
+    ///     case-sensitive), a channel that is not <c>&lt;namespace&gt;/&lt;name&gt;</c>, or a duplicate entry. Unknown keys
+    ///     are refused by the schema (message 27). The CK language gate (message 90) is <see cref="CheckCkLanguage" />.
+    /// </summary>
+    private static void CheckWriteAccess(CkModelRootBase model, IOriginFileResolver originFileResolver,
+        OperationResult operationResult)
+    {
+        foreach (var ckType in model.Types ?? [])
+        {
+            if (ckType.WriteAccess is not { } writeAccess)
+            {
+                continue;
+            }
+
+            var key = new CkId<CkTypeId>(model.ModelId, ckType.TypeId);
+
+            void Report(string reason) =>
+                operationResult.AddMessage(MessageCodes.CkTypeWriteAccessInvalid(originFileResolver.Resolve(key), key,
+                    reason));
+
+            if (writeAccess.Principals == null && writeAccess.Channels == null)
+            {
+                Report("the block declares neither 'principals' nor 'channels', so it would admit no writer; declare at " +
+                       "least one principal kind or channel, or remove the block");
+                continue;
+            }
+
+            if (writeAccess.Principals is { Count: 0 })
+            {
+                Report("'principals' is an empty list; list at least one of 'Interactive', 'Client' or omit the key");
+            }
+
+            if (writeAccess.Channels is { Count: 0 })
+            {
+                Report("'channels' is an empty list; list at least one channel '<namespace>/<name>' or omit the key");
+            }
+
+            foreach (var principal in (writeAccess.Principals ?? []).Where(p => !CkWritePrincipals.IsKnown(p)))
+            {
+                Report($"unknown principal kind '{principal}'; allowed are '{CkWritePrincipals.Interactive}' and " +
+                       $"'{CkWritePrincipals.Client}' (case-sensitive)");
+            }
+
+            foreach (var channel in (writeAccess.Channels ?? []).Where(c => !CkWritePrincipals.IsValidChannel(c)))
+            {
+                Report($"invalid channel '{channel}'; a channel has the form '<namespace>/<name>', e.g. " +
+                       "'System.Ai/KnowledgeTools' (letters, digits and underscores, each part starting with a letter)");
+            }
+
+            foreach (var duplicate in (writeAccess.Principals ?? []).Concat(writeAccess.Channels ?? [])
+                     .GroupBy(v => v, StringComparer.Ordinal).Where(g => g.Count() > 1))
+            {
+                Report($"'{duplicate.Key}' is listed more than once");
+            }
+        }
+    }
+
+    /// <summary>
     ///     CK v2 (AB#5584): message 91 for a CK language version this engine does not support, message 90 for
     ///     every CK v2 feature used by a model that does not declare <c>ckLanguage: 2</c>.
     /// </summary>
@@ -545,6 +607,12 @@ internal class ElementResolver : IElementResolver
             {
                 operationResult.AddMessage(MessageCodes.CkMethodModeInvalid(originFileResolver.Resolve(key),
                     method.MethodId, key, $"'execution.mode' requires 'ckLanguage: 2' (the model declares ckLanguage {ckLanguage})"));
+            }
+
+            // AB#8574: the write restriction is a CK v2 key of its own.
+            if (ckType.WriteAccess != null)
+            {
+                Report(key, "writeAccess", key);
             }
 
             CheckAccess(key, key, ckType.Attributes);

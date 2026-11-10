@@ -400,6 +400,12 @@ internal static class MessageCodes
     internal static OperationMessage CkMethodModeInvalid(string? location, object methodId, object ckTypeId, object reason) =>
         GetMessage("CkMethodModeInvalid", location, methodId, ckTypeId, reason);
 
+    internal static OperationMessage CkTypeWriteAccessInvalid(string? location, object ckTypeId, object reason) =>
+        GetMessage("CkTypeWriteAccessInvalid", location, ckTypeId, reason);
+
+    internal static OperationMessage RtTypeWriteAccessDenied(string? location, object operation, object rtId, object ckTypeId, object restrictingCkTypeId, object principalKind, object channel, object principals, object channels) =>
+        GetMessage("RtTypeWriteAccessDenied", location, operation, rtId, ckTypeId, restrictingCkTypeId, principalKind, channel, principals, channels);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1151,6 +1157,18 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  142, "Method '{methodId}' of '{ckTypeId}' declares an invalid 'execution.mode': {reason}",
                  new [] {"methodId", "ckTypeId", "reason"})
+        },
+        {
+            "CkTypeWriteAccessInvalid",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 143, "Type '{ckTypeId}' declares an invalid 'writeAccess': {reason}",
+                 new [] {"ckTypeId", "reason"})
+        },
+        {
+            "RtTypeWriteAccessDenied",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 144, "Write refused: the {operation} of entity '{rtId}' of type '{ckTypeId}' is restricted by the 'writeAccess' of type '{restrictingCkTypeId}'. The caller is principal '{principalKind}' on channel '{channel}'; only the principals [{principals}] or the channels [{channels}] may write it",
+                 new [] {"operation", "rtId", "ckTypeId", "restrictingCkTypeId", "principalKind", "channel", "principals", "channels"})
         },
     };
 }

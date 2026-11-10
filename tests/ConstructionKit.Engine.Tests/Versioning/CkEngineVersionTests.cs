@@ -361,6 +361,47 @@ public class CkEngineVersionTests(ITestOutputHelper output) : CkV2ResolverTestBa
         Assert.True(CkEngineVersion.CheckModel(model, "loc", new OperationResult(), previous));
     }
 
+    // ── writeAccess (AB#8574) ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void RequiredMinEngineVersion_RaisedOnlyWhenATypeDeclaresWriteAccess()
+    {
+        var plain = Model();
+        Assert.Equal(CkEngineVersion.CkV2MinEngineVersion, CkEngineVersion.GetRequiredMinEngineVersion(plain));
+
+        var restricted = Model();
+        Type(restricted, "Principal").WriteAccess = new CkTypeWriteAccessDto { Principals = [CkWritePrincipals.Interactive] };
+        Assert.Equal(CkEngineVersion.WriteAccessMinEngineVersion, CkEngineVersion.GetRequiredMinEngineVersion(restricted));
+        Assert.True(Version.Parse(CkEngineVersion.WriteAccessMinEngineVersion) >
+                    Version.Parse(CkEngineVersion.ExecutionModeMinEngineVersion));
+
+        // The higher of two markers wins.
+        var both = Model();
+        Type(both, "Principal").WriteAccess = new CkTypeWriteAccessDto { Channels = ["System.Ai/Tools"] };
+        Type(both, "Principal").Methods!.Single(m => m.MethodId == "ChangePassword-1").Execution =
+            new CkMethodExecutionDto { Mode = CkMethodModes.Async };
+        Assert.Equal(CkEngineVersion.WriteAccessMinEngineVersion, CkEngineVersion.GetRequiredMinEngineVersion(both));
+    }
+
+    [Fact]
+    public void Code126_ModelWithWriteAccess_IsRefusedByAnEngineThatPredatesTheField()
+    {
+        // The last version without the field would drop the key and let every caller write the type.
+        var model = Model();
+        Type(model, "Principal").WriteAccess = new CkTypeWriteAccessDto { Principals = [CkWritePrincipals.Interactive] };
+        model.MinEngineVersion = CkEngineVersion.GetRequiredMinEngineVersion(model);
+        var operationResult = new OperationResult();
+        var first = Version.Parse(CkEngineVersion.WriteAccessMinEngineVersion);
+        var predating = new Version(first.Major, first.Minor, first.Build - 1);
+
+        Assert.False(CkEngineVersion.CheckModel(model, "loc", operationResult, predating));
+        var message = Assert.Single(operationResult.Messages);
+        Assert.Equal(126, message.MessageNumber);
+        Assert.Contains(CkEngineVersion.WriteAccessMinEngineVersion, message.MessageText);
+
+        Assert.True(CkEngineVersion.CheckModel(model, "loc", new OperationResult(), first));
+    }
+
     // ── sensitive method result (AB#7006) ───────────────────────────────────────────
 
     [Fact]

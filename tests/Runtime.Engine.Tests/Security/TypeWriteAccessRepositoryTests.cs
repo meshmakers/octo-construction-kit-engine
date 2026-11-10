@@ -4,6 +4,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
+using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Engine.Repositories;
 using Meshmakers.Octo.Runtime.Engine.Tests.Secrets;
@@ -141,6 +142,37 @@ public class TypeWriteAccessRepositoryTests
         Assert.Contains(ex.OperationResult!.Messages, m => m.MessageNumber == 144 &&
                                                           m.Parameters["operation"] == "association change");
         AssertPersisted(false);
+    }
+
+    [Fact]
+    public async Task FilterWrites_CallerScopedClientSession_AreRefusedBeforeThePersistenceLayer()
+    {
+        var filter = FieldFilterCriteria.Create();
+        var entity = new RtEntity(Rt(KnowledgeType), OctoObjectId.GenerateNewId());
+        var session = Session(RtPrincipalKind.Client);
+
+        foreach (var write in new Func<RuntimeRepositoryBase, Task>[]
+                 {
+                     r => r.UpdateOneRtEntityAsync(session, filter, entity),
+                     r => r.UpdateManyRtEntityAsync(session, filter, entity),
+                     r => r.ReplaceOneRtEntityAsync(session, filter, entity),
+                     r => r.DeleteOneRtEntityAsync(session, Rt(KnowledgeType), filter, new DeleteOptions()),
+                     r => r.DeleteManyRtEntitiesAsync(session, Rt(KnowledgeType), filter, new DeleteOptions()),
+                     // A filter does not know the concrete types it matches: Interactive passes Knowledge's own block
+                     // but not the block of the derived LockedKnowledge, so the filter write is refused as well.
+                     r => r.DeleteManyRtEntitiesAsync(Session(RtPrincipalKind.Interactive), Rt(KnowledgeType), filter,
+                         new DeleteOptions())
+                 })
+        {
+            var ex = await Assert.ThrowsAsync<RuntimeRepositoryException>(() => write(Repository()));
+            Assert.Contains(ex.OperationResult.Messages, m => m.MessageNumber == 144);
+        }
+
+        // The stub's persistence layer is reached (NotSupportedException) for a system session and an unrestricted type.
+        await Assert.ThrowsAsync<NotSupportedException>(() =>
+            Repository().DeleteManyRtEntitiesAsync(A.Fake<IOctoSession>(), Rt(KnowledgeType), filter, new DeleteOptions()));
+        await Assert.ThrowsAsync<NotSupportedException>(() =>
+            Repository().UpdateManyRtEntityAsync(session, filter, new RtEntity(Rt(NoteType), OctoObjectId.GenerateNewId())));
     }
 
     [Fact]

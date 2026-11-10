@@ -46,9 +46,9 @@ Rules:
 `RtSecurityContext.PrincipalKind` (`RtPrincipalKind`: `Unknown` | `Interactive` | `Client`) and
 `RtImportCallerContext.PrincipalKind` carry what the service that opened the session knows about the caller. The
 default is `Unknown`. **For a restricted type `Unknown` is refused (fail closed)**; it is admitted only through a
-listed channel. Deriving the kind from the token (grant type / client-credentials marker) is done by the services
-that open sessions (asset repository, identity), not by the engine: until a service sets it, its callers are
-`Unknown` and cannot write restricted types except through a channel.
+listed channel. Services that open caller-scoped sessions set the principal kind from the caller's token
+(`RtSecurityContext.ForUser(subject, roles, principalKind)`, `RtImportCallerContext.UserInitiated(subject,
+principalKind)`); the engine never derives it.
 
 ## Compiler validation (message 143)
 
@@ -75,8 +75,13 @@ Parameters: `operation` (`create`, `update`, `replace`, `delete`, `create or rep
 - Repository write funnel (`ApplyChangesAsync` and the single-entity writes built on it): checked for every
   non-system session, on every tenant (with or without data policies), **before** the data-permission guard; the
   whole change set is rejected atomically with a `RuntimeRepositoryException` whose `OperationResult` carries the
-  144 messages. The check judges the type only, never a stored entity, so it reveals nothing about existence
-  (AB#7126).
+  144 messages. The check judges types only, never a stored entity, so it reveals nothing about existence
+  (AB#7126). A create names the exact type; for an update, replace, delete and both ends of an association the named
+  type may be a base of the stored entity's type, so the blocks of every derived type are checked as well (write
+  through the concrete type when a derived type is more restricted).
+- Filter-based writes (`UpdateOneRtEntityAsync` / `UpdateManyRtEntityAsync` / `ReplaceOneRtEntityAsync` with a filter,
+  `DeleteOneRtEntityAsync` / `DeleteManyRtEntitiesAsync`): checked in `RuntimeRepositoryBase` for non-system sessions
+  before the persistence layer runs, against the given type, its base types and every derived type.
 - Bulk import paths (`BulkInsertRtEntitiesAsync`, `BulkRtAssociationsAsync`): checked for non-system sessions.
 - RT import, user path (`ImportAsCallerAsync`): preflight over the whole file (YAML list or the first pass over the
   JSON bulks) before the first write; one `ExchangeException` with message number 144 lists every offender.

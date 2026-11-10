@@ -37,7 +37,8 @@ internal static class TypeWriteAccessTestModel
             new CkTypeAttributeDto { CkAttributeId = attrId, AttributeName = "Name", IsOptional = true }, definition);
     }
 
-    private static CkTypeGraph Graph(string rtId, CkTypeWriteAccessDto? writeAccess, string? baseRtId = null)
+    private static CkTypeGraph Graph(string rtId, CkTypeWriteAccessDto? writeAccess, string? baseRtId = null,
+        params string[] derivedRtIds)
     {
         var name = NameAttr();
         var baseTypes = baseRtId == null
@@ -45,7 +46,9 @@ internal static class TypeWriteAccessTestModel
             : [new CkGraphTypeInheritance(Ck(rtId), Ck(baseRtId), 0)];
         return new CkTypeGraph(Ck(rtId), isAbstract: false, isFinal: false, isCollectionRoot: false,
             baseTypes: baseTypes, derivedFromCkTypeId: baseRtId == null ? null : Ck(baseRtId),
-            definingCollectionRootCkTypeId: null, derivedTypes: [], definedAttributes: [],
+            definingCollectionRootCkTypeId: null,
+            derivedTypes: derivedRtIds.Select(d => new CkGraphTypeInheritance(Ck(d), Ck(rtId), 0)).ToList(),
+            definedAttributes: [],
             allAttributes: new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> { [name.CkAttributeId] = name },
             indexes: [], associations: new CkGraphDirectedAssociations([]), description: "test",
             enableChangeStreamPreAndPostImages: false, writeAccess: writeAccess);
@@ -61,7 +64,7 @@ internal static class TypeWriteAccessTestModel
         {
             Graph(KnowledgeType, restricted
                 ? new CkTypeWriteAccessDto { Principals = [CkWritePrincipals.Interactive], Channels = [Channel] }
-                : null),
+                : null, null, SpecialKnowledgeType, LockedKnowledgeType),
             Graph(SpecialKnowledgeType, null, KnowledgeType),
             Graph(LockedKnowledgeType, restricted ? new CkTypeWriteAccessDto { Channels = [Channel] } : null,
                 KnowledgeType),

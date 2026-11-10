@@ -94,6 +94,7 @@ public class CkTypeWriteAccessResolverTests(ITestOutputHelper output) : CkV2Reso
     [InlineData("System Ai/Tools")]
     [InlineData("1System/Tools")]
     [InlineData("claude-agent-gerald-wks-1")]
+    [InlineData("System.Ai/KnowledgeTools\n")]
     public void Code143_InvalidChannel_IsRefused(string channel)
     {
         var model = Model();

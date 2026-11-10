@@ -359,7 +359,10 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public async Task ReplaceOneRtEntityAsync(IOctoSession session, FieldFilterCriteria fieldFilterCriteria,
         RtEntity rtEntity)
     {
-        await ReplaceOneRtEntityAsync(session, rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(),
+        var ckTypeId = rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet();
+        await ThrowIfFilterWriteRestrictedAsync(session, ckTypeId, TypeWriteAccessGuard.OperationReplace)
+            .ConfigureAwait(false);
+        await ReplaceOneRtEntityAsync(session, ckTypeId,
                 fieldFilterCriteria, rtEntity)
             .ConfigureAwait(false);
     }
@@ -371,6 +374,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
+        await ThrowIfFilterWriteRestrictedAsync(session, ckTypeId, TypeWriteAccessGuard.OperationReplace)
+            .ConfigureAwait(false);
         await ReplaceOneRtEntityAsync(session, ckTypeId, fieldFilterCriteria, rtEntity).ConfigureAwait(false);
     }
 
@@ -393,7 +398,10 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public async Task UpdateOneRtEntityAsync(IOctoSession session, FieldFilterCriteria fieldFilterCriteria,
         RtEntity rtEntity)
     {
-        await UpdateOneRtEntityAsync(session, rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(),
+        var ckTypeId = rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet();
+        await ThrowIfFilterWriteRestrictedAsync(session, ckTypeId, TypeWriteAccessGuard.OperationUpdate)
+            .ConfigureAwait(false);
+        await UpdateOneRtEntityAsync(session, ckTypeId,
                 fieldFilterCriteria, rtEntity)
             .ConfigureAwait(false);
     }
@@ -405,6 +413,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
+        await ThrowIfFilterWriteRestrictedAsync(session, ckTypeId, TypeWriteAccessGuard.OperationUpdate)
+            .ConfigureAwait(false);
         await UpdateOneRtEntityAsync(session, ckTypeId, fieldFilterCriteria, rtEntity).ConfigureAwait(false);
     }
 
@@ -412,7 +422,10 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public async Task UpdateManyRtEntityAsync(IOctoSession session, FieldFilterCriteria fieldFilterCriteria,
         RtEntity rtEntity)
     {
-        await UpdateManyRtEntityAsync(session, rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(),
+        var ckTypeId = rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet();
+        await ThrowIfFilterWriteRestrictedAsync(session, ckTypeId, TypeWriteAccessGuard.OperationUpdate)
+            .ConfigureAwait(false);
+        await UpdateManyRtEntityAsync(session, ckTypeId,
                 fieldFilterCriteria, rtEntity)
             .ConfigureAwait(false);
     }
@@ -424,6 +437,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
+        await ThrowIfFilterWriteRestrictedAsync(session, ckTypeId, TypeWriteAccessGuard.OperationUpdate)
+            .ConfigureAwait(false);
         await UpdateManyRtEntityAsync(session, ckTypeId, fieldFilterCriteria, rtEntity).ConfigureAwait(false);
     }
 
@@ -518,7 +533,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         FieldFilterCriteria fieldFilterCriteria,
         DeleteOptions deleteOptions)
     {
-        return DeleteOneRtEntityAsync<RtEntity>(session, ckTypeId, fieldFilterCriteria, deleteOptions);
+        return GuardFilterWriteAsync(session, ckTypeId, TypeWriteAccessGuard.OperationDelete,
+            () => DeleteOneRtEntityAsync<RtEntity>(session, ckTypeId, fieldFilterCriteria, deleteOptions));
     }
 
     /// <inheritdoc />
@@ -527,7 +543,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
-        return DeleteOneRtEntityAsync<TEntity>(session, ckTypeId, fieldFilterCriteria, deleteOptions);
+        return GuardFilterWriteAsync(session, ckTypeId, TypeWriteAccessGuard.OperationDelete,
+            () => DeleteOneRtEntityAsync<TEntity>(session, ckTypeId, fieldFilterCriteria, deleteOptions));
     }
 
     /// <inheritdoc />
@@ -535,7 +552,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         FieldFilterCriteria fieldFilterCriteria,
         DeleteOptions deleteOptions)
     {
-        return DeleteManyRtEntitiesAsync<RtEntity>(session, ckTypeId, fieldFilterCriteria, deleteOptions);
+        return GuardFilterWriteAsync(session, ckTypeId, TypeWriteAccessGuard.OperationDelete,
+            () => DeleteManyRtEntitiesAsync<RtEntity>(session, ckTypeId, fieldFilterCriteria, deleteOptions));
     }
 
     /// <inheritdoc />
@@ -544,7 +562,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
-        return DeleteManyRtEntitiesAsync<TEntity>(session, ckTypeId, fieldFilterCriteria, deleteOptions);
+        return GuardFilterWriteAsync(session, ckTypeId, TypeWriteAccessGuard.OperationDelete,
+            () => DeleteManyRtEntitiesAsync<TEntity>(session, ckTypeId, fieldFilterCriteria, deleteOptions));
     }
 
     /// <summary>
@@ -1257,6 +1276,21 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         await ThrowIfTypeWriteRestrictedAsync(session, TypeWriteAccessGuard.TargetsOf(associations)).ConfigureAwait(false);
         return await RepositoryDataSource.RtAssociations.BulkImportAsync(session, associations, options)
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     AB#8574: the filter-based update, replace and delete paths write in the persistence layer without the write
+    ///     funnel and do not know the concrete types of the matched entities. A caller-scoped session is therefore held to
+    ///     the type write restriction of the given type, its base types and every derived type before the write.
+    /// </summary>
+    private Task ThrowIfFilterWriteRestrictedAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, string operation) =>
+        ThrowIfTypeWriteRestrictedAsync(session, [new TypeWriteTarget(ckTypeId, null, operation, ExactType: false)]);
+
+    private async Task GuardFilterWriteAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, string operation,
+        Func<Task> write)
+    {
+        await ThrowIfFilterWriteRestrictedAsync(session, ckTypeId, operation).ConfigureAwait(false);
+        await write().ConfigureAwait(false);
     }
 
     /// <summary>

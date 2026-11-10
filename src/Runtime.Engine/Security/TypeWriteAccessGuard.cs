@@ -16,7 +16,14 @@ namespace Meshmakers.Octo.Runtime.Engine.Security;
 /// <param name="CkTypeId">The runtime CK type of the entity</param>
 /// <param name="RtId">The rtId of the entity, if known</param>
 /// <param name="Operation">What is written: create, update, replace, delete, create or replace, association change</param>
-internal readonly record struct TypeWriteTarget(RtCkId<CkTypeId> CkTypeId, OctoObjectId? RtId, string Operation);
+/// <param name="ExactType">
+///     True when <paramref name="CkTypeId" /> is the concrete type of the entity (a create: the caller names the type it
+///     creates). False when the stored entity may be of a derived type (update, replace, delete, association ends, filter
+///     writes): then the blocks of every derived type are checked as well, so naming a less restricted base type does not
+///     bypass the restriction of the stored entity's type.
+/// </param>
+internal readonly record struct TypeWriteTarget(RtCkId<CkTypeId> CkTypeId, OctoObjectId? RtId, string Operation,
+    bool ExactType = false);
 
 /// <summary>
 ///     AB#8574: enforces the model-declared write restriction of a CK type (<c>writeAccess</c>, see
@@ -52,13 +59,16 @@ internal static class TypeWriteAccessGuard
         RtPrincipalKind principalKind, string? writeChannel, IEnumerable<TypeWriteTarget> targets)
     {
         var refusals = new List<OperationMessage>();
-        var refusingBlockByType = new Dictionary<RtCkId<CkTypeId>, (CkTypeGraph Type, CkTypeWriteAccessDto Block)?>();
+        var refusingBlockByType =
+            new Dictionary<(RtCkId<CkTypeId>, bool), (CkTypeGraph Type, CkTypeWriteAccessDto Block)?>();
         foreach (var target in targets)
         {
-            if (!refusingBlockByType.TryGetValue(target.CkTypeId, out var refusing))
+            var key = (target.CkTypeId, target.ExactType);
+            if (!refusingBlockByType.TryGetValue(key, out var refusing))
             {
-                refusing = FindRefusingBlock(ckCacheService, tenantId, target.CkTypeId, principalKind, writeChannel);
-                refusingBlockByType[target.CkTypeId] = refusing;
+                refusing = FindRefusingBlock(ckCacheService, tenantId, target.CkTypeId, target.ExactType, principalKind,
+                    writeChannel);
+                refusingBlockByType[key] = refusing;
             }
 
             if (refusing is { } r)
@@ -97,7 +107,7 @@ internal static class TypeWriteAccessGuard
                 EntityModOptions.Delete => OperationDelete,
                 EntityModOptions.Replace => OperationReplace,
                 _ => OperationUpdate
-            });
+            }, ExactType: item.ModOption == EntityModOptions.Insert);
         }
 
         foreach (var association in associationUpdateInfoList)
@@ -110,7 +120,7 @@ internal static class TypeWriteAccessGuard
     /// <summary>The targets of a bulk import of entities (insert or upsert).</summary>
     internal static IEnumerable<TypeWriteTarget> TargetsOf(IEnumerable<RtEntity> entities) =>
         entities.Where(e => e.CkTypeId != null)
-            .Select(e => new TypeWriteTarget(e.CkTypeId!, e.RtId, OperationCreateOrReplace));
+            .Select(e => new TypeWriteTarget(e.CkTypeId!, e.RtId, OperationCreateOrReplace, ExactType: true));
 
     /// <summary>The targets of a bulk import of association edges (both ends).</summary>
     internal static IEnumerable<TypeWriteTarget> TargetsOf(IEnumerable<RtAssociation> associations) =>
@@ -133,7 +143,7 @@ internal static class TypeWriteAccessGuard
                 continue;
             }
 
-            yield return new TypeWriteTarget(entity.CkTypeId, entity.RtId, OperationCreateOrReplace);
+            yield return new TypeWriteTarget(entity.CkTypeId, entity.RtId, OperationCreateOrReplace, ExactType: true);
             foreach (var association in entity.Associations ?? [])
             {
                 yield return new TypeWriteTarget(entity.CkTypeId, entity.RtId, OperationAssociation);
@@ -168,10 +178,11 @@ internal static class TypeWriteAccessGuard
 
     /// <summary>
     ///     The first block along the inheritance chain (own type first, then the base types from the nearest) that does
-    ///     not admit the caller; <c>null</c> when every block admits it or the chain declares none.
+    ///     not admit the caller, and, when the type is not exact, of any derived type; <c>null</c> when every block admits
+    ///     it or none is declared.
     /// </summary>
     private static (CkTypeGraph Type, CkTypeWriteAccessDto Block)? FindRefusingBlock(ICkCacheService ckCacheService,
-        string tenantId, RtCkId<CkTypeId> ckTypeId, RtPrincipalKind principalKind, string? writeChannel)
+        string tenantId, RtCkId<CkTypeId> ckTypeId, bool exactType, RtPrincipalKind principalKind, string? writeChannel)
     {
         if (!ckCacheService.TryGetRtCkType(tenantId, ckTypeId, out var typeGraph) || typeGraph == null)
         {
@@ -189,6 +200,20 @@ internal static class TypeWriteAccessGuard
                 baseGraph?.WriteAccess is { } inherited && !Admits(inherited, principalKind, writeChannel))
             {
                 return (baseGraph, inherited);
+            }
+        }
+
+        if (exactType)
+        {
+            return null;
+        }
+
+        foreach (var derivedTypeId in typeGraph.GetAllDerivedTypes(false))
+        {
+            if (ckCacheService.TryGetCkType(tenantId, derivedTypeId, out var derivedGraph) &&
+                derivedGraph?.WriteAccess is { } derived && !Admits(derived, principalKind, writeChannel))
+            {
+                return (derivedGraph, derived);
             }
         }
 

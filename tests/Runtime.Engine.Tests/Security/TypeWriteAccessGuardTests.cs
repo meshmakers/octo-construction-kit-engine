@@ -33,7 +33,7 @@ public class TypeWriteAccessGuardTests
         TypeWriteAccessGuard.Find(cache, Tenant, kind, channel, targets);
 
     private static TypeWriteTarget Create(string type) =>
-        new(Rt(type), OctoObjectId.GenerateNewId(), TypeWriteAccessGuard.OperationCreate);
+        new(Rt(type), OctoObjectId.GenerateNewId(), TypeWriteAccessGuard.OperationCreate, ExactType: true);
 
     [Theory]
     [InlineData(RtPrincipalKind.Interactive, null, true)]
@@ -89,6 +89,34 @@ public class TypeWriteAccessGuardTests
 
         // The channel is admitted by both blocks.
         Assert.Empty(Find(Cache(), RtPrincipalKind.Client, Channel, Create(LockedKnowledgeType)));
+    }
+
+    [Fact]
+    public void UpdateNamingABaseType_IsCheckedAgainstTheDerivedTypes_CreateNamesTheExactType()
+    {
+        // Knowledge admits Interactive, its derived LockedKnowledge admits only the channel. An update, replace or delete
+        // naming Knowledge may hit a stored LockedKnowledge entity, so the derived blocks apply; a create names the exact
+        // type it creates.
+        var update = new TypeWriteTarget(Rt(KnowledgeType), OctoObjectId.GenerateNewId(),
+            TypeWriteAccessGuard.OperationUpdate);
+        var refusal = Assert.Single(Find(Cache(), RtPrincipalKind.Interactive, null, update));
+        Assert.Equal(LockedKnowledgeType, refusal.Parameters["restrictingCkTypeId"]);
+
+        var create = new TypeWriteTarget(Rt(KnowledgeType), OctoObjectId.GenerateNewId(),
+            TypeWriteAccessGuard.OperationCreate, ExactType: true);
+        Assert.Empty(Find(Cache(), RtPrincipalKind.Interactive, null, create));
+
+        // The channel is admitted by every block of the subtree.
+        Assert.Empty(Find(Cache(), RtPrincipalKind.Client, Channel, update));
+
+        // Entity change sets: inserts are exact, the other modifications are not.
+        var targets = TypeWriteAccessGuard.TargetsOf(
+        [
+            EntityUpdateInfo<RtEntity>.CreateInsert(Rt(KnowledgeType), new RtEntity(Rt(KnowledgeType), OctoObjectId.GenerateNewId())),
+            EntityUpdateInfo<RtEntity>.CreateDelete(new RtEntityId(Rt(KnowledgeType), OctoObjectId.GenerateNewId()))
+        ], []).ToArray();
+        Assert.True(targets[0].ExactType);
+        Assert.False(targets[1].ExactType);
     }
 
     [Fact]

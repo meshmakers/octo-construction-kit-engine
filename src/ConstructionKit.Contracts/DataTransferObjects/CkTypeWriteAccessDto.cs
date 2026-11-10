@@ -62,11 +62,11 @@ public static class CkWritePrincipals
     /// <summary>
     ///     True when <paramref name="channel" /> has the form <c>&lt;namespace&gt;/&lt;name&gt;</c>: a namespace of
     ///     dot-separated identifiers (letters, digits, underscore; starting with a letter), a slash and a name of the
-    ///     same characters.
+    ///     same characters. Anchored with <c>\z</c>, so a trailing newline (e.g. from a YAML block scalar) is refused.
     /// </summary>
     public static bool IsValidChannel(string? channel) =>
         channel != null && ChannelRegex.IsMatch(channel);
 
     private static readonly Regex ChannelRegex =
-        new(@"^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)*/[A-Za-z][A-Za-z0-9_]*$", RegexOptions.CultureInvariant);
+        new(@"^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)*/[A-Za-z][A-Za-z0-9_]*\z", RegexOptions.CultureInvariant);
 }

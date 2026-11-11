@@ -1484,9 +1484,15 @@ without the key compiles byte-identical to the engine before CK v2 — compiled 
 re-verified byte-identical against `origin/main` 01fb187 on 2026-10-08; the comparison covers the compiled YAML, the
 cache JSON and the catalog JSON of a model without and one with a dependency).
 
-**Methods are definitions only.** Phase 1 ships the method meta-model (schema, DTOs, graphs, cache, compiler rules,
-`CkMethodIds`, generated method-id constants). There is no invocation, dispatch or handler runtime in the engine;
-that is Phase 3.
+**Methods: the engine owns the definitions, the runtime lives elsewhere.** The engine ships the method meta-model
+(schema, DTOs, graphs, cache, compiler rules, `CkMethodIds`, generated method-id constants and parameter/result records,
+`execution.handler` and `execution.mode` with their diff rules). It has no invocation, dispatch or handler runtime of its
+own. The invocation runtime is shipped (CK v2 Phase 3) in other repositories: the handler SDK, dispatcher, invocation
+pipeline (audit, authorization, idempotency keys), bus and in-process transports and asynchronous operations (operation
+record, sweep) in **octo-common-services** (`src/Methods`, `docs/method-handler-sdk.md`); typed GraphQL method mutations,
+the gateway gate and `runtime.operations` in **octo-asset-repo-services** (`CLAUDE.md`, "Typed method mutations",
+"Asynchronous methods"); pipeline handlers in **octo-communication-controller-services** (`src/CommunicationControllerServices/Methods`, runs the deployed pipeline on a mesh adapter, AB#6877). Async is limited to
+service handlers (message 142).
 
 | Key | Where | Contracts |
 | --- | ----- | --------- |
@@ -1637,7 +1643,9 @@ Phase 4 (System → ckLanguage 2) together with a non-`new()` query path.
 parameters, nullable for optional ones, camelCase → PascalCase; CLR types: string/bool/DateTime/DateTimeOffset/
 TimeSpan/int/long/double, `IReadOnlyList<string|long>`, `Rt{Enum}Enum`, `Rt{Record}Record`) with a `ToString()` that
 redacts `sensitive` parameters as `***`, and `{Type}{Method}Result { Value }` when the method has a result
-(definitions only, no dispatch). Interface methods get no records. **Review L15:** the generated name
+(the engine does not dispatch; the records are the `TParameters` / `TResult` of the typed handlers in
+octo-common-services: `ICkMethodHandler<TParameters, TResult>` for a method with a result,
+`ICkMethodHandler<TParameters>` for a method without one). Interface methods get no records. **Review L15:** the generated name
 (`CkMethodIds.GeneratedName`, shared with the `{Name}MethodId` constants) is checked per model by the compiler —
 **message 125** `CkMethodGeneratedNameCollision` (`User`+`ChangePassword` vs `UserChange`+`Password`); the existing
 constant names stay unchanged (no separator). Pinned by `CkV2GeneratedContractsTests` (Roslyn compile + emitted
@@ -1652,7 +1660,8 @@ an inherited member is not repeated (CS0108). A generated Rt class lists its dec
 every member of those interfaces and their parents **explicitly** (`string IRtNamed.Name => Name;`; an optional
 member the type does not assign returns `default`), so a required assignment of an optional member still conforms
 and re-implementing an interface a base class already implements is legal. Association members are not emitted
-(the Rt classes have no generated navigations yet); methods neither (definitions only). v1 models: nothing emitted,
+(the Rt classes have no generated navigations yet); methods neither (a C# interface carries no
+method members; handlers implement `ICkMethodHandler<…>` of octo-common-services instead). v1 models: nothing emitted,
 type output unchanged. Pinned by `CkInterfaceCodeGeneratorTests` (Roslyn-compiles the generated code against
 `Runtime.Contracts` with a consumer that assigns `RtAccount` to `IRtNamed`).
 Docs generator: `Interfaces.md` per model (members incl. inherited ones, "Extends" line, association and method

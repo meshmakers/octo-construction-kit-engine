@@ -1212,11 +1212,17 @@ internal class BlueprintService : IBlueprintService
             preview.EntitiesToAdd = diff.ToAdd;
             preview.TenantOwnedSkipped.AddRange(diff.TenantOwnedSkipped);
             preview.TenantOwnedStaysDeleted.AddRange(diff.TenantOwnedStaysDeleted);
-            if (diff.TenantOwnedSkipped.Count > 0 || diff.TenantOwnedStaysDeleted.Count > 0)
+            preview.TenantOwnedRefreshed.AddRange(diff.TenantOwnedRefreshed);
+            preview.TenantOwnedUpdateAvailable.AddRange(diff.TenantOwnedUpdateAvailable);
+            if (diff.TenantOwnedSkipped.Count > 0 || diff.TenantOwnedStaysDeleted.Count > 0 ||
+                diff.TenantOwnedRefreshed.Count > 0)
             {
                 preview.Warnings.Add(
-                    $"{diff.TenantOwnedSkipped.Count} tenant-owned seed entities (rtBlueprintLocked=false) are left untouched, " +
-                    $"{diff.TenantOwnedStaysDeleted.Count} deleted by the tenant stay deleted (see TenantOwnedSkipped, TenantOwnedStaysDeleted)");
+                    $"{diff.TenantOwnedSkipped.Count} tenant-owned seed entities (rtBlueprintLocked=false) are left untouched " +
+                    $"({diff.TenantOwnedUpdateAvailable.Count} of them edited by the tenant although the seed changed), " +
+                    $"{diff.TenantOwnedRefreshed.Count} unedited receive the new seed content, " +
+                    $"{diff.TenantOwnedStaysDeleted.Count} deleted by the tenant stay deleted " +
+                    "(see TenantOwnedSkipped, TenantOwnedUpdateAvailable, TenantOwnedRefreshed, TenantOwnedStaysDeleted)");
             }
             preview.EntitiesToDelete = diff.ToDelete;
             preview.Warnings.AddRange(diff.Warnings);
@@ -1497,8 +1503,38 @@ internal class BlueprintService : IBlueprintService
                     var held = FindTenantEntity(tenantAnyByKey, key!, seed);
                     if (held != null)
                     {
-                        diff.TenantOwnedSkipped.Add(ToTenantOwnedEntity(key!, ckTypeId, held));
                         var heldSource = held.GetAttributeStringValueOrDefault("RtBlueprintSource");
+                        var outcome = await ClassifyHeldTenantOwnedAsync(tenantId, ckTypeGraph, ckTypeId, key!, seed,
+                                held, targetVersion, previousSeed)
+                            .ConfigureAwait(false);
+
+                        // AB#8778: an unedited entity receives the new seed content - in the modes that
+                        // update (Safe only adds). The import writes it like a locked entity; the seed
+                        // keeps rtBlueprintLocked: false, so it stays tenant-owned.
+                        if (outcome == TenantOwnedOutcome.Refresh && updateMode != BlueprintUpdateMode.Safe)
+                        {
+                            diff.TenantOwnedRefreshed.Add(ToTenantOwnedEntity(key!, ckTypeId, held));
+                            diff.EntitiesToUpdate.Add(seed);
+                            diff.ToUpdate++;
+                            AddBlankingFindings(diff, seed, held, ckTypeId, ckTypeGraph!);
+                            diff.ChangedEntities.Add(new BlueprintEntityChange
+                            {
+                                EntityId = held.RtId.ToString() ?? string.Empty,
+                                EntityWellKnownName = held.RtWellKnownName,
+                                EntityDisplayName = held.RtDisplayName,
+                                EntityCkTypeId = ckTypeId.ToString(),
+                                // Listed in TenantOwnedRefreshed as well; Note stays reserved for "not comparable".
+                                Attributes = CompareWithTenant(tenantId, seed, held, ckTypeGraph!)
+                            });
+                            continue;
+                        }
+
+                        diff.TenantOwnedSkipped.Add(ToTenantOwnedEntity(key!, ckTypeId, held));
+                        if (outcome == TenantOwnedOutcome.UpdateAvailable)
+                        {
+                            diff.TenantOwnedUpdateAvailable.Add(ToTenantOwnedEntity(key!, ckTypeId, held));
+                        }
+
                         if (updateMode != BlueprintUpdateMode.Safe &&
                             heldSource != null && IsSameBlueprintName(heldSource, targetVersion))
                         {
@@ -1736,6 +1772,103 @@ internal class BlueprintService : IBlueprintService
         };
     }
 
+    /// <summary>
+    /// AB#6315 for a refreshed tenant-owned entity (AB#8778): the attributes the import will keep or blank,
+    /// found by the same guard the apply runs.
+    /// </summary>
+    private static void AddBlankingFindings(BlueprintUpdateDiff diff, RtEntityTcDto seed, RtEntity tenant,
+        RtCkId<CkTypeId> ckTypeId, CkTypeGraph ckType)
+    {
+        foreach (var finding in SeedBlankingDetector.Detect(seed, tenant,
+                     ImportRtModelCommand.SelectGuardedAttributes(ckType)))
+        {
+            diff.Blanked.Add(new BlueprintBlankedAttribute
+            {
+                RtId = tenant.RtId.ToString() ?? string.Empty,
+                CkTypeId = ckTypeId.ToString(),
+                AttributeName = finding.Attribute.AttributeName,
+                Reason = finding.Reason.ToString(),
+                CurrentSummary = SeedBlankingDetector.Summarize(finding.ExistingValue),
+                IncomingSummary = SeedBlankingDetector.SummarizeIncoming(finding),
+                AppliedOnUpdate = false
+            });
+        }
+    }
+
+    /// <summary>AB#8778: what an update does with a tenant-owned seed entity the tenant holds.</summary>
+    internal enum TenantOwnedOutcome
+    {
+        /// <summary>Nothing to write: up to date, no new seed content, or not comparable.</summary>
+        Kept,
+
+        /// <summary>Unedited since the installed version and the seed changed: write the new seed content.</summary>
+        Refresh,
+
+        /// <summary>The seed changed, but the tenant edited the entity (or that it did not cannot be proven): keep it.</summary>
+        UpdateAvailable
+    }
+
+    /// <summary>
+    /// AB#8778 (SeedContentHash rule, AB#8450): decides whether a held tenant-owned entity receives
+    /// the target seed. The baseline of "unedited" is the content the seed of the installed version
+    /// writes; the tenant entity is unedited when it equals that content (same comparison as the
+    /// update preview, <see cref="BlueprintEntityComparer" />). No marker is stored on the entity, so
+    /// entities seeded before this rule follow it unchanged: unedited exactly when their content equals
+    /// the previous seed. Everything that cannot be decided keeps the tenant content.
+    /// </summary>
+    private async Task<TenantOwnedOutcome> ClassifyHeldTenantOwnedAsync(
+        string tenantId,
+        CkTypeGraph? ckType,
+        RtCkId<CkTypeId> ckTypeId,
+        string key,
+        RtEntityTcDto seed,
+        RtEntity held,
+        BlueprintId targetVersion,
+        PreviousSeedKeys previousSeed)
+    {
+        if (ckType == null)
+        {
+            return TenantOwnedOutcome.Kept; // not comparable: never overwrite
+        }
+
+        try
+        {
+            if (CompareWithTenant(tenantId, seed, held, ckType).Count == 0)
+            {
+                return TenantOwnedOutcome.Kept; // already carries the target content
+            }
+
+            var previous = await previousSeed.GetAsync(ckTypeId.ToString(), key).ConfigureAwait(false);
+            if (previous != null && BlueprintEntityComparer.SeedsEqual(previous, seed, ckType,
+                    enumId => _ckCacheService.TryGetCkEnum(tenantId, enumId, out var e) ? e : null,
+                    recordId => _ckCacheService.TryGetRtCkRecord(tenantId, recordId, out var r) ? r : null))
+            {
+                return TenantOwnedOutcome.Kept; // the target version brings no new content for it
+            }
+
+            var heldSource = held.GetAttributeStringValueOrDefault("RtBlueprintSource");
+            if (previous != null && heldSource != null && IsSameBlueprintName(heldSource, targetVersion)
+                && CompareWithTenant(tenantId, previous, held, ckType).Count == 0)
+            {
+                return TenantOwnedOutcome.Refresh;
+            }
+
+            return TenantOwnedOutcome.UpdateAvailable;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Could not compare tenant-owned entity {CkTypeId}/{Key} with its seed", ckTypeId, key);
+            return TenantOwnedOutcome.Kept;
+        }
+    }
+
+    private List<BlueprintAttributeChange> CompareWithTenant(
+        string tenantId, RtEntityTcDto seed, RtEntity tenant, CkTypeGraph ckType) =>
+        BlueprintEntityComparer.Compare(seed, tenant, ckType,
+            v => ImportRtModelCommand.ToTransportValue(_ckCacheService, tenantId, v),
+            enumId => _ckCacheService.TryGetCkEnum(tenantId, enumId, out var e) ? e : null,
+            recordId => _ckCacheService.TryGetRtCkRecord(tenantId, recordId, out var r) ? r : null);
+
     private static RtEntity? FindTenantEntity(
         IReadOnlyDictionary<string, RtEntity> tenantByKey, string key, RtEntityTcDto seed)
     {
@@ -1785,20 +1918,23 @@ internal class BlueprintService : IBlueprintService
     private static string SeedIdentity(string ckTypeId, string key) => $"{ckTypeId}|{key}";
 
     /// <summary>
-    /// The identity keys (CK type + key) of the seed of the previously installed blueprint version,
-    /// read from the catalog on first use. <c>null</c> keys: nothing was installed before (first
-    /// install - every key is new) or the seed could not be read (see <see cref="Failure" />).
+    /// The seed of the previously installed blueprint version, by identity (CK type + key), read from
+    /// the catalog on first use. AB#6383 uses the keys (deleted vs. new), AB#8778 the entities (what the
+    /// installed version wrote, the baseline of "unedited"). <c>null</c>: nothing was installed before
+    /// (first install - every key is new) or the seed could not be read (see <see cref="Failure" />).
     /// </summary>
     private sealed class PreviousSeedKeys
     {
-        private readonly Func<Task<(HashSet<string>? Keys, string? Failure)>>? _load;
-        private (HashSet<string>? Keys, string? Failure)? _loaded;
+        private readonly Func<Task<(Dictionary<string, RtEntityTcDto>? Entities, string? Failure)>>? _load;
+        private (Dictionary<string, RtEntityTcDto>? Entities, string? Failure)? _loaded;
 
-        private PreviousSeedKeys(Func<Task<(HashSet<string>? Keys, string? Failure)>>? load) => _load = load;
+        private PreviousSeedKeys(Func<Task<(Dictionary<string, RtEntityTcDto>? Entities, string? Failure)>>? load) =>
+            _load = load;
 
         /// <summary>No previous version: every seed key is new.</summary>
         public static PreviousSeedKeys For(
-            BlueprintId? previousVersion, Func<Task<(HashSet<string>? Keys, string? Failure)>> load) =>
+            BlueprintId? previousVersion,
+            Func<Task<(Dictionary<string, RtEntityTcDto>? Entities, string? Failure)>> load) =>
             new(previousVersion == null ? null : load);
 
         public string? Failure => _loaded?.Failure;
@@ -1812,11 +1948,26 @@ internal class BlueprintService : IBlueprintService
             }
 
             _loaded ??= await _load().ConfigureAwait(false);
-            return _loaded.Value.Keys?.Contains(SeedIdentity(ckTypeId, key));
+            return _loaded.Value.Entities?.ContainsKey(SeedIdentity(ckTypeId, key));
+        }
+
+        /// <summary>
+        /// AB#8778: the entity as the previous version's seed defined it; <c>null</c> when nothing was
+        /// installed before, the seed cannot be read or it did not contain the key.
+        /// </summary>
+        public async Task<RtEntityTcDto?> GetAsync(string ckTypeId, string key)
+        {
+            if (_load == null)
+            {
+                return null;
+            }
+
+            _loaded ??= await _load().ConfigureAwait(false);
+            return _loaded.Value.Entities?.GetValueOrDefault(SeedIdentity(ckTypeId, key));
         }
     }
 
-    private async Task<(HashSet<string>? Keys, string? Failure)> LoadPreviousSeedKeysAsync(
+    private async Task<(Dictionary<string, RtEntityTcDto>? Entities, string? Failure)> LoadPreviousSeedKeysAsync(
         BlueprintId previousVersion,
         IReadOnlyDictionary<string, string> variables,
         CancellationToken cancellationToken)
@@ -1830,7 +1981,7 @@ internal class BlueprintService : IBlueprintService
                 return (null, FirstMessage(opResult) ?? "blueprint version not found in the catalog");
             }
 
-            var keys = new HashSet<string>(StringComparer.Ordinal);
+            var keys = new Dictionary<string, RtEntityTcDto>(StringComparer.Ordinal);
             var paths = BlueprintSeedData.ResolvePaths(previous);
             if (paths.Count == 0)
             {
@@ -1851,7 +2002,7 @@ internal class BlueprintService : IBlueprintService
                     ?? (entity.RtId.Equals(OctoObjectId.Empty) ? null : entity.RtId.ToString());
                 if (!string.IsNullOrEmpty(key))
                 {
-                    keys.Add(SeedIdentity(entity.CkTypeId.ToString(), key));
+                    keys[SeedIdentity(entity.CkTypeId.ToString(), key)] = entity;
                 }
             }
 
@@ -1876,6 +2027,12 @@ internal class BlueprintService : IBlueprintService
 
         /// <summary>AB#6383: tenant-owned seed entities the tenant deleted; not re-created.</summary>
         public List<BlueprintTenantOwnedEntity> TenantOwnedStaysDeleted { get; } = [];
+
+        /// <summary>AB#8778: unedited tenant-owned entities the update writes with the new seed content.</summary>
+        public List<BlueprintTenantOwnedEntity> TenantOwnedRefreshed { get; } = [];
+
+        /// <summary>AB#8778: edited tenant-owned entities with new seed content; kept (also in TenantOwnedSkipped).</summary>
+        public List<BlueprintTenantOwnedEntity> TenantOwnedUpdateAvailable { get; } = [];
 
         /// <summary>
         /// AB#6383: the held tenant-owned entities of this blueprint whose blueprint stamp the apply
@@ -2431,6 +2588,8 @@ internal class BlueprintService : IBlueprintService
         result.Warnings.AddRange(diff.Warnings);
         result.TenantOwnedSkipped.AddRange(diff.TenantOwnedSkipped);
         result.TenantOwnedStaysDeleted.AddRange(diff.TenantOwnedStaysDeleted);
+        result.TenantOwnedRefreshed.AddRange(diff.TenantOwnedRefreshed);
+        result.TenantOwnedUpdateAvailable.AddRange(diff.TenantOwnedUpdateAvailable);
 
         // Apply user-supplied conflict resolutions to override the default Skip.
         var conflictOverrides = options.ConflictResolutions ?? new Dictionary<string, ConflictResolution>();
@@ -3277,9 +3436,10 @@ internal class BlueprintService : IBlueprintService
             // shared with the plain ImportRt path (AB#4582 / AB#4589).
             // AB#6383: tenant-owned seed entities (rtBlueprintLocked: false) are created once. A
             // re-apply (--force, or an install over another version) leaves the ones the tenant holds
-            // alone and does not bring back the ones it deleted.
+            // alone and does not bring back the ones it deleted. AB#8778: an install over another
+            // version writes the new seed content into the held ones the tenant never edited.
             var tenantOwnedStamps = await ExcludeTenantOwnedFromSeedAsync(
-                    repository, seedRoot, blueprint.BlueprintId, previousVersion, variables, operationResult,
+                    tenantId, repository, seedRoot, blueprint.BlueprintId, previousVersion, variables, operationResult,
                     cancellationToken)
                 .ConfigureAwait(false);
 
@@ -3365,6 +3525,7 @@ internal class BlueprintService : IBlueprintService
     /// once. Returns the held entities whose blueprint stamp is to be refreshed after the import.
     /// </summary>
     private async Task<List<(RtCkId<CkTypeId> CkTypeId, RtEntity Entity)>> ExcludeTenantOwnedFromSeedAsync(
+        string tenantId,
         IRuntimeRepository repository,
         RtModelRootTcDto seedRoot,
         BlueprintId blueprintId,
@@ -3386,10 +3547,13 @@ internal class BlueprintService : IBlueprintService
         var held = new List<string>();
         var deleted = new List<string>();
         var undecidable = new List<string>();
+        var refreshed = new List<string>();
+        var updateAvailable = new List<string>();
 
         foreach (var typeGroup in tenantOwned.GroupBy(e => e.CkTypeId))
         {
             var ckTypeId = typeGroup.Key;
+            _ckCacheService.TryGetRtCkType(tenantId, ckTypeId, out var ckTypeGraph);
             var tenantByKey = new Dictionary<string, RtEntity>(StringComparer.Ordinal);
             var tenantReadable = true;
             try
@@ -3434,6 +3598,20 @@ internal class BlueprintService : IBlueprintService
                 var heldEntity = FindTenantEntity(tenantByKey, key, seed);
                 if (heldEntity != null)
                 {
+                    var outcome = await ClassifyHeldTenantOwnedAsync(tenantId, ckTypeGraph, ckTypeId, key, seed,
+                            heldEntity, blueprintId, previous)
+                        .ConfigureAwait(false);
+                    if (outcome == TenantOwnedOutcome.Refresh)
+                    {
+                        refreshed.Add(label); // stays in the seed: the import writes the new content
+                        continue;
+                    }
+
+                    if (outcome == TenantOwnedOutcome.UpdateAvailable)
+                    {
+                        updateAvailable.Add(label);
+                    }
+
                     seedRoot.Entities.Remove(seed);
                     held.Add(label);
                     var source = heldEntity.GetAttributeStringValueOrDefault("RtBlueprintSource");
@@ -3465,6 +3643,18 @@ internal class BlueprintService : IBlueprintService
             operationResult.AddMessage(new OperationMessage(
                 MessageLevel.Info, blueprintId.FullName, 61,
                 $"{held.Count} tenant-owned seed entities (rtBlueprintLocked=false) already exist and were left untouched: {string.Join(", ", held)}"));
+        }
+        if (updateAvailable.Count > 0)
+        {
+            operationResult.AddMessage(new OperationMessage(
+                MessageLevel.Info, blueprintId.FullName, 64,
+                $"{updateAvailable.Count} of them were edited by the tenant although the seed changed (TenantOwnedUpdateAvailable): {string.Join(", ", updateAvailable)}"));
+        }
+        if (refreshed.Count > 0)
+        {
+            operationResult.AddMessage(new OperationMessage(
+                MessageLevel.Info, blueprintId.FullName, 65,
+                $"{refreshed.Count} tenant-owned seed entities were unedited and receive the new seed content (TenantOwnedRefreshed): {string.Join(", ", refreshed)}"));
         }
         if (deleted.Count > 0)
         {

@@ -97,6 +97,21 @@ public class BlueprintUpdatePreview
     public List<BlueprintTenantOwnedEntity> TenantOwnedStaysDeleted { get; set; } = [];
 
     /// <summary>
+    /// AB#8778: tenant-owned seed entities the tenant never edited - the stored content equals what
+    /// the seed of the installed version wrote - whose seed content changed in the target version.
+    /// The update writes the new seed content (and the blueprint stamp). Not part of
+    /// <see cref="TenantOwnedSkipped" />.
+    /// </summary>
+    public List<BlueprintTenantOwnedEntity> TenantOwnedRefreshed { get; set; } = [];
+
+    /// <summary>
+    /// AB#8778: tenant-owned seed entities whose seed content changed in the target version but
+    /// which the tenant edited (or whose unedited state cannot be proven). The update keeps the
+    /// tenant content; the entities are also listed in <see cref="TenantOwnedSkipped" />.
+    /// </summary>
+    public List<BlueprintTenantOwnedEntity> TenantOwnedUpdateAvailable { get; set; } = [];
+
+    /// <summary>
     /// Detected conflicts that need resolution
     /// </summary>
     public List<BlueprintUpdateConflict> Conflicts { get; set; } = [];
@@ -177,9 +192,11 @@ public class BlueprintEntityChange
 }
 
 /// <summary>
-/// A tenant-owned seed entity (AB#6383) an update did not write: either the tenant still holds it
-/// (<see cref="BlueprintUpdatePreview.TenantOwnedSkipped" />) or deleted it
-/// (<see cref="BlueprintUpdatePreview.TenantOwnedStaysDeleted" />).
+/// A tenant-owned seed entity (AB#6383) an update handled apart from the product-owned ones: the
+/// tenant still holds it (<see cref="BlueprintUpdatePreview.TenantOwnedSkipped" />), deleted it
+/// (<see cref="BlueprintUpdatePreview.TenantOwnedStaysDeleted" />), never edited it and receives the
+/// new seed content (<see cref="BlueprintUpdatePreview.TenantOwnedRefreshed" />, AB#8778) or edited it
+/// while a new seed content exists (<see cref="BlueprintUpdatePreview.TenantOwnedUpdateAvailable" />).
 /// </summary>
 public class BlueprintTenantOwnedEntity
 {
@@ -489,6 +506,18 @@ public class BlueprintUpdateResult
     /// <see cref="EntitiesSkipped" />.
     /// </summary>
     public List<BlueprintTenantOwnedEntity> TenantOwnedStaysDeleted { get; set; } = [];
+
+    /// <summary>
+    /// AB#8778: unedited tenant-owned seed entities whose new seed content the update wrote.
+    /// Counted in <see cref="EntitiesUpdated" />.
+    /// </summary>
+    public List<BlueprintTenantOwnedEntity> TenantOwnedRefreshed { get; set; } = [];
+
+    /// <summary>
+    /// AB#8778: edited tenant-owned seed entities for which the target version brings new seed
+    /// content; kept as the tenant edited them. Also listed in <see cref="TenantOwnedSkipped" />.
+    /// </summary>
+    public List<BlueprintTenantOwnedEntity> TenantOwnedUpdateAvailable { get; set; } = [];
 
     /// <summary>
     /// AB#7997: the columns the update added to activated archives (ingested columns through <c>ADD COLUMN</c>,

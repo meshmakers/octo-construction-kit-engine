@@ -2,6 +2,8 @@ using FakeItEasy;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
@@ -24,6 +26,10 @@ namespace Meshmakers.Octo.Runtime.Engine.Tests.Blueprints;
 /// install: created once, never updated, never re-created after the tenant deleted it, and no
 /// conflict. The seed flag decides, not the stamp the tenant copy carries. Entities without the flag
 /// keep the product-owned behaviour (renewed by updates, back after a delete).
+/// AB#8778 refines "never updated": a held entity the tenant never edited - its content equals what
+/// the seed of the installed version wrote - receives a changed seed; an edited one is kept and
+/// reported as <c>TenantOwnedUpdateAvailable</c>. These cases need the CK type in the cache
+/// (<see cref="GivenRuleTypeKnown" />); without it the entity cannot be compared and is kept.
 /// </summary>
 public class BlueprintServiceTenantOwnedSeedTests
 {
@@ -32,7 +38,7 @@ public class BlueprintServiceTenantOwnedSeedTests
     private static readonly BlueprintId V2 = new("Shop-2.0.0");
     private static readonly RtCkId<CkTypeId> RuleType = new("Test-1.0.0/Rule");
     private static readonly RtCkId<CkAttributeId> LockedAttr = new("System/RtBlueprintLocked");
-    private static readonly RtCkId<CkAttributeId> ThresholdAttr = new("Test-1.0.0/Threshold");
+    private static readonly RtCkId<CkAttributeId> ThresholdAttr = new CkId<CkAttributeId>("Test-1.0.0/Threshold").ToRtCkId();
 
     /// <summary>One entity of a seed: key, the seed's lock flag (null = absent) and a payload value.</summary>
     private sealed record SeedSpec(string Key, bool? Locked, int Threshold = 1);
@@ -46,6 +52,7 @@ public class BlueprintServiceTenantOwnedSeedTests
     private readonly IBlueprintVariableProvider _variables = A.Fake<IBlueprintVariableProvider>();
     private readonly IBlueprintDependencyResolver _resolver = A.Fake<IBlueprintDependencyResolver>();
     private readonly ITenantBlueprintInstallations _installations = A.Fake<ITenantBlueprintInstallations>();
+    private readonly ICkCacheService _cache = A.Fake<ICkCacheService>();
 
     private readonly Dictionary<string, SeedSpec[]> _seeds = [];
     private readonly HashSet<string> _unreadable = [];
@@ -101,7 +108,7 @@ public class BlueprintServiceTenantOwnedSeedTests
     }
 
     private BlueprintService CreateService() => new(
-        A.Fake<ICkCacheService>(),
+        _cache,
         _catalog,
         _history,
         A.Fake<IBlueprintMigrationExecutor>(),
@@ -565,5 +572,240 @@ public class BlueprintServiceTenantOwnedSeedTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(["old", "owned"], ImportedKeys.Order().ToArray());
+    }
+
+    // ---- AB#8778: unedited entities receive a changed seed, edited ones are kept ---------------
+
+    /// <summary>Puts the Rule type (one payload attribute, Threshold) into the CK cache so entities can be compared.</summary>
+    private void GivenRuleTypeKnown()
+    {
+        var attrId = new CkId<CkAttributeId>("Test-1.0.0/Threshold");
+        var threshold = new CkTypeAttributeGraph(attrId,
+            new CkTypeAttributeDto { CkAttributeId = attrId, AttributeName = "Threshold" },
+            new CkAttributeGraph(attrId, new CkAttributeDto
+            {
+                AttributeId = "Threshold", ValueType = AttributeValueTypesDto.Integer
+            }));
+        var graph = new CkTypeGraph(new CkId<CkTypeId>("Test-1.0.0/Rule"), isAbstract: false, isFinal: false,
+            isCollectionRoot: false, baseTypes: [], derivedFromCkTypeId: null, definingCollectionRootCkTypeId: null,
+            derivedTypes: [], definedAttributes: [], allAttributes: new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> { [attrId] = threshold }, indexes: [],
+            associations: new CkGraphDirectedAssociations([]), description: "test",
+            enableChangeStreamPreAndPostImages: false);
+        CkTypeGraph? ignored;
+        A.CallTo(() => _cache.TryGetRtCkType(A<string>._, RuleType, out ignored))
+            .Returns(true)
+            .AssignsOutAndRefParameters(graph);
+    }
+
+    private int ImportedThreshold(string key) =>
+        Convert.ToInt32(_imported.Single(e => e.RtWellKnownName == key).Attributes.Single(a => a.Id.Equals(ThresholdAttr)).Value);
+
+    [Fact]
+    public async Task Update_UneditedEntity_ReceivesTheChangedSeedAndStaysTenantOwned()
+    {
+        // Also the migration case: nothing marks the entity; it equals what the V1 seed wrote.
+        GivenRuleTypeKnown();
+        GivenInstalled(V1);
+        GivenSeed(V1, new SeedSpec("owned", false, Threshold: 1));
+        GivenSeed(V2, new SeedSpec("owned", false, Threshold: 5));
+        GivenTenantEntity("owned", false, V1, threshold: 1);
+
+        var result = await Update();
+
+        Assert.True(result.Success, string.Join("; ", result.Errors));
+        Assert.Equal(["owned"], ImportedKeys.ToArray());
+        Assert.Equal(5, ImportedThreshold("owned"));
+        var written = _imported.Single();
+        Assert.Equal(false, written.Attributes.Single(a => a.Id.Equals(LockedAttr)).Value);
+        Assert.Equal(V2.FullName,
+            written.Attributes.Single(a => a.Id.ToString().EndsWith("RtBlueprintSource", StringComparison.Ordinal)).Value);
+        Assert.Equal("owned", Assert.Single(result.TenantOwnedRefreshed).Key);
+        Assert.Empty(result.TenantOwnedSkipped);
+        Assert.Empty(result.TenantOwnedUpdateAvailable);
+        Assert.Empty(_stamped); // the import writes the stamp with the content
+        Assert.Equal(1, result.EntitiesUpdated);
+    }
+
+    [Fact]
+    public async Task Update_EditedEntity_IsKeptListedAsUpdateAvailableAndTheNewVersionEntityIsCreated()
+    {
+        // The knowledge page shape: the page carries its current version (Threshold), the target seed
+        // brings a changed page and a new, separate version entity. The edited page keeps its content,
+        // so it does not point to the new version; the version entity exists all the same.
+        GivenRuleTypeKnown();
+        GivenInstalled(V1);
+        GivenSeed(V1, new SeedSpec("page", false, Threshold: 1), new SeedSpec("page@1", false, Threshold: 1));
+        GivenSeed(V2, new SeedSpec("page", false, Threshold: 2), new SeedSpec("page@1", false, Threshold: 1),
+            new SeedSpec("page@2", false, Threshold: 2));
+        var page = GivenTenantEntity("page", false, V1, threshold: 7);
+        GivenTenantEntity("page@1", false, V1, threshold: 1);
+
+        var preview = await Preview();
+        var result = await Update();
+
+        Assert.True(result.Success, string.Join("; ", result.Errors));
+        Assert.Equal(["page@2"], ImportedKeys.ToArray());
+        Assert.Equal(7, page.GetAttributeValueOrDefault<int>("Threshold"));
+        Assert.Equal("page", Assert.Single(result.TenantOwnedUpdateAvailable).Key);
+        Assert.Contains(result.TenantOwnedSkipped, e => e.Key == "page");
+        Assert.Empty(result.TenantOwnedRefreshed);
+        Assert.Equal("page", Assert.Single(preview.TenantOwnedUpdateAvailable).Key);
+        Assert.Equal(1, preview.EntitiesToAdd);
+        Assert.Equal(0, preview.EntitiesToUpdate);
+    }
+
+    [Fact]
+    public async Task Update_EntityDeletedByTheTenant_IsNotRecreatedEvenWhenTheSeedChanged()
+    {
+        GivenRuleTypeKnown();
+        GivenInstalled(V1);
+        GivenSeed(V1, new SeedSpec("owned", false, Threshold: 1));
+        GivenSeed(V2, new SeedSpec("owned", false, Threshold: 5));
+
+        var result = await Update();
+
+        Assert.True(result.Success);
+        Assert.Empty(_imported);
+        Assert.Equal("owned", Assert.Single(result.TenantOwnedStaysDeleted).Key);
+        Assert.Empty(result.TenantOwnedRefreshed);
+    }
+
+    [Fact]
+    public async Task Update_SecondRunOfTheSameVersion_IsANoOp()
+    {
+        GivenRuleTypeKnown();
+        GivenInstalled(V1);
+        GivenSeed(V1, new SeedSpec("owned", false, Threshold: 1), new SeedSpec("edited", false, Threshold: 1));
+        GivenSeed(V2, new SeedSpec("owned", false, Threshold: 5), new SeedSpec("edited", false, Threshold: 5));
+        var owned = GivenTenantEntity("owned", false, V1, threshold: 1);
+        GivenTenantEntity("edited", false, V1, threshold: 9);
+
+        var first = await Update();
+        Assert.Equal(["owned"], ImportedKeys.ToArray());
+        Assert.Equal("edited", Assert.Single(first.TenantOwnedUpdateAvailable).Key);
+
+        // What the import wrote, and V2 is now the installed version.
+        owned.SetAttributeValueNonNullable("Threshold", AttributeValueTypesDto.Integer, 5);
+        owned.SetAttributeValueNonNullable("RtBlueprintSource", AttributeValueTypesDto.String, V2.FullName);
+        GivenInstalled(V2);
+        _imported.Clear();
+
+        var again = await Update();
+
+        Assert.True(again.Success);
+        Assert.Empty(_imported);
+        Assert.Empty(again.TenantOwnedRefreshed);
+        Assert.Empty(again.TenantOwnedUpdateAvailable); // V2 -> V2 brings nothing new for the edited one
+        Assert.Equal(0, again.EntitiesUpdated);
+    }
+
+    [Fact]
+    public async Task Update_PreviousSeedNotReadable_ChangedHeldEntityIsKeptAsUpdateAvailable()
+    {
+        GivenRuleTypeKnown();
+        GivenInstalled(V1);
+        GivenCatalogCannotProvide(V1);
+        GivenSeed(V2, new SeedSpec("owned", false, Threshold: 5));
+        GivenTenantEntity("owned", false, V1, threshold: 1);
+
+        var result = await Update();
+
+        Assert.True(result.Success);
+        Assert.Empty(_imported);
+        Assert.Equal("owned", Assert.Single(result.TenantOwnedUpdateAvailable).Key);
+    }
+
+    [Fact]
+    public async Task Update_UneditedEntityOfAnotherBlueprint_IsNotOverwritten()
+    {
+        GivenRuleTypeKnown();
+        GivenInstalled(V1);
+        GivenSeed(V1, new SeedSpec("owned", false, Threshold: 1));
+        GivenSeed(V2, new SeedSpec("owned", false, Threshold: 5));
+        GivenTenantEntity("owned", false, new BlueprintId("Other-1.0.0"), threshold: 1);
+
+        var result = await Update();
+
+        Assert.True(result.Success);
+        Assert.Empty(_imported);
+        Assert.Equal("owned", Assert.Single(result.TenantOwnedUpdateAvailable).Key);
+    }
+
+    [Fact]
+    public async Task Update_SafeMode_DoesNotRefreshAnUneditedEntity()
+    {
+        GivenRuleTypeKnown();
+        GivenInstalled(V1);
+        GivenSeed(V1, new SeedSpec("owned", false, Threshold: 1));
+        GivenSeed(V2, new SeedSpec("owned", false, Threshold: 5));
+        GivenTenantEntity("owned", false, V1, threshold: 1);
+
+        var result = await Update(BlueprintUpdateMode.Safe);
+
+        Assert.True(result.Success);
+        Assert.Empty(_imported);
+        Assert.Empty(result.TenantOwnedRefreshed);
+        Assert.Single(result.TenantOwnedSkipped);
+    }
+
+    [Fact]
+    public async Task Preview_ShowsRefreshedUpdateAvailableAndStaysDeleted()
+    {
+        GivenRuleTypeKnown();
+        GivenInstalled(V1);
+        GivenSeed(V1, new SeedSpec("unedited", false, 1), new SeedSpec("edited", false, 1), new SeedSpec("deleted", false, 1));
+        GivenSeed(V2, new SeedSpec("unedited", false, 2), new SeedSpec("edited", false, 2), new SeedSpec("deleted", false, 2));
+        GivenTenantEntity("unedited", false, V1, threshold: 1);
+        GivenTenantEntity("edited", false, V1, threshold: 9);
+
+        var preview = await Preview();
+
+        Assert.True(preview.CanProceed);
+        Assert.Equal("unedited", Assert.Single(preview.TenantOwnedRefreshed).Key);
+        Assert.Equal("edited", Assert.Single(preview.TenantOwnedUpdateAvailable).Key);
+        Assert.Equal("deleted", Assert.Single(preview.TenantOwnedStaysDeleted).Key);
+        Assert.Equal(1, preview.EntitiesToUpdate);
+        var change = Assert.Single(preview.Changes);
+        Assert.Equal("unedited", change.EntityWellKnownName);
+        Assert.Equal("Threshold", Assert.Single(change.Attributes!).AttributeName);
+        Assert.Empty(_imported);
+        Assert.Empty(_stamped);
+    }
+
+    [Fact]
+    public async Task InstallOverOtherVersion_UneditedEntityReceivesTheSeedEditedOneIsKept()
+    {
+        GivenRuleTypeKnown();
+        GivenInstalled(V1);
+        GivenSeed(V1, new SeedSpec("unedited", false, 1), new SeedSpec("edited", false, 1));
+        GivenSeed(V2, new SeedSpec("unedited", false, 2), new SeedSpec("edited", false, 2));
+        GivenResolution(V2);
+        var edited = GivenTenantEntity("edited", false, V1, threshold: 9);
+        GivenTenantEntity("unedited", false, V1, threshold: 1);
+
+        var result = await CreateService().ApplyBlueprintAsync(TenantId, V2, false, TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["unedited"], ImportedKeys.ToArray());
+        Assert.Equal(2, ImportedThreshold("unedited"));
+        Assert.Equal(9, edited.GetAttributeValueOrDefault<int>("Threshold"));
+        Assert.Contains(result.OperationResult.Messages, m => m.MessageText.Contains("TenantOwnedRefreshed"));
+        Assert.Contains(result.OperationResult.Messages, m => m.MessageText.Contains("TenantOwnedUpdateAvailable"));
+    }
+
+    [Fact]
+    public async Task ForcedReapplyOfTheSameVersion_EditedEntityIsNotReportedAsUpdateAvailable()
+    {
+        GivenRuleTypeKnown();
+        GivenInstalled(V2);
+        GivenSeed(V2, new SeedSpec("owned", false, 5));
+        GivenResolution(V2);
+        GivenTenantEntity("owned", false, V2, threshold: 9);
+
+        var result = await CreateService().ApplyBlueprintAsync(TenantId, V2, true, TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(_imported);
+        Assert.DoesNotContain(result.OperationResult.Messages, m => m.MessageText.Contains("TenantOwnedUpdateAvailable"));
     }
 }

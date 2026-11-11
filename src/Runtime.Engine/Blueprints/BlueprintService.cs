@@ -1858,8 +1858,11 @@ internal class BlueprintService : IBlueprintService
             // The comparison covers attributes only. A seed that declares associations would make the import write them
             // over the tenant's (e.g. a changed to-one target), so such an entity is never refreshed automatically.
             var declaresAssociations = seed.Associations is { Count: > 0 };
+            // A tenant that renamed the entity edited it: the upsert would write the seed's well-known name back.
+            var sameName = string.IsNullOrEmpty(seed.RtWellKnownName)
+                           || string.Equals(held.RtWellKnownName, seed.RtWellKnownName, StringComparison.Ordinal);
             var heldSource = held.GetAttributeStringValueOrDefault("RtBlueprintSource");
-            if (previous != null && sameRtId && !declaresAssociations
+            if (previous != null && sameRtId && sameName && !declaresAssociations
                 && heldSource != null && IsSameBlueprintName(heldSource, targetVersion)
                 && CompareWithTenant(tenantId, previous, held, ckType).Count == 0)
             {

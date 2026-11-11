@@ -929,4 +929,23 @@ public class BlueprintServiceTenantOwnedSeedTests
         Assert.Equal(1, held.GetAttributeValueOrDefault<int>("Threshold"));
         Assert.Equal("owned", Assert.Single(result.TenantOwnedUpdateAvailable).Key);
     }
+
+    [Fact]
+    public async Task Update_UneditedEntityTheTenantRenamed_IsNotRefreshed()
+    {
+        // Same rtId, other well-known name: the upsert would write the seed name back over the tenant's.
+        GivenRuleTypeKnown();
+        GivenInstalled(V1);
+        GivenSeed(V1, new SeedSpec("owned", false, Threshold: 1));
+        GivenSeed(V2, new SeedSpec("owned", false, Threshold: 5));
+        var held = GivenTenantEntity("owned", false, V1, threshold: 1);
+        held.RtWellKnownName = "renamed-by-tenant";
+
+        var result = await Update();
+
+        Assert.True(result.Success);
+        Assert.Empty(_imported);
+        Assert.Equal("renamed-by-tenant", held.RtWellKnownName);
+        Assert.Equal("owned", Assert.Single(result.TenantOwnedUpdateAvailable).Key);
+    }
 }

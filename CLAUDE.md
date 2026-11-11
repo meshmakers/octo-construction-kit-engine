@@ -1643,8 +1643,9 @@ Phase 4 (System → ckLanguage 2) together with a non-`new()` query path.
 parameters, nullable for optional ones, camelCase → PascalCase; CLR types: string/bool/DateTime/DateTimeOffset/
 TimeSpan/int/long/double, `IReadOnlyList<string|long>`, `Rt{Enum}Enum`, `Rt{Record}Record`) with a `ToString()` that
 redacts `sensitive` parameters as `***`, and `{Type}{Method}Result { Value }` when the method has a result
-(the engine does not dispatch; the records are the `TParameters` / `TResult` of the typed handlers,
-`ICkMethodHandler<TParameters, TResult>` in octo-common-services). Interface methods get no records. **Review L15:** the generated name
+(the engine does not dispatch; the records are the `TParameters` / `TResult` of the typed handlers in
+octo-common-services: `ICkMethodHandler<TParameters, TResult>` for a method with a result,
+`ICkMethodHandler<TParameters>` for a method without one). Interface methods get no records. **Review L15:** the generated name
 (`CkMethodIds.GeneratedName`, shared with the `{Name}MethodId` constants) is checked per model by the compiler —
 **message 125** `CkMethodGeneratedNameCollision` (`User`+`ChangePassword` vs `UserChange`+`Password`); the existing
 constant names stay unchanged (no separator). Pinned by `CkV2GeneratedContractsTests` (Roslyn compile + emitted

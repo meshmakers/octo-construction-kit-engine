@@ -62,6 +62,9 @@ public class BlueprintServiceTenantOwnedSeedTests
     private readonly ICkCacheService _cache = A.Fake<ICkCacheService>();
 
     private readonly Dictionary<string, SeedSpec[]> _seeds = [];
+
+    /// <summary>Keys whose seed entities declare an association (to another seed entity).</summary>
+    private readonly HashSet<string> _associationsFor = [];
     private readonly HashSet<string> _unreadable = [];
     private readonly List<RtEntity> _tenant = [];
     private readonly List<RtEntityTcDto> _imported = [];
@@ -85,7 +88,7 @@ public class BlueprintServiceTenantOwnedSeedTests
         // The description handed to the serializer is "<blueprint full name>/<path>".
         A.CallTo(() => _serializer.DeserializeAsync(A<Stream>._, A<string>._, A<OperationResult>._))
             .ReturnsLazily((Stream _, string location, OperationResult _) =>
-                Task.FromResult(BuildSeed(_seeds[location[..location.IndexOf('/')]])));
+                Task.FromResult(WithAssociations(BuildSeed(_seeds[location[..location.IndexOf('/')]]))));
 
         A.CallTo(() => _variables.GetVariablesAsync(A<string>._, A<CancellationToken>._))
             .Returns(Task.FromResult<IReadOnlyDictionary<string, string>>(new Dictionary<string, string>()));
@@ -172,6 +175,24 @@ public class BlueprintServiceTenantOwnedSeedTests
             }
 
             root.Entities.Add(entity);
+        }
+
+        return root;
+    }
+
+    private RtModelRootTcDto WithAssociations(RtModelRootTcDto root)
+    {
+        foreach (var entity in root.Entities.Where(e => _associationsFor.Contains(e.RtWellKnownName!)))
+        {
+            entity.Associations =
+            [
+                new RtAssociationTcDto
+                {
+                    RoleId = new RtCkId<CkAssociationRoleId>("Test-1.0.0/Related"),
+                    TargetRtId = IdOf("target"),
+                    TargetCkTypeId = RuleType
+                }
+            ];
         }
 
         return root;
@@ -888,5 +909,24 @@ public class BlueprintServiceTenantOwnedSeedTests
         Assert.Contains(preview.BlankedAttributes, b => b.AttributeName == "Note");
         var note = Assert.Single(Assert.Single(preview.Changes).Attributes!, a => a.AttributeName == "Note");
         Assert.DoesNotContain("token-4711", note.OldValue?.ToString() ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task Update_UneditedEntityWhoseSeedDeclaresAssociations_IsNotRefreshed()
+    {
+        // Associations are not compared; the import would write the seed's associations over the tenant's.
+        GivenRuleTypeKnown();
+        GivenInstalled(V1);
+        GivenSeed(V1, new SeedSpec("owned", false, Threshold: 1));
+        GivenSeed(V2, new SeedSpec("owned", false, Threshold: 5));
+        _associationsFor.Add("owned");
+        var held = GivenTenantEntity("owned", false, V1, threshold: 1);
+
+        var result = await Update();
+
+        Assert.True(result.Success);
+        Assert.Empty(_imported);
+        Assert.Equal(1, held.GetAttributeValueOrDefault<int>("Threshold"));
+        Assert.Equal("owned", Assert.Single(result.TenantOwnedUpdateAvailable).Key);
     }
 }

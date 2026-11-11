@@ -1855,8 +1855,12 @@ internal class BlueprintService : IBlueprintService
             // The import upserts by rtId: a tenant entity found only by its well-known name under another rtId
             // would not be refreshed but duplicated, so it is kept.
             var sameRtId = seed.RtId.Equals(OctoObjectId.Empty) || held.RtId.Equals(seed.RtId);
+            // The comparison covers attributes only. A seed that declares associations would make the import write them
+            // over the tenant's (e.g. a changed to-one target), so such an entity is never refreshed automatically.
+            var declaresAssociations = seed.Associations is { Count: > 0 };
             var heldSource = held.GetAttributeStringValueOrDefault("RtBlueprintSource");
-            if (previous != null && sameRtId && heldSource != null && IsSameBlueprintName(heldSource, targetVersion)
+            if (previous != null && sameRtId && !declaresAssociations
+                && heldSource != null && IsSameBlueprintName(heldSource, targetVersion)
                 && CompareWithTenant(tenantId, previous, held, ckType).Count == 0)
             {
                 return TenantOwnedOutcome.Refresh;

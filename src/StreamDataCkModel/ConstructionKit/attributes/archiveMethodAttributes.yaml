@@ -91,3 +91,41 @@ attributes:
     valueType: RecordArray
     valueCkRecordId: ${this}/CkRollupAggregation
     isRuntimeState: true
+  # ---------- RecomputeJobInfo (AB#8599, System.StreamData 1.25.0) --------------------------------
+  - id: ArchiveMethod.JobRtId
+    description: "Method result member: runtime id of the recompute job (entity RecomputeJob)."
+    valueType: String
+    isRuntimeState: true
+  - id: ArchiveMethod.JobState
+    description: "Method result member: lifecycle state of the recompute job (Pending, Running, Swapping, Completed, Failed, Coalesced)."
+    valueType: Enum
+    valueCkEnumId: ${this}/CkRecomputeJobState
+    isRuntimeState: true
+  - id: ArchiveMethod.RowsProcessed
+    description: "Method result member: rows written into the staging table; null while pending."
+    valueType: Int
+    isRuntimeState: true
+  - id: ArchiveMethod.WindowsProcessed
+    description: "Method result member: buckets recomputed; null while pending."
+    valueType: Int
+    isRuntimeState: true
+  - id: ArchiveMethod.StartedAt
+    description: "Method result member: when the compute started; null while pending."
+    valueType: DateTime
+    isRuntimeState: true
+  - id: ArchiveMethod.FinishedAt
+    description: "Method result member: when the job reached a terminal state; null while running."
+    valueType: DateTime
+    isRuntimeState: true
+  - id: ArchiveMethod.DurationMs
+    description: "Method result member: wall-clock duration of the job in milliseconds; null while running."
+    valueType: Int
+    isRuntimeState: true
+  - id: ArchiveMethod.ErrorReason
+    description: "Method result member: failure reason when the state is Failed; null otherwise."
+    valueType: String
+    isRuntimeState: true
+  - id: ArchiveMethod.LastProgressAt
+    description: "Method result member: the last heartbeat of a running job; null before the first chunk."
+    valueType: DateTime
+    isRuntimeState: true

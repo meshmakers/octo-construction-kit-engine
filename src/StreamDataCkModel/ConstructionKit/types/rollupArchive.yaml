@@ -71,3 +71,112 @@ types:
         execution:
           timeoutSeconds: 60
           idempotent: false
+      # AB#8599 (1.25.0): rollup control and recomputation, mirroring the streamData mutations freezeRollupArchive,
+      # unfreezeRollupArchive, rewindRollupWatermark, recomputeArchive and backfillRollupFromSource. Recompute and
+      # BackfillFromSource stay synchronous (mode sync, answer the job as the mutations do); moving them to async methods is a
+      # later decision after F3.6.
+      - methodId: Freeze-1
+        description: "Sets FrozenUntil on the rollup: the orchestrator stops producing buckets whose end falls in the frozen range. Monotonic - an earlier value than the current FrozenUntil is refused (use Unfreeze) (mutation streamData.freezeRollupArchive)."
+        parameters:
+          - { name: until, valueType: DateTime, description: "Inclusive upper bound of the frozen range (UTC)." }
+        result:
+          valueType: Record
+          valueCkRecordId: ${this}/ArchiveTransitionResult
+        errors:
+          - { code: STREAMDATA_ARCHIVE_NOT_FOUND, description: "The rollup archive does not exist (as the mutation)." }
+          - { code: STREAMDATA_ARCHIVE_NOT_ACTIVATED, description: "An archive the call needs is not activated (as the mutation)." }
+          - { code: STREAMDATA_INVALID_TRANSITION, description: "The change is not allowed in the current state; parameters fromStatus and attemptedTransition (as the mutation)." }
+          - { code: STREAMDATA_SCHEMA_IMMUTABLE, description: "The archive schema cannot change in its current state (as the mutation)." }
+          - { code: STREAMDATA_PATH_INVALID, description: "A column path does not resolve on the target CK type; parameter path (as the mutation)." }
+          - { code: STREAMDATA_ACTIVATION_FAILED, description: "Provisioning a CrateDB table failed (as the mutation)." }
+          - { code: STREAMDATA_ERROR, description: "Any other stream-data rule refused the call; parameter message carries the engine text (as the mutation)." }
+          - { code: STREAMDATA_NOT_ENABLED, description: "Stream data is not enabled for the tenant (the mutation answers this as a generic error)." }
+        authorization:
+          roles: [ StreamDataAdmin ]
+        execution:
+          timeoutSeconds: 30
+          idempotent: true
+      - methodId: Unfreeze-1
+        description: "Clears FrozenUntil so the orchestrator produces the frozen buckets again; idempotent on an unfrozen rollup (mutation streamData.unfreezeRollupArchive)."
+        parameters:
+          - { name: acceptGaps, valueType: Boolean, isOptional: true, description: "Acknowledge that unfreezing over truncated source data produces gaps. Default false." }
+        result:
+          valueType: Record
+          valueCkRecordId: ${this}/ArchiveTransitionResult
+        errors:
+          - { code: STREAMDATA_ARCHIVE_NOT_FOUND, description: "The rollup archive does not exist (as the mutation)." }
+          - { code: STREAMDATA_ARCHIVE_NOT_ACTIVATED, description: "An archive the call needs is not activated (as the mutation)." }
+          - { code: STREAMDATA_INVALID_TRANSITION, description: "The change is not allowed in the current state; parameters fromStatus and attemptedTransition (as the mutation)." }
+          - { code: STREAMDATA_SCHEMA_IMMUTABLE, description: "The archive schema cannot change in its current state (as the mutation)." }
+          - { code: STREAMDATA_PATH_INVALID, description: "A column path does not resolve on the target CK type; parameter path (as the mutation)." }
+          - { code: STREAMDATA_ACTIVATION_FAILED, description: "Provisioning a CrateDB table failed (as the mutation)." }
+          - { code: STREAMDATA_ERROR, description: "Any other stream-data rule refused the call; parameter message carries the engine text (as the mutation)." }
+          - { code: STREAMDATA_NOT_ENABLED, description: "Stream data is not enabled for the tenant (the mutation answers this as a generic error)." }
+        authorization:
+          roles: [ StreamDataAdmin ]
+        execution:
+          timeoutSeconds: 30
+          idempotent: true
+      - methodId: RewindWatermark-1
+        description: "Resets the aggregation watermark to an earlier bucket end (aligned down to the bucket grid) so the orchestrator re-aggregates the range, and clears recompute generations at and after it (mutation streamData.rewindRollupWatermark)."
+        parameters:
+          - { name: toBucketEnd, valueType: DateTime, description: "Target bucket end (exclusive, UTC); aligned down to the bucket boundary." }
+        result:
+          valueType: Record
+          valueCkRecordId: ${this}/ArchiveTransitionResult
+        errors:
+          - { code: STREAMDATA_ARCHIVE_NOT_FOUND, description: "The rollup archive does not exist (as the mutation)." }
+          - { code: STREAMDATA_ARCHIVE_NOT_ACTIVATED, description: "An archive the call needs is not activated (as the mutation)." }
+          - { code: STREAMDATA_INVALID_TRANSITION, description: "The change is not allowed in the current state; parameters fromStatus and attemptedTransition (as the mutation)." }
+          - { code: STREAMDATA_SCHEMA_IMMUTABLE, description: "The archive schema cannot change in its current state (as the mutation)." }
+          - { code: STREAMDATA_PATH_INVALID, description: "A column path does not resolve on the target CK type; parameter path (as the mutation)." }
+          - { code: STREAMDATA_ACTIVATION_FAILED, description: "Provisioning a CrateDB table failed (as the mutation)." }
+          - { code: STREAMDATA_ERROR, description: "Any other stream-data rule refused the call; parameter message carries the engine text (as the mutation)." }
+          - { code: STREAMDATA_NOT_ENABLED, description: "Stream data is not enabled for the tenant (the mutation answers this as a generic error)." }
+        authorization:
+          roles: [ StreamDataAdmin ]
+        execution:
+          timeoutSeconds: 60
+          idempotent: true
+      - methodId: Recompute-1
+        description: "Recomputes the rollup over [from, to) into a staging generation and swaps the generation pointer atomically (AB#4184). Answers the recompute job; a refused precondition (archive missing or not activated) is a job in state Failed, as with the mutation (mutation streamData.recomputeArchive)."
+        parameters:
+          - { name: from, valueType: DateTime, description: "Inclusive range start (UTC), aligned down to the bucket grid." }
+          - { name: to, valueType: DateTime, description: "Exclusive range end (UTC), aligned to the bucket grid." }
+          - { name: rtIdScope, valueType: String, isOptional: true, description: "Optional runtime id of a single entity (metering point, stream) the recompute is restricted to." }
+        result:
+          valueType: Record
+          valueCkRecordId: ${this}/RecomputeJobInfo
+        errors:
+          - { code: STREAMDATA_ARCHIVE_NOT_FOUND, description: "The rollup archive does not exist (as the mutation)." }
+          - { code: STREAMDATA_ARCHIVE_NOT_ACTIVATED, description: "An archive the call needs is not activated (as the mutation)." }
+          - { code: STREAMDATA_INVALID_TRANSITION, description: "The change is not allowed in the current state; parameters fromStatus and attemptedTransition (as the mutation)." }
+          - { code: STREAMDATA_SCHEMA_IMMUTABLE, description: "The archive schema cannot change in its current state (as the mutation)." }
+          - { code: STREAMDATA_PATH_INVALID, description: "A column path does not resolve on the target CK type; parameter path (as the mutation)." }
+          - { code: STREAMDATA_ACTIVATION_FAILED, description: "Provisioning a CrateDB table failed (as the mutation)." }
+          - { code: STREAMDATA_ERROR, description: "Any other stream-data rule refused the call; parameter message carries the engine text (as the mutation)." }
+          - { code: STREAMDATA_NOT_ENABLED, description: "Stream data is not enabled for the tenant (the mutation answers this as a generic error)." }
+        authorization:
+          roles: [ StreamDataAdmin ]
+        execution:
+          timeoutSeconds: 300
+          idempotent: false
+      - methodId: BackfillFromSource-1
+        description: "Queues a durable background backfill of the rollup over the entire history of its source archive and answers the Pending job at once; the recompute runs later on the background orchestrator. No result (null) when the source archive holds no data (mutation streamData.backfillRollupFromSource)."
+        result:
+          valueType: Record
+          valueCkRecordId: ${this}/RecomputeJobInfo
+        errors:
+          - { code: STREAMDATA_ARCHIVE_NOT_FOUND, description: "The rollup archive does not exist (as the mutation)." }
+          - { code: STREAMDATA_ARCHIVE_NOT_ACTIVATED, description: "An archive the call needs is not activated (as the mutation)." }
+          - { code: STREAMDATA_INVALID_TRANSITION, description: "The change is not allowed in the current state; parameters fromStatus and attemptedTransition (as the mutation)." }
+          - { code: STREAMDATA_SCHEMA_IMMUTABLE, description: "The archive schema cannot change in its current state (as the mutation)." }
+          - { code: STREAMDATA_PATH_INVALID, description: "A column path does not resolve on the target CK type; parameter path (as the mutation)." }
+          - { code: STREAMDATA_ACTIVATION_FAILED, description: "Provisioning a CrateDB table failed (as the mutation)." }
+          - { code: STREAMDATA_ERROR, description: "Any other stream-data rule refused the call; parameter message carries the engine text (as the mutation)." }
+          - { code: STREAMDATA_NOT_ENABLED, description: "Stream data is not enabled for the tenant (the mutation answers this as a generic error)." }
+        authorization:
+          roles: [ StreamDataAdmin ]
+        execution:
+          timeoutSeconds: 60
+          idempotent: false

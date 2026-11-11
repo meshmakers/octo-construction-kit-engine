@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.25.0 - 2026-11-11
+
+_Required bump level: minor._
+
+### Added
+
+- Rollup control and recomputation as CK methods (AB#8599, Feature AB#5697 F4.3), handled by the asset repository, instance
+  methods of `RollupArchive`:
+  - `Freeze-1` (parameter `until`), `Unfreeze-1` (optional `acceptGaps`) and `RewindWatermark-1` (parameter `toBucketEnd`),
+    result record `ArchiveTransitionResult`;
+  - `Recompute-1` (parameters `from`, `to`, optional `rtIdScope`) and `BackfillFromSource-1`, result record `RecomputeJobInfo`
+    (the job as the mutations answer it; `BackfillFromSource-1` answers no result when the source archive holds no data).
+  - Record `RecomputeJobInfo` and its attributes `ArchiveMethod.JobRtId`, `JobState`, `RowsProcessed`, `WindowsProcessed`,
+    `StartedAt`, `FinishedAt`, `DurationMs`, `ErrorReason`, `LastProgressAt` (runtime state).
+- Role `StreamDataAdmin`, explicit timeouts, the error codes of the 1.24.0 archive methods. `Recompute-1` and
+  `BackfillFromSource-1` stay synchronous (no `execution.mode`); moving them to async methods is a later decision (F3.6).
+
+### Compatibility
+
+- Additive, a Minor against 1.24.0 (no acknowledgement). `minEngineVersion` unchanged. The replaced streamData mutations stay
+  and are deprecated in the asset repository.
+
 ## 1.24.0 - 2026-11-10
 
 _Required bump level: minor._

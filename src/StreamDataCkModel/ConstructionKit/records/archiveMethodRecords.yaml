@@ -68,3 +68,34 @@ records:
         isOptional: true
       - id: ${this}/ArchiveMethod.Aggregations
         name: Aggregations
+  # AB#8599 (System.StreamData 1.25.0): the answer of RollupArchive.Recompute-1 and BackfillFromSource-1, the shape of the
+  # RecomputeJobInfo of the recomputeArchive / backfillRollupFromSource mutations.
+  - recordId: RecomputeJobInfo
+    description: "Result of RollupArchive.Recompute and BackfillFromSource: the recompute job, its state and progress (the shape of the RecomputeJobInfo of the streamData mutations). Poll the RecomputeJob entity for the later states."
+    isFinal: true
+    attributes:
+      - id: ${this}/ArchiveMethod.JobRtId
+        name: JobRtId
+      - id: ${this}/ArchiveMethod.JobState
+        name: State
+      - id: ${this}/ArchiveMethod.RowsProcessed
+        name: RowsProcessed
+        isOptional: true
+      - id: ${this}/ArchiveMethod.WindowsProcessed
+        name: WindowsProcessed
+        isOptional: true
+      - id: ${this}/ArchiveMethod.StartedAt
+        name: StartedAt
+        isOptional: true
+      - id: ${this}/ArchiveMethod.FinishedAt
+        name: FinishedAt
+        isOptional: true
+      - id: ${this}/ArchiveMethod.DurationMs
+        name: DurationMs
+        isOptional: true
+      - id: ${this}/ArchiveMethod.ErrorReason
+        name: ErrorReason
+        isOptional: true
+      - id: ${this}/ArchiveMethod.LastProgressAt
+        name: LastProgressAt
+        isOptional: true

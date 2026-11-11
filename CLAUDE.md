@@ -1087,6 +1087,11 @@ replace the hand-written `streamData` GraphQL mutations of octo-asset-repo-servi
 | `Archive.DeleteArchive-1` | instance | Boolean | `deleteArchive` (`Delete` is a reserved method name, message 102) |
 | `TimeRangeArchive.CreateArchive-1` | static, parameter `archive: TimeRangeArchiveCreateInput` | String (rtId) | `createTimeRangeArchive` |
 | `RollupArchive.CreateArchive-1` | static, parameter `archive: RollupArchiveCreateInput` | String (rtId) | `createRollupArchive` |
+| `RollupArchive.Freeze-1` (1.25.0) | instance, parameter `until: DateTime` | `ArchiveTransitionResult` | `freezeRollupArchive` |
+| `RollupArchive.Unfreeze-1` (1.25.0) | instance, optional `acceptGaps: Boolean` | `ArchiveTransitionResult` | `unfreezeRollupArchive` |
+| `RollupArchive.RewindWatermark-1` (1.25.0) | instance, parameter `toBucketEnd: DateTime` | `ArchiveTransitionResult` | `rewindRollupWatermark` |
+| `RollupArchive.Recompute-1` (1.25.0) | instance, `from`, `to: DateTime`, optional `rtIdScope` | `RecomputeJobInfo` | `recomputeArchive` |
+| `RollupArchive.BackfillFromSource-1` (1.25.0) | instance | `RecomputeJobInfo` (none for an empty source) | `backfillRollupFromSource` |
 
 - The instance methods sit on the abstract `Archive`; the concrete archive types inherit them (`CkTypeGraph.AllMethods`).
 - Every method: role `StreamDataAdmin`, explicit timeout, the STREAMDATA_* error codes of the mutations plus `STREAMDATA_NOT_ENABLED`.
@@ -1094,10 +1099,12 @@ replace the hand-written `streamData` GraphQL mutations of octo-asset-repo-servi
   `isRuntimeState: true`) take the ckLanguage 2 default `derivable: Model`. Their shapes equal the mutation input/result types.
 - No `replacesGenericCreate`: blueprints seed `TimeRangeArchive` / `RollupArchive` through `ImportRt` (SmartMeterInsights.Base,
   EnergyCommunity.Base, voest-app), which the flag would refuse (message 136).
-- **The create-method handlers bind `archive` to plain classes**, not to the generated `{Type}{Method}Parameters`: the generated
-  `Rt{Record}Record` holds a record array as `IAttributeValueList<T>` (an interface), which the method JSON (System.Text.Json) cannot
-  bind. The plain classes in octo-asset-repo-services have the same members as the records (AB#8707).
-- Tests: `StreamDataCkLanguage2Tests` (`ArchiveLifecycleMethods_CarryTheContractOfTheMutations`, `StreamData_1_24_0_AgainstTheMethodlessRelease_1_23_0_IsAMinor_WithoutAcknowledgement`;
+- **The create-method handlers bind the generated `{Type}{Method}Parameters`** (AB#8707): the method JSON of octo-common-services
+  (`CkMethodJson`) binds the record arrays (`IAttributeValueList<T>`) of the generated `Rt{Record}Record`; the plain look-alike
+  classes of AB#8598 are gone.
+- `Recompute-1` and `BackfillFromSource-1` (1.25.0, AB#8599) are synchronous like the mutations: they answer the job
+  (`RecomputeJobInfo`, state Pending/Running/... or Failed for a refused precondition); async methods are a later decision (F3.6).
+- Tests: `StreamDataCkLanguage2Tests` (`ArchiveLifecycleMethods_CarryTheContractOfTheMutations`, `RollupControlMethods_CarryTheContractOfTheMutations`, `StreamData_1_24_0_AgainstTheMethodlessRelease_1_23_0_IsAMinor_WithoutAcknowledgement`, `StreamData_1_25_0_AgainstThe_1_24_0_Release_IsAMinor_WithoutAcknowledgement`;
   the ckLanguage 1 baseline copy strips the `methods:` blocks and the method-only files).
 
 ## CK Model Publishing Lanes (CI)

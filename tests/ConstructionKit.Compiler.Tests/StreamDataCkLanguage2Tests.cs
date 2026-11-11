@@ -36,7 +36,7 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
     ///     default <c>derivable: Model</c>: they are method inputs and answers, not extension points.
     /// </summary>
     internal static readonly string[] MethodRecords =
-        ["ArchiveColumnSpec", "ArchiveTransitionResult", "RollupArchiveCreateInput", "TimeRangeArchiveCreateInput"];
+        ["ArchiveColumnSpec", "ArchiveTransitionResult", "RecomputeJobInfo", "RollupArchiveCreateInput", "TimeRangeArchiveCreateInput"];
 
     /// <summary>The files that hold only the method records and their attributes (AB#8598).</summary>
     internal static readonly string[] MethodOnlyFiles = ["records/archiveMethodRecords.yaml", "attributes/archiveMethodAttributes.yaml"];
@@ -189,13 +189,14 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         result.Messages.Where(m => m.Severity == CkCompileGateSeverity.Error).Select(m => m.Code ?? "").ToArray();
 
     [Fact]
-    public async Task StreamData_Is_1_24_0_OnCkLanguage2_WithMinEngineVersion351_AndPublishedToTheV3RootOnly()
+    public async Task StreamData_Is_1_25_0_OnCkLanguage2_WithMinEngineVersion351_AndPublishedToTheV3RootOnly()
     {
         var compiled = await CompileStreamDataAsync(RealStreamDataSource());
 
         Assert.Equal("System.StreamData", compiled.ModelId.Name);
-        // 1.23.0 (AB#8597) raised the language; 1.24.0 (AB#8598) adds the archive lifecycle methods.
-        Assert.Equal(new Version(1, 24, 0), new Version(compiled.ModelId.Version.ToString()));
+        // 1.23.0 (AB#8597) raised the language; 1.24.0 (AB#8598) adds the archive lifecycle methods, 1.25.0 (AB#8599) the
+        // rollup control methods.
+        Assert.Equal(new Version(1, 25, 0), new Version(compiled.ModelId.Version.ToString()));
         Assert.Equal(2, compiled.EffectiveCkLanguage);
         // Pinned exactly: a higher value means every service below it can no longer import System.StreamData. A feature that
         // raises it (e.g. an Archive method with execution.mode) is a deliberate rollout decision and updates this assertion.
@@ -336,7 +337,7 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         var creates = new[] { ("TimeRangeArchive", "TimeRangeArchiveCreateInput"), ("RollupArchive", "RollupArchiveCreateInput") };
         foreach (var (type, input) in creates)
         {
-            var create = Assert.Single(types[type].Methods!);
+            var create = Assert.Single(types[type].Methods!, m => m.Kind == CkMethodKindDto.Static);
             Assert.Equal("CreateArchive-1", create.MethodId);
             Assert.Equal(CkMethodKindDto.Static, create.Kind);
             var parameter = Assert.Single(create.Parameters!);
@@ -349,7 +350,7 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         Assert.Null(types["RecomputeJob"].Methods);
 
         var all = archive.Values.Concat(types["TimeRangeArchive"].Methods!).Concat(types["RollupArchive"].Methods!).ToList();
-        Assert.Equal(7, all.Count);
+        Assert.Equal(12, all.Count);
         Assert.All(all, m =>
         {
             Assert.Equal(["StreamDataAdmin"], m.Authorization!.Roles!);
@@ -359,6 +360,87 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
             Assert.False(m.ReplacesGenericCreate, m.MethodId);
             Assert.DoesNotContain(m.Parameters ?? [], p => p.Sensitive);
         });
+    }
+
+    /// <summary>
+    ///     AB#8599: rollup control and recomputation as instance methods of RollupArchive, with the arguments and answers of
+    ///     freezeRollupArchive, unfreezeRollupArchive, rewindRollupWatermark, recomputeArchive and backfillRollupFromSource.
+    /// </summary>
+    [Fact]
+    public async Task RollupControlMethods_CarryTheContractOfTheMutations()
+    {
+        var compiled = await CompileStreamDataAsync(RealStreamDataSource());
+        var rollup = compiled.Types!.Single(t => t.TypeId.Name == "RollupArchive").Methods!.ToDictionary(m => m.MethodId);
+
+        Assert.Equal(["BackfillFromSource-1", "CreateArchive-1", "Freeze-1", "Recompute-1", "RewindWatermark-1", "Unfreeze-1"],
+            rollup.Keys.Order(StringComparer.Ordinal));
+        Assert.All(rollup.Values.Where(m => m.MethodId != "CreateArchive-1"),
+            m => Assert.Equal(CkMethodKindDto.Instance, m.Kind));
+
+        static (string, AttributeValueTypesDto, bool)[] Parameters(CkMethodDto m) =>
+            (m.Parameters ?? []).Select(p => (p.Name, p.ValueType, p.IsOptional)).ToArray();
+
+        Assert.Equal([("until", AttributeValueTypesDto.DateTime, false)], Parameters(rollup["Freeze-1"]));
+        Assert.Equal([("acceptGaps", AttributeValueTypesDto.Boolean, true)], Parameters(rollup["Unfreeze-1"]));
+        Assert.Equal([("toBucketEnd", AttributeValueTypesDto.DateTime, false)], Parameters(rollup["RewindWatermark-1"]));
+        Assert.Equal(
+            [("from", AttributeValueTypesDto.DateTime, false), ("to", AttributeValueTypesDto.DateTime, false),
+             ("rtIdScope", AttributeValueTypesDto.String, true)],
+            Parameters(rollup["Recompute-1"]));
+        Assert.Empty(Parameters(rollup["BackfillFromSource-1"]));
+
+        foreach (var id in new[] { "Freeze-1", "Unfreeze-1", "RewindWatermark-1" })
+        {
+            Assert.Equal("ArchiveTransitionResult", rollup[id].Result!.ValueCkRecordId!.ElementId.Name);
+        }
+
+        foreach (var id in new[] { "Recompute-1", "BackfillFromSource-1" })
+        {
+            Assert.Equal("RecomputeJobInfo", rollup[id].Result!.ValueCkRecordId!.ElementId.Name);
+            Assert.False(rollup[id].Execution!.Idempotent, id);
+            Assert.Null(rollup[id].Execution!.Mode); // synchronous, as the mutations; async is a later decision (F3.6)
+        }
+
+        var jobInfo = compiled.Records!.Single(r => r.RecordId.Name == "RecomputeJobInfo");
+        Assert.Equal(["DurationMs", "ErrorReason", "FinishedAt", "JobRtId", "LastProgressAt", "RowsProcessed", "StartedAt", "State",
+                "WindowsProcessed"],
+            jobInfo.Attributes!.Select(a => a.AttributeName).Order(StringComparer.Ordinal));
+    }
+
+    /// <summary>
+    ///     AB#8599: 1.25.0 against 1.24.0 (the same sources without the rollup control methods, RecomputeJobInfo and its
+    ///     attributes) is a Minor without acknowledgement.
+    /// </summary>
+    [Fact]
+    public async Task StreamData_1_25_0_AgainstThe_1_24_0_Release_IsAMinor_WithoutAcknowledgement()
+    {
+        var baseline = CopyStreamData("streamdata-1.24.0", (path, yaml) => path switch
+        {
+            "ckModel.yaml" => SetVersion(yaml, "1.24.0"),
+            "types/rollupArchive.yaml" => CutFrom(yaml, "      # AB#8599 (1.25.0)"),
+            "records/archiveMethodRecords.yaml" => CutFrom(yaml, "  # AB#8599 (System.StreamData 1.25.0)"),
+            "attributes/archiveMethodAttributes.yaml" => CutFrom(yaml, "  # ---------- RecomputeJobInfo (AB#8599"),
+            _ => yaml
+        });
+        var compiled = await CompileStreamDataAsync(baseline);
+        Assert.Single(compiled.Types!.Single(t => t.TypeId.Name == "RollupArchive").Methods!);
+        await _fixture.Services.GetRequiredService<ICatalogService>().PublishAsync(InMemoryPublishedCatalog.Name, compiled,
+            new OriginFileResolver(baseline), isForced: true);
+
+        var result = await RunGateAsync(RealStreamDataSource());
+
+        Assert.Empty(Errors(result));
+        Assert.Contains("1.24.0", result.Verdict!.BaselineId.ToString());
+        Assert.Equal(CkSemVerLevel.Minor, result.Verdict.RequiredLevel);
+        Assert.DoesNotContain(result.Verdict.ClassifiedChanges, c => c.RequiresAcknowledge);
+    }
+
+    /// <summary>The YAML up to (not including) the line that starts with <paramref name="marker" />.</summary>
+    private static string CutFrom(string yaml, string marker)
+    {
+        var index = yaml.IndexOf("\n" + marker, StringComparison.Ordinal);
+        Assert.True(index >= 0, $"marker '{marker}' not found");
+        return yaml[..(index + 1)];
     }
 
     /// <summary>

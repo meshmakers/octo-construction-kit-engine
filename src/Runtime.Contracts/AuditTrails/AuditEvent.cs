@@ -53,4 +53,13 @@ public sealed record AuditEvent(
     /// this; sinks that only persist a flat event-log entry can ignore it.
     /// </summary>
     public IReadOnlyDictionary<string, object?>? Metadata { get; init; }
+
+    /// <summary>
+    /// Optional opt-in to aggregation (AB#7279). Events that carry a key are repeated facts (for
+    /// example the same AuditOnly data-permission violation of the same subject on the same type):
+    /// the engine's <c>AggregatingAuditEventSink</c> publishes the first occurrence per
+    /// (<see cref="TenantId"/>, key) at once and then one summary per window instead of every
+    /// repetition. Events without a key are always published one by one.
+    /// </summary>
+    public string? AggregationKey { get; init; }
 }

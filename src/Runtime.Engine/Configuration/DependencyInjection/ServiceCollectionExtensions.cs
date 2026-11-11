@@ -1,3 +1,4 @@
+using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.AuditTrails;
 using Meshmakers.Octo.Runtime.Contracts.Blueprints;
@@ -24,6 +25,7 @@ using Meshmakers.Octo.Runtime.Engine.TransportContainer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -58,7 +60,9 @@ public static class ServiceCollectionExtensions
         // and the caller-specific read-filter factory
         services.TryAddSingleton<IDataPermissionResolver, DataPermissionResolver>();
         services.TryAddSingleton<IDataSecurityFilterFactory, DataSecurityFilterFactory>();
-        services.TryAddSingleton<IRtDataPermissionEvaluator, RtDataPermissionEvaluator>();
+        services.TryAddSingleton<IRtDataPermissionEvaluator>(sp => new RtDataPermissionEvaluator(
+            sp.GetRequiredService<IDataPermissionResolver>(), sp.GetRequiredService<ICkCacheService>(),
+            sp.GetService<AggregatingAuditEventSink>()));
 
         // Secret attribute key ring (AB#5528, concept §3.5): bound from SecretEncryption in the
         // host configuration, so every engine host gets it. Without keys the host still starts;
@@ -143,6 +147,24 @@ public static class ServiceCollectionExtensions
         // landed. TryAdd so test fixtures or hosts can pre-register a substitute (e.g.
         // NoOpAuditEventSink) and have this no-op out.
         services.TryAddSingleton<IAuditEventSink, LoggingAuditEventSink>();
+
+        // AB#7279: repeated AuditOnly data-permission violations (one per repository call, up to a million
+        // log lines a day) are aggregated per (tenant, subject, type, action): first occurrence at once, then
+        // one summary per window (AuditEventAggregation:Window, default 15 min). The aggregator wraps
+        // whatever IAuditEventSink the host registered (log or event store) and is handed only to the
+        // publishers of those violations (RtDataPermissionEvaluator here, the tenant repositories in
+        // engine-mongodb). It is not registered as IAuditEventSink, so every other audit event and the
+        // host's sink type stay untouched. A singleton: the container disposes it on shutdown, which
+        // publishes the pending summaries.
+        services.AddOptions<AuditEventAggregationOptions>()
+            .Configure<IServiceProvider>((options, serviceProvider) =>
+                serviceProvider.GetService<IConfiguration>()?.GetSection(AuditEventAggregationOptions.SectionName)
+                    .Bind(options));
+        services.TryAddSingleton(sp => new AggregatingAuditEventSink(
+            sp.GetRequiredService<IAuditEventSink>(),
+            sp.GetRequiredService<IOptions<AuditEventAggregationOptions>>(),
+            sp.GetService<ILogger<AggregatingAuditEventSink>>(),
+            sp.GetService<TimeProvider>()));
 
         // CK model import audit trail (WI #3324). Default forwards every call through
         // IAuditEventSink.

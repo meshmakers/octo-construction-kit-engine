@@ -4,6 +4,7 @@ using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.AuditTrails;
 using Meshmakers.Octo.Runtime.Contracts.DataPermissions;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
+using Meshmakers.Octo.Runtime.Engine.AuditTrails;
 
 namespace Meshmakers.Octo.Runtime.Engine.Security;
 
@@ -54,11 +55,8 @@ internal static class DataPermissionRules
     internal static Task PublishWriteAuditAsync(IAuditEventSink? auditEventSink, string tenantId,
         RtSecurityContext securityContext, RtCkId<CkTypeId> ckTypeId, RtDataAction action)
     {
-        return auditEventSink?.PublishAsync(new AuditEvent(tenantId, AuditEventLevel.Warning,
-                   "DataPermissions.WriteViolation",
-                   $"Subject '{securityContext.SubjectId}' performed '{action}' on protected type " +
-                   $"'{ckTypeId.SemanticVersionedFullName}' without a grant (AuditOnly policy — not blocked)."))
-               ?? Task.CompletedTask;
+        return DataPermissionAudit.PublishWriteViolationAsync(auditEventSink, tenantId, securityContext.SubjectId,
+            ckTypeId.SemanticVersionedFullName, action);
     }
 
     /// <summary>
@@ -69,21 +67,15 @@ internal static class DataPermissionRules
     internal static Task PublishWriteVisibilityAuditAsync(IAuditEventSink? auditEventSink, string tenantId,
         RtSecurityContext securityContext, RtCkId<CkTypeId> ckTypeId, RtDataAction action)
     {
-        return auditEventSink?.PublishAsync(new AuditEvent(tenantId, AuditEventLevel.Warning,
-                   "DataPermissions.WriteViolation",
-                   $"Subject '{securityContext.SubjectId}' performed '{action}' on an entity of protected type " +
-                   $"'{ckTypeId.SemanticVersionedFullName}' that it cannot see (AuditOnly policy — not blocked)."))
-               ?? Task.CompletedTask;
+        return DataPermissionAudit.PublishWriteViolationAsync(auditEventSink, tenantId, securityContext.SubjectId,
+            ckTypeId.SemanticVersionedFullName, action, entityNotVisible: true);
     }
 
     internal static Task PublishReadAuditAsync(IAuditEventSink? auditEventSink, string tenantId,
         RtSecurityContext securityContext, RtCkId<CkTypeId> ckTypeId)
     {
-        return auditEventSink?.PublishAsync(new AuditEvent(tenantId, AuditEventLevel.Warning,
-                   "DataPermissions.ReadViolation",
-                   $"Subject '{securityContext.SubjectId}' read protected type " +
-                   $"'{ckTypeId.SemanticVersionedFullName}' without a grant (AuditOnly policy — not blocked)."))
-               ?? Task.CompletedTask;
+        return DataPermissionAudit.PublishReadViolationAsync(auditEventSink, tenantId, securityContext.SubjectId,
+            ckTypeId.SemanticVersionedFullName, DataPermissionAudit.Actions.Read);
     }
 
     internal sealed record TypeAccess(

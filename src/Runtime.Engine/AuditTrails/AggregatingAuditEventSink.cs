@@ -39,6 +39,7 @@ public sealed class AggregatingAuditEventSink : IAuditEventSink, IAsyncDisposabl
     private readonly Lock _lock = new();
     private readonly ITimer? _timer;
     private int _flushRunning;
+    private Task _timerFlush = Task.CompletedTask;
     private bool _disposed;
 
     /// <summary>Constructor.</summary>
@@ -63,7 +64,7 @@ public sealed class AggregatingAuditEventSink : IAuditEventSink, IAsyncDisposabl
             // Check often enough that a summary is at most a small fraction of the window late.
             var tick = TimeSpan.FromTicks(Math.Clamp(_window.Ticks / 15, TimeSpan.TicksPerSecond,
                 TimeSpan.TicksPerMinute));
-            _timer = _timeProvider.CreateTimer(_ => _ = FlushDueSafeAsync(), null, tick, tick);
+            _timer = _timeProvider.CreateTimer(_ => OnTimer(), null, tick, tick);
         }
     }
 
@@ -207,6 +208,8 @@ public sealed class AggregatingAuditEventSink : IAuditEventSink, IAsyncDisposabl
             await _timer.DisposeAsync().ConfigureAwait(false);
         }
 
+        // A flush the timer started has already taken its summaries out of the store; wait until they are published.
+        await Volatile.Read(ref _timerFlush).ConfigureAwait(false);
         await FlushPendingAsync().ConfigureAwait(false);
     }
 
@@ -238,12 +241,19 @@ public sealed class AggregatingAuditEventSink : IAuditEventSink, IAsyncDisposabl
         return oldest.Value.Repetitions > 0 ? oldest.Value.BuildSummary(_window) : null;
     }
 
-    private async Task FlushDueSafeAsync()
+    private void OnTimer()
     {
         if (Interlocked.Exchange(ref _flushRunning, 1) == 1)
         {
             return;
         }
+
+        // Remembered so DisposeAsync can wait for a flush the timer started (its summaries are no longer in the store).
+        Volatile.Write(ref _timerFlush, FlushDueSafeAsync());
+    }
+
+    private async Task FlushDueSafeAsync()
+    {
 
         try
         {

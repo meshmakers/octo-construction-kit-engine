@@ -2,7 +2,8 @@ namespace Meshmakers.Octo.Runtime.Engine.AuditTrails;
 
 /// <summary>
 /// Options of <see cref="AggregatingAuditEventSink"/> (AB#7279), bound from the host configuration
-/// section <see cref="SectionName"/> (e.g. <c>AuditEventAggregation__Window=00:05:00</c>).
+/// section <see cref="SectionName"/>; services override it with the platform's environment prefix, e.g.
+/// <c>OCTO_AuditEventAggregation__Window=00:05:00</c>.
 /// </summary>
 public sealed class AuditEventAggregationOptions
 {

@@ -225,6 +225,29 @@ public class AggregatingAuditEventSinkTests
     }
 
     [Fact]
+    public async Task Dispose_WaitsForASummaryTheTimerIsStillPublishing()
+    {
+        var release = new TaskCompletionSource();
+        var inner = new BlockingSummarySink(release.Task);
+        var clock = new ManualTimeProvider();
+        var sink = new AggregatingAuditEventSink(inner,
+            Options.Create(new AuditEventAggregationOptions { Window = Window }),
+            NullLogger<AggregatingAuditEventSink>.Instance, clock);
+        await DataPermissionAudit.PublishReadViolationAsync(sink, "t1", "sa-1", "A/A-1", "read");
+        await DataPermissionAudit.PublishReadViolationAsync(sink, "t1", "sa-1", "A/A-1", "read");
+        clock.Advance(Window);
+
+        clock.FireTimers();
+        var dispose = sink.DisposeAsync().AsTask();
+        await Task.Delay(100, TestContext.Current.CancellationToken);
+
+        Assert.False(dispose.IsCompleted);
+        release.SetResult();
+        await dispose;
+        Assert.Equal(1, inner.Summaries);
+    }
+
+    [Fact]
     public async Task EventsWithoutKey_PassThroughOneByOne()
     {
         var (sink, inner, _) = Create();
@@ -345,19 +368,48 @@ public class AggregatingAuditEventSinkTests
         }
     }
 
-    /// <summary>Clock under test control; its timers never fire (the tests call FlushDueAsync).</summary>
+    /// <summary>Sink whose summaries (events without key) wait for <c>release</c>.</summary>
+    private sealed class BlockingSummarySink(Task release) : IAuditEventSink
+    {
+        private int _summaries;
+
+        public int Summaries => Volatile.Read(ref _summaries);
+
+        public async Task PublishAsync(AuditEvent auditEvent, CancellationToken cancellationToken = default)
+        {
+            if (auditEvent.AggregationKey == null)
+            {
+                await release;
+                Interlocked.Increment(ref _summaries);
+            }
+        }
+    }
+
+    /// <summary>Clock under test control; its timers fire only on <see cref="FireTimers" />.</summary>
     private sealed class ManualTimeProvider : TimeProvider
     {
+        private readonly List<(TimerCallback Callback, object? State)> _timers = [];
         private DateTimeOffset _now = new(2026, 11, 11, 12, 0, 0, TimeSpan.Zero);
 
         public void Advance(TimeSpan by) => _now += by;
 
+        public void FireTimers()
+        {
+            foreach (var (callback, state) in _timers)
+            {
+                callback(state);
+            }
+        }
+
         public override DateTimeOffset GetUtcNow() => _now;
 
-        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period) =>
-            new NeverTimer();
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            _timers.Add((callback, state));
+            return new ManualTimer();
+        }
 
-        private sealed class NeverTimer : ITimer
+        private sealed class ManualTimer : ITimer
         {
             public bool Change(TimeSpan dueTime, TimeSpan period) => true;
             public void Dispose() { }

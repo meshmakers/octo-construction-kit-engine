@@ -920,7 +920,8 @@ aggregated instead of published one by one:
   sink); `DisposeAsync` (container shutdown) calls it as well.
 - Options `AuditEventAggregation` (`AuditEventAggregationOptions`, bound from `IConfiguration` in
   `AddRuntimeEngine`): `Enabled` (default `true`), `Window` (default `00:15:00`; zero disables),
-  `MaxKeys` (default 1000).
+  `MaxKeys` (default 1000). Override per service with the platform prefix, e.g.
+  `OCTO_AuditEventAggregation__Window=00:05:00`.
 - It is registered as its own singleton, **not** as `IAuditEventSink`: hosts keep their sink type
   (common-services checks `IStrictAuditEventSink` for the CK method audit) and every other audit
   event is untouched. Publishers of repeated facts take it explicitly: `RtDataPermissionEvaluator`

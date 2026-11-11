@@ -802,6 +802,58 @@ public class BlueprintEntityComparerTests
         return record;
     }
 
+    // ---- AB#8778: seed against seed ----------------------------------------------------------
+
+    [Fact]
+    public void SeedsEqual_SameContentInImportShapes_IsEqual()
+    {
+        var type = BuildType(EnumAttr("State"), Attr("Take", AttributeValueTypesDto.Integer64),
+            Attr("Name", AttributeValueTypesDto.String));
+
+        Assert.True(BlueprintEntityComparer.SeedsEqual(
+            Seed(("State", "Matched"), ("Take", 500), ("Name", "x")),
+            Seed(("State", 1), ("Take", 500L), ("Name", "x")),
+            type, ResolveEnum));
+    }
+
+    [Fact]
+    public void SeedsEqual_ChangedValue_IsDifferent()
+    {
+        var type = BuildType(Attr("Name", AttributeValueTypesDto.String));
+
+        Assert.False(BlueprintEntityComparer.SeedsEqual(Seed(("Name", "old")), Seed(("Name", "new")), type, ResolveEnum));
+    }
+
+    [Fact]
+    public void SeedsEqual_OmittedAttributeEqualsItsDefault()
+    {
+        var type = BuildType(Defaulted("Mode", AttributeValueTypesDto.Integer, 3));
+
+        Assert.True(BlueprintEntityComparer.SeedsEqual(Seed(), Seed(("Mode", 3)), type, ResolveEnum));
+        Assert.False(BlueprintEntityComparer.SeedsEqual(Seed(), Seed(("Mode", 4)), type, ResolveEnum));
+    }
+
+    [Fact]
+    public void SeedsEqual_BookkeepingAndPreservedAttributes_AreNotContent()
+    {
+        var type = BuildType(Attr("RtBlueprintSource", AttributeValueTypesDto.String),
+            Attr("Status", AttributeValueTypesDto.String, AttributeOwnershipDto.RuntimeState));
+
+        Assert.True(BlueprintEntityComparer.SeedsEqual(
+            Seed(("RtBlueprintSource", "Shop-1.0.0"), ("Status", "a")),
+            Seed(("RtBlueprintSource", "Shop-2.0.0"), ("Status", "b")),
+            type, ResolveEnum));
+    }
+
+    [Fact]
+    public void SeedsEqual_NullAndEmptyRecordArray_AreEqual()
+    {
+        var type = BuildType(RecordArrayAttr("Columns"));
+
+        Assert.True(BlueprintEntityComparer.SeedsEqual(Seed(("Columns", null)), Seed(("Columns", new List<RtRecordTcDto>())),
+            type, ResolveEnum));
+    }
+
     private static RtEntityTcDto Seed(params (string name, object? value)[] attrs)
     {
         var dto = new RtEntityTcDto

@@ -206,6 +206,61 @@ internal static class BlueprintEntityComparer
     }
 
     /// <summary>
+    /// AB#8778: whether two seed definitions of the same entity write the same content - the
+    /// question "did the target version change the seed of this entity?". Same rules as
+    /// <see cref="Compare" />: the blueprint bookkeeping, Secret attributes and attributes the
+    /// upsert preserves are not content; an omitted attribute counts as its CK default; a null
+    /// RecordArray equals an empty one. Anything that cannot be prepared counts as different.
+    /// </summary>
+    internal static bool SeedsEqual(
+        RtEntityTcDto a,
+        RtEntityTcDto b,
+        CkTypeWithAttributesGraph ckType,
+        Func<CkId<CkEnumId>, CkEnumGraph?> resolveEnum,
+        Func<RtCkId<CkRecordId>, CkRecordGraph?>? resolveRecord = null)
+    {
+        foreach (var attribute in ckType.AllAttributes.Values)
+        {
+            if (BlueprintBookkeeping.Contains(attribute.AttributeName)
+                || attribute.ValueType == AttributeValueTypesDto.Secret
+                || attribute.Ownership.IsPreservedOnUpsert())
+            {
+                continue;
+            }
+
+            var rawA = EffectiveSeedValue(attribute, a.Attributes.FirstOrDefault(x => x.Id.Equals(attribute.CkAttributeId)));
+            var rawB = EffectiveSeedValue(attribute, b.Attributes.FirstOrDefault(x => x.Id.Equals(attribute.CkAttributeId)));
+            bool equal;
+            try
+            {
+                if (attribute.ValueType is AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray)
+                {
+                    equal = ValuesEqual(rawA, rawB, NestedRecordGraph(attribute, resolveRecord), resolveEnum, resolveRecord)
+                            || (attribute.ValueType == AttributeValueTypesDto.RecordArray
+                                && IsEmptyOrNullSequence(rawA) && IsEmptyOrNullSequence(rawB));
+                }
+                else
+                {
+                    equal = ValuesEqual(
+                        Normalise(ConvertLikeTheImport(attribute, rawA), attribute, resolveEnum),
+                        Normalise(ConvertLikeTheImport(attribute, rawB), attribute, resolveEnum));
+                }
+            }
+            catch (Exception)
+            {
+                equal = false;
+            }
+
+            if (!equal)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// The import's own write-side conversion (<see cref="AttributeValueConverter" />), applied to
     /// a value regardless of which side it came from. A conversion the converter refuses leaves
     /// the raw value in place, which at worst reports a change that the apply would not make.

@@ -1516,7 +1516,7 @@ internal class BlueprintService : IBlueprintService
                             diff.TenantOwnedRefreshed.Add(ToTenantOwnedEntity(key!, ckTypeId, held));
                             diff.EntitiesToUpdate.Add(seed);
                             diff.ToUpdate++;
-                            AddBlankingFindings(diff, seed, held, ckTypeId, ckTypeGraph!);
+                            var blankedOnRefresh = AddBlankingFindings(diff, seed, held, ckTypeId, ckTypeGraph!);
                             diff.ChangedEntities.Add(new BlueprintEntityChange
                             {
                                 EntityId = held.RtId.ToString() ?? string.Empty,
@@ -1524,7 +1524,8 @@ internal class BlueprintService : IBlueprintService
                                 EntityDisplayName = held.RtDisplayName,
                                 EntityCkTypeId = ckTypeId.ToString(),
                                 // Listed in TenantOwnedRefreshed as well; Note stays reserved for "not comparable".
-                                Attributes = CompareWithTenant(tenantId, seed, held, ckTypeGraph!)
+                                // Blanked attributes are reported as summaries only (AB#6315), as for locked entities.
+                                Attributes = CompareWithTenant(tenantId, seed, held, ckTypeGraph!, blankedOnRefresh)
                             });
                             continue;
                         }
@@ -1776,12 +1777,15 @@ internal class BlueprintService : IBlueprintService
     /// AB#6315 for a refreshed tenant-owned entity (AB#8778): the attributes the import will keep or blank,
     /// found by the same guard the apply runs.
     /// </summary>
-    private static void AddBlankingFindings(BlueprintUpdateDiff diff, RtEntityTcDto seed, RtEntity tenant,
+    /// <returns>The names of the blanked attributes, for masking their values in the change list.</returns>
+    private static HashSet<string> AddBlankingFindings(BlueprintUpdateDiff diff, RtEntityTcDto seed, RtEntity tenant,
         RtCkId<CkTypeId> ckTypeId, CkTypeGraph ckType)
     {
+        var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var finding in SeedBlankingDetector.Detect(seed, tenant,
                      ImportRtModelCommand.SelectGuardedAttributes(ckType)))
         {
+            names.Add(finding.Attribute.AttributeName);
             diff.Blanked.Add(new BlueprintBlankedAttribute
             {
                 RtId = tenant.RtId.ToString() ?? string.Empty,
@@ -1793,6 +1797,8 @@ internal class BlueprintService : IBlueprintService
                 AppliedOnUpdate = false
             });
         }
+
+        return names;
     }
 
     /// <summary>AB#8778: what an update does with a tenant-owned seed entity the tenant holds.</summary>
@@ -1846,8 +1852,11 @@ internal class BlueprintService : IBlueprintService
                 return TenantOwnedOutcome.Kept; // the target version brings no new content for it
             }
 
+            // The import upserts by rtId: a tenant entity found only by its well-known name under another rtId
+            // would not be refreshed but duplicated, so it is kept.
+            var sameRtId = seed.RtId.Equals(OctoObjectId.Empty) || held.RtId.Equals(seed.RtId);
             var heldSource = held.GetAttributeStringValueOrDefault("RtBlueprintSource");
-            if (previous != null && heldSource != null && IsSameBlueprintName(heldSource, targetVersion)
+            if (previous != null && sameRtId && heldSource != null && IsSameBlueprintName(heldSource, targetVersion)
                 && CompareWithTenant(tenantId, previous, held, ckType).Count == 0)
             {
                 return TenantOwnedOutcome.Refresh;
@@ -1863,11 +1872,13 @@ internal class BlueprintService : IBlueprintService
     }
 
     private List<BlueprintAttributeChange> CompareWithTenant(
-        string tenantId, RtEntityTcDto seed, RtEntity tenant, CkTypeGraph ckType) =>
+        string tenantId, RtEntityTcDto seed, RtEntity tenant, CkTypeGraph ckType,
+        IReadOnlySet<string>? maskedAttributeNames = null) =>
         BlueprintEntityComparer.Compare(seed, tenant, ckType,
             v => ImportRtModelCommand.ToTransportValue(_ckCacheService, tenantId, v),
             enumId => _ckCacheService.TryGetCkEnum(tenantId, enumId, out var e) ? e : null,
-            recordId => _ckCacheService.TryGetRtCkRecord(tenantId, recordId, out var r) ? r : null);
+            recordId => _ckCacheService.TryGetRtCkRecord(tenantId, recordId, out var r) ? r : null,
+            maskedAttributeNames);
 
     private static RtEntity? FindTenantEntity(
         IReadOnlyDictionary<string, RtEntity> tenantByKey, string key, RtEntityTcDto seed)

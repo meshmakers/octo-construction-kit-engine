@@ -40,8 +40,15 @@ public class BlueprintServiceTenantOwnedSeedTests
     private static readonly RtCkId<CkAttributeId> LockedAttr = new("System/RtBlueprintLocked");
     private static readonly RtCkId<CkAttributeId> ThresholdAttr = new CkId<CkAttributeId>("Test-1.0.0/Threshold").ToRtCkId();
 
-    /// <summary>One entity of a seed: key, the seed's lock flag (null = absent) and a payload value.</summary>
-    private sealed record SeedSpec(string Key, bool? Locked, int Threshold = 1);
+    /// <summary>One entity of a seed: key, the seed's lock flag (null = absent), a payload value and an optional note.</summary>
+    private sealed record SeedSpec(string Key, bool? Locked, int Threshold = 1, string? Note = null);
+
+    private static readonly RtCkId<CkAttributeId> NoteAttr = new CkId<CkAttributeId>("Test-1.0.0/Note").ToRtCkId();
+
+    /// <summary>The rtId of a key, the same in every seed version and on the tenant (the import upserts by rtId).</summary>
+    private static OctoObjectId IdOf(string key) =>
+        new(Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(key)))[..24]
+            .ToLowerInvariant());
 
     private readonly IBlueprintCatalogManager _catalog = A.Fake<IBlueprintCatalogManager>();
     private readonly ITenantBlueprintHistory _history = A.Fake<ITenantBlueprintHistory>();
@@ -101,7 +108,19 @@ public class BlueprintServiceTenantOwnedSeedTests
                 A<IReadOnlyCollection<RtImportBlankingConfirmation>?>._))
             .Invokes((IRuntimeRepository _, RtModelRootTcDto root, ImportStrategy _, CancellationToken? _,
                 RtImportBlankingPolicy _, IReadOnlyCollection<RtImportBlankingConfirmation>? _) =>
-                _imported.AddRange(root.Entities))
+            {
+                _imported.AddRange(root.Entities);
+                // The upsert by rtId: an existing tenant entity takes the imported payload.
+                foreach (var dto in root.Entities)
+                {
+                    var stored = _tenant.FirstOrDefault(t => t.RtId.Equals(dto.RtId));
+                    var threshold = dto.Attributes.FirstOrDefault(a => a.Id.Equals(ThresholdAttr))?.Value;
+                    if (stored != null && threshold != null)
+                    {
+                        stored.SetAttributeValueNonNullable("Threshold", AttributeValueTypesDto.Integer, Convert.ToInt32(threshold));
+                    }
+                }
+            })
             .Returns(Task.CompletedTask);
         A.CallTo(() => _installations.GetByBlueprintNameAsync(TenantId, A<string>._, A<CancellationToken>._))
             .Returns(Task.FromResult<BlueprintInstallation?>(null));
@@ -138,11 +157,15 @@ public class BlueprintServiceTenantOwnedSeedTests
         {
             var entity = new RtEntityTcDto
             {
-                RtId = new OctoObjectId($"aa{i + 1:x22}"),
+                RtId = IdOf(specs[i].Key),
                 CkTypeId = RuleType,
                 RtWellKnownName = specs[i].Key
             };
             entity.Attributes.Add(new RtAttributeTcDto { Id = ThresholdAttr, Value = specs[i].Threshold });
+            if (specs[i].Note != null)
+            {
+                entity.Attributes.Add(new RtAttributeTcDto { Id = NoteAttr, Value = specs[i].Note });
+            }
             if (specs[i].Locked is { } locked)
             {
                 entity.Attributes.Add(new RtAttributeTcDto { Id = LockedAttr, Value = locked });
@@ -178,16 +201,26 @@ public class BlueprintServiceTenantOwnedSeedTests
 
     private int _tenantIndex;
 
-    /// <summary>A tenant entity of blueprint <paramref name="source" /> carrying an edited payload value.</summary>
-    private RtEntity GivenTenantEntity(string key, bool storedLocked, BlueprintId source, int threshold = 99)
+    /// <summary>
+    /// A tenant entity of blueprint <paramref name="source" /> carrying an edited payload value, under the rtId the seed
+    /// gives its key (<paramref name="foreignRtId" />: another rtId, found only by its well-known name).
+    /// </summary>
+    private RtEntity GivenTenantEntity(string key, bool storedLocked, BlueprintId source, int threshold = 99,
+        string? note = null, bool foreignRtId = false)
     {
-        var entity = new RtEntity(RuleType, new OctoObjectId($"bb{++_tenantIndex:x22}"),
-            new Dictionary<string, object?>
-            {
-                ["RtBlueprintSource"] = source.FullName,
-                ["RtBlueprintLocked"] = storedLocked,
-                ["Threshold"] = threshold
-            })
+        var attributes = new Dictionary<string, object?>
+        {
+            ["RtBlueprintSource"] = source.FullName,
+            ["RtBlueprintLocked"] = storedLocked,
+            ["Threshold"] = threshold
+        };
+        if (note != null)
+        {
+            attributes["Note"] = note;
+        }
+
+        var entity = new RtEntity(RuleType, foreignRtId ? new OctoObjectId($"bb{++_tenantIndex:x22}") : IdOf(key),
+            attributes)
         {
             RtWellKnownName = key
         };
@@ -586,9 +619,18 @@ public class BlueprintServiceTenantOwnedSeedTests
             {
                 AttributeId = "Threshold", ValueType = AttributeValueTypesDto.Integer
             }));
+        var noteId = new CkId<CkAttributeId>("Test-1.0.0/Note");
+        var note = new CkTypeAttributeGraph(noteId,
+            new CkTypeAttributeDto { CkAttributeId = noteId, AttributeName = "Note", IsOptional = true },
+            new CkAttributeGraph(noteId, new CkAttributeDto
+            {
+                AttributeId = "Note", ValueType = AttributeValueTypesDto.String
+            }));
         var graph = new CkTypeGraph(new CkId<CkTypeId>("Test-1.0.0/Rule"), isAbstract: false, isFinal: false,
             isCollectionRoot: false, baseTypes: [], derivedFromCkTypeId: null, definingCollectionRootCkTypeId: null,
-            derivedTypes: [], definedAttributes: [], allAttributes: new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> { [attrId] = threshold }, indexes: [],
+            derivedTypes: [], definedAttributes: [],
+            allAttributes: new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> { [attrId] = threshold, [noteId] = note },
+            indexes: [],
             associations: new CkGraphDirectedAssociations([]), description: "test",
             enableChangeStreamPreAndPostImages: false);
         CkTypeGraph? ignored;
@@ -608,13 +650,16 @@ public class BlueprintServiceTenantOwnedSeedTests
         GivenInstalled(V1);
         GivenSeed(V1, new SeedSpec("owned", false, Threshold: 1));
         GivenSeed(V2, new SeedSpec("owned", false, Threshold: 5));
-        GivenTenantEntity("owned", false, V1, threshold: 1);
+        var held = GivenTenantEntity("owned", false, V1, threshold: 1);
 
         var result = await Update();
 
         Assert.True(result.Success, string.Join("; ", result.Errors));
         Assert.Equal(["owned"], ImportedKeys.ToArray());
         Assert.Equal(5, ImportedThreshold("owned"));
+        Assert.Equal(held.RtId, _imported.Single().RtId); // the held entity is written, not a second one
+        Assert.Equal(5, held.GetAttributeValueOrDefault<int>("Threshold"));
+        Assert.Single(_tenant);
         var written = _imported.Single();
         Assert.Equal(false, written.Attributes.Single(a => a.Id.Equals(LockedAttr)).Value);
         Assert.Equal(V2.FullName,
@@ -807,5 +852,41 @@ public class BlueprintServiceTenantOwnedSeedTests
         Assert.True(result.IsSuccess);
         Assert.Empty(_imported);
         Assert.DoesNotContain(result.OperationResult.Messages, m => m.MessageText.Contains("TenantOwnedUpdateAvailable"));
+    }
+
+    [Fact]
+    public async Task Update_UneditedEntityFoundOnlyByNameUnderAnotherRtId_IsNotRefreshed()
+    {
+        // The import upserts by rtId: refreshing would create a second entity next to the held one.
+        GivenRuleTypeKnown();
+        GivenInstalled(V1);
+        GivenSeed(V1, new SeedSpec("owned", false, Threshold: 1));
+        GivenSeed(V2, new SeedSpec("owned", false, Threshold: 5));
+        var held = GivenTenantEntity("owned", false, V1, threshold: 1, foreignRtId: true);
+
+        var result = await Update();
+
+        Assert.True(result.Success);
+        Assert.Empty(_imported);
+        Assert.Equal(1, held.GetAttributeValueOrDefault<int>("Threshold"));
+        Assert.Equal("owned", Assert.Single(result.TenantOwnedUpdateAvailable).Key);
+        Assert.Empty(result.TenantOwnedRefreshed);
+    }
+
+    [Fact]
+    public async Task Preview_RefreshThatBlanksAString_ReportsItAsBlankedAndMasksTheValue()
+    {
+        GivenRuleTypeKnown();
+        GivenInstalled(V1);
+        GivenSeed(V1, new SeedSpec("owned", false, Threshold: 1, Note: "token-4711"));
+        GivenSeed(V2, new SeedSpec("owned", false, Threshold: 2, Note: ""));
+        GivenTenantEntity("owned", false, V1, threshold: 1, note: "token-4711");
+
+        var preview = await Preview();
+
+        Assert.Equal("owned", Assert.Single(preview.TenantOwnedRefreshed).Key);
+        Assert.Contains(preview.BlankedAttributes, b => b.AttributeName == "Note");
+        var note = Assert.Single(Assert.Single(preview.Changes).Attributes!, a => a.AttributeName == "Note");
+        Assert.DoesNotContain("token-4711", note.OldValue?.ToString() ?? string.Empty);
     }
 }

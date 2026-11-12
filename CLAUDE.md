@@ -51,7 +51,7 @@ line `0.1.*`) fails fast with MSBuild error `OCTO0001`. Use `-c DebugL` locally.
 # Run all tests except system tests
 dotnet test --configuration DebugL --filter "FullyQualifiedName!~SystemTests"
 
-# Run all tests including system tests
+# Run all tests including system tests (CI runs these too; they need no running services)
 dotnet test --configuration DebugL
 
 # Run tests for specific project
@@ -1171,7 +1171,9 @@ run-isolated through `OctoLocalCatalogRootPath`). Omitting it on any one of them
    publishes Test and System.TestIdentity to the LocalFileSystemCatalog only (AB#6114). It runs before the test projects because
    `Runtime.Engine.Tests` references `TestCkModel.dll` and the DotNetCoreCLI glob order is
    not guaranteed.
-4. `Build tests` — `tests/**/*Tests.csproj` except `*SystemTests`, also with
+4. `Build tests` — `tests/**/*Tests.csproj`, the `*SystemTests` projects included (AB#8921:
+   they need no running services; the GitHub write test skips itself without
+   `CK_GITHUB_WRITE_TEST_REPO`/`CK_GITHUB_WRITE_TEST_TOKEN`), also with
    `/p:BuildProjectReferences=false`: the src projects are already built into the same
    output folders, so only the test assemblies compile.
 5. `Test` — one `dotnet test --no-build --no-restore` per project, sequentially (keep it

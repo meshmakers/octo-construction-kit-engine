@@ -76,7 +76,7 @@ public class CompilerService : ICompilerService
         var modelDto = new CkMetaRootDto
         {
             ModelId = "Sample1",
-            Dependencies = [new("System", "[1.0,)")]
+            Dependencies = [new("System", "[2.0,3.0)")]
         };
 #if NETSTANDARD2_0
         using var streamWriter = new StreamWriter(Path.Combine(rootPath, CompilerStatics.MetadataFile));

@@ -10,7 +10,7 @@ public class Builder
         return new CkModelCompileCandidate
         {
             ModelId = new CkModelId("sample1", "1.0.0"),
-            DependencyRanges = [new("System", "[1.0,)")],
+            DependencyRanges = [new("System", "[2.0,3.0)")],
             AssociationRoles =
             [
                 new()

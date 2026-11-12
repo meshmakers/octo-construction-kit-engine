@@ -210,9 +210,12 @@ stages:
             displayName: 'Build tests'
             inputs:
               command: 'build'
-              projects: |
-                tests/**/*Tests.csproj
-                !tests/**/*SystemTests.csproj
+              # Includes the *SystemTests projects (AB#8921): ConstructionKit.Compiler.SystemTests,
+              # ConstructionKit.Engine.SystemTests and Runtime.Engine.SystemTests need no running services
+              # (temp directories, in-memory catalogs, faked HTTP/GitHub clients). The only test that would
+              # write to GitHub (GitHubClientWrapperWriteSystemTests) skips itself unless
+              # CK_GITHUB_WRITE_TEST_REPO and CK_GITHUB_WRITE_TEST_TOKEN are set, which CI never does.
+              projects: 'tests/**/*Tests.csproj'
               arguments: '--configuration $(buildConfiguration) /p:BuildProjectReferences=false /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoLocalCatalogIsEnabled=true /p:OctoPublishCatalog=LocalFileSystemCatalog'
           # 🔴 /p:OctoPublishCatalog=LocalFileSystemCatalog is NOT optional on any step that can
           # BUILD a CK-model project (AB#5413) — today that is 'Build test CK model' above;
@@ -236,9 +239,8 @@ stages:
               # for a multi-project glob) — keep it that way: parallel test runs risk
               # the Testcontainers memory budget of the DinD sidecar (14 Gi).
               arguments: '--configuration $(buildConfiguration) --no-build --no-restore /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoLocalCatalogIsEnabled=true /p:OctoPublishCatalog=LocalFileSystemCatalog'
-              projects: |
-                **/*Tests.csproj
-                !**/*SystemTests.csproj
+              # The *SystemTests projects run too (AB#8921, see 'Build tests').
+              projects: '**/*Tests.csproj'
               testRunTitle: 'CI'
           # CK SemVer honesty gate AND publish (AB#4420, AB#5121, tpl-v1.0.0): after build and
           # tests this step validates the CK models against the last published version, compiles

@@ -10,7 +10,7 @@ public class Builder
         return new CkCompiledModelRoot
         {
             ModelId = new CkModelId("records1", "1.0.0"),
-            Dependencies = [new("System", "[1.0,)")],
+            Dependencies = [new("System", "[2.0,3.0)")],
             AssociationRoles =
             [
                 new()

@@ -363,7 +363,7 @@ apply unchanged).
 
 Both settings are validated at start (`RecomputeLateDataOptions`). `RecomputeOrchestrator` keeps its previous constructor,
 which means no debounce, for hosts built against the earlier contract. The executor member has a default implementation
-(one generation recompute per rtId), so an executor built before AB#9016 still loads.
+(one rtId: scoped recompute; several: one unscoped recompute, as before AB#9016), so an executor built before AB#9016 still loads.
 
 ## §5 Triggers
 

@@ -29,7 +29,7 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
     writes stay unscoped and are not held back. An unscoped obligation absorbs the set-scoped ones it overlaps;
   - the active-job guard serialises the refresh with every other recompute of the rollup.
   - **Interface change (agent-operating-rules §2.4a):** `IArchiveRecomputeExecutor.ExecuteScopedRefreshAsync` is a new
-    member with a default implementation (one generation recompute per rtId), so an implementation built against the
+    member with a default implementation (one rtId: scoped recompute; several: one unscoped recompute, as before AB#9016), so an implementation built against the
     previous contract still loads. The contract records got init-only properties (`RtIds`, `RtIdSet`) and keep their
     positional constructors. `RecomputeOrchestrator` keeps its previous constructor, which means no debounce; the new one
     takes `RecomputeLateDataOptions`. The engine-mongodb release that records the rtIds and implements the in-place refresh

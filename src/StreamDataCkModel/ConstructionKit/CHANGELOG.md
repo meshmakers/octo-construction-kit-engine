@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.26.0 - 2026-11-15
+
+_Required bump level: minor._
+
+### Added
+
+- The rtId sets of the late-delivery recompute (AB#9016), each an optional `StringArray`:
+  - `CkArchiveDirtyWindow.RtIds`: the series whose rows made the window dirty;
+  - `CkArchiveRecomputeRange.RtIdSet`: the series a pending recompute refreshes in place, inherited by the chained rollups;
+  - `RecomputeJob.RtIdSet`: the series a job refreshed.
+
+### Compatibility
+
+- Additive, a Minor against 1.25.0 (no acknowledgement). `minEngineVersion` unchanged. Records and jobs stored without the
+  attributes read as unscoped, as before; no data migration.
+
 ## 1.25.0 - 2026-11-11
 
 _Required bump level: minor._

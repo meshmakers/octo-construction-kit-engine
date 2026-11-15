@@ -14,3 +14,6 @@ records:
         name: Source
       - id: ${this}/CkArchiveDirtyWindow.DetectedAt
         name: DetectedAt
+      - id: ${this}/CkArchiveDirtyWindow.RtIds
+        name: RtIds
+        isOptional: true

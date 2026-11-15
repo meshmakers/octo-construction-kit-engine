@@ -59,6 +59,10 @@ attributes:
     description: "When the storage layer detected and recorded the change (UTC)."
     valueType: DateTime
     ownership: SeedOwned
+  - id: CkArchiveDirtyWindow.RtIds
+    description: "The distinct rtIds (metering points / streams) whose rows made the window dirty (AB#9016). The recompute of the dependent rollups is restricted to exactly these series. Empty or missing means every series in the window, as before 1.26.0; the storage layer leaves it empty when a write touches more rtIds than StreamData:Recompute:MaxScopedRtIds."
+    valueType: StringArray
+    ownership: SeedOwned
 
   # ---------- CkArchiveRecomputeRange members -------------------------------------------------
   - id: CkArchiveRecomputeRange.DependentArchiveRtId
@@ -76,6 +80,10 @@ attributes:
   - id: CkArchiveRecomputeRange.RtIdScope
     description: "Optional single rtId (metering point / stream) the recompute is restricted to. Null means all rtIds in the range."
     valueType: String
+    ownership: SeedOwned
+  - id: CkArchiveRecomputeRange.RtIdSet
+    description: "Optional set of rtIds the recompute is restricted to (AB#9016), carried over from the dirty window of a late delivery and inherited by the chained dependents. The orchestrator refreshes only these series in place at the bucket's active generation. Empty or missing means no set scope (RtIdScope or all rtIds)."
+    valueType: StringArray
     ownership: SeedOwned
   - id: CkArchiveRecomputeRange.EnqueuedAt
     description: "When this obligation was enqueued (UTC)."
@@ -122,6 +130,10 @@ attributes:
   - id: RecomputeJob.RtIdScope
     description: "Optional single rtId the job was scoped to. Null means all rtIds in the range."
     valueType: String
+    ownership: SeedOwned
+  - id: RecomputeJob.RtIdSet
+    description: "Optional set of rtIds the job refreshed in place (AB#9016, late-delivery recompute). Empty or missing means the job was not set-scoped."
+    valueType: StringArray
     ownership: SeedOwned
   - id: RecomputeJob.RowsProcessed
     description: "Number of rows written into the staging table during compute."

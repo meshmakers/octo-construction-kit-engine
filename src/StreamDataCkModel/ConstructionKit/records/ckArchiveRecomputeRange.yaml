@@ -12,6 +12,9 @@ records:
         name: RangeEnd
       - id: ${this}/CkArchiveRecomputeRange.RtIdScope
         name: RtIdScope
+      - id: ${this}/CkArchiveRecomputeRange.RtIdSet
+        name: RtIdSet
+        isOptional: true
       - id: ${this}/CkArchiveRecomputeRange.EnqueuedAt
         name: EnqueuedAt
       - id: ${this}/CkArchiveRecomputeRange.Attempts

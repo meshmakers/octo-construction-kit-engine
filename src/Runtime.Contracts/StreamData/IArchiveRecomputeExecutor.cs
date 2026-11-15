@@ -35,4 +35,44 @@ public interface IArchiveRecomputeExecutor
         DateTime rangeEnd,
         OctoObjectId? rtIdScope,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Refreshes the series of <paramref name="rtIds"/> of <paramref name="rollup"/> in place for the half-open range
+    /// <c>[rangeStart, rangeEnd)</c> (AB#9016, late-delivery recompute): their buckets are aggregated from
+    /// <paramref name="source"/> again and written at the generation each (bucket, rtId) row is read at today, so no new
+    /// generation, no pointer entry and no sweep of superseded rows is needed. Every other series is left untouched. The
+    /// result equals what <see cref="ExecuteAsync"/> over the whole range produces for these series.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Must only run while no other recompute of the rollup runs: the orchestrator's active-job guard serialises it
+    /// with every unscoped, per-rtId and set-scoped recompute of the same rollup. A row is replaced atomically, so a reader
+    /// sees each series either before or after the refresh.
+    /// </para>
+    /// <para>
+    /// The default implementation recomputes one rtId after the other through <see cref="ExecuteAsync"/> (a generation per
+    /// rtId). It exists so that an implementation compiled against the contract before AB#9016 keeps working in a mixed
+    /// package set; it is correct but not cheaper. The CrateDB executor overrides it with the in-place refresh.
+    /// </para>
+    /// </remarks>
+    async Task<RecomputeExecutionResult> ExecuteScopedRefreshAsync(
+        ArchiveSnapshot source,
+        RollupArchiveSnapshot rollup,
+        DateTime rangeStart,
+        DateTime rangeEnd,
+        RtIdSet rtIds,
+        CancellationToken cancellationToken)
+    {
+        var rows = 0;
+        var windows = 0;
+        foreach (var rtId in rtIds)
+        {
+            var result = await ExecuteAsync(source, rollup, rangeStart, rangeEnd, rtId, cancellationToken)
+                .ConfigureAwait(false);
+            rows += result.RowsProcessed;
+            windows = Math.Max(windows, result.WindowsProcessed);
+        }
+
+        return new RecomputeExecutionResult(rows, windows);
+    }
 }

@@ -12,9 +12,9 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <see cref="RtIdScope"/> is <c>null</c> for ranges derived from dirty-window propagation (which is
-/// window- not rtId-granular); it is only populated when an operator triggers a manually scoped
-/// recompute. The range boundaries are aligned to the dependent's own bucket boundaries, so the
+/// <see cref="RtIdScope"/> is only populated when an operator triggers a manually scoped recompute of one
+/// entity. Ranges derived from the dirty window of a late delivery carry the affected series in
+/// <see cref="RtIdSet"/> instead (AB#9016); both <c>null</c> means every rtId in the range. The range boundaries are aligned to the dependent's own bucket boundaries, so the
 /// recompute orchestrator can process them as whole buckets.
 /// </para>
 /// <para>
@@ -71,4 +71,24 @@ public sealed record ArchiveRecomputeRange(
 
     /// <summary>Whether <c>[RangeStart, RangeEnd)</c> lies entirely inside <c>[from, to)</c>.</summary>
     public bool IsContainedIn(DateTime from, DateTime to) => RangeStart >= from && RangeEnd <= to;
+
+    /// <summary>
+    /// The series a late-delivery obligation is restricted to (AB#9016, System.StreamData 1.26.0), or <c>null</c>. A
+    /// set-scoped obligation is refreshed in place at the active generation of each bucket instead of being recomputed
+    /// into a new generation, and is inherited by the chained dependents.
+    /// </summary>
+    /// <remarks>
+    /// Init-only, not positional, so the positional constructor keeps its signature for a storage layer compiled against
+    /// the previous contract. Part of the value equality like every other field (<see cref="StreamData.RtIdSet"/> compares by
+    /// its members).
+    /// </remarks>
+    public RtIdSet? RtIdSet { get; init; }
+
+    /// <summary>
+    /// Whether this obligation is held back by the late-data debounce (AB#9016) rather than by a retry backoff: it has
+    /// never failed (<see cref="Attempts"/> zero) and carries a <see cref="NextAttemptAt"/> anyway. The drain releases every
+    /// debounced obligation of a rollup together as soon as the oldest of them is due, so late deliveries of one interval
+    /// are computed once.
+    /// </summary>
+    public bool IsDebounced => Attempts == 0 && NextAttemptAt is not null && !IsParked;
 }

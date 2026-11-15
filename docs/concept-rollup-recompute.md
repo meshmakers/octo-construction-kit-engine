@@ -313,6 +313,58 @@ generation-0 refresh for those buckets, freezing them on the value the recompute
 every row that arrived inside the lag. Corrections inside the lag window need no obligation of
 their own: the forward pass rewrites those buckets from the source on every tick until they close.
 
+## §4a Late deliveries (AB#9016)
+
+A late delivery (energy: EDA day packets one or two days late, a few metering points each) used to mark the window dirty
+for every series. Every packet then cost a full recompute of the window on every rollup level: a new generation, a pointer
+flip and a sweep DELETE. That was 57 jobs for one late day on prod-2 `sbeg`, and the cleanup DELETEs were the largest
+CrateDB cost. Three rules now apply.
+
+**Only the affected series.** The storage layer records the distinct rtIds of the late, in-reach automated rows on the
+dirty window (`ArchiveDirtyWindow.RtIds`, `CkArchiveDirtyWindow.RtIds`, System.StreamData 1.26.0). Propagation copies them
+into the recompute range (`ArchiveRecomputeRange.RtIdSet`). A write with more than `MaxScopedRtIds` distinct rtIds records
+none, which means every series, as before. Manual writes (AB#7594) and manual recomputes, rewinds and backfills stay
+unscoped.
+
+**In place.** A set-scoped range runs as `IArchiveRecomputeExecutor.ExecuteScopedRefreshAsync`. The executor stages the
+buckets for those series only (`rtid IN (...)`), exactly as the full recompute stages them. It then upserts the staged rows
+into the live table at the generation each (window, rtId) row is read at today: the CASE of the read predicate
+(`GenerationFilterSql.RenderActiveGeneration`) over the pointer entries that can apply to these series. No generation is
+used, no pointer entry is written, and nothing is swept. Readers see the same values as after a full recompute of the
+window. The proof is `ScopedRefreshEquivalenceTests` in engine-mongodb: twin tenants, hourly and daily levels, the
+TimeWeightedAvg carry bucket, rows at generation 0, at an unscoped and at a foreign scoped pointer.
+
+- Each row is replaced by one statement. The active-job guard (§3) serialises the refresh with every other recompute of
+  the rollup, so the pointer entries it read cannot change under it.
+- The forward pass never writes inside the range: the range is clamped to the lag-closed buckets (§4, bucket ownership).
+- Late data adds or corrects source rows and never removes one. The refresh therefore never has to delete a bucket row.
+  A delivery that removed source rows would need a full recompute, as before.
+
+**Once per debounce interval.** Obligations from late deliveries are enqueued with `NextAttemptAt = now + LateDataDebounce`
+at attempt zero (`ArchiveRecomputeRange.IsDebounced`). The state lives on the archive entity in MongoDB, so it holds across
+replicas and restarts. When the oldest held obligation of a rollup is due, the drain runs all held obligations of that
+rollup together:
+
+- intervals are merged across sets, and each merged interval refreshes the union of its sets;
+- a union above `MaxScopedRtIds` runs unscoped;
+- an unscoped due obligation absorbs the set-scoped obligations it overlaps.
+
+The number of jobs per late day and rollup is therefore at most the number of debounce intervals in which late data
+arrived.
+
+**Cascade.** A committed refresh enqueues the same set on its direct dependents. They run on the same tick, without a
+debounce, and refresh in place again. A failed refresh hands its remainder back with its set (AB#5189 retry and parking
+apply unchanged).
+
+| Setting | Env var | Default | Meaning |
+|---|---|---|---|
+| `StreamData:Recompute:LateDataDebounce` | `OCTO_STREAMDATA__RECOMPUTE__LATEDATADEBOUNCE` | `00:05:00` | How long late deliveries are collected before the recompute runs. `0` = off (due on the next tick, as before). |
+| `StreamData:Recompute:MaxScopedRtIds` | `OCTO_STREAMDATA__RECOMPUTE__MAXSCOPEDRTIDS` | `200` | The most rtIds a late-delivery recompute is restricted to; above it, every series. `0` = off. |
+
+Both settings are validated at start (`RecomputeLateDataOptions`). `RecomputeOrchestrator` keeps its previous constructor,
+which means no debounce, for hosts built against the earlier contract. The executor member has a default implementation
+(one generation recompute per rtId), so an executor built before AB#9016 still loads.
+
 ## §5 Triggers
 
 | Trigger | Surface | Behavior |

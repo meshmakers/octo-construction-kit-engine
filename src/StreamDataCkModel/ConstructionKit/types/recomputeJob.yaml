@@ -20,6 +20,9 @@ types:
       - id: ${this}/RecomputeJob.RtIdScope
         name: RtIdScope
         isOptional: true
+      - id: ${this}/RecomputeJob.RtIdSet
+        name: RtIdSet
+        isOptional: true
       - id: ${this}/RecomputeJob.RowsProcessed
         name: RowsProcessed
         isOptional: true

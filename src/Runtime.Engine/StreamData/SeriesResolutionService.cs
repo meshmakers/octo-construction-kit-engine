@@ -134,7 +134,8 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
             request.TargetPoints,
             request.RequiredAggregation,
             (rung, from, to) => EffectiveGrainMs(
-                rung, from, to, request.QueryTimeZone, request.ComparisonPolicy, request.QueryDayStartOffsetMs));
+                rung, from, to, request.QueryTimeZone, request.ComparisonPolicy, request.QueryDayStartOffsetMs),
+            request.MinRollupPoints);
     }
 
     /// <summary>

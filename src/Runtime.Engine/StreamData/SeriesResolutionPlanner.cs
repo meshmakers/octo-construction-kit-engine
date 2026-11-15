@@ -60,13 +60,20 @@ internal static class SeriesResolutionPlanner
     /// <paramref name="to"/> (fixed rungs → their grain; calendar rungs → a wall-clock/zone-derived
     /// width), or <c>null</c> when the rung's grain is indeterminate (raw / advisory-null Period).
     /// </param>
+    /// <param name="minRollupPoints">
+    /// Rollup preference threshold (AB#8993, <see cref="SeriesResolutionRequest.MinRollupPoints"/>): when no rollup is
+    /// fine enough but the finest compatible rollup still delivers at least this many points over the window, that
+    /// rollup is chosen (<see cref="SeriesResolutionSignal.ResolutionLimited"/>) even though the base archive's native
+    /// resolution would fit the target. <c>0</c> turns the preference off (raw fits wins, as before AB#8993).
+    /// </param>
     public static SeriesResolutionResult Plan(
         IReadOnlyList<ResolutionRung> ladder,
         DateTime from,
         DateTime to,
         int targetPoints,
         CkRollupFunction requiredAggregation,
-        Func<ResolutionRung, DateTime, DateTime, long?> effectiveGrainMs)
+        Func<ResolutionRung, DateTime, DateTime, long?> effectiveGrainMs,
+        int minRollupPoints = SeriesResolutionRequest.DefaultMinRollupPoints)
     {
         if (ladder is null)
         {
@@ -83,7 +90,12 @@ internal static class SeriesResolutionPlanner
             throw new ArgumentOutOfRangeException(nameof(targetPoints), targetPoints, "TargetPoints must be positive.");
         }
 
-        var unfiltered = PlanCore(ladder, from, to, targetPoints, requiredAggregation, effectiveGrainMs);
+        if (minRollupPoints < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(minRollupPoints), minRollupPoints, "MinRollupPoints must not be negative.");
+        }
+
+        var unfiltered = PlanCore(ladder, from, to, targetPoints, requiredAggregation, effectiveGrainMs, minRollupPoints);
 
         // AB#5157: measured coverage filter. Null ⇒ no rung reports coverage ⇒ inert.
         var candidates = SelectCoveringRungs(ladder, from);
@@ -92,7 +104,7 @@ internal static class SeriesResolutionPlanner
             return unfiltered;
         }
 
-        var filtered = PlanCore(candidates, from, to, targetPoints, requiredAggregation, effectiveGrainMs);
+        var filtered = PlanCore(candidates, from, to, targetPoints, requiredAggregation, effectiveGrainMs, minRollupPoints);
         if (filtered.ArchiveRtId == unfiltered.ArchiveRtId)
         {
             return unfiltered;
@@ -193,7 +205,8 @@ internal static class SeriesResolutionPlanner
         DateTime to,
         int targetPoints,
         CkRollupFunction requiredAggregation,
-        Func<ResolutionRung, DateTime, DateTime, long?> effectiveGrainMs)
+        Func<ResolutionRung, DateTime, DateTime, long?> effectiveGrainMs,
+        int minRollupPoints)
     {
         var spanMs = Math.Max(1L, (long)(to - from).TotalMilliseconds);
         var idealBucketMs = Math.Max(1L, spanMs / targetPoints);
@@ -245,7 +258,14 @@ internal static class SeriesResolutionPlanner
         //    coarser rollup, so it is preferred over a ResolutionLimited rollup. Checked BEFORE the
         //    ResolutionLimited branch so a short window doesn't get a coarse rollup when the raw data
         //    already fits (e.g. one day of 15-min data = 96 points, not the hourly rollup's 24).
-        if (baseRung is not null && baseNative is not null && baseNative.Value <= targetPoints)
+        //    Rollup preference (AB#8993): when the finest compatible rollup still delivers at least
+        //    minRollupPoints over the window, raw does not win here and rule 3 picks that rollup. A long
+        //    window then reads the rollup (7 days: 168 hourly points) instead of scanning the raw archive
+        //    (672 windows per series), while a short window keeps the finer raw data (1 day: hourly gives
+        //    only 24 points, so the raw 96 win). 0 turns the preference off.
+        var rollupPreferred = minRollupPoints > 0 && eligible.Count > 0
+            && spanMs / eligible.Min(x => x.Grain) >= minRollupPoints;
+        if (!rollupPreferred && baseRung is not null && baseNative is not null && baseNative.Value <= targetPoints)
         {
             return new SeriesResolutionResult(
                 baseRung.ArchiveRtId, baseGrain!.Value, baseNative.Value, requiredAggregation,
@@ -255,8 +275,8 @@ internal static class SeriesResolutionPlanner
             };
         }
 
-        // 3. Compatible rollups exist but all are coarser than ideal, and the base does not fit → deliver
-        //    the finest rollup's native buckets (fewer points). Do NOT reduce the base directly
+        // 3. Compatible rollups exist but all are coarser than ideal, and the base does not fit (or a rollup
+        //    is preferred, rule 2) → deliver the finest rollup's native buckets (fewer points). Do NOT reduce the base directly
         //    (decision O2-followup) or fall through to a finer, costlier source (decision O4).
         if (eligible.Count > 0)
         {

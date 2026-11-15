@@ -78,6 +78,23 @@ public sealed record SeriesResolutionRequest(
     public SeriesComparisonPolicy ComparisonPolicy { get; init; } = SeriesComparisonPolicy.PerQuery;
 
     /// <summary>
+    /// Default of <see cref="MinRollupPoints"/> (AB#8993): a rollup that delivers at least 150 points is preferred over
+    /// the base archive. A 7-day window over an hourly rollup (168 points) reads the rollup, a 1-day window (24 points)
+    /// keeps the 15-minute base data.
+    /// </summary>
+    public const int DefaultMinRollupPoints = 150;
+
+    /// <summary>
+    /// Rollup preference threshold (AB#8993). When no compatible rollup is fine enough for <see cref="TargetPoints"/>,
+    /// the base archive used to win whenever its native resolution fit the target, so a 7-day window at 800 points read
+    /// 672 raw windows per series instead of the 168 points of an hourly rollup. Now the finest compatible rollup is
+    /// chosen (signal <see cref="SeriesResolutionSignal.ResolutionLimited"/>) when it delivers at least this many points
+    /// over the window, whether or not the base would fit. <c>0</c> turns the preference off (the base wins when it fits,
+    /// as before AB#8993); a negative value is refused. Default <see cref="DefaultMinRollupPoints"/>.
+    /// </summary>
+    public int MinRollupPoints { get; init; } = DefaultMinRollupPoints;
+
+    /// <summary>
     /// Builds a request for the aggregation function the caller will run on the chosen archive. The
     /// stored rollup function a rung must carry is derived with
     /// <see cref="RollupQueryFunction.RequiredStoredFunction"/> — for

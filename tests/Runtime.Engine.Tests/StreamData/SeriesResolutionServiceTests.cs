@@ -653,4 +653,28 @@ public class SeriesResolutionServiceTests
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
             () => NewSut().ResolveAsync(request, TestContext.Current.CancellationToken));
     }
+
+    // AB#8993: the request's MinRollupPoints reaches the planner (default 150, 0 = off).
+    [Theory]
+    [InlineData(null, true)] // default 150: hourly (168 points) preferred over raw (672)
+    [InlineData(0, false)]   // preference off: raw fits 800 and wins, as before AB#8993
+    [InlineData(200, false)] // threshold above the rollup's 168 points: raw
+    public async Task SevenDaysAt800Points_MinRollupPointsOfTheRequest_DecidesRollupOrRaw(int? minRollupPoints, bool rollupWins)
+    {
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        var oneHour = Rollup(baseArchive.RtId, TimeSpan.FromHours(1), CkRollupFunction.Sum);
+        StubRollups(baseArchive.RtId, oneHour);
+        var to = new DateTime(2026, 11, 15, 0, 0, 0, DateTimeKind.Utc);
+        var request = Request(baseArchive.RtId, to.AddDays(-7), to, 800);
+        if (minRollupPoints is { } threshold)
+        {
+            request = request with { MinRollupPoints = threshold };
+        }
+
+        var result = await NewSut().ResolveAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(rollupWins ? oneHour.RtId : baseArchive.RtId, result.ArchiveRtId);
+        Assert.Equal(rollupWins ? 168 : 672, result.Points);
+    }
 }

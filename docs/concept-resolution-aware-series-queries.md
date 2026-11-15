@@ -110,6 +110,12 @@ baseNative  = timespan / basePeriod                   (null if the base grain is
        # checked BEFORE ResolutionLimited: raw is finer and delivers more points
        # than any coarser rollup when it already fits (e.g. 1 day of 15-min = 96
        # points, not the hourly rollup's 24).
+       # SKIPPED when rollupPreferred (AB#8993):
+       #   rollupPreferred = minRollupPoints > 0 AND eligible non-empty
+       #                     AND timespan / finest eligible grain >= minRollupPoints
+       # minRollupPoints = SeriesResolutionRequest.MinRollupPoints, default 150, 0 = off.
+       # 7 days at 800 points: hourly gives 168 >= 150 → rule 3 picks the hourly rollup
+       # instead of 672 raw windows per series; 1 day: hourly gives 24 < 150 → raw 96.
 3. else if eligible non-empty → the FINEST eligible rung's native buckets           (ResolutionLimited, O4)
 4. else                       # no compatible rollup and the base does not fit
        base grain unknown → return base                                            (UnknownBaseGrain)
@@ -118,7 +124,7 @@ baseNative  = timespan / basePeriod                   (null if the base grain is
 then = downsample the chosen rung with limit = points          (AB#4233 path)
 ```
 
-Rationale: the coarsest sufficient rung minimises the CrateDB scan while the `limit`-downsampling on top lands a point count near the target. The output bucket is a **whole multiple of the chosen rung's grain**, not the raw pixel ideal — a windowed rollup can only be re-aggregated on complete grain windows, so an off-grain bucket silently undercounts (AB#4714). Picking a rung *finer* than necessary only inflates the scan for an identical picture — **except** when no rollup is fine enough yet the raw base already fits within the target: then the base (finest, most points) is preferred over a coarser ResolutionLimited rollup. The resolver **never silently produces a wrong or degraded result** — it either reduces correctly, returns raw when it fits, or returns a truthful signal (`no-suitable-rollup` / `resolution-limited: actual/target`) the caller can surface.
+Rationale: the coarsest sufficient rung minimises the CrateDB scan while the `limit`-downsampling on top lands a point count near the target. The output bucket is a **whole multiple of the chosen rung's grain**, not the raw pixel ideal — a windowed rollup can only be re-aggregated on complete grain windows, so an off-grain bucket silently undercounts (AB#4714). Picking a rung *finer* than necessary only inflates the scan for an identical picture — **except** when no rollup is fine enough yet the raw base already fits within the target: then the base (finest, most points) is preferred over a coarser ResolutionLimited rollup. Since AB#8993 that exception is limited to short windows: when the finest compatible rollup still delivers at least `minRollupPoints` (default 150) points, it is chosen (ResolutionLimited) even though the raw base would fit. Reason: on prod-2 tenant `sbeg` a 7-day chart at 800 points read the 129 M-row raw archive (672 windows per series, about 400 series per call) instead of the hourly rollup (168 points). The threshold turns the 7-day cliff at exactly `baseNative` (672 points) into a documented rule; the frontend cap of AB#8994 (500 points) and this rule both lead a 7-day chart to the hourly rollup. The resolver **never silently produces a wrong or degraded result** — it either reduces correctly, returns raw when it fits, or returns a truthful signal (`no-suitable-rollup` / `resolution-limited: actual/target`) the caller can surface.
 
 ### §4.2a Coverage filter and the `CoverageLimited` signal (AB#5157)
 

@@ -452,4 +452,126 @@ public class SeriesResolutionPlannerTests
         Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
         Assert.Null(result.FinerRungAvailableFrom);
     }
+
+    // ---- Rollup preference (AB#8993) -------------------------------------------------------
+    // prod-2/sbeg: a 7-day line chart asked for 800 points; raw 15-min (672 points) fit, so the resolver read
+    // the 129 M-row raw archive instead of the hourly rollup (168 points). With MinRollupPoints (default 150)
+    // a rollup that delivers at least that many points wins over raw when no rollup is fine enough.
+
+    private static readonly DateTime WeekTo = new(2026, 11, 15, 0, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime WeekFrom = WeekTo.AddDays(-7);
+
+    private static SeriesResolutionResult PlanWithThreshold(
+        IReadOnlyList<ResolutionRung> ladder, DateTime from, DateTime to, int target, int minRollupPoints) =>
+        SeriesResolutionPlanner.Plan(ladder, from, to, target, CkRollupFunction.Sum, FixedProbe, minRollupPoints);
+
+    [Theory]
+    [InlineData(200)] // before AB#8993: hourly as well (raw 672 > 200 does not fit)
+    [InlineData(500)] // the frontend cap of AB#8994
+    [InlineData(672)] // before AB#8993: raw (672 <= 672 fits) - the cliff
+    [InlineData(800)] // before AB#8993: raw
+    public void SevenDays_HourlyRollupDelivers168Points_IsPreferredOverRaw(int target)
+    {
+        var baseRung = Base(FifteenMin);
+        var hourly = Rollup(OneHour, CkRollupFunction.Sum);
+        var ladder = new[] { baseRung, hourly, Rollup(OneDay, CkRollupFunction.Sum) };
+
+        var result = Plan(ladder, WeekFrom, WeekTo, target, CkRollupFunction.Sum);
+
+        Assert.Equal(hourly.ArchiveRtId, result.ArchiveRtId);
+        Assert.Equal(SeriesResolutionSignal.ResolutionLimited, result.Signal);
+        Assert.Equal(168, result.Points);
+        Assert.Equal(168, result.ActualPoints);
+        Assert.Equal(OneHour, result.EffectiveBucketMs);
+    }
+
+    [Theory]
+    [InlineData(200, false)] // raw does not fit: hourly either way
+    [InlineData(672, true)]
+    [InlineData(800, true)]
+    public void SevenDays_PreferenceOff_KeepsTheBehaviourBeforeAb8993(int target, bool rawWins)
+    {
+        var baseRung = Base(FifteenMin);
+        var hourly = Rollup(OneHour, CkRollupFunction.Sum);
+
+        var result = PlanWithThreshold(new[] { baseRung, hourly }, WeekFrom, WeekTo, target, minRollupPoints: 0);
+
+        Assert.Equal(rawWins ? baseRung.ArchiveRtId : hourly.ArchiveRtId, result.ArchiveRtId);
+        Assert.Equal(rawWins ? 672 : 168, result.Points);
+    }
+
+    [Fact]
+    public void OneDay_HourlyDeliversOnly24Points_RawStays()
+    {
+        var baseRung = Base(FifteenMin);
+        var ladder = new[] { baseRung, Rollup(OneHour, CkRollupFunction.Sum) };
+
+        var result = Plan(ladder, DayFrom, DayTo, 800, CkRollupFunction.Sum);
+
+        Assert.Equal(baseRung.ArchiveRtId, result.ArchiveRtId);
+        Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
+        Assert.Equal(96, result.Points);
+    }
+
+    [Theory]
+    [InlineData(149, false)] // 149 hourly points < 150: raw (596 points) fits and wins
+    [InlineData(150, true)]  // exactly the threshold: the rollup wins
+    [InlineData(151, true)]
+    public void AtTheDefaultThreshold_RollupWinsFrom150Points(int hours, bool rollupWins)
+    {
+        var baseRung = Base(FifteenMin);
+        var hourly = Rollup(OneHour, CkRollupFunction.Sum);
+        var to = WeekTo;
+        var from = to.AddHours(-hours);
+
+        var result = Plan(new[] { baseRung, hourly }, from, to, 800, CkRollupFunction.Sum);
+
+        Assert.Equal(rollupWins ? hourly.ArchiveRtId : baseRung.ArchiveRtId, result.ArchiveRtId);
+        Assert.Equal(rollupWins ? hours : hours * 4, result.Points);
+    }
+
+    [Theory]
+    [InlineData(168, true)]  // a configured threshold equal to the rollup's points: rollup
+    [InlineData(169, false)] // one above: raw fits and wins
+    public void ConfiguredThreshold_IsHonoured(int minRollupPoints, bool rollupWins)
+    {
+        var baseRung = Base(FifteenMin);
+        var hourly = Rollup(OneHour, CkRollupFunction.Sum);
+
+        var result = PlanWithThreshold(new[] { baseRung, hourly }, WeekFrom, WeekTo, 800, minRollupPoints);
+
+        Assert.Equal(rollupWins ? hourly.ArchiveRtId : baseRung.ArchiveRtId, result.ArchiveRtId);
+    }
+
+    [Fact]
+    public void Preference_UsesTheFinestCompatibleRollup_NotAnIncompatibleOne()
+    {
+        // A finer MAX rollup does not count for a SUM series; the daily SUM rollup delivers 7 points < 150.
+        var baseRung = Base(FifteenMin);
+        var ladder = new[] { baseRung, Rollup(OneHour, CkRollupFunction.Max), Rollup(OneDay, CkRollupFunction.Sum) };
+
+        var result = Plan(ladder, WeekFrom, WeekTo, 800, CkRollupFunction.Sum);
+
+        Assert.Equal(baseRung.ArchiveRtId, result.ArchiveRtId);
+        Assert.Equal(672, result.Points);
+    }
+
+    [Fact]
+    public void Preference_DoesNotChangeAFineEnoughRollupChoice()
+    {
+        // 7 days at 150 points: ideal bucket 67.2 min, the hourly rollup is fine enough (rule 1, Ok).
+        var hourly = Rollup(OneHour, CkRollupFunction.Sum);
+
+        var result = Plan(new[] { Base(FifteenMin), hourly }, WeekFrom, WeekTo, 150, CkRollupFunction.Sum);
+
+        Assert.Equal(hourly.ArchiveRtId, result.ArchiveRtId);
+        Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
+    }
+
+    [Fact]
+    public void NegativeThreshold_IsRefused()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            PlanWithThreshold(new[] { Base(FifteenMin) }, WeekFrom, WeekTo, 800, minRollupPoints: -1));
+    }
 }

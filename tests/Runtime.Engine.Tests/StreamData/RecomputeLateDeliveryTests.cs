@@ -365,6 +365,23 @@ public class RecomputeLateDeliveryTests
         Assert.Null(queued.RtIdSet);
     }
 
+    [Fact]
+    public async Task ADeadJob_DoesNotChargeALateDeliveryThatWasQueuedAfterItStarted()
+    {
+        // A job whose process died an hour ago; the late delivery arrived after it had started and never ran.
+        var started = Start.AddHours(-2);
+        await _jobStore.CreateAsync(new RecomputeJobSnapshot(
+            OctoObjectId.Empty, A02, RecomputeJobState.Running, RecomputeTrigger.Periodic,
+            LateDay, LateDay.AddDays(1), null, null, null, started, null, null, null, null, started));
+        LateDelivery(LateDay.AddHours(8), LateDay.AddHours(9), M1);
+
+        await NewSut().TickAsync(CancellationToken.None);
+
+        var held = Assert.Single(_stateStore.Pending(A02));
+        Assert.Equal(0, held.Attempts);
+        Assert.True(held.IsDebounced);
+    }
+
     // ---- Failure keeps the scope ----------------------------------------------------------------
 
     [Fact]

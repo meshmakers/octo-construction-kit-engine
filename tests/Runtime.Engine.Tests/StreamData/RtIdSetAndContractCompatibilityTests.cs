@@ -115,17 +115,21 @@ public class RtIdSetAndContractCompatibilityTests
     }
 
     [Fact]
-    public async Task TheDefaultScopedRefresh_RecomputesOneRtIdAfterTheOther()
+    public async Task TheDefaultScopedRefresh_RecomputesOneRtIdScoped_AndSeveralUnscopedOnce()
     {
         var executor = new PreviousContractExecutor();
         var now = DateTime.UtcNow;
-        var set = RtIdSet.Of(new[] { M2, M1 })!;
 
+        await ((IArchiveRecomputeExecutor)executor).ExecuteScopedRefreshAsync(
+            A.Dummy<ArchiveSnapshot>(), A.Dummy<RollupArchiveSnapshot>(), now, now.AddHours(1), RtIdSet.Of(new[] { M1 })!,
+            CancellationToken.None);
         var result = await ((IArchiveRecomputeExecutor)executor).ExecuteScopedRefreshAsync(
-            A.Dummy<ArchiveSnapshot>(), A.Dummy<RollupArchiveSnapshot>(), now, now.AddHours(1), set, CancellationToken.None);
+            A.Dummy<ArchiveSnapshot>(), A.Dummy<RollupArchiveSnapshot>(), now, now.AddHours(1), RtIdSet.Of(new[] { M2, M1 })!,
+            CancellationToken.None);
 
-        Assert.Equal(set.Select(id => (OctoObjectId?)id).ToList(), executor.Scopes);
-        Assert.Equal(new RecomputeExecutionResult(14, 7), result);
+        // One rtId: the classic per-entity recompute. Several: one unscoped recompute (one generation, not one per rtId).
+        Assert.Equal(new OctoObjectId?[] { M1, null }, executor.Scopes);
+        Assert.Equal(new RecomputeExecutionResult(7, 7), result);
     }
 
     /// <summary>An executor as written before AB#9016: it implements only <see cref="IArchiveRecomputeExecutor.ExecuteAsync"/>.</summary>

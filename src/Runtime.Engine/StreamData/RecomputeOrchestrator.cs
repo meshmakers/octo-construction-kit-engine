@@ -554,7 +554,10 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         }
 
         var affected = pending
+            // AB#9016: only obligations that were queued when the job started can have been part of its run; a late
+            // delivery debounced after that has never run and must not be charged an attempt for the dead job.
             .Where(r => !r.IsParked
+                        && (job.StartedAt is not { } jobStarted || r.EnqueuedAt <= jobStarted)
                         && (job.RtIdSet is { } jobSet
                             ? r.RtIdSet is { } set && set.IsSubsetOf(jobSet)
                             : r.RtIdScope == job.RtIdScope)

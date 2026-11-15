@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Meshmakers.Octo.ConstructionKit.Contracts;
@@ -50,12 +51,13 @@ public interface IArchiveRecomputeExecutor
     /// sees each series either before or after the refresh.
     /// </para>
     /// <para>
-    /// The default implementation recomputes one rtId after the other through <see cref="ExecuteAsync"/> (a generation per
-    /// rtId). It exists so that an implementation compiled against the contract before AB#9016 keeps working in a mixed
-    /// package set; it is correct but not cheaper. The CrateDB executor overrides it with the in-place refresh.
+    /// The default implementation exists so that an implementation compiled against the contract before AB#9016 keeps
+    /// working in a mixed package set: one rtId is recomputed scoped through <see cref="ExecuteAsync"/>, several are
+    /// recomputed with one unscoped <see cref="ExecuteAsync"/> over the range (the behaviour before AB#9016 - correct for
+    /// every series, one generation instead of one per rtId). The CrateDB executor overrides it with the in-place refresh.
     /// </para>
     /// </remarks>
-    async Task<RecomputeExecutionResult> ExecuteScopedRefreshAsync(
+    Task<RecomputeExecutionResult> ExecuteScopedRefreshAsync(
         ArchiveSnapshot source,
         RollupArchiveSnapshot rollup,
         DateTime rangeStart,
@@ -63,16 +65,7 @@ public interface IArchiveRecomputeExecutor
         RtIdSet rtIds,
         CancellationToken cancellationToken)
     {
-        var rows = 0;
-        var windows = 0;
-        foreach (var rtId in rtIds)
-        {
-            var result = await ExecuteAsync(source, rollup, rangeStart, rangeEnd, rtId, cancellationToken)
-                .ConfigureAwait(false);
-            rows += result.RowsProcessed;
-            windows = Math.Max(windows, result.WindowsProcessed);
-        }
-
-        return new RecomputeExecutionResult(rows, windows);
+        OctoObjectId? scope = rtIds.Count == 1 ? rtIds.First() : null;
+        return ExecuteAsync(source, rollup, rangeStart, rangeEnd, scope, cancellationToken);
     }
 }

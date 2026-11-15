@@ -367,6 +367,227 @@ public class BlueprintVariableInterpolatorTests
         Assert.Equal("https://example.com", resolved.Attributes[0].Value);
     }
 
+    // ---- AB#8995: escape $${name} -> literal ${name} ----------------------------------------
+
+    private static Dictionary<string, string> TenantVariables() => new(StringComparer.Ordinal)
+    {
+        ["tenantId"] = "sbeg",
+    };
+
+    private static void AssertNoUnknownVariableWarning(OperationResult op) =>
+        Assert.DoesNotContain(op.Messages, m => m.MessageNumber == 27);
+
+    [Fact]
+    public void Interpolate_EscapedPlaceholder_IsWrittenAsLiteral_WithoutWarning()
+    {
+        var root = MakeRoot(attributeValue: "Failed: $${count} processes", wellKnownName: null);
+
+        var op = new OperationResult();
+        BlueprintVariableInterpolator.Interpolate(root, TenantVariables(), "test.yaml", op);
+
+        Assert.Equal("Failed: ${count} processes", root.Entities[0].Attributes[0].Value);
+        Assert.Empty(op.Messages);
+    }
+
+    [Fact]
+    public void Interpolate_EscapedPlaceholder_IsUnescaped_WhenTheBlueprintHasNoVariables()
+    {
+        var root = MakeRoot(attributeValue: "$${count}", wellKnownName: null);
+
+        var op = new OperationResult();
+        BlueprintVariableInterpolator.Interpolate(
+            root, new Dictionary<string, string>(StringComparer.Ordinal), "test.yaml", op);
+
+        Assert.Equal("${count}", root.Entities[0].Attributes[0].Value);
+        Assert.Empty(op.Messages);
+    }
+
+    [Fact]
+    public void Interpolate_EscapedKnownVariable_IsNotSubstituted()
+    {
+        // The escape wins over a variable of the same name: the author asked for the literal.
+        var root = MakeRoot(attributeValue: "$${tenantId}", wellKnownName: null);
+
+        var op = new OperationResult();
+        BlueprintVariableInterpolator.Interpolate(root, TenantVariables(), "test.yaml", op);
+
+        Assert.Equal("${tenantId}", root.Entities[0].Attributes[0].Value);
+        Assert.Empty(op.Messages);
+    }
+
+    [Fact]
+    public void Interpolate_UnescapedKnownVariable_IsStillSubstituted()
+    {
+        var root = MakeRoot(attributeValue: "tenant ${tenantId}", wellKnownName: null);
+
+        var op = new OperationResult();
+        BlueprintVariableInterpolator.Interpolate(root, TenantVariables(), "test.yaml", op);
+
+        Assert.Equal("tenant sbeg", root.Entities[0].Attributes[0].Value);
+        Assert.Empty(op.Messages);
+    }
+
+    [Fact]
+    public void Interpolate_UnescapedUnknownVariable_KeepsTodaysWarning()
+    {
+        var root = MakeRoot(attributeValue: "${count}", wellKnownName: null);
+
+        var op = new OperationResult();
+        BlueprintVariableInterpolator.Interpolate(root, TenantVariables(), "test.yaml", op);
+
+        Assert.Equal("${count}", root.Entities[0].Attributes[0].Value);
+        var warning = Assert.Single(op.Messages);
+        Assert.Equal(MessageLevel.Warning, warning.MessageLevel);
+        Assert.Equal(27, warning.MessageNumber);
+        Assert.Contains("${count}", warning.MessageText);
+    }
+
+    [Fact]
+    public void Interpolate_MixedEscapedAndKnownVariable_InOneString()
+    {
+        var root = MakeRoot(attributeValue: "$${count} of ${tenantId}", wellKnownName: null);
+
+        var op = new OperationResult();
+        BlueprintVariableInterpolator.Interpolate(root, TenantVariables(), "test.yaml", op);
+
+        Assert.Equal("${count} of sbeg", root.Entities[0].Attributes[0].Value);
+        Assert.Empty(op.Messages);
+    }
+
+    [Fact]
+    public void Interpolate_MixedEscapedAndUnknownVariable_WarnsOnlyForTheUnknownOne()
+    {
+        var root = MakeRoot(attributeValue: "$${count} / ${typo} / $${name}", wellKnownName: null);
+
+        var op = new OperationResult();
+        BlueprintVariableInterpolator.Interpolate(root, TenantVariables(), "test.yaml", op);
+
+        Assert.Equal("${count} / ${typo} / ${name}", root.Entities[0].Attributes[0].Value);
+        var warning = Assert.Single(op.Messages);
+        Assert.Equal(27, warning.MessageNumber);
+        Assert.Contains("${typo}", warning.MessageText);
+    }
+
+    [Fact]
+    public void Interpolate_EscapedPlaceholder_InRtWellKnownName()
+    {
+        var root = MakeRoot(attributeValue: "static", wellKnownName: "template-$${name}");
+
+        var op = new OperationResult();
+        BlueprintVariableInterpolator.Interpolate(root, TenantVariables(), "test.yaml", op);
+
+        Assert.Equal("template-${name}", root.Entities[0].RtWellKnownName);
+        Assert.Empty(op.Messages);
+    }
+
+    [Theory]
+    [InlineData("${a->b}", "${a->b}")]       // unescaped arrow path: no variable name, verbatim, no warning (as before)
+    [InlineData("$${a->b}", "${a->b}")]      // escaped arrow path: unescaped, no warning
+    [InlineData("$${ count }", "${ count }")] // the text between the braces is kept as written
+    [InlineData("$$${count}", "$${count}")]  // only the $$ directly before { is the escape
+    [InlineData("cost: $$5", "cost: $$5")]   // $$ not followed by { is left alone
+    public void Interpolate_EscapeEdgeCases_AreLiteral_WithoutWarning(string seed, string expected)
+    {
+        var root = MakeRoot(attributeValue: seed, wellKnownName: null);
+
+        var op = new OperationResult();
+        BlueprintVariableInterpolator.Interpolate(root, TenantVariables(), "test.yaml", op);
+
+        Assert.Equal(expected, root.Entities[0].Attributes[0].Value);
+        AssertNoUnknownVariableWarning(op);
+    }
+
+    [Fact]
+    public void Interpolate_EscapedPlaceholders_InStringListsAndNestedRecords()
+    {
+        // String list items, a RecordArray entry with a nested single record, and a
+        // single-Record attribute - every walked position honours the escape.
+        var inner = new RtRecordTcDto
+        {
+            CkRecordId = new RtCkId<CkRecordId>("System.Test/Inner"),
+            Attributes =
+            {
+                new RtAttributeTcDto
+                {
+                    Id = new RtCkId<CkAttributeId>("System.Test/Text"),
+                    Value = "inner $${meteringPointNumber} for ${tenantId}"
+                }
+            }
+        };
+        var arrayEntry = new RtRecordTcDto
+        {
+            CkRecordId = new RtCkId<CkRecordId>("System.Test/Line"),
+            Attributes =
+            {
+                new RtAttributeTcDto
+                {
+                    Id = new RtCkId<CkAttributeId>("System.Test/Text"),
+                    Value = "line $${startTime}"
+                },
+                new RtAttributeTcDto
+                {
+                    Id = new RtCkId<CkAttributeId>("System.Test/Inner"),
+                    Value = inner
+                }
+            }
+        };
+        var single = new RtRecordTcDto
+        {
+            CkRecordId = new RtCkId<CkRecordId>("System.Test/Single"),
+            Attributes =
+            {
+                new RtAttributeTcDto
+                {
+                    Id = new RtCkId<CkAttributeId>("System.Test/Text"),
+                    Value = "single $${responseCode}"
+                }
+            }
+        };
+        var root = new RtModelRootTcDto
+        {
+            Entities =
+            {
+                new RtEntityTcDto
+                {
+                    RtId = new OctoObjectId("abcdef1234567890abcdef12"),
+                    CkTypeId = new RtCkId<CkTypeId>("System.Test/Sample-1"),
+                    Attributes =
+                    {
+                        new RtAttributeTcDto
+                        {
+                            Id = new RtCkId<CkAttributeId>("System.Test/Tags"),
+                            Value = new List<object> { "$${info}", 7, "${tenantId}" }
+                        },
+                        new RtAttributeTcDto
+                        {
+                            Id = new RtCkId<CkAttributeId>("System.Test/Lines"),
+                            Value = new List<object> { arrayEntry }
+                        },
+                        new RtAttributeTcDto
+                        {
+                            Id = new RtCkId<CkAttributeId>("System.Test/Single"),
+                            Value = single
+                        }
+                    }
+                }
+            }
+        };
+
+        var op = new OperationResult();
+        BlueprintVariableInterpolator.Interpolate(root, TenantVariables(), "test.yaml", op);
+
+        var tags = Assert.IsType<List<object>>(root.Entities[0].Attributes[0].Value);
+        Assert.Equal(new object[] { "${info}", 7, "sbeg" }, tags);
+        var lines = Assert.IsType<List<object>>(root.Entities[0].Attributes[1].Value);
+        var line = Assert.IsType<RtRecordTcDto>(lines[0]);
+        Assert.Equal("line ${startTime}", line.Attributes[0].Value);
+        var nested = Assert.IsType<RtRecordTcDto>(line.Attributes[1].Value);
+        Assert.Equal("inner ${meteringPointNumber} for sbeg", nested.Attributes[0].Value);
+        var singleResolved = Assert.IsType<RtRecordTcDto>(root.Entities[0].Attributes[2].Value);
+        Assert.Equal("single ${responseCode}", singleResolved.Attributes[0].Value);
+        Assert.Empty(op.Messages);
+    }
+
     private static RtModelRootTcDto MakeRoot(string attributeValue, string? wellKnownName)
     {
         return new RtModelRootTcDto

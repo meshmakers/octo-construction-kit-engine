@@ -39,11 +39,24 @@ namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
 ///     <see cref="MessageLevel.Warning"/> on the <see cref="OperationResult"/> and the
 ///     placeholder is left verbatim — that way a typo doesn't silently produce empty strings
 ///     in MongoDB.
+///
+///     Escape (AB#8995): <c>$${…}</c> is written as the literal <c>${…}</c> without a lookup
+///     and without a warning. Seeds use it for placeholders that are resolved later at run time
+///     (notification templates, KPI formulas), whose names come from arbitrary query columns and
+///     therefore cannot be listed as blueprint variables. Only a doubled <c>$</c> directly before
+///     <c>{</c> is an escape; the braces may hold any text without braces (<c>$${a->b}</c> becomes
+///     <c>${a->b}</c>). Unescaped placeholders that do not match the variable name pattern (such as
+///     <c>${a->b}</c>) are left verbatim without a warning, as before.
 /// </remarks>
 internal static class BlueprintVariableInterpolator
 {
+    /// <summary>
+    ///     One pass over the string: the first alternative is the escape <c>$${…}</c> (group
+    ///     <c>escaped</c>), the second a variable <c>${name}</c> (group <c>name</c>). Matching both in
+    ///     one regex keeps the escape from being seen as <c>$</c> followed by a variable.
+    /// </summary>
     private static readonly Regex VariablePattern =
-        new(@"\${\s*([\w\d._]+)\s*}", RegexOptions.Compiled);
+        new(@"\$\$\{(?<escaped>[^{}]*)\}|\$\{\s*(?<name>[\w\d._]+)\s*\}", RegexOptions.Compiled);
 
     /// <summary>
     ///     Walks <paramref name="root"/> in place, replacing every <c>${name}</c> with the
@@ -55,13 +68,8 @@ internal static class BlueprintVariableInterpolator
         string sourceDescription,
         OperationResult operationResult)
     {
-        if (variables.Count == 0)
-        {
-            // Nothing to substitute — but blueprint authors may still have written
-            // placeholders, so we don't short-circuit Regex.Replace; we just rely on it
-            // to be a fast no-op when the input contains no ${...} sequences.
-        }
-
+        // No short-circuit when variables.Count == 0: seeds may still hold placeholders (an
+        // unknown one must warn) and escapes (which must be unescaped).
         foreach (var entity in root.Entities)
         {
             if (!string.IsNullOrEmpty(entity.RtWellKnownName))
@@ -140,7 +148,13 @@ internal static class BlueprintVariableInterpolator
 
         return VariablePattern.Replace(value, match =>
         {
-            var name = match.Groups[1].Value;
+            var escaped = match.Groups["escaped"];
+            if (escaped.Success)
+            {
+                return "${" + escaped.Value + "}";
+            }
+
+            var name = match.Groups["name"].Value;
             if (variables.TryGetValue(name, out var replacement))
             {
                 return replacement;

@@ -141,9 +141,11 @@ OCTO_BLUEPRINTS__SYSTEMTENANTID=OctoSystem
 - Every string-typed attribute `value` in `seed-data/entities.yaml`
 - Every entity's `rtWellKnownName`
 
-Non-string attribute values (numbers, booleans, embedded records) are left untouched.
+Non-string scalar values (numbers, booleans, enum values) are left untouched.
 Unknown placeholders log a warning and are kept verbatim — so a typo is loud rather than
-quietly writing an empty string to MongoDB.
+quietly writing an empty string to MongoDB. String list items and string members of records
+and record arrays (at any depth) are resolved too. A placeholder that must survive the install
+verbatim is escaped as `$${name}` (see "Keeping a runtime placeholder" below).
 
 ```yaml
 # seed-data/entities.yaml
@@ -157,6 +159,36 @@ entities:
       - id: System.Communication/ChartVersion
         value: "${octo.version}"   # ← rolled forward by helm with every release
 ```
+
+#### Keeping a runtime placeholder: `$${name}` (AB#8995)
+
+Some seed values carry placeholders that are resolved later at run time, not at install:
+notification templates (`${count}`, `${name}`, resolved by the mesh-adapter
+`NotificationDigest` node when the message is sent) or KPI formulas. Their names come from
+arbitrary query columns, so they cannot be declared as blueprint variables. Write them with a
+doubled `$`:
+
+```yaml
+- id: System.Notification/SubjectTemplate
+  value: 'Failed EDA processes in ${octo.tenantId}: $${count}'
+# stored: 'Failed EDA processes in <tenant>: ${count}' - the notification fills ${count} when it is sent
+```
+
+Rules (`BlueprintVariableInterpolator`):
+
+- `$${…}` is written as the literal `${…}`, without a variable lookup and without a warning.
+  The text between the braces is kept as written (`$${a->b}` → `${a->b}`); it may not contain
+  `{` or `}`.
+- The escape wins over a variable of the same name: `$${octo.tenantId}` stays `${octo.tenantId}`.
+- Only a `$$` directly before `{` is an escape (`$$$${x}` → `$$${x}`, `$$5` stays `$$5`).
+- It applies wherever variables are resolved: `rtWellKnownName`, string attributes, string
+  lists and records / record arrays at any depth, and also when the tenant has no variables at all.
+- An unescaped unknown `${name}` keeps the old behaviour: left unchanged, warning message 27
+  ("Unknown blueprint variable"). A placeholder that is not a variable name (`${a->b}`) is left
+  unchanged without a warning, as before.
+- **Engine version:** an engine before this change stores `$${name}` verbatim. Use the escape in
+  a blueprint only once every cluster that installs it runs an engine with AB#8995 (the first
+  libs release after r3.5.75).
 
 #### Empty-string sentinel for chart versions
 

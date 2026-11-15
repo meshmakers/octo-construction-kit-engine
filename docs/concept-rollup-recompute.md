@@ -330,15 +330,20 @@ unscoped.
 buckets for those series only (`rtid IN (...)`), exactly as the full recompute stages them. It then upserts the staged rows
 into the live table at the generation each (window, rtId) row is read at today: the CASE of the read predicate
 (`GenerationFilterSql.RenderActiveGeneration`) over the pointer entries that can apply to these series. No generation is
-used, no pointer entry is written, and nothing is swept. Readers see the same values as after a full recompute of the
+used, no pointer entry is written, and no superseded generation is swept. Readers see the same values as after a full recompute of the
 window. The proof is `ScopedRefreshEquivalenceTests` in engine-mongodb: twin tenants, hourly and daily levels, the
 TimeWeightedAvg carry bucket, rows at generation 0, at an unscoped and at a foreign scoped pointer.
 
 - Each row is replaced by one statement. The active-job guard (§3) serialises the refresh with every other recompute of
   the rollup, so the pointer entries it read cannot change under it.
 - The forward pass never writes inside the range: the range is clamped to the lag-closed buckets (§4, bucket ownership).
-- Late data adds or corrects source rows and never removes one. The refresh therefore never has to delete a bucket row.
-  A delivery that removed source rows would need a full recompute, as before.
+- **Vanished buckets.** A full recompute leaves a bucket row out of the new generation when its source rows are gone.
+  The refresh removes such rows too, so it is never weaker than the full recompute. The refresh marker is the
+  `rtchangeddatetime` of the oldest staged row: every row the upsert writes carries at least that value, and every row
+  it did not reach is older. After the upsert the refresh counts the rows of the series at the active generation in the
+  range that are older than the marker (or all of them when nothing was staged). It deletes them only when there are
+  any. The cost is bounded by series × buckets, like the upsert, and is normally zero rows. Proof: the
+  `ScopedRefreshEquivalenceTests` variant in which one series loses its source rows for one bucket.
 
 **Once per debounce interval.** Obligations from late deliveries are enqueued with `NextAttemptAt = now + LateDataDebounce`
 at attempt zero (`ArchiveRecomputeRange.IsDebounced`). The state lives on the archive entity in MongoDB, so it holds across

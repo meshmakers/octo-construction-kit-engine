@@ -17,7 +17,8 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   - the dirty window carries the rtIds of the late rows (`ArchiveDirtyWindow.RtIds`), and the recompute range and the job
     carry them as `RtIdSet`. The orchestrator runs such a range as a **set-scoped refresh**: the new
     `IArchiveRecomputeExecutor.ExecuteScopedRefreshAsync` aggregates only those series again and writes them at the
-    generation each row is read at today. No new generation, no pointer entry, nothing to sweep. Readers get the same
+    generation each row is read at today. No new generation, no pointer entry, no generation sweep; a bucket row whose
+    source rows are gone is removed, as a full recompute removes it. Readers get the same
     values as after a full recompute of the window;
   - the obligations of late deliveries are held for `StreamData:Recompute:LateDataDebounce` (**new setting**, default
     `00:05:00`, `0` = off), stored as `NextAttemptAt` at attempt zero on the archive entity, so the hold survives replicas

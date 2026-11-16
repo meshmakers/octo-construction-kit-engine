@@ -270,7 +270,7 @@ types:
           timeoutSeconds: 60
           idempotent: false
       - methodId: RetryComputedColumnBackfill-1
-        description: "Queues the backfill of a computed column again - for a column that ended Failed, or that is stuck in Pending or Backfilling without a running job - and answers the queued job (ComputedColumnName set; an already queued job of the column is answered as is). Refused when the column is Active (mutation streamData.retryComputedColumnBackfill)."
+        description: "Queues the backfill of a computed column again - for a column that ended Failed, or that is stuck in Pending or Backfilling without a running job - and answers the queued job (ComputedColumnName set; an already queued job of the column is answered as is). No result (null) when the service has no recompute job store. Refused when the column is Active (mutation streamData.retryComputedColumnBackfill)."
         parameters:
           - { name: name, valueType: String, description: "Name of the computed column whose backfill is retried." }
         result:
@@ -291,7 +291,7 @@ types:
           timeoutSeconds: 60
           idempotent: true
       - methodId: RepairComputedColumn-1
-        description: "Queues a repair of an Active computed column as a background job: re-evaluates the rows in [from, to) whose cell is null although an operand of the formula is not null and writes the results; the column stays Active. Answers the queued job (ComputedColumnName set; an already queued or running repair of the column is answered as is). Refused when the column does not exist or is not Active (mutation streamData.repairComputedColumn)."
+        description: "Queues a repair of an Active computed column as a background job: re-evaluates the rows in [from, to) whose cell is null although an operand of the formula is not null and writes the results; the column stays Active. Answers the queued job (ComputedColumnName set; an already queued or running repair of the column is answered as is). No result (null) when the service has no recompute job store. Refused when the column does not exist or is not Active (mutation streamData.repairComputedColumn)."
         parameters:
           - { name: name, valueType: String, description: "Name of the computed column to repair." }
           - { name: from, valueType: DateTime, isOptional: true, description: "Inclusive start of the repaired range (UTC); default the first row of the archive." }

@@ -12,7 +12,8 @@ _Required bump level: minor._
     `AddColumn-1` (`path`, optional `indexed`, default false; idempotent), `RemoveComputedColumn-1` (`name`) and
     `UpdateComputedColumnFormula-1` (`name`, `formula`), result record `ArchiveTransitionResult`;
   - `RetryComputedColumnBackfill-1` (`name`) and `RepairComputedColumn-1` (`name`, optional `from`, `to`), result record
-    `RecomputeJobInfo` (the queued job; an already queued job of the column is answered as is).
+    `RecomputeJobInfo` (the queued job; an already queued job of the column is answered as is; no result when the service has
+    no recompute job store, as with the mutations).
   - Optional member `RecomputeJobInfo.ComputedColumnName` (attribute `ArchiveMethod.ComputedColumnName`, runtime state): the computed
     column a backfill or repair job writes, as `computedColumnName` of the mutations' `RecomputeJobInfo`.
 - Role `StreamDataAdmin`, explicit timeouts, the error codes of the archive methods. The backfills and repairs run as background jobs

@@ -13,7 +13,8 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   of System.Ai.Builder erased 0 of 46 entities. The `Referenced` rule spread along the seed's own `LinksTo` links between
   pages, and `Edited` never fired because the comparison left out `TenantOwned` attributes. The rules are now:
   - `Referenced` means a direct reference from an entity outside the blueprint, plus the seeded to-one children of a kept
-    entity (its versions). Associations the seed declares between its own entities no longer spread a keep, and they go with
+    entity (its versions) and the to-one parents of a kept entity (a kept version keeps its page), so no kept entity points
+    to an erased one. Associations the seed declares between its own entities no longer spread a keep, and they go with
     the erased entities.
   - The uninstall comparison counts `TenantOwned` attributes.
   - An entity outside the blueprint that attaches itself to a seed entity through a to-one association (a tenant-written page

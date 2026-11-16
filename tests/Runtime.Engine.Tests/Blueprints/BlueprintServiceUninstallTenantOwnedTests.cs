@@ -593,6 +593,51 @@ public class BlueprintServiceUninstallTenantOwnedTests
     }
 
     [Fact]
+    public async Task Uninstall_TenantReferencesAVersion_KeepsTheVersionAndItsPageOnly()
+    {
+        // A kept child keeps its to-one parent, so its VersionOf never points to an erased page; nothing spreads over the
+        // to-many LinksTo between pages.
+        GivenSeed(new SeedSpec("p1", false, 1, "p2"), new SeedSpec("p1@1", false) { VersionOf = "p1" },
+            new SeedSpec("p2", false, 1, "p1"), new SeedSpec("p2@1", false) { VersionOf = "p2" });
+        var p1 = GivenTenantEntity("p1", storedLocked: false);
+        var v1 = GivenTenantEntity("p1@1", storedLocked: false);
+        var p2 = GivenTenantEntity("p2", storedLocked: false);
+        var v2 = GivenTenantEntity("p2@1", storedLocked: false);
+        GivenAssociation(v1.RtId, p1.RtId, VersionOfRole);
+        GivenAssociation(v2.RtId, p2.RtId, VersionOfRole);
+        GivenAssociation(p1.RtId, p2.RtId);
+        GivenAssociation(p2.RtId, p1.RtId);
+        var user = GivenUserEntity("cc00000000000000000000b1");
+        GivenAssociation(user.RtId, v1.RtId);
+
+        var result = await Uninstall();
+
+        Assert.Equal(new[] { p2.RtId, v2.RtId }.Order(), _erased.Order());
+        Assert.Equal(["p1", "p1@1"], Keys(result.TenantOwnedKept));
+        Assert.Equal([user.RtId.ToString()], result.TenantOwnedKept.Single(k => k.Key == "p1@1").ReferencedBy);
+        Assert.Equal([v1.RtId.ToString()], result.TenantOwnedKept.Single(k => k.Key == "p1").ReferencedBy);
+        Assert.DoesNotContain(_associations, a => _erased.Contains(a.OriginRtId) || _erased.Contains(a.TargetRtId));
+    }
+
+    [Fact]
+    public async Task Uninstall_ExternalEntitySharingTheRtIdOfASeedEntityOfAnotherType_IsOutsideTheSeed()
+    {
+        // The seed has Note "x" (declaring a Related link to c); an external Rule "x" with the same rtId links to c under
+        // the same role. It is not the seed's Note, so it keeps c, and its association stays.
+        GivenSeed(new SeedSpec("x-note", false, 1, "c") { Type = NoteType, RtIdKey = "x" }, new SeedSpec("c", false));
+        GivenTenantEntity("x-note", storedLocked: false, type: NoteType, rtIdKey: "x", threshold: 7);
+        var c = GivenTenantEntity("c", storedLocked: false);
+        var external = GivenUserEntity(IdOf("x").ToString()!);
+        GivenAssociation(external.RtId, c.RtId);
+
+        var result = await Uninstall();
+
+        Assert.Empty(_erased);
+        Assert.Equal(BlueprintTenantOwnedKeptReason.Referenced, result.TenantOwnedKept.Single(k => k.Key == "c").Reason);
+        Assert.Single(_associations);
+    }
+
+    [Fact]
     public async Task Uninstall_SeedLinksBetweenPages_DoNotSpreadAKeep()
     {
         // The edited page links (seed-declared, to-many) to an unedited page, which links on: no propagation. The linked

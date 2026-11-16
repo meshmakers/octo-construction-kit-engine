@@ -939,6 +939,9 @@ tenant-owned seed entity (the seed sets `rtBlueprintLocked: false`) that the ten
     link out of the blueprint (to a system entity, say) does not count; it is erased with it;
   - **seeded child of an entity that stays**: the seed declares a to-one association from it to a kept entity of this
     blueprint (the seeded version of a kept page). This repeats for children of children;
+  - **to-one parent of an entity that stays**: a kept entity's to-one association within the seed keeps its target (a
+    version referenced from outside keeps its page), so no kept entity is left pointing to an erased one. This repeats
+    upward along to-one roles only;
   - an association the tenant created between two entities of this blueprint's seed, when the other one stays. An
     association counts as seed-declared only with the same origin, target and role (role compared without the model
     version); a second association under another role is the tenant's.
@@ -967,7 +970,6 @@ Limits of the uninstall rules:
 - "Seeded child" is generic: any to-one association the seed declares from an entity to a kept entity of the same
   blueprint. A seed that points its entities at a shared tenant-owned parent through a to-one role, such as a folder that
   stays, keeps all of them. System.Ai pages have no such role; `VersionOf` is their only to-one link.
-- A kept child does not keep its parent: a version kept from outside does not keep its unedited page.
 - An update (AB#8778) keeps `TenantOwned` values. After an update whose seed changed a `TenantOwned` attribute, the entity
   differs from the installed seed and counts as edited on uninstall. It is kept, never erased by mistake.
 - Only associations are references. An entity that names another one in an **attribute** (for example a page that

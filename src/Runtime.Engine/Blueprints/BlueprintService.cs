@@ -3626,9 +3626,12 @@ internal class BlueprintService : IBlueprintService
     /// <item>
     /// The other end is an entity of this blueprint's seed: an association the seed declares between its own entities never
     /// keeps the candidate (no propagation along, e.g., links between pages) - unless the candidate is a seeded child of
-    /// the kept entity: the seed declares a to-one association from the candidate to it (a version of its page). The
-    /// candidate is then kept as <see cref="BlueprintTenantOwnedKeptReason.Referenced" /> with it. An association the seed
-    /// does not declare (the tenant linked two seed entities) keeps the candidate as Referenced.
+    /// the kept entity: the seed declares a to-one association from the candidate to it (a version of its page), or the
+    /// to-one parent of a kept entity: the seed declares a to-one association from the kept entity to the candidate (a
+    /// kept version keeps its page, so its to-one association never points to an erased entity). The candidate is then
+    /// kept as <see cref="BlueprintTenantOwnedKeptReason.Referenced" /> with it; this repeats up and down along to-one
+    /// roles only. An association the seed does not declare (the tenant linked two seed entities) keeps the candidate as
+    /// Referenced.
     /// </item>
     /// <item>
     /// The other end lies outside the seed (an entity the tenant created, of another blueprint, a system entity): the
@@ -3767,6 +3770,12 @@ internal class BlueprintService : IBlueprintService
                                 // A seeded child of an entity that stays; a role that cannot be resolved counts as one.
                                 referencedBy.Add(otherId);
                             }
+                            else if (!selfIsOrigin && _isToOne(association.OriginCkTypeId, association.AssociationRoleId) != false)
+                            {
+                                // The to-one parent of an entity that stays (a kept version keeps its page), so the kept
+                                // entity's to-one association never points to an erased entity. Upward only along to-one roles.
+                                referencedBy.Add(otherId);
+                            }
 
                             continue; // otherwise a link the seed declares between its own entities: no propagation
                         }
@@ -3837,9 +3846,12 @@ internal class BlueprintService : IBlueprintService
 
         private static string TypeName(string ckTypeId) => ckTypeId[(ckTypeId.LastIndexOf('/') + 1)..];
 
-        /// <summary>Outside the seed only when certain: an rtId of this seed counts as inside, whatever its CK type.</summary>
+        /// <summary>
+        /// Whether an association end is an entity of this seed: matched like any end (<see cref="SameEntity" />), so an
+        /// external entity that only shares an rtId with a seed entity of another type is outside.
+        /// </summary>
         private bool IsInSeed(UninstallEntityKey end) =>
-            _seedIdentities.Contains(end) || _seedRtIds.Contains(end.RtId);
+            _seedIdentities.Contains(end) || (_seedRtIds.Contains(end.RtId) && _seedIdentities.Any(k => SameEntity(end, k)));
 
         /// <summary>Whether the seed declares this association: same origin, target and role (role without model version).</summary>
         private bool IsSeedDeclared(UninstallEntityKey origin, UninstallEntityKey target, string role) =>

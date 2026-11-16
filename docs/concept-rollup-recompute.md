@@ -336,7 +336,9 @@ TimeWeightedAvg carry bucket, rows at generation 0, at an unscoped and at a fore
 
 - Each row is replaced by one statement, but the refresh is not atomic across rows: while it runs, or after it failed part
   way, a reader can see some buckets of the series already refreshed and others not yet. Every written row holds its
-  final value, and the retry (AB#5189) completes the rest. A full recompute keeps the old generation visible until its
+  final value, and the retry (AB#5189) completes the rest - up to the attempt cap (`maxRangeAttempts`, default 5). After
+  that the remainder is parked: it stays visible on the archive and is not due again until a recompute that covers it
+  succeeds (a later late delivery for the same series, or a manual `recomputeArchive` over the range). A full recompute keeps the old generation visible until its
   flip; the refresh trades that for the absence of a new generation and its sweep.
 - The active-job guard (§3) serialises the refresh with every other recompute of
   the rollup, so the pointer entries it read cannot change under it.

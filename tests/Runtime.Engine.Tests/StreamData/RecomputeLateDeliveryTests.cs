@@ -418,6 +418,29 @@ public class RecomputeLateDeliveryTests
         Assert.True(held.IsDebounced);
     }
 
+    [Fact]
+    public async Task ADeadJob_DoesNotChargeARetryThatWasStillHeldBackWhenItStarted()
+    {
+        // A retry of {M1} with four failed attempts, held back until 12:30; at 12:05 a fresh job of {M1} for one hour
+        // started (without the held retry) and its process died.
+        var started = Start.AddHours(-2);
+        var held = new ArchiveRecomputeRange(A02, LateDay.AddHours(8), LateDay.AddHours(20), null, started.AddHours(-1), 4,
+            started.AddMinutes(25), "earlier failure") { RtIdSet = RtIdSet.Of(new[] { M1 }) };
+        _stateStore.Pending(A02).Add(held);
+        await _jobStore.CreateAsync(new RecomputeJobSnapshot(
+            OctoObjectId.Empty, A02, RecomputeJobState.Running, RecomputeTrigger.Periodic,
+            LateDay.AddHours(8), LateDay.AddHours(9), null, null, null, started, null, null, null, null, started)
+        {
+            RtIdSet = RtIdSet.Of(new[] { M1 }),
+        });
+
+        await NewSut().TickAsync(CancellationToken.None);
+
+        // The held retry was not part of the dead job: still at attempt 4, not parked (it is due now and runs again).
+        Assert.DoesNotContain(_stateStore.Pending(A02), r => r.IsParked);
+        Assert.DoesNotContain(_stateStore.Pending(A02), r => r.Attempts >= 5);
+    }
+
     // ---- Failure keeps the scope ----------------------------------------------------------------
 
     [Fact]

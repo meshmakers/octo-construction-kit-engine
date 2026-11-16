@@ -559,10 +559,13 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         }
 
         var affected = pending
-            // AB#9016: only obligations that were queued when the job started can have been part of its run; a late
-            // delivery debounced after that has never run and must not be charged an attempt for the dead job.
+            // AB#9016: only obligations the drain could hand to the job can have been part of its run - queued before the
+            // job started, and due then (a debounced one may have been released with the oldest of its rollup). A late
+            // delivery debounced after the start, or a retry still held back by its backoff, never ran and must not be
+            // charged an attempt for the dead job.
             .Where(r => !r.IsParked
-                        && (job.StartedAt is not { } jobStarted || r.EnqueuedAt <= jobStarted)
+                        && (job.StartedAt is not { } jobStarted
+                            || (r.EnqueuedAt <= jobStarted && (r.IsDebounced || r.IsDueAt(jobStarted))))
                         && (job.RtIdSet is { } jobSet
                             ? r.RtIdSet is { } set && set.IsSubsetOf(jobSet)
                             : r.RtIdScope == job.RtIdScope)

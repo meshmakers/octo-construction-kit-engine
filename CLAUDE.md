@@ -1107,7 +1107,9 @@ against 1.26.0 without acknowledgement. Behaviour:
 - `ArchiveSnapshot.IsFailedOnHiddenColumns` / `WithoutHiddenColumns()`: such an archive refuses writes, its history stays queryable
   without the Hidden columns (engine-mongodb query paths).
 - `RedactHiddenColumnsAsync` drops the Hidden columns (CrateDB first, then the definition), audits it and resumes a Failed-on-Hidden
-  archive; refused while a rollup aggregates one of the columns (`HiddenColumnRedactionBlockedException`).
+  archive; refused for rollups, for an activated archive with Hidden columns, while a computed column reads one of them, and while a
+  rollup aggregates one of them (`HiddenColumnRedactionBlockedException`).
+- A rollup whose aggregation source path reaches Hidden goes `Failed` with its reason but no Hidden columns (unreadable).
 - Every new interface member has a default implementation (mixed package sets keep compiling); the implementations live in
   engine-mongodb.
 
@@ -1572,7 +1574,7 @@ Notes:
   `TargetCkTypeId` + column paths). The rule — **no archive column may reach a Hidden attribute** — is implemented by
   `ArchiveHiddenColumnGuard` (Runtime.Engine): a path reaches Hidden when a segment is Hidden **or when it ends at a
   record / record array whose record, transitively, contains a Hidden sub-attribute** (a whole-record column stores
-  it; review G3 E-M2). Case-insensitive, `[*]` ignored, rollup and computed columns skipped. `ArchiveLifecycleService`
+  it; review G3 E-M2). Case-insensitive, `[*]` ignored, computed columns skipped; for a rollup the aggregation source paths are checked (AB#6247). `ArchiveLifecycleService`
   applies it on activation, retry and re-provisioning (`HiddenAttributeInArchiveException`), and
   `RevalidateAccessAsync(archiveRtId)` sets an **active** archive to `Failed` (stops ingesting) when a model change
   made one of its columns reach Hidden; since AB#6247 it records the reason and the columns, the history stays readable without

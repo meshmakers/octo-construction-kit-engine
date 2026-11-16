@@ -162,8 +162,9 @@ public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
             return true;
         }
 
-        var paths = hidden.Select(h => h.Path).ToList();
-        var reason = DescribeHiddenColumns(hidden);
+        // Rollups are not readable without their aggregations; they record no Hidden columns and stay unreadable.
+        var paths = snapshot.RollupAggregations is null ? hidden.Select(h => h.Path).ToList() : [];
+        var reason = Truncate(DescribeHiddenColumns(hidden));
         _logger.LogWarning(
             "Archive {ArchiveRtId} captures columns that now reach Hidden attributes ({Columns}); the archive is set to " +
             "Failed and stops ingesting, its history stays queryable without these columns", archiveRtId, reason);
@@ -192,11 +193,33 @@ public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
         }
 
         var snapshot = await LoadAsync(archiveRtId);
+        if (snapshot.RollupAggregations is not null)
+        {
+            // A rollup's columns are derived from its aggregations: change or delete the rollup instead.
+            throw new InvalidArchiveStateTransitionException(archiveRtId, snapshot.Status,
+                "redact the Hidden columns of a rollup archive (change or delete the rollup instead)");
+        }
+
         var hidden = ArchiveHiddenColumnGuard.FindHiddenColumns(_ckCacheService, _tenantId, snapshot);
         var paths = hidden.Select(h => h.Path).ToList();
 
         if (paths.Count > 0)
         {
+            if (snapshot.Status == CkArchiveStatus.Activated)
+            {
+                // Ingest and re-provisioning still work from the definition while the columns are dropped; the access
+                // re-validation sets such an archive to Failed, or the operator disables it first.
+                throw new InvalidArchiveStateTransitionException(archiveRtId, snapshot.Status,
+                    "redact the Hidden columns of an activated archive (disable it first)");
+            }
+
+            // A computed column whose formula reads a dropped column would dangle: refuse before anything is dropped.
+            var hiddenPaths = new HashSet<string>(paths, StringComparer.OrdinalIgnoreCase);
+            await _repository.ValidateComputedColumnsAsync(archiveRtId,
+                snapshot.Columns.Where(c => c.IsComputed || !hiddenPaths.Contains(c.Path)).ToList());
+
+            // Best-effort: a rollup created between this check and the drop is not seen (rollup creation is not
+            // serialised with the redaction).
             var dependents = await FindRollupsAggregatingAsync(archiveRtId, paths);
             if (dependents.Count > 0)
             {
@@ -208,7 +231,8 @@ public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
             await _repository.DropIngestedColumnStorageAsync(snapshot, paths);
             await _store.RemoveIngestedColumnsAsync(archiveRtId, paths);
 
-            var redactedReason = $"RedactHiddenColumns dropped the columns {DescribeHiddenColumns(hidden)} and their stored values";
+            var redactedReason =
+                Truncate($"RedactHiddenColumns dropped the columns {DescribeHiddenColumns(hidden)} and their stored values");
             await _audit.RecordTransitionAsync(_tenantId, archiveRtId, snapshot.Status, snapshot.Status, redactedReason);
             _logger.LogWarning("Archive {ArchiveRtId}: {Reason}", archiveRtId, redactedReason);
         }
@@ -265,6 +289,9 @@ public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
 
         return dependents;
     }
+
+    private static string Truncate(string reason) =>
+        reason.Length <= MaxStatusReasonLength ? reason : reason[..MaxStatusReasonLength];
 
     private static string DescribeHiddenColumns(IEnumerable<(string Path, string Attribute)> hidden) =>
         string.Join(", ", hidden.Select(h => $"'{h.Path}' (reaches the Hidden attribute '{h.Attribute}')"));
@@ -887,9 +914,8 @@ public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
             try
             {
                 // AB#6247: the reason is kept on the archive (Archive.StatusReason), not only in the log.
-                var reason = $"Provisioning the CrateDB table failed: {ex.Message}";
                 await _store.SetStatusAsync(snapshot.RtId, CkArchiveStatus.Failed,
-                    reason.Length <= MaxStatusReasonLength ? reason : reason[..MaxStatusReasonLength], []);
+                    Truncate($"Provisioning the CrateDB table failed: {ex.Message}"), []);
                 await _audit.RecordTransitionAsync(_tenantId, snapshot.RtId, snapshot.Status, CkArchiveStatus.Failed, ex.Message);
 
                 StreamDataDiagnostics.StatusTransitions.Add(1,

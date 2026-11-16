@@ -154,6 +154,8 @@ public class ArchiveHiddenColumnGuardTests
         Assert.True(await Sut().RevalidateAccessAsync(Rt));
 
         A.CallTo(() => _store.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._)).MustNotHaveHappened();
+        A.CallTo(() => _store.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._, A<string?>._,
+            A<IReadOnlyList<string>>._)).MustNotHaveHappened();
     }
 
     private static ArchiveSnapshot Snapshot(CkArchiveStatus status, RtCkId<CkTypeId> type, string[] hidden,
@@ -227,6 +229,82 @@ public class ArchiveHiddenColumnGuardTests
         Assert.Equal(CkArchiveStatus.Disabled, result.Status);
         Assert.Equal(["Secret"], result.RemovedColumns);
         A.CallTo(() => _store.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._)).MustNotHaveHappened();
+        A.CallTo(() => _store.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._, A<string?>._,
+            A<IReadOnlyList<string>>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Redact_OfAnActivatedArchiveWithAHiddenColumn_IsRefused()
+    {
+        Stub(CkArchiveStatus.Activated, "Temperature", "Secret");
+
+        await Assert.ThrowsAsync<InvalidArchiveStateTransitionException>(() => Sut().RedactHiddenColumnsAsync(Rt));
+
+        A.CallTo(() => _repo.DropIngestedColumnStorageAsync(A<ArchiveSnapshot>._, A<IReadOnlyCollection<string>>._,
+            A<System.Threading.CancellationToken>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Redact_IsRefusedWhenAComputedColumnReadsAHiddenColumn()
+    {
+        Stub(CkArchiveStatus.Disabled, "Temperature", "Secret");
+        A.CallTo(() => _repo.ValidateComputedColumnsAsync(Rt, A<IReadOnlyList<CkArchiveColumnSpec>>._,
+                A<System.Threading.CancellationToken>._))
+            .Throws(new ArchivePathInvalidException(Rt, "secret", "a computed column reads it"));
+
+        await Assert.ThrowsAsync<ArchivePathInvalidException>(() => Sut().RedactHiddenColumnsAsync(Rt));
+
+        A.CallTo(() => _repo.ValidateComputedColumnsAsync(Rt,
+                A<IReadOnlyList<CkArchiveColumnSpec>>.That.Matches(c => c.Select(x => x.Path).SequenceEqual(new[] { "Temperature" })),
+                A<System.Threading.CancellationToken>._)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => _repo.DropIngestedColumnStorageAsync(A<ArchiveSnapshot>._, A<IReadOnlyCollection<string>>._,
+            A<System.Threading.CancellationToken>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Redact_OfARollup_IsRefused()
+    {
+        A.CallTo(() => _store.GetAsync(Rt)).Returns(new ArchiveSnapshot(Rt, _sensor, CkArchiveStatus.Failed, null, [])
+        {
+            RollupAggregations = [new CkRollupAggregationSpec("Secret", CkRollupFunction.Avg, null, null)]
+        });
+
+        await Assert.ThrowsAsync<InvalidArchiveStateTransitionException>(() => Sut().RedactHiddenColumnsAsync(Rt));
+    }
+
+    [Fact]
+    public async Task Revalidation_FailsARollupOfAHiddenAttribute_WithoutMakingItReadable()
+    {
+        A.CallTo(() => _store.GetAsync(Rt)).Returns(new ArchiveSnapshot(Rt, _sensor, CkArchiveStatus.Activated, null, [])
+        {
+            RollupAggregations =
+            [
+                new CkRollupAggregationSpec("Secret", CkRollupFunction.Avg, null, null),
+                new CkRollupAggregationSpec("temperature_avg_sum", CkRollupFunction.Sum, null, null) // a source rollup column
+            ]
+        });
+
+        Assert.False(await Sut().RevalidateAccessAsync(Rt));
+
+        A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Failed, A<string>.That.Contains("'Secret'"),
+            A<IReadOnlyList<string>>.That.IsEmpty())).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Redact_RetriedAfterADefinitionWriteFailed_Converges()
+    {
+        Stub(CkArchiveStatus.Disabled, "Temperature", "Secret");
+        A.CallTo(() => _store.EnumerateAsync()).Returns(AsyncEnumerable.Empty<ArchiveSnapshot>());
+        A.CallTo(() => _store.RemoveIngestedColumnsAsync(Rt, A<IReadOnlyCollection<string>>._))
+            .Throws(new InvalidOperationException("mongo down")).Once();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Sut().RedactHiddenColumnsAsync(Rt));
+        var result = await Sut().RedactHiddenColumnsAsync(Rt);
+
+        Assert.Equal(["Secret"], result.RemovedColumns);
+        A.CallTo(() => _repo.DropIngestedColumnStorageAsync(A<ArchiveSnapshot>._, A<IReadOnlyCollection<string>>._,
+            A<System.Threading.CancellationToken>._)).MustHaveHappenedTwiceExactly();
+        A.CallTo(() => _store.RemoveIngestedColumnsAsync(Rt, A<IReadOnlyCollection<string>>._)).MustHaveHappenedTwiceExactly();
     }
 
     [Fact]

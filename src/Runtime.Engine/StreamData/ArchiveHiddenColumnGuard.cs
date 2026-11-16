@@ -66,8 +66,8 @@ public static class ArchiveHiddenColumnGuard
     }
 
     /// <summary>
-    ///     The first ingested column of the archive that reaches a Hidden attribute. Rollup columns are derived from
-    ///     source archives (checked themselves); computed columns reference other columns of the same row.
+    ///     The first column of the archive that reaches a Hidden attribute (<see cref="FindHiddenColumns" />): an ingested
+    ///     column, or for a rollup an aggregation source path; computed columns reference other columns of the same row.
     /// </summary>
     public static (string Path, string Attribute)? FindHiddenColumn(ICkCacheService cache, string tenantId,
         ArchiveSnapshot snapshot)
@@ -78,15 +78,22 @@ public static class ArchiveHiddenColumnGuard
 
     /// <summary>
     ///     Every ingested column of the archive that reaches a Hidden attribute, in column order (AB#6247: the
-    ///     re-validation records all of them, the redaction drops all of them). Rollup and computed columns are skipped
-    ///     as in <see cref="FindHiddenColumn" />.
+    ///     re-validation records all of them, the redaction drops all of them). Computed columns are skipped. For a rollup
+    ///     the aggregation source paths are checked against its target type (a rollup of a Hidden attribute stores values
+    ///     derived from it); source paths that name a column of a source rollup do not resolve on the type and pass.
     /// </summary>
     public static IReadOnlyList<(string Path, string Attribute)> FindHiddenColumns(ICkCacheService cache,
         string tenantId, ArchiveSnapshot snapshot)
     {
-        if (snapshot.RollupAggregations is not null)
+        if (snapshot.RollupAggregations is { } aggregations)
         {
-            return [];
+            return aggregations
+                .Select(a => (Path: a.SourcePath,
+                    Attribute: FindHiddenAttribute(cache, tenantId, snapshot.TargetCkTypeId, a.SourcePath)))
+                .Where(h => h.Attribute != null)
+                .Select(h => (h.Path, h.Attribute!))
+                .Distinct()
+                .ToList();
         }
 
         var found = new List<(string Path, string Attribute)>();

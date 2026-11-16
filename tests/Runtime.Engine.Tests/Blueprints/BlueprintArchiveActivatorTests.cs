@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using FakeItEasy;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs;
@@ -57,6 +58,11 @@ public class BlueprintArchiveActivatorTests
             .ReturnsLazily((OctoObjectId id) => Task.FromResult(_archives.GetValueOrDefault(id)));
         A.CallTo(() => _archiveStore.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._))
             .Invokes((OctoObjectId id, CkArchiveStatus status) => _archives[id] = _archives[id] with { Status = status })
+            .Returns(Task.CompletedTask);
+        A.CallTo(() => _archiveStore.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._, A<string>._,
+                A<IReadOnlyList<string>>._))
+            .Invokes((OctoObjectId id, CkArchiveStatus status, string? reason, IReadOnlyList<string> hidden) =>
+                _archives[id] = _archives[id] with { Status = status, StatusReason = reason, HiddenColumns = hidden })
             .Returns(Task.CompletedTask);
         A.CallTo(() => _rollupStore.GetAsync(A<OctoObjectId>._))
             .ReturnsLazily((OctoObjectId id) => Task.FromResult(_rollups.GetValueOrDefault(id)));
@@ -211,6 +217,8 @@ public class BlueprintArchiveActivatorTests
         A.CallTo(() => _recompute.EnqueueBackfillFromSourceAsync(A<OctoObjectId>._, A<CancellationToken>._))
             .MustNotHaveHappened();
         A.CallTo(() => _archiveStore.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._)).MustNotHaveHappened();
+        A.CallTo(() => _archiveStore.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._, A<string>._,
+            A<IReadOnlyList<string>>._)).MustNotHaveHappened();
         // Nothing new to activate: the tenant's stream-data services are not even resolved.
         A.CallTo(() => _provider.GetAsync(A<string>._, A<CancellationToken>._)).MustNotHaveHappened();
         Assert.Equal(CkArchiveStatus.Disabled, _archives[Raw2].Status);
@@ -335,6 +343,7 @@ public class BlueprintArchiveActivatorTests
         Assert.Equal(BlueprintArchiveActivationOutcome.Failed, failed.Outcome);
         Assert.Contains("CrateDB is unreachable", failed.Reason);
         Assert.Equal(CkArchiveStatus.Failed, _archives[Raw].Status); // retryable
+        Assert.False(string.IsNullOrEmpty(_archives[Raw].StatusReason)); // AB#6247: the reason is kept on the archive
 
         // The rollup on the failed source is not attempted and is Failed too; the independent pair is activated.
         var dependent = Of(results, Rollup1h);

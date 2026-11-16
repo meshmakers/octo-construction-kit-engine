@@ -121,8 +121,11 @@ public sealed record ArchiveSnapshot(
     public bool IsFailedOnHiddenColumns => Status == CkArchiveStatus.Failed && HiddenColumns.Count > 0;
 
     /// <summary>
-    /// This snapshot without the ingested columns named in <see cref="HiddenColumns"/> (case-insensitive), so the query
-    /// paths neither project nor accept them. Returns the snapshot itself when <see cref="HiddenColumns"/> is empty.
+    /// This snapshot without the ingested columns named in <see cref="HiddenColumns"/> (case-insensitive). Returns the
+    /// snapshot itself when <see cref="HiddenColumns"/> is empty. Computed columns are kept here, because their formulas
+    /// use the storage layer's physical column names: the storage layer must also remove every computed column whose
+    /// current or pending formula reads a Hidden column before it reads or exports the archive (engine-mongodb
+    /// <c>CrateDbStreamDataRepository.EnsureArchiveQueryableAsync</c> and <c>ExportRowsAsync</c> do).
     /// </summary>
     public ArchiveSnapshot WithoutHiddenColumns()
     {

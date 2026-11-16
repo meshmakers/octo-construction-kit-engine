@@ -3162,6 +3162,8 @@ internal class BlueprintService : IBlueprintService
                     .ConfigureAwait(false);
                 if (!depResult.Success)
                 {
+                    // What the dependent erased before it failed stays erased; report it.
+                    AddCascadedOutcome(result, depResult);
                     result.Success = false;
                     result.Errors.AddRange(depResult.Errors);
                     await NotifyUninstallFailedAsync(
@@ -3243,6 +3245,7 @@ internal class BlueprintService : IBlueprintService
                 }
                 else
                 {
+                    AddCascadedOutcome(result, cascadeResult);
                     result.Warnings.AddRange(cascadeResult.Errors
                         .Select(e => $"Cascade of '{depBpId.FullName}' failed: {e}"));
                 }
@@ -3280,6 +3283,7 @@ internal class BlueprintService : IBlueprintService
         result.EntitiesDeleted += cascaded.EntitiesDeleted;
         result.DeletedEntities.AddRange(cascaded.DeletedEntities);
         result.TenantOwnedKept.AddRange(cascaded.TenantOwnedKept);
+        result.Warnings.AddRange(cascaded.Warnings);
     }
 
     private async Task NotifyUninstallFailedAsync(
@@ -3609,10 +3613,11 @@ internal class BlueprintService : IBlueprintService
     /// edited page keeps its versions, whether the page points to them or they point to the page), and so does any
     /// association the tenant created.
     /// <para>
-    /// Matching an association end to an entity: by rtId, because the stored CK type of an association end need not be
-    /// spelled like the seed's (resolved, concrete or missing). Only an rtId that the entities of this uninstall carry under
-    /// more than one CK type (seeds reuse an rtId across types) is matched by CK type as well; when that cannot decide, the
-    /// end counts as staying and inside the seed, so the candidate is kept.
+    /// Matching an association end to an entity: by rtId and a CK type that can be the same, because the stored type of an
+    /// association end need not be spelled like the seed's (a resolved model version, or missing): see
+    /// <c>SameEntity</c>. An rtId that the entities of this uninstall carry under more than one CK type (seeds reuse an rtId
+    /// across types) needs the exact type. When that cannot decide, the end counts as staying and inside the seed, so the
+    /// candidate is kept.
     /// </para>
     /// </summary>
     private sealed class UninstallReferences
@@ -3701,7 +3706,7 @@ internal class BlueprintService : IBlueprintService
                         var target = UninstallEntityKey.Of(association.TargetCkTypeId, association.TargetRtId);
                         var selfIsOrigin = IsSelf(origin, self) && !(IsSelf(target, self) && origin.CkTypeId != self.CkTypeId);
                         var other = selfIsOrigin ? target : origin;
-                        if (other.RtId.Equals(self.RtId) && (other.CkTypeId == self.CkTypeId || !_ambiguousRtIds.Contains(self.RtId)))
+                        if (IsSelf(other, self))
                         {
                             continue; // a link to itself
                         }
@@ -3735,12 +3740,40 @@ internal class BlueprintService : IBlueprintService
             } while (changed);
         }
 
-        private bool IsSelf(UninstallEntityKey end, UninstallEntityKey self) =>
-            end.RtId.Equals(self.RtId) && (!_ambiguousRtIds.Contains(self.RtId) || end.CkTypeId == self.CkTypeId);
+        private bool IsSelf(UninstallEntityKey end, UninstallEntityKey self) => SameEntity(end, self);
 
-        /// <summary>Gone only when certain: an rtId of several types needs the exact CK type.</summary>
+        /// <summary>Gone only when certain: same rtId and a CK type that can be the same (see <see cref="SameEntity" />).</summary>
         private bool IsGone(UninstallEntityKey end, HashSet<UninstallEntityKey> gone) =>
-            gone.Contains(end) || (!_ambiguousRtIds.Contains(end.RtId) && gone.Any(g => g.RtId.Equals(end.RtId)));
+            gone.Contains(end) || gone.Any(g => SameEntity(end, g));
+
+        /// <summary>
+        /// Whether an association end names this entity. The same rtId, and: for an rtId the uninstall carries under several
+        /// CK types the exact type; otherwise a type that can be the same spelled differently - equal, missing on one side, or
+        /// the same type name after the model (a resolved model version). An end of another type name with the same rtId
+        /// (an entity outside the uninstall) is a different entity, so the candidate is kept.
+        /// </summary>
+        private bool SameEntity(UninstallEntityKey end, UninstallEntityKey entity)
+        {
+            if (!end.RtId.Equals(entity.RtId))
+            {
+                return false;
+            }
+
+            if (end.CkTypeId == entity.CkTypeId)
+            {
+                return true;
+            }
+
+            if (_ambiguousRtIds.Contains(entity.RtId))
+            {
+                return false;
+            }
+
+            return end.CkTypeId.Length == 0 || entity.CkTypeId.Length == 0
+                                            || string.Equals(TypeName(end.CkTypeId), TypeName(entity.CkTypeId), StringComparison.Ordinal);
+        }
+
+        private static string TypeName(string ckTypeId) => ckTypeId[(ckTypeId.LastIndexOf('/') + 1)..];
 
         /// <summary>Outside the seed only when certain: an rtId of this seed counts as inside, whatever its CK type.</summary>
         private bool IsInSeed(UninstallEntityKey end) =>

@@ -669,6 +669,38 @@ public class BlueprintServiceUninstallTenantOwnedTests
     }
 
     [Fact]
+    public async Task Uninstall_ExternalEntityWithTheRtIdOfAnErasedEntityOfAnotherType_KeepsTheCandidate()
+    {
+        // Locked Note "x" is erased; a user entity Rule "x" (same rtId, other type, outside the uninstall) stays and is
+        // linked to the candidate, so the candidate stays.
+        GivenSeed(new SeedSpec("x-note", null) { Type = NoteType, RtIdKey = "x" }, new SeedSpec("c", false));
+        var note = GivenTenantEntity("x-note", storedLocked: true, type: NoteType, rtIdKey: "x");
+        var c = GivenTenantEntity("c", storedLocked: false);
+        var external = GivenUserEntity(IdOf("x").ToString()!);
+        GivenAssociation(external.RtId, c.RtId);
+
+        var result = await Uninstall();
+
+        Assert.Equal([note.RtId], _erased);
+        Assert.Equal(BlueprintTenantOwnedKeptReason.Referenced, Assert.Single(result.TenantOwnedKept).Reason);
+    }
+
+    [Fact]
+    public async Task Uninstall_LinkToAnErasedNeighbourStoredUnderAResolvedModelVersion_StillErasesBoth()
+    {
+        // The stored end type carries another model spelling of the same type name: the neighbour is erased all the same.
+        GivenSeed(new SeedSpec("page", false), new SeedSpec("space", null));
+        var page = GivenTenantEntity("page", storedLocked: false);
+        var space = GivenTenantEntity("space", storedLocked: true);
+        GivenAssociation(page.RtId, space.RtId, targetType: new RtCkId<CkTypeId>("Test-2.0.0/Rule"));
+
+        var result = await Uninstall();
+
+        Assert.Equal(2, result.EntitiesDeleted);
+        Assert.Empty(result.TenantOwnedKept);
+    }
+
+    [Fact]
     public async Task Uninstall_EraseFailsAfterTheLinkedCandidateWasErased_ListsEachEntityOnce()
     {
         // b is erased first; a's erase fails afterwards. b must not show up as kept as well.

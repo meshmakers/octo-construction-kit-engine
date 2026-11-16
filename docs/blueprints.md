@@ -940,9 +940,10 @@ tenant-owned seed entity (the seed sets `rtBlueprintLocked: false`) that the ten
     Seed-declared links are matched by origin and target; the role is not compared, because the stored role id is the one
     the CK cache resolved.
 
-  An association end is matched to an entity by `rtId`, because its stored CK type need not be spelled like the seed's.
-  Only an `rtId` the entities of the uninstall carry under several CK types (seeds reuse an `rtId` across types) is matched
-  by CK type as well; when that cannot decide, the end counts as staying, so the entity is kept.
+  An association end is matched to an entity by `rtId` and a CK type that can be the same: equal, missing on one side, or
+  the same type name under another model spelling (its stored CK type need not be spelled like the seed's). An `rtId` the
+  entities of the uninstall carry under several CK types (seeds reuse an `rtId` across types) needs the exact type. When that
+  cannot decide, the end counts as staying, so the entity is kept.
 
   Associations with entities this uninstall erases (locked entities, other unedited entities, entities of dependents a cascade
   removes first) do not count. The rule is applied until nothing changes: an edited page keeps its unedited versions, whether

@@ -1073,6 +1073,27 @@ the ckLanguage 1 release 1.22.0 (`ValidateVersion`: only "ckLanguage changed '1'
   `derivable: Any` = `OCTO-CK200`, a dependent model derives from `Archive` and `CkArchiveColumn` without message 113). The Mongo round-trip gate
   (`CkMetaModelReflectionGateTests` in engine-mongodb) covers the model through the package.
 
+### Late-delivery recompute (System.StreamData 1.26.0, AB#9016)
+
+1.26.0 adds the optional `StringArray` attributes `CkArchiveDirtyWindow.RtIds`, `CkArchiveRecomputeRange.RtIdSet` and
+`RecomputeJob.RtIdSet`. This is a Minor against 1.25.0 with no acknowledgement. They carry the series of a late delivery
+(`RtIdSet` value type in `Runtime.Contracts/StreamData`). `RecomputeOrchestrator` uses them as follows:
+
+- it debounces late-delivery obligations (`NextAttemptAt` at attempt zero, `RecomputeLateDataOptions.LateDataDebounce`);
+- it merges them into one set-scoped job per merged range and interval, capped by `MaxScopedRtIds`;
+- it runs that job through `IArchiveRecomputeExecutor.ExecuteScopedRefreshAsync`, an in-place refresh at the active
+  generation in engine-mongodb;
+- the chained rollups inherit the set.
+
+Contract rules for a mixed package set:
+
+- the record properties are init-only, so the positional constructors stay;
+- the executor member has a default implementation;
+- the previous orchestrator constructor stays and means "no debounce".
+
+Pinned by `RtIdSetAndContractCompatibilityTests`; behaviour by `RecomputeLateDeliveryTests`. Concept:
+`docs/concept-rollup-recompute.md` §4a.
+
 ### Archive lifecycle methods (System.StreamData 1.24.0, AB#8598)
 
 1.24.0 adds the archive lifecycle as CK methods (Minor against 1.23.0, no acknowledgement, `minEngineVersion` unchanged 3.5.1). They

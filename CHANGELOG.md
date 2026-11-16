@@ -9,6 +9,36 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Changed
 
+- **Late stream-data deliveries recompute rollups only for the affected series, once per debounce interval (AB#9016).**
+  Before, every late delivery marked the whole window dirty on the raw archive, and the next tick recomputed the rollup for
+  that window over every series, then the whole cascade. Each run used a new generation and cleaned up the old one
+  (prod-2 tenant `sbeg`: 57 jobs for one late day, 59-80 k rows each, 556 cleanup DELETEs and 6052 s of CrateDB time in two
+  weeks). Now:
+  - the dirty window carries the rtIds of the late rows (`ArchiveDirtyWindow.RtIds`), and the recompute range and the job
+    carry them as `RtIdSet`. The orchestrator runs such a range as a **set-scoped refresh**: the new
+    `IArchiveRecomputeExecutor.ExecuteScopedRefreshAsync` aggregates only those series again and writes them at the
+    generation each row is read at today. No new generation, no pointer entry, no generation sweep; a bucket row whose
+    source rows are gone is removed, as a full recompute removes it. Readers get the same
+    values as after a full recompute of the window;
+  - the obligations of late deliveries are held for `StreamData:Recompute:LateDataDebounce` (**new setting**, default
+    `00:05:00`, `0` = off), stored as `NextAttemptAt` at attempt zero on the archive entity, so the hold survives replicas
+    and restarts. As soon as the oldest is due, all held obligations of the rollup run together: one job per merged range
+    over the union of its series (late deliveries for the same day merge into one job);
+  - a write or a merged interval with more than `StreamData:Recompute:MaxScopedRtIds` (**new setting**, default `200`,
+    `0` = off) distinct rtIds falls back to the unscoped recompute;
+  - chained rollups inherit the set and follow without waiting for another debounce interval (a multi-level chain over
+    one or more ticks). Manual recomputes, backfills and manual writes keep their scope and are not held back. An
+    unscoped obligation absorbs the set-scoped ones that lie entirely inside its range; a partly covered one stays
+    set-scoped. A set refresh also releases parked single-entity obligations of its series;
+  - the active-job guard serialises the refresh with every other recompute of the rollup.
+  - **Interface change (agent-operating-rules §2.4a):** `IArchiveRecomputeExecutor.ExecuteScopedRefreshAsync` is a new
+    member with a default implementation (one rtId: scoped recompute; several: one unscoped recompute, as before AB#9016), so an implementation built against the
+    previous contract still loads. The contract records got init-only properties (`RtIds`, `RtIdSet`) and keep their
+    positional constructors. `RecomputeOrchestrator` keeps its previous constructor, which means no debounce; the new one
+    takes `RecomputeLateDataOptions`. The engine-mongodb release that records the rtIds and implements the in-place refresh
+    merges with or after this one.
+  - Needs System.StreamData 1.26.0 (below). Rules: `docs/concept-rollup-recompute.md`, "Late deliveries (AB#9016)".
+
 - **Series resolver prefers a rollup on long windows (AB#8993).** `SeriesResolutionPlanner` (behind `ISeriesResolutionService`
   and the asset repository's `resolveSeriesQuery`) used to return the raw base archive whenever its native resolution fit the
   requested points, so a 7-day chart at 800 points read 672 raw 15-minute windows per series instead of the 168 points of the

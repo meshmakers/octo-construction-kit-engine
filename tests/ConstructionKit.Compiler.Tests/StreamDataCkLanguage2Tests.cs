@@ -189,14 +189,14 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         result.Messages.Where(m => m.Severity == CkCompileGateSeverity.Error).Select(m => m.Code ?? "").ToArray();
 
     [Fact]
-    public async Task StreamData_Is_1_25_0_OnCkLanguage2_WithMinEngineVersion351_AndPublishedToTheV3RootOnly()
+    public async Task StreamData_Is_1_26_0_OnCkLanguage2_WithMinEngineVersion351_AndPublishedToTheV3RootOnly()
     {
         var compiled = await CompileStreamDataAsync(RealStreamDataSource());
 
         Assert.Equal("System.StreamData", compiled.ModelId.Name);
         // 1.23.0 (AB#8597) raised the language; 1.24.0 (AB#8598) adds the archive lifecycle methods, 1.25.0 (AB#8599) the
-        // rollup control methods.
-        Assert.Equal(new Version(1, 25, 0), new Version(compiled.ModelId.Version.ToString()));
+        // rollup control methods, 1.26.0 (AB#9016) the rtId sets of the late-delivery recompute.
+        Assert.Equal(new Version(1, 26, 0), new Version(compiled.ModelId.Version.ToString()));
         Assert.Equal(2, compiled.EffectiveCkLanguage);
         // Pinned exactly: a higher value means every service below it can no longer import System.StreamData. A feature that
         // raises it (e.g. an Archive method with execution.mode) is a deliberate rollout decision and updates this assertion.

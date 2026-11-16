@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Meshmakers.Octo.ConstructionKit.Contracts;
@@ -35,4 +36,36 @@ public interface IArchiveRecomputeExecutor
         DateTime rangeEnd,
         OctoObjectId? rtIdScope,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Refreshes the series of <paramref name="rtIds"/> of <paramref name="rollup"/> in place for the half-open range
+    /// <c>[rangeStart, rangeEnd)</c> (AB#9016, late-delivery recompute): their buckets are aggregated from
+    /// <paramref name="source"/> again and written at the generation each (bucket, rtId) row is read at today, so no new
+    /// generation, no pointer entry and no sweep of superseded rows is needed. Every other series is left untouched. The
+    /// result equals what <see cref="ExecuteAsync"/> over the whole range produces for these series.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Must only run while no other recompute of the rollup runs: the orchestrator's active-job guard serialises it
+    /// with every unscoped, per-rtId and set-scoped recompute of the same rollup. A row is replaced atomically, so a reader
+    /// sees each series either before or after the refresh.
+    /// </para>
+    /// <para>
+    /// The default implementation exists so that an implementation compiled against the contract before AB#9016 keeps
+    /// working in a mixed package set: one rtId is recomputed scoped through <see cref="ExecuteAsync"/>, several are
+    /// recomputed with one unscoped <see cref="ExecuteAsync"/> over the range (the behaviour before AB#9016 - correct for
+    /// every series, one generation instead of one per rtId). The CrateDB executor overrides it with the in-place refresh.
+    /// </para>
+    /// </remarks>
+    Task<RecomputeExecutionResult> ExecuteScopedRefreshAsync(
+        ArchiveSnapshot source,
+        RollupArchiveSnapshot rollup,
+        DateTime rangeStart,
+        DateTime rangeEnd,
+        RtIdSet rtIds,
+        CancellationToken cancellationToken)
+    {
+        OctoObjectId? scope = rtIds.Count == 1 ? rtIds.First() : null;
+        return ExecuteAsync(source, rollup, rangeStart, rangeEnd, scope, cancellationToken);
+    }
 }

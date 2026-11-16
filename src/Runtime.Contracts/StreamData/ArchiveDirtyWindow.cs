@@ -13,4 +13,17 @@ public sealed record ArchiveDirtyWindow(
     DateTime WindowEnd,
     RecomputeChangeKind ChangeKind,
     RecomputeChangeSource Source,
-    DateTime DetectedAt);
+    DateTime DetectedAt)
+{
+    /// <summary>
+    /// The rtIds whose rows made the window dirty (AB#9016, System.StreamData 1.26.0), or <c>null</c> when the window
+    /// covers every series - a window recorded before 1.26.0, a manual write, or a write that touched more rtIds than
+    /// <see cref="RecomputeLateDataOptions.MaxScopedRtIds"/>. The dependent rollups refresh only these series.
+    /// </summary>
+    /// <remarks>
+    /// An init-only property instead of a positional parameter on purpose: the positional constructor keeps its
+    /// signature, so a storage layer compiled against the previous contract still runs against this one (it simply
+    /// records no set, i.e. the unscoped behaviour).
+    /// </remarks>
+    public RtIdSet? RtIds { get; init; }
+}

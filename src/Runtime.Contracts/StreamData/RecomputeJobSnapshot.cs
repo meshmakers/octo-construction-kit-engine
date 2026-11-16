@@ -49,6 +49,12 @@ public sealed record RecomputeJobSnapshot(
     DateTime? LastProgressAt = null)
 {
     /// <summary>
+    /// The series a late-delivery job refreshed in place (AB#9016, System.StreamData 1.26.0); <c>null</c> for every other
+    /// job. Init-only so the positional constructor keeps its signature.
+    /// </summary>
+    public RtIdSet? RtIdSet { get; init; }
+
+    /// <summary>
     /// Prefix of <see cref="StagingTableName"/> that marks a computed-column backfill job (AB#8002).
     /// A computed-column backfill has no staging table; its target is the hidden physical column the
     /// backfill writes before the column is switched on. The marker lets such a job live in the same

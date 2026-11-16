@@ -93,6 +93,59 @@ copy the data elsewhere before the redaction. A retry after a failure between th
 (`DROP COLUMN IF EXISTS`). If the resume itself fails (provisioning), the archive is `Failed` with the provisioning reason
 and no Hidden columns; `RetryActivation` applies.
 
+## Backups (AB#9141)
+
+A tenant backup leaves out the values of every column known to reach a Hidden attribute, in either format, from the staging
+copy and from the final artefact. Known means: found in the archive's CK type, or recorded on the archive. When the type
+cannot be read, only the recorded columns are known, so such a backup can hold Hidden values (residual risk, below). The rule
+lives in `CrateDbStreamDataRepository` (engine-mongodb); the contracts are unchanged.
+
+What a backup leaves out of an archive:
+
+- every ingested column that reaches a Hidden attribute under the tenant's **current** CK model
+  (`ArchiveHiddenColumnGuard.FindHiddenColumns`), whatever the archive's status - also an Activated archive whose
+  re-validation has not run yet, and a Disabled archive (the re-validation checks Activated archives only);
+- every column the re-validation recorded in `Archive.HiddenColumns`, even when the model was changed back since;
+- for a rollup, the aggregate columns of every aggregation whose source reaches a Hidden attribute;
+- every computed column whose current or pending formula reads one of these columns, transitively, in every stored
+  version (`{base}`, `{base}__v{N}`).
+
+When the archive's CK type cannot be read, only the recorded columns are left out (WARN naming the archive and the reason,
+never a value); the dump is not failed, so a tenant with a broken model (ResolveFailed) stays backupable for its recovery.
+**Residual risk:** a column that a model made Hidden while that model cannot be read, and that the re-validation has not
+recorded yet, can end up in the backup.
+
+| Path | What changes |
+|---|---|
+| Native copy (format 2) | The plan describes the data table without these columns, so the manifest lists only the columns the dump holds. Each data slice is copied with an explicit column list, `COPY <table> ("a", "b", …) WHERE … TO DIRECTORY … WITH (format = 'json_object', …)`: the staged files written by CrateDB do not contain the left-out values. A generation map holds no attribute values and is copied as before. |
+| Row path (format 1) and the archive data export | `ExportRowsAsync` leaves out the same columns (it used to leave out only the recorded ones of an archive Failed on Hidden columns). |
+
+What a restore does with such an archive (octo-bot-services, both formats). Before the archive's table is touched, the
+restore runs `IArchiveLifecycleService.RevalidateAccessAsync` against the restored CK model. That call writes: an Activated
+archive whose columns reach Hidden goes `Failed` with its reason (and its Hidden columns, for a raw or time-range archive).
+Then:
+
+- **A raw or time-range archive that is not Activated** (Failed on Hidden columns, also one that was Activated in the backup
+  and fails now, or Disabled): the table is provisioned for the definition without the columns that still reach Hidden, the
+  computed columns derived from them and the conflict precedence keys on them, the data is loaded (the backup holds no
+  values for them), and the archive **keeps its status** (`Failed` with its reason, or `Disabled`). Its history is
+  queryable without them as before; `RedactHiddenColumns` removes the columns from the definition and, for an archive
+  Failed on Hidden columns, activates it again (the column drop is `DROP COLUMN IF EXISTS`, so the missing table column is
+  no obstacle; a Disabled archive can be enabled after it).
+- **A rollup over a Hidden attribute**: skipped with the reason, its table is not touched (the re-validation has set it
+  `Failed`). Change the rollup or the model.
+- **A rollup whose source was restored this way**: skipped with the reason before its table is touched; it cannot be
+  activated while its source is not Activated.
+- **A native backup written before AB#9141** that still holds a value column of such an archive: skipped with the reason
+  (the column is named) before the table is touched; the load would refuse a column the table does not have. A row-path
+  (format 1) backup of that age is restored and the values of these columns are ignored.
+- The check itself fails (e.g. the archive's type is unknown): the restore goes on as before.
+
+`CrateDbStreamDataRepository.EnsureArchiveCreatedAsync` and `ImportRowsAsync` leave the columns that still reach Hidden out
+for a raw or time-range archive that is not Activated. The lifecycle never provisions such an archive (every activation
+refuses a Hidden column first), so only a restore takes this path; a column whose attribute is visible again is provisioned
+as before, so `RetryActivation` after a model change back still adds it.
+
 ## Contracts for a mixed package set
 
 The new members are default interface members, so implementations built against an older `Runtime.Contracts` keep compiling:
@@ -109,8 +162,6 @@ monorepo: `MongoArchiveRuntimeStore` and `CrateDbStreamDataRepository` (octo-con
 
 ## Not covered
 
-- The native staging copy of a tenant backup (`CopyToStagingAsync`) copies the table as it is, Hidden columns included. The
-  row export (`ExportRowsAsync`) leaves them out for an archive Failed on Hidden columns (engine-mongodb).
 - No compare-and-swap on the status write (review G3 N7): concurrent re-validations in several stream-data replicas can
   write the same `Failed` transition twice (duplicate audit rows), and one that runs during a redaction can set the
   resumed archive to `Failed` again, so the redaction must be repeated.
@@ -118,4 +169,6 @@ monorepo: `MongoArchiveRuntimeStore` and `CrateDbStreamDataRepository` (octo-con
   behaviour of the consumer); its re-check runs with the next update or the next import.
 
 Tests: `ArchiveHiddenColumnGuardTests` (Runtime.Engine.Tests), `StreamDataCkLanguage2Tests` (Compiler.Tests);
-engine-mongodb `ArchiveHiddenAccessTests`.
+engine-mongodb `ArchiveHiddenAccessTests`, `ArchiveHiddenColumnBackupIntegrationTests` (real CrateDB: dump, staged files,
+manifest, row export, restore, redaction) and `HiddenColumnExclusionTests`; octo-bot-services `RestoreRepositoryNativeTests`
+and `RestoreRepositoryArchiveDataTests` (the restore paths).

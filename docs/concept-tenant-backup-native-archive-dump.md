@@ -196,6 +196,12 @@ flowchart TD
   G --> H["pack staging files + mongo.tar.gz + manifest into .octobak.zip, store, delete staging"]
 ```
 
+- **Hidden columns (AB#9141).** A column that reaches a Hidden attribute (current CK model or recorded on the archive),
+  the aggregate columns of a rollup over one, and the computed columns derived from either are not dumped: the plan and
+  the manifest describe the table without them, and the slice is copied as
+  `COPY archive_<rtId> ("col", …) WHERE … TO DIRECTORY … WITH (format = 'json_object', …)` (a column list alone would switch
+  CrateDB to `json_array`, which `COPY FROM` cannot load). The restore of such an archive and the full rule:
+  `docs/archive-hidden-columns.md`, "Backups".
 - **Slices.** One `COPY TO` per time slice, cut by `window_start` (or `timestamp` on a raw archive)
   with the planner AB#5489 introduced. A slice is a short statement, shows progress, and the job
   can stop between two slices.

@@ -47,4 +47,16 @@ internal static class DiagnosticsDescriptors
             "Construction Kit", // category
             DiagnosticSeverity.Error,
             true);
+
+    /// <summary>
+    ///     AB#9096: a type implements, or an interface extends, a CK interface of another model, and no referenced
+    ///     assembly declares its generated C# interface — the C# package of that model is missing.
+    /// </summary>
+    public static readonly DiagnosticDescriptor UnresolvedForeignInterface
+        = new("OM1006", // id
+            "Interface of another CK model not found", // title
+            "Interface '{0}' used by model '{1}' cannot be referenced in the generated C#: {2}", // message
+            "Construction Kit", // category
+            DiagnosticSeverity.Error,
+            true);
 }

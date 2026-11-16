@@ -9,6 +9,14 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Changed
 
+- **Generated C# implements interfaces of another CK model (AB#9096).** A type that implements an interface declared in
+  another model (e.g. `System/Named-1` on `Basic/NamedEntity`) generated the short name `IRtNamed`, and the build failed
+  with CS0246. The source generator now finds the other model's generated interface in the referenced assemblies and
+  emits it fully qualified (`global::<RootNamespace>.Generated.System.v2.IRtNamed`), also in the explicit member
+  implementations and in `extends` of interfaces. The consuming model project needs a reference to the C# package of the
+  other model (for System: `Meshmakers.Octo.ConstructionKit.Models.System`); without it the generator reports the new
+  error **OM1006** naming that package. Models without foreign interfaces generate unchanged code.
+
 - **Uninstall: keeps only what is referenced from outside or edited (AB#8966, follow-up of #371).** On kb-test2 the uninstall
   of System.Ai.Builder erased 0 of 46 entities. The `Referenced` rule spread along the seed's own `LinksTo` links between
   pages, and `Edited` never fired because the comparison left out `TenantOwned` attributes. The rules are now:

@@ -1107,8 +1107,10 @@ against 1.26.0 without acknowledgement. Behaviour:
 - `ArchiveSnapshot.IsFailedOnHiddenColumns` / `WithoutHiddenColumns()`: such an archive refuses writes, its history stays queryable
   without the Hidden columns (engine-mongodb query paths).
 - `RedactHiddenColumnsAsync` drops the Hidden columns (CrateDB first, then the definition), audits it and resumes a Failed-on-Hidden
-  archive; refused for rollups, for an activated archive with Hidden columns, while a computed column reads one of them, and while a
-  rollup aggregates one of them (`HiddenColumnRedactionBlockedException`).
+  archive; refused for rollups, for an activated archive with Hidden columns, while a computed column (current or pending formula)
+  reads one of them (the validator's exception), while a `ConflictPrecedence` key names one (`InvalidArchiveStateTransitionException`,
+  like the rollup and activated cases), and while a rollup aggregates one of them (`HiddenColumnRedactionBlockedException`). The audit
+  entry is written before the drop, once per attempt.
 - A rollup whose aggregation source path reaches Hidden goes `Failed` with its reason but no Hidden columns (unreadable).
 - Every new interface member has a default implementation (mixed package sets keep compiling); the implementations live in
   engine-mongodb.

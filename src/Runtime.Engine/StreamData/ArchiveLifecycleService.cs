@@ -213,10 +213,28 @@ public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
                     "redact the Hidden columns of an activated archive (disable it first)");
             }
 
-            // A computed column whose formula reads a dropped column would dangle: refuse before anything is dropped.
+            // A conflict key that names a dropped column would make every write of the resumed archive fail.
             var hiddenPaths = new HashSet<string>(paths, StringComparer.OrdinalIgnoreCase);
-            await _repository.ValidateComputedColumnsAsync(archiveRtId,
-                snapshot.Columns.Where(c => c.IsComputed || !hiddenPaths.Contains(c.Path)).ToList());
+            var keyedPaths = snapshot.ConflictPrecedence
+                .Where(k => !k.IsOrigin && hiddenPaths.Contains(k.Column))
+                .Select(k => k.Column)
+                .ToList();
+            if (keyedPaths.Count > 0)
+            {
+                throw new InvalidArchiveStateTransitionException(archiveRtId, snapshot.Status,
+                    $"redact the Hidden columns while ConflictPrecedence still names {string.Join(", ", keyedPaths)} " +
+                    "(change the conflict precedence first)");
+            }
+
+            // A computed column whose formula - current or pending (a formula change in progress) - reads a dropped
+            // column would dangle: refuse before anything is dropped.
+            var remaining = snapshot.Columns.Where(c => c.IsComputed || !hiddenPaths.Contains(c.Path)).ToList();
+            await _repository.ValidateComputedColumnsAsync(archiveRtId, remaining);
+            if (remaining.Any(c => c.HasPendingFormula))
+            {
+                await _repository.ValidateComputedColumnsAsync(archiveRtId,
+                    remaining.Select(c => c.HasPendingFormula ? c with { Formula = c.PendingFormula } : c).ToList());
+            }
 
             // Best-effort: a rollup created between this check and the drop is not seen (rollup creation is not
             // serialised with the redaction).
@@ -226,15 +244,18 @@ public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
                 throw new HiddenColumnRedactionBlockedException(archiveRtId, paths, dependents);
             }
 
+            // Audited before anything is dropped, as the attempt: if the audit were written after the drop and failed, a
+            // retry would find no Hidden column any more and the deletion would have no audit entry. A failed attempt is
+            // retried with the same definition, so every attempt is recorded.
+            var redactedReason =
+                Truncate($"RedactHiddenColumns drops the columns {DescribeHiddenColumns(hidden)} and their stored values");
+            await _audit.RecordTransitionAsync(_tenantId, archiveRtId, snapshot.Status, snapshot.Status, redactedReason);
+            _logger.LogWarning("Archive {ArchiveRtId}: {Reason}", archiveRtId, redactedReason);
+
             // Crate first (idempotent DROP COLUMN), entity store last (§11): a failure in between leaves the definition
             // naming columns the table no longer has, which a retry of this call converges.
             await _repository.DropIngestedColumnStorageAsync(snapshot, paths);
             await _store.RemoveIngestedColumnsAsync(archiveRtId, paths);
-
-            var redactedReason =
-                Truncate($"RedactHiddenColumns dropped the columns {DescribeHiddenColumns(hidden)} and their stored values");
-            await _audit.RecordTransitionAsync(_tenantId, archiveRtId, snapshot.Status, snapshot.Status, redactedReason);
-            _logger.LogWarning("Archive {ArchiveRtId}: {Reason}", archiveRtId, redactedReason);
         }
 
         var status = snapshot.Status;

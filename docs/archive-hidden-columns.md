@@ -69,16 +69,19 @@ Both attributes are runtime state of System.StreamData 1.27.0 and are visible wh
 1. Determine the columns that reach Hidden under the **current** CK model. A rollup archive is refused, and so is an
    **activated** archive with Hidden columns: ingest and re-provisioning still work from its definition while the columns
    are dropped. The re-validation sets such an archive to `Failed`, or the operator disables it first.
-2. Refuse when a computed column reads one of the columns (`IStreamDataRepository.ValidateComputedColumnsAsync` with the
-   remaining columns); remove that computed column first.
+2. Refuse when a computed column reads one of the columns, with its current or its pending formula
+   (`IStreamDataRepository.ValidateComputedColumnsAsync` with the remaining columns), and when a `ConflictPrecedence` key
+   names one of them (the computed-column validator's exception, or `InvalidArchiveStateTransitionException` for the key);
+   remove that computed column or change the precedence first.
 3. Refuse with `HiddenColumnRedactionBlockedException` (`STREAMDATA_REDACTION_BLOCKED`) while a rollup archive aggregates one
    of them. Change or delete that rollup first. Nothing is dropped. The check is best-effort: a rollup created between the
    check and the drop is not seen.
-4. Drop the CrateDB columns (`IStreamDataRepository.DropIngestedColumnStorageAsync`, `ALTER TABLE … DROP COLUMN`), then remove
+4. Record the redaction in the audit trail **before** the drop (a transition event from the current status to the same
+   status, reason `RedactHiddenColumns drops the columns …`), so a failure after the drop cannot leave it without an entry.
+   Every attempt is recorded; a retry after a failed attempt records a second entry.
+5. Drop the CrateDB columns (`IStreamDataRepository.DropIngestedColumnStorageAsync`, `ALTER TABLE … DROP COLUMN`), then remove
    them from the archive definition (`IArchiveRuntimeStore.RemoveIngestedColumnsAsync`). **The values stored in these columns
    are lost**; every other column and row is kept.
-5. Record the redaction in the audit trail (a transition event from the current status to the same status, reason
-   `RedactHiddenColumns dropped the columns …`).
 6. An archive that was Failed on Hidden columns is activated again, through the same steps as `RetryActivation`. Any other
    archive keeps its status (a Disabled archive with a Hidden column can then be enabled).
 

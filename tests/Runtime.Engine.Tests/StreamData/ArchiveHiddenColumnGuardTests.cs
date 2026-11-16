@@ -214,7 +214,7 @@ public class ArchiveHiddenColumnGuardTests
                 .MustHaveHappenedOnceExactly())
             .Then(A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Activated)).MustHaveHappenedOnceExactly());
         A.CallTo(() => _audit.RecordTransitionAsync(TenantId, Rt, CkArchiveStatus.Failed, CkArchiveStatus.Failed,
-            A<string>.That.Contains("RedactHiddenColumns dropped"))).MustHaveHappenedOnceExactly();
+            A<string>.That.Contains("RedactHiddenColumns drops"))).MustHaveHappenedOnceExactly();
     }
 
     [Fact]
@@ -259,6 +259,94 @@ public class ArchiveHiddenColumnGuardTests
                 A<System.Threading.CancellationToken>._)).MustHaveHappenedOnceExactly();
         A.CallTo(() => _repo.DropIngestedColumnStorageAsync(A<ArchiveSnapshot>._, A<IReadOnlyCollection<string>>._,
             A<System.Threading.CancellationToken>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Redact_IsRefusedWhileAConflictKeyNamesAHiddenColumn()
+    {
+        A.CallTo(() => _store.GetAsync(Rt)).Returns(Snapshot(CkArchiveStatus.Disabled, _sensor, [], "Temperature", "Secret")
+            with
+            {
+                ConflictPrecedence =
+                [
+                    new ArchiveConflictKey(ArchiveConflictKey.OriginKey, ConflictKeyOrder.HigherWins),
+                    new ArchiveConflictKey("secret", ConflictKeyOrder.HigherWins)
+                ]
+            });
+
+        var ex = await Assert.ThrowsAsync<InvalidArchiveStateTransitionException>(() => Sut().RedactHiddenColumnsAsync(Rt));
+
+        Assert.Contains("secret", ex.Message);
+        A.CallTo(() => _repo.DropIngestedColumnStorageAsync(A<ArchiveSnapshot>._, A<IReadOnlyCollection<string>>._,
+            A<System.Threading.CancellationToken>._)).MustNotHaveHappened();
+        A.CallTo(() => _audit.RecordTransitionAsync(A<string>._, A<OctoObjectId>._, A<CkArchiveStatus>._,
+            A<CkArchiveStatus>._, A<string?>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Redact_IgnoresTheOriginKey_AndAPendingFormulaOverRemainingColumns()
+    {
+        A.CallTo(() => _store.GetAsync(Rt)).Returns(Snapshot(CkArchiveStatus.Disabled, _sensor, [], "Temperature", "Secret")
+            with
+            {
+                ConflictPrecedence = [new ArchiveConflictKey(ArchiveConflictKey.OriginKey, ConflictKeyOrder.HigherWins)],
+                Columns =
+                [
+                    new CkArchiveColumnSpec("Temperature", true, false), new CkArchiveColumnSpec("Secret", true, false),
+                    new CkArchiveColumnSpec(string.Empty, false, false)
+                    {
+                        Name = "doubled", Formula = "temperature * 2", PendingFormula = "temperature * 3"
+                    }
+                ]
+            });
+        A.CallTo(() => _store.EnumerateAsync()).Returns(AsyncEnumerable.Empty<ArchiveSnapshot>());
+
+        var result = await Sut().RedactHiddenColumnsAsync(Rt);
+
+        Assert.Equal(["Secret"], result.RemovedColumns);
+        A.CallTo(() => _repo.ValidateComputedColumnsAsync(Rt, A<IReadOnlyList<CkArchiveColumnSpec>>._,
+            A<System.Threading.CancellationToken>._)).MustHaveHappenedTwiceExactly();
+    }
+
+    [Fact]
+    public async Task Redact_ValidatesAPendingFormulaToo()
+    {
+        A.CallTo(() => _store.GetAsync(Rt)).Returns(Snapshot(CkArchiveStatus.Disabled, _sensor, [], "Temperature", "Secret")
+            with
+            {
+                Columns =
+                [
+                    new CkArchiveColumnSpec("Temperature", true, false), new CkArchiveColumnSpec("Secret", true, false),
+                    new CkArchiveColumnSpec(string.Empty, false, false)
+                    {
+                        Name = "doubled", Formula = "temperature * 2", PendingFormula = "secret * 2"
+                    }
+                ]
+            });
+        A.CallTo(() => _repo.ValidateComputedColumnsAsync(Rt,
+                A<IReadOnlyList<CkArchiveColumnSpec>>.That.Matches(c =>
+                    c.Any(x => x.Formula == "secret * 2") && !c.Any(x => x.Path == "Secret")),
+                A<System.Threading.CancellationToken>._))
+            .Throws(new ArchivePathInvalidException(Rt, "secret", "the pending formula reads it"));
+
+        await Assert.ThrowsAsync<ArchivePathInvalidException>(() => Sut().RedactHiddenColumnsAsync(Rt));
+
+        A.CallTo(() => _repo.DropIngestedColumnStorageAsync(A<ArchiveSnapshot>._, A<IReadOnlyCollection<string>>._,
+            A<System.Threading.CancellationToken>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Redact_IsAuditedBeforeTheDrop()
+    {
+        Stub(CkArchiveStatus.Disabled, "Temperature", "Secret");
+        A.CallTo(() => _store.EnumerateAsync()).Returns(AsyncEnumerable.Empty<ArchiveSnapshot>());
+        A.CallTo(() => _repo.DropIngestedColumnStorageAsync(A<ArchiveSnapshot>._, A<IReadOnlyCollection<string>>._,
+            A<System.Threading.CancellationToken>._)).Throws(new InvalidOperationException("crate down"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Sut().RedactHiddenColumnsAsync(Rt));
+
+        A.CallTo(() => _audit.RecordTransitionAsync(TenantId, Rt, CkArchiveStatus.Disabled, CkArchiveStatus.Disabled,
+            A<string>.That.Contains("'Secret'"))).MustHaveHappenedOnceExactly();
     }
 
     [Fact]

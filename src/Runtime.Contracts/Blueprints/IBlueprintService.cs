@@ -242,7 +242,7 @@ public class BlueprintUninstallResult
 
     /// <summary>
     /// AB#8966: tenant-owned seed entities of the blueprint that stay in the tenant, each with the reason
-    /// (edited by the tenant, referenced from outside the uninstall, or not comparable with the seed).
+    /// (edited by the tenant, referenced by an entity that stays, not comparable with the seed, or its erase failed).
     /// They are re-adopted when the blueprint is installed again.
     /// </summary>
     public List<BlueprintTenantOwnedKeptEntity> TenantOwnedKept { get; set; } = [];
@@ -317,5 +317,10 @@ public enum BlueprintTenantOwnedKeptReason
     /// Whether the tenant edited it cannot be decided (the CK type is not in the cache, or the comparison failed), so
     /// the tenant content is kept.
     /// </summary>
-    NotComparable
+    NotComparable,
+
+    /// <summary>
+    /// Unedited and meant to be erased, but the erase failed (the reason is in the warnings); it stays in the tenant.
+    /// </summary>
+    EraseFailed
 }

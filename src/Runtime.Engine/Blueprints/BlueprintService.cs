@@ -3517,7 +3517,9 @@ internal class BlueprintService : IBlueprintService
         }
 
         var references = candidates.Count > 0
-            ? await UninstallReferences.LoadAsync(repository, session, seedRoot, seedIdentities, candidates.Values)
+            ? await UninstallReferences.LoadAsync(repository, session, seedRoot, seedIdentities, candidates.Values,
+                    seedIdentities.Concat(lockedTargets.Select(t => t.Identity)).Concat(candidates.Keys)
+                        .Concat(run.DeletedEntities))
                 .ConfigureAwait(false)
             : null;
 
@@ -3543,10 +3545,12 @@ internal class BlueprintService : IBlueprintService
                 continue; // kept after a failed erase of a neighbour
             }
 
+            // Out of the candidates either way, so a later re-check never moves an erased entity into TenantOwnedKept.
+            candidates.Remove(target.Identity);
             if (!await EraseAsync(repository, session, target, tenantOwned: true, result, run).ConfigureAwait(false))
             {
-                candidates.Remove(target.Identity);
                 gone.Remove(target.Identity);
+                kept.Add(ToKeptEntity(target.Key, target.CkTypeId, target.Entity, BlueprintTenantOwnedKeptReason.EraseFailed));
                 references?.KeepReferenced(candidates, gone, kept);
             }
         }
@@ -3603,60 +3607,77 @@ internal class BlueprintService : IBlueprintService
     /// candidate's own blueprint-seeded link, e.g. to a system entity or an entity of another blueprint). So any
     /// association with an entity of this seed that stays keeps the candidate, whichever side the seed declares it on (an
     /// edited page keeps its versions, whether the page points to them or they point to the page), and so does any
-    /// association the tenant created. Entities are identified by CK type and rtId.
+    /// association the tenant created.
+    /// <para>
+    /// Matching an association end to an entity: by rtId, because the stored CK type of an association end need not be
+    /// spelled like the seed's (resolved, concrete or missing). Only an rtId that the entities of this uninstall carry under
+    /// more than one CK type (seeds reuse an rtId across types) is matched by CK type as well; when that cannot decide, the
+    /// end counts as staying and inside the seed, so the candidate is kept.
+    /// </para>
     /// </summary>
     private sealed class UninstallReferences
     {
-        private readonly Dictionary<UninstallEntityKey, List<RtAssociation>> _byEntity;
-        private readonly HashSet<(UninstallEntityKey Origin, UninstallEntityKey Target)> _seedDeclared;
+        private readonly Dictionary<UninstallEntityKey, List<RtAssociation>> _byCandidate;
+        private readonly HashSet<(OctoObjectId Origin, OctoObjectId Target)> _seedDeclared;
+        private readonly HashSet<(UninstallEntityKey Origin, UninstallEntityKey Target)> _seedDeclaredTyped;
         private readonly HashSet<UninstallEntityKey> _seedIdentities;
+        private readonly HashSet<OctoObjectId> _seedRtIds;
+        private readonly HashSet<OctoObjectId> _ambiguousRtIds;
 
-        private UninstallReferences(Dictionary<UninstallEntityKey, List<RtAssociation>> byEntity,
-            HashSet<(UninstallEntityKey, UninstallEntityKey)> seedDeclared, HashSet<UninstallEntityKey> seedIdentities)
+        private UninstallReferences(Dictionary<UninstallEntityKey, List<RtAssociation>> byCandidate,
+            RtModelRootTcDto seedRoot, HashSet<UninstallEntityKey> seedIdentities, HashSet<OctoObjectId> ambiguousRtIds)
         {
-            _byEntity = byEntity;
-            _seedDeclared = seedDeclared;
+            _byCandidate = byCandidate;
             _seedIdentities = seedIdentities;
-        }
-
-        public static async Task<UninstallReferences> LoadAsync(IRuntimeRepository repository, IOctoSession session,
-            RtModelRootTcDto seedRoot, HashSet<UninstallEntityKey> seedIdentities, IEnumerable<UninstallCandidate> candidates)
-        {
-            var associationSet = await repository.GetRtAssociationsAsync(session,
-                    candidates.Select(c => new RtEntityId(c.CkTypeId, c.Entity.RtId)).ToList(),
-                    RtAssociationExtendedQueryOptions.Create(GraphDirections.Any))
-                .ConfigureAwait(false);
-
-            var byEntity = new Dictionary<UninstallEntityKey, List<RtAssociation>>();
-            var seen = new HashSet<OctoObjectId>();
-            foreach (var association in associationSet.Values.SelectMany(r => r.Items))
-            {
-                if (!seen.Add(association.AssociationId))
-                {
-                    continue;
-                }
-
-                foreach (var end in new[] { OriginOf(association), TargetOf(association) }.Distinct())
-                {
-                    if (!byEntity.TryGetValue(end, out var list))
-                    {
-                        byEntity[end] = list = [];
-                    }
-                    list.Add(association);
-                }
-            }
-
-            var seedDeclared = new HashSet<(UninstallEntityKey, UninstallEntityKey)>();
+            _seedRtIds = [..seedIdentities.Select(k => k.RtId)];
+            _ambiguousRtIds = ambiguousRtIds;
+            _seedDeclared = [];
+            _seedDeclaredTyped = [];
             foreach (var seed in seedRoot.Entities)
             {
                 foreach (var association in seed.Associations ?? [])
                 {
-                    seedDeclared.Add((UninstallEntityKey.Of(seed.CkTypeId, seed.RtId),
+                    _seedDeclared.Add((seed.RtId, association.TargetRtId));
+                    _seedDeclaredTyped.Add((UninstallEntityKey.Of(seed.CkTypeId, seed.RtId),
                         UninstallEntityKey.Of(association.TargetCkTypeId, association.TargetRtId)));
                 }
             }
+        }
 
-            return new UninstallReferences(byEntity, seedDeclared, seedIdentities);
+        /// <summary>
+        /// Reads the associations of the candidates. <c>knownEntities</c>: every entity identity of this uninstall (seed,
+        /// held, locked, candidates, erased earlier in the cascade); an rtId among them under more than one CK type is
+        /// matched by type as well.
+        /// </summary>
+        public static async Task<UninstallReferences> LoadAsync(IRuntimeRepository repository, IOctoSession session,
+            RtModelRootTcDto seedRoot, HashSet<UninstallEntityKey> seedIdentities,
+            IReadOnlyCollection<UninstallCandidate> candidates, IEnumerable<UninstallEntityKey> knownEntities)
+        {
+            var requested = candidates.ToDictionary(c => c.Identity, c => new RtEntityId(c.CkTypeId, c.Entity.RtId));
+            var associationSet = await repository.GetRtAssociationsAsync(session, requested.Values.ToList(),
+                    RtAssociationExtendedQueryOptions.Create(GraphDirections.Any))
+                .ConfigureAwait(false);
+
+            // Bucketed by the entity id the query was made for, never by the stored type of an association end.
+            var byCandidate = new Dictionary<UninstallEntityKey, List<RtAssociation>>();
+            foreach (var (requestedId, associations) in associationSet)
+            {
+                var key = UninstallEntityKey.Of(requestedId.CkTypeId, requestedId.RtId);
+                if (!byCandidate.TryGetValue(key, out var list))
+                {
+                    byCandidate[key] = list = [];
+                }
+
+                list.AddRange(associations.Items.Where(a => list.All(l => !l.AssociationId.Equals(a.AssociationId))));
+            }
+
+            var ambiguous = knownEntities
+                .GroupBy(k => k.RtId)
+                .Where(g => g.Select(k => k.CkTypeId).Distinct(StringComparer.Ordinal).Count() > 1)
+                .Select(g => g.Key)
+                .ToHashSet();
+
+            return new UninstallReferences(byCandidate, seedRoot, seedIdentities, ambiguous);
         }
 
         /// <summary>
@@ -3674,18 +3695,23 @@ internal class BlueprintService : IBlueprintService
                 {
                     var self = candidate.Identity;
                     var referencedBy = new SortedSet<string>(StringComparer.Ordinal);
-                    foreach (var association in _byEntity.GetValueOrDefault(self) ?? [])
+                    foreach (var association in _byCandidate.GetValueOrDefault(self) ?? [])
                     {
-                        var origin = OriginOf(association);
-                        var target = TargetOf(association);
-                        var other = origin.Equals(self) ? target : origin;
-                        if (other.Equals(self) || gone.Contains(other))
+                        var origin = UninstallEntityKey.Of(association.OriginCkTypeId, association.OriginRtId);
+                        var target = UninstallEntityKey.Of(association.TargetCkTypeId, association.TargetRtId);
+                        var selfIsOrigin = IsSelf(origin, self) && !(IsSelf(target, self) && origin.CkTypeId != self.CkTypeId);
+                        var other = selfIsOrigin ? target : origin;
+                        if (other.RtId.Equals(self.RtId) && (other.CkTypeId == self.CkTypeId || !_ambiguousRtIds.Contains(self.RtId)))
+                        {
+                            continue; // a link to itself
+                        }
+
+                        if (IsGone(other, gone))
                         {
                             continue; // erased in this uninstall as well
                         }
 
-                        if (origin.Equals(self) && !_seedIdentities.Contains(other)
-                            && _seedDeclared.Contains((origin, target)))
+                        if (selfIsOrigin && !IsInSeed(other) && IsSeedDeclared(self, other))
                         {
                             continue; // the candidate's own blueprint-seeded link out of the blueprint; erased with it
                         }
@@ -3709,9 +3735,21 @@ internal class BlueprintService : IBlueprintService
             } while (changed);
         }
 
-        private static UninstallEntityKey OriginOf(RtAssociation a) => UninstallEntityKey.Of(a.OriginCkTypeId, a.OriginRtId);
+        private bool IsSelf(UninstallEntityKey end, UninstallEntityKey self) =>
+            end.RtId.Equals(self.RtId) && (!_ambiguousRtIds.Contains(self.RtId) || end.CkTypeId == self.CkTypeId);
 
-        private static UninstallEntityKey TargetOf(RtAssociation a) => UninstallEntityKey.Of(a.TargetCkTypeId, a.TargetRtId);
+        /// <summary>Gone only when certain: an rtId of several types needs the exact CK type.</summary>
+        private bool IsGone(UninstallEntityKey end, HashSet<UninstallEntityKey> gone) =>
+            gone.Contains(end) || (!_ambiguousRtIds.Contains(end.RtId) && gone.Any(g => g.RtId.Equals(end.RtId)));
+
+        /// <summary>Outside the seed only when certain: an rtId of this seed counts as inside, whatever its CK type.</summary>
+        private bool IsInSeed(UninstallEntityKey end) =>
+            _seedIdentities.Contains(end) || _seedRtIds.Contains(end.RtId);
+
+        private bool IsSeedDeclared(UninstallEntityKey self, UninstallEntityKey other) =>
+            _ambiguousRtIds.Contains(self.RtId) || _ambiguousRtIds.Contains(other.RtId)
+                ? _seedDeclaredTyped.Contains((self, other))
+                : _seedDeclared.Contains((self.RtId, other.RtId));
     }
 
     /// <returns><c>false</c> when the erase failed (reported as a warning); the entity then stays.</returns>

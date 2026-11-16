@@ -940,13 +940,16 @@ tenant-owned seed entity (the seed sets `rtBlueprintLocked: false`) that the ten
     Seed-declared links are matched by origin and target; the role is not compared, because the stored role id is the one
     the CK cache resolved.
 
-  Entities are identified by CK type and `rtId` (seeds reuse an `rtId` across CK types).
+  An association end is matched to an entity by `rtId`, because its stored CK type need not be spelled like the seed's.
+  Only an `rtId` the entities of the uninstall carry under several CK types (seeds reuse an `rtId` across types) is matched
+  by CK type as well; when that cannot decide, the end counts as staying, so the entity is kept.
 
   Associations with entities this uninstall erases (locked entities, other unedited entities, entities of dependents a cascade
   removes first) do not count. The rule is applied until nothing changes: an edited page keeps its unedited versions, whether
   the page points to them or they point to the page, and a version kept that way keeps its successors. When an erase fails
-  (reported as a warning, the entity stays), the rule is applied again before the next erase, so the unedited entities
-  linked to it stay as well; entities erased before the failure stay erased.
+  (reported as a warning, the entity stays and a tenant-owned one is listed with the reason `EraseFailed`), the rule is
+  applied again before the next erase, so the unedited entities linked to it stay as well; entities erased before the
+  failure stay erased.
 - **Not comparable → kept**, reason `NotComparable`: the CK type is not in the cache or the comparison failed.
 - Locked entities are erased as before; entities with another blueprint's `rtBlueprintSource` are not touched.
 

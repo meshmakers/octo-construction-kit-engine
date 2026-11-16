@@ -126,9 +126,9 @@ public class BlueprintServiceUninstallTenantOwnedTests
                 foreach (var id in ids)
                 {
                     var set = A.Fake<IResultSet<RtAssociation>>();
+                    // By rtId only: the harsher case - the stored type of an end need not be spelled like the request.
                     var items = _associations
-                        .Where(a => (a.OriginRtId.Equals(id.RtId) && Equals(a.OriginCkTypeId, id.CkTypeId))
-                                    || (a.TargetRtId.Equals(id.RtId) && Equals(a.TargetCkTypeId, id.CkTypeId))).ToList();
+                        .Where(a => a.OriginRtId.Equals(id.RtId) || a.TargetRtId.Equals(id.RtId)).ToList();
                     A.CallTo(() => set.Items).Returns(items);
                     result[id] = set;
                 }
@@ -661,8 +661,45 @@ public class BlueprintServiceUninstallTenantOwnedTests
         var result = await Uninstall();
 
         Assert.Empty(_erased);
-        Assert.Equal("b", Assert.Single(result.TenantOwnedKept).Key);
+        Assert.Equal(["a", "b"], Keys(result.TenantOwnedKept));
+        Assert.Equal(BlueprintTenantOwnedKeptReason.EraseFailed, result.TenantOwnedKept.Single(k => k.Key == "a").Reason);
+        Assert.Equal(BlueprintTenantOwnedKeptReason.Referenced, result.TenantOwnedKept.Single(k => k.Key == "b").Reason);
+        Assert.Empty(result.DeletedEntities);
         Assert.Single(_associations);
+    }
+
+    [Fact]
+    public async Task Uninstall_EraseFailsAfterTheLinkedCandidateWasErased_ListsEachEntityOnce()
+    {
+        // b is erased first; a's erase fails afterwards. b must not show up as kept as well.
+        GivenSeed(new SeedSpec("b", false), new SeedSpec("a", false));
+        var a = GivenTenantEntity("a", storedLocked: false);
+        var b = GivenTenantEntity("b", storedLocked: false);
+        GivenAssociation(a.RtId, b.RtId);
+        _failingErase.Add(a.RtId);
+
+        var result = await Uninstall();
+
+        Assert.Equal([b.RtId], _erased);
+        Assert.Equal(["b"], Keys(result.DeletedEntities));
+        var kept = Assert.Single(result.TenantOwnedKept);
+        Assert.Equal("a", kept.Key);
+        Assert.Equal(BlueprintTenantOwnedKeptReason.EraseFailed, kept.Reason);
+    }
+
+    [Fact]
+    public async Task Uninstall_AssociationEndStoredUnderAnotherTypeSpelling_StillKeepsTheReferencedEntity()
+    {
+        // The stored type of an association end can differ from the seed's spelling (resolved, concrete type).
+        GivenSeed(new SeedSpec("page", false));
+        var page = GivenTenantEntity("page", storedLocked: false);
+        var user = GivenUserEntity("cc0000000000000000000009");
+        GivenAssociation(user.RtId, page.RtId, targetType: new RtCkId<CkTypeId>("Test-1.1.0/RuleConcrete"));
+
+        var result = await Uninstall();
+
+        Assert.Empty(_erased);
+        Assert.Equal(BlueprintTenantOwnedKeptReason.Referenced, Assert.Single(result.TenantOwnedKept).Reason);
     }
 
     [Fact]

@@ -282,6 +282,17 @@ public class CkForeignInterfaceCodeGeneratorTests(ITestOutputHelper output)
         Assert.Null(lookup.Find(named));
         Assert.Contains("more than one referenced assembly", lookup.Unresolved[named]);
         Assert.Equal("global::Generated.System.v2.IRtDescribable", lookup.Find(describable));
+        // The same interface name declared by two assemblies is ambiguous as well.
+        var enableable = new CkId<CkInterfaceId>(new CkModelId("System", "2.7.0"), "Enableable-1");
+        var duplicated = new CkGeneratedInterfaceLookup([
+            "A.Generated.System.v2.IRtEnableable, AssemblyA", "A.Generated.System.v2.IRtEnableable, AssemblyB"
+        ]);
+        Assert.Null(duplicated.Find(enableable));
+        Assert.Contains("AssemblyA", duplicated.Unresolved[enableable]);
+        Assert.Contains("AssemblyB", duplicated.Unresolved[enableable]);
+        Assert.Equal("global::A.Generated.System.v2.IRtEnableable",
+            new CkGeneratedInterfaceLookup(["A.Generated.System.v2.IRtEnableable, AssemblyA"]).Find(enableable));
+
         // Other major, other model name with the same suffix: not a match.
         Assert.Null(lookup.Find(hierarchical));
         Assert.Contains("Meshmakers.Octo.ConstructionKit.Models.System", lookup.Unresolved[hierarchical]);

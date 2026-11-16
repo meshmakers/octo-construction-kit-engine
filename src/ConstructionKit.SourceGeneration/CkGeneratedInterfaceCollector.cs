@@ -12,9 +12,11 @@ public static class CkGeneratedInterfaceCollector
     private const string GeneratedSegment = CkGeneratedInterfaceLookup.GeneratedSegment;
 
     /// <summary>
-    ///     Collects the metadata names of all public generated CK interfaces (<c>IRt*</c> in a namespace
-    ///     <c>*.Generated.*.v&lt;n&gt;</c>) of the assemblies <paramref name="compilation" /> references, sorted, so the
-    ///     result can serve as an equatable incremental-generator input.
+    ///     Collects all public generated CK interfaces (<c>IRt*</c> in a namespace <c>*.Generated.*.v&lt;n&gt;</c>) of the
+    ///     assemblies <paramref name="compilation" /> references, as assembly-qualified names
+    ///     (<c>A.Generated.System.v2.IRtNamed, AssemblyA</c>), sorted, so the result can serve as an equatable
+    ///     incremental-generator input. The same interface name declared by two assemblies stays two entries, so the
+    ///     lookup reports it as ambiguous.
     /// </summary>
     public static ImmutableArray<string> Collect(Compilation compilation, CancellationToken cancellationToken = default)
     {
@@ -28,17 +30,17 @@ public static class CkGeneratedInterfaceCollector
                 continue;
             }
 
-            Walk(assembly.GlobalNamespace, result);
+            Walk(assembly.GlobalNamespace, assembly.Identity.Name, result);
         }
 
         return result.ToImmutableArray();
     }
 
-    private static void Walk(INamespaceSymbol ns, SortedSet<string> result)
+    private static void Walk(INamespaceSymbol ns, string assemblyName, SortedSet<string> result)
     {
         foreach (var child in ns.GetNamespaceMembers())
         {
-            Walk(child, result);
+            Walk(child, assemblyName, result);
         }
 
         if (ns.IsGlobalNamespace)
@@ -57,7 +59,7 @@ public static class CkGeneratedInterfaceCollector
             if (type.TypeKind == TypeKind.Interface && type.DeclaredAccessibility == Accessibility.Public &&
                 type.Name.StartsWith("IRt", StringComparison.Ordinal))
             {
-                result.Add($"{nsName}.{type.Name}");
+                result.Add($"{nsName}.{type.Name}{CkGeneratedInterfaceLookup.AssemblySeparator}{assemblyName}");
             }
         }
     }

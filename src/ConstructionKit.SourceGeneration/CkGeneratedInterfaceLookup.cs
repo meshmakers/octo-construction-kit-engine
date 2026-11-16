@@ -14,10 +14,16 @@ public sealed class CkGeneratedInterfaceLookup
 {
     internal const string GeneratedSegment = ".Generated.";
 
+    /// <summary>Separates the interface name from the declaring assembly in an entry (<c>Ns.IRtNamed, Assembly</c>).</summary>
+    public const string AssemblySeparator = ", ";
+
     private readonly IReadOnlyList<string> _fullNames;
     private readonly Dictionary<CkId<CkInterfaceId>, string> _unresolved = new();
 
-    /// <summary>Creates a lookup over the metadata names of generated interfaces (<c>A.B.Generated.System.v2.IRtNamed</c>).</summary>
+    /// <summary>
+    ///     Creates a lookup over generated interfaces: metadata names (<c>A.B.Generated.System.v2.IRtNamed</c>), optionally
+    ///     assembly-qualified (<c>…IRtNamed, AssemblyA</c>, as <c>CkGeneratedInterfaceCollector</c> returns them).
+    /// </summary>
     public CkGeneratedInterfaceLookup(IEnumerable<string> fullNames)
     {
         _fullNames = fullNames.ToList();
@@ -53,10 +59,10 @@ public sealed class CkGeneratedInterfaceLookup
         var suffix =
             $"{GeneratedSegment}{ckInterfaceId.ModelId.Name}.v{ckInterfaceId.ModelId.Version.Major}.{CkInterfaceCodeGenerator.InterfaceName(ckInterfaceId.ElementId)}";
         // A leading dot, so a project whose root namespace is empty ("Generated.System.v2…") matches too.
-        var matches = _fullNames.Where(n => ("." + n).EndsWith(suffix, StringComparison.Ordinal)).ToList();
+        var matches = _fullNames.Where(n => ("." + TypeName(n)).EndsWith(suffix, StringComparison.Ordinal)).ToList();
         if (matches.Count == 1)
         {
-            return "global::" + matches[0];
+            return "global::" + TypeName(matches[0]);
         }
 
         var modelName = ckInterfaceId.ModelId.Name;
@@ -65,5 +71,11 @@ public sealed class CkGeneratedInterfaceLookup
               (modelName == "System" ? " (Meshmakers.Octo.ConstructionKit.Models.System)" : "")
             : $"more than one referenced assembly declares it ({string.Join(", ", matches)}); keep only one reference to the C# package of model '{modelName}'";
         return null;
+    }
+
+    private static string TypeName(string entry)
+    {
+        var index = entry.IndexOf(AssemblySeparator, StringComparison.Ordinal);
+        return index < 0 ? entry : entry.Substring(0, index);
     }
 }

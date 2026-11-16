@@ -1699,8 +1699,9 @@ type output unchanged. Pinned by `CkInterfaceCodeGeneratorTests` (Roslyn-compile
 another model declares, e.g. `Basic/NamedEntity` implements `System/Named-1`. Its C# interface lives in the other
 model's assembly, in `<that project's RootNamespace>.Generated.<Model>.v<Major>`, which the CK cache does not know.
 `CkSourceGenerator` therefore reads the generated interfaces of the compilation's referenced assemblies
-(`CkGeneratedInterfaceCollector.Collect`: public `IRt*` interfaces in namespaces `*.Generated.*.v<n>`, sorted, compared
-by content so the generation reruns only when the references change) and passes a `CkGeneratedInterfaceLookup` to
+(`CkGeneratedInterfaceCollector.Collect`: public `IRt*` interfaces in namespaces `*.Generated.*.v<n>`, assembly-qualified
+so the same name in two assemblies counts as ambiguous, sorted, compared by content so the generation reruns only when
+the references change) and passes a `CkGeneratedInterfaceLookup` to
 `CkTypeCodeGenerator` / `CkInterfaceCodeGenerator`. A foreign interface is emitted **fully qualified**
 (`RtNamedEntity : RtEntity, global::Meshmakers.Octo.ConstructionKit.Models.System.Generated.System.v2.IRtNamed`, and
 `string global::….IRtNamed.Name => Name;`), matched by model name, the model's major and the interface name. Interfaces

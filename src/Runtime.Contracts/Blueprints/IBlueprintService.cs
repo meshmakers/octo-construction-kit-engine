@@ -160,8 +160,13 @@ public interface IBlueprintService
 
     /// <summary>
     /// Removes a blueprint from a tenant. Locked entities owned by the
-    /// blueprint are erased; unlocked entities are left as user data
-    /// (they may have been adopted by the user after the original apply).
+    /// blueprint are erased. Tenant-owned seed entities (the seed sets
+    /// <c>rtBlueprintLocked: false</c>, AB#8966) are erased when the tenant
+    /// never edited them (their content still equals the seed of the
+    /// installed version) and nothing outside the uninstall references them;
+    /// the others are kept and listed in
+    /// <see cref="BlueprintUninstallResult.TenantOwnedKept"/> with the reason.
+    /// Other unlocked entities are left as user data.
     /// </summary>
     /// <param name="tenantId">Target tenant identifier.</param>
     /// <param name="blueprintName">Name of the blueprint to uninstall.</param>
@@ -183,6 +188,24 @@ public interface IBlueprintService
         string blueprintName,
         bool cascade = false,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// AB#8966: the dry run of <see cref="UninstallAsync"/>. Runs the same checks and the same
+    /// classification but changes nothing: no entity is erased, no installation row removed and no
+    /// notification sent. <see cref="BlueprintUninstallResult.DryRun"/> is <c>true</c>,
+    /// <see cref="BlueprintUninstallResult.EntitiesDeleted"/> and
+    /// <see cref="BlueprintUninstallResult.DeletedEntities"/> name what the uninstall would erase,
+    /// <see cref="BlueprintUninstallResult.TenantOwnedKept"/> what it would keep.
+    /// </summary>
+    /// <param name="tenantId">Target tenant identifier.</param>
+    /// <param name="blueprintName">Name of the blueprint to uninstall.</param>
+    /// <param name="cascade">As for <see cref="UninstallAsync"/>.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<BlueprintUninstallResult> PreviewUninstallAsync(
+        string tenantId,
+        string blueprintName,
+        bool cascade = false,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -200,8 +223,29 @@ public class BlueprintUninstallResult
     /// </summary>
     public BlueprintId? UninstalledBlueprintId { get; set; }
 
-    /// <summary>Number of locked entities erased from the tenant.</summary>
+    /// <summary>
+    /// <c>true</c> for the result of <see cref="IBlueprintService.PreviewUninstallAsync"/>: nothing was changed, the
+    /// counts and lists say what the uninstall would do.
+    /// </summary>
+    public bool DryRun { get; set; }
+
+    /// <summary>
+    /// Number of entities erased from the tenant: the locked entities of the blueprint and its unedited,
+    /// unreferenced tenant-owned seed entities (AB#8966). In a dry run: the number that would be erased.
+    /// </summary>
     public int EntitiesDeleted { get; set; }
+
+    /// <summary>
+    /// AB#8966: the entities counted in <see cref="EntitiesDeleted"/>, cascaded blueprints included.
+    /// </summary>
+    public List<BlueprintUninstallDeletedEntity> DeletedEntities { get; set; } = [];
+
+    /// <summary>
+    /// AB#8966: tenant-owned seed entities of the blueprint that stay in the tenant, each with the reason
+    /// (edited by the tenant, referenced from outside the uninstall, or not comparable with the seed).
+    /// They are re-adopted when the blueprint is installed again.
+    /// </summary>
+    public List<BlueprintTenantOwnedKeptEntity> TenantOwnedKept { get; set; } = [];
 
     /// <summary>
     /// Blueprint ids that were cascade-uninstalled because they were marked
@@ -222,4 +266,56 @@ public class BlueprintUninstallResult
 
     /// <summary>Warnings emitted during the operation.</summary>
     public List<string> Warnings { get; set; } = [];
+}
+
+/// <summary>
+/// AB#8966: an entity an uninstall erased (or, in a dry run, would erase).
+/// </summary>
+public class BlueprintUninstallDeletedEntity : BlueprintTenantOwnedEntity
+{
+    /// <summary>
+    /// <c>true</c> for a tenant-owned seed entity erased because the tenant never edited it; <c>false</c> for a
+    /// locked entity of the blueprint.
+    /// </summary>
+    public bool TenantOwned { get; set; }
+}
+
+/// <summary>
+/// AB#8966: a tenant-owned seed entity an uninstall keeps, with the reason.
+/// </summary>
+public class BlueprintTenantOwnedKeptEntity : BlueprintTenantOwnedEntity
+{
+    /// <summary>Why the entity is kept.</summary>
+    public BlueprintTenantOwnedKeptReason Reason { get; set; }
+
+    /// <summary>
+    /// For <see cref="BlueprintTenantOwnedKeptReason.Referenced"/>: the runtime ids of the entities outside the
+    /// uninstall that hold an association to it. Empty otherwise.
+    /// </summary>
+    public List<string> ReferencedBy { get; set; } = [];
+}
+
+/// <summary>
+/// AB#8966: why an uninstall keeps a tenant-owned seed entity.
+/// </summary>
+public enum BlueprintTenantOwnedKeptReason
+{
+    /// <summary>
+    /// The tenant edited it: its attributes or its well-known name differ from the seed of the installed version, or
+    /// it is held under another runtime id than the seed gives it.
+    /// </summary>
+    Edited,
+
+    /// <summary>
+    /// Unedited, but it shares an association with an entity that stays in the tenant (an entity the tenant created, an
+    /// edited or referenced entity of the same blueprint, ...), and the association is not the entity's own
+    /// seed-declared link. Erasing it would remove that association.
+    /// </summary>
+    Referenced,
+
+    /// <summary>
+    /// Whether the tenant edited it cannot be decided (the CK type is not in the cache, or the comparison failed), so
+    /// the tenant content is kept.
+    /// </summary>
+    NotComparable
 }

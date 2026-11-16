@@ -3033,28 +3033,61 @@ internal class BlueprintService : IBlueprintService
     }
 
     /// <inheritdoc />
-    public async Task<BlueprintUninstallResult> UninstallAsync(
+    public Task<BlueprintUninstallResult> UninstallAsync(
         string tenantId,
         string blueprintName,
         bool cascade = false,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        UninstallCoreAsync(tenantId, blueprintName, cascade, new UninstallRun(dryRun: false), cancellationToken);
+
+    /// <inheritdoc />
+    public Task<BlueprintUninstallResult> PreviewUninstallAsync(
+        string tenantId,
+        string blueprintName,
+        bool cascade = false,
+        CancellationToken cancellationToken = default) =>
+        UninstallCoreAsync(tenantId, blueprintName, cascade, new UninstallRun(dryRun: true), cancellationToken);
+
+    /// <summary>
+    /// AB#8966: the state one uninstall (or its dry run) shares across the cascaded blueprints. A dry run changes nothing,
+    /// so it remembers here what the real run would already have removed when the next blueprint is handled.
+    /// </summary>
+    private sealed class UninstallRun(bool dryRun)
     {
-        var result = new BlueprintUninstallResult();
+        public bool DryRun { get; } = dryRun;
+
+        /// <summary>Names of the blueprints removed (dry run: that would be removed) so far.</summary>
+        public HashSet<string> RemovedBlueprints { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>Runtime ids of the entities erased (dry run: that would be erased) so far.</summary>
+        public HashSet<OctoObjectId> DeletedRtIds { get; } = [];
+    }
+
+    private async Task<BlueprintUninstallResult> UninstallCoreAsync(
+        string tenantId,
+        string blueprintName,
+        bool cascade,
+        UninstallRun run,
+        CancellationToken cancellationToken)
+    {
+        var result = new BlueprintUninstallResult { DryRun = run.DryRun };
         var correlationId = Guid.NewGuid();
 
         _logger.LogInformation(
-            "Uninstalling blueprint '{BlueprintName}' from tenant {TenantId} (cascade={Cascade})",
-            blueprintName, tenantId, cascade);
+            "Uninstalling blueprint '{BlueprintName}' from tenant {TenantId} (cascade={Cascade}, dryRun={DryRun})",
+            blueprintName, tenantId, cascade, run.DryRun);
 
-        var installation = await _installations
-            .GetByBlueprintNameAsync(tenantId, blueprintName, cancellationToken)
-            .ConfigureAwait(false);
+        var installation = run.RemovedBlueprints.Contains(blueprintName)
+            ? null
+            : await _installations
+                .GetByBlueprintNameAsync(tenantId, blueprintName, cancellationToken)
+                .ConfigureAwait(false);
 
         if (installation == null)
         {
             result.Success = false;
             result.Errors.Add($"Blueprint '{blueprintName}' is not installed on tenant '{tenantId}'.");
-            await NotifyUninstallFailedAsync(tenantId, null, result.Errors, correlationId).ConfigureAwait(false);
+            await NotifyUninstallFailedAsync(run, tenantId, null, result.Errors, correlationId).ConfigureAwait(false);
             return result;
         }
 
@@ -3065,6 +3098,7 @@ internal class BlueprintService : IBlueprintService
             .ConfigureAwait(false);
         var dependents = allInstalled
             .Where(other => other.BlueprintId.Name != blueprintName
+                && !run.RemovedBlueprints.Contains(other.BlueprintId.Name)
                 && other.ResolvedDependencies.Any(d => d.Name == blueprintName))
             .Select(other => other.BlueprintId)
             .ToList();
@@ -3078,7 +3112,7 @@ internal class BlueprintService : IBlueprintService
                 string.Join(", ", dependents.Select(d => d.FullName)) +
                 ". Re-run with cascade to remove dependents as well.");
             await NotifyUninstallFailedAsync(
-                tenantId, installation.BlueprintId, result.Errors, correlationId)
+                run, tenantId, installation.BlueprintId, result.Errors, correlationId)
                 .ConfigureAwait(false);
             return result;
         }
@@ -3089,19 +3123,19 @@ internal class BlueprintService : IBlueprintService
             foreach (var dependentId in dependents)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var depResult = await UninstallAsync(
-                        tenantId, dependentId.Name, cascade: true, cancellationToken)
+                var depResult = await UninstallCoreAsync(
+                        tenantId, dependentId.Name, cascade: true, run, cancellationToken)
                     .ConfigureAwait(false);
                 if (!depResult.Success)
                 {
                     result.Success = false;
                     result.Errors.AddRange(depResult.Errors);
                     await NotifyUninstallFailedAsync(
-                        tenantId, installation.BlueprintId, result.Errors, correlationId)
+                        run, tenantId, installation.BlueprintId, result.Errors, correlationId)
                         .ConfigureAwait(false);
                     return result;
                 }
-                result.EntitiesDeleted += depResult.EntitiesDeleted;
+                AddCascadedOutcome(result, depResult);
                 result.CascadedDependencies.Add(dependentId);
                 result.CascadedDependencies.AddRange(depResult.CascadedDependencies);
             }
@@ -3110,10 +3144,9 @@ internal class BlueprintService : IBlueprintService
         // Remove the entities owned by this blueprint.
         try
         {
-            var deleted = await DeleteBlueprintOwnedEntitiesAsync(
-                    tenantId, installation.BlueprintId, result, cancellationToken)
+            await DeleteBlueprintOwnedEntitiesAsync(
+                    tenantId, installation.BlueprintId, result, run, cancellationToken)
                 .ConfigureAwait(false);
-            result.EntitiesDeleted += deleted;
         }
         catch (Exception ex)
         {
@@ -3122,12 +3155,16 @@ internal class BlueprintService : IBlueprintService
             result.Success = false;
             result.Errors.Add($"Failed to delete blueprint entities: {ex.Message}");
             await NotifyUninstallFailedAsync(
-                tenantId, installation.BlueprintId, result.Errors, correlationId)
+                run, tenantId, installation.BlueprintId, result.Errors, correlationId)
                 .ConfigureAwait(false);
             return result;
         }
 
-        await _installations.RemoveAsync(tenantId, blueprintName, cancellationToken).ConfigureAwait(false);
+        if (!run.DryRun)
+        {
+            await _installations.RemoveAsync(tenantId, blueprintName, cancellationToken).ConfigureAwait(false);
+        }
+        run.RemovedBlueprints.Add(blueprintName);
 
         // Cascade transitive deps that are now orphaned and originally came in as dependencies.
         if (cascade)
@@ -3136,9 +3173,11 @@ internal class BlueprintService : IBlueprintService
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var depRow = await _installations
-                    .GetByBlueprintNameAsync(tenantId, depBpId.Name, cancellationToken)
-                    .ConfigureAwait(false);
+                var depRow = run.RemovedBlueprints.Contains(depBpId.Name)
+                    ? null
+                    : await _installations
+                        .GetByBlueprintNameAsync(tenantId, depBpId.Name, cancellationToken)
+                        .ConfigureAwait(false);
                 if (depRow == null || !depRow.IsDependency)
                 {
                     // Either already removed or originally an explicit install — leave it alone.
@@ -3150,6 +3189,7 @@ internal class BlueprintService : IBlueprintService
                     .GetInstalledAsync(tenantId, cancellationToken).ConfigureAwait(false);
                 var stillReferenced = remaining.Any(other =>
                     other.BlueprintId.Name != depBpId.Name
+                    && !run.RemovedBlueprints.Contains(other.BlueprintId.Name)
                     && other.ResolvedDependencies.Any(d => d.Name == depBpId.Name));
 
                 if (stillReferenced)
@@ -3157,14 +3197,14 @@ internal class BlueprintService : IBlueprintService
                     continue;
                 }
 
-                var cascadeResult = await UninstallAsync(
-                        tenantId, depBpId.Name, cascade: true, cancellationToken)
+                var cascadeResult = await UninstallCoreAsync(
+                        tenantId, depBpId.Name, cascade: true, run, cancellationToken)
                     .ConfigureAwait(false);
                 if (cascadeResult.Success)
                 {
                     result.CascadedDependencies.Add(depBpId);
                     result.CascadedDependencies.AddRange(cascadeResult.CascadedDependencies);
-                    result.EntitiesDeleted += cascadeResult.EntitiesDeleted;
+                    AddCascadedOutcome(result, cascadeResult);
                 }
                 else
                 {
@@ -3176,7 +3216,7 @@ internal class BlueprintService : IBlueprintService
 
         result.Success = result.Errors.Count == 0;
 
-        if (result.Success)
+        if (result.Success && !run.DryRun)
         {
             try
             {
@@ -3200,12 +3240,25 @@ internal class BlueprintService : IBlueprintService
         return result;
     }
 
+    private static void AddCascadedOutcome(BlueprintUninstallResult result, BlueprintUninstallResult cascaded)
+    {
+        result.EntitiesDeleted += cascaded.EntitiesDeleted;
+        result.DeletedEntities.AddRange(cascaded.DeletedEntities);
+        result.TenantOwnedKept.AddRange(cascaded.TenantOwnedKept);
+    }
+
     private async Task NotifyUninstallFailedAsync(
+        UninstallRun run,
         string tenantId,
         BlueprintId? blueprintId,
         IReadOnlyList<string> errors,
         Guid correlationId)
     {
+        if (run.DryRun)
+        {
+            return; // a dry run changes nothing and announces nothing
+        }
+
         try
         {
             await _notifications.NotifyOperationFailedAsync(
@@ -3224,10 +3277,26 @@ internal class BlueprintService : IBlueprintService
         }
     }
 
+    /// <summary>A tenant-owned seed entity that is unedited and so far meant to be erased (AB#8966).</summary>
+    private sealed record UninstallCandidate(RtCkId<CkTypeId> CkTypeId, RtEntity Entity, string Key);
+
     /// <summary>
-    /// Erases all locked entities owned by the blueprint. Unlocked entities
-    /// are left in place — they may carry user modifications, so removing them
-    /// silently would be data loss; they are reported as warnings instead.
+    /// Erases the entities owned by the blueprint (in a dry run: only reports them) and fills
+    /// <see cref="BlueprintUninstallResult.EntitiesDeleted" />, <see cref="BlueprintUninstallResult.DeletedEntities" />
+    /// and <see cref="BlueprintUninstallResult.TenantOwnedKept" />.
+    /// <list type="bullet">
+    /// <item>Locked entities are erased.</item>
+    /// <item>
+    /// AB#8966: tenant-owned seed entities (the seed sets <c>rtBlueprintLocked: false</c>) are erased when they are
+    /// unedited - their content equals the seed of the installed version, the comparison of the AB#8778 update rule
+    /// (<see cref="BlueprintEntityComparer" />, no stored hash) - and they share no association with an entity that stays
+    /// in the tenant, other than their own seed-declared links. Edited, referenced and not comparable ones are kept and
+    /// listed.
+    /// "Referenced" is decided to a fixpoint: keeping an entity can make another candidate referenced (an edited page
+    /// keeps its unedited versions).
+    /// </item>
+    /// <item>Other unlocked entities (a product-owned seed entity the tenant unlocked) are kept as user data, with a warning.</item>
+    /// </list>
     /// </summary>
     /// <remarks>
     /// We do not have a global "scan every collection" primitive, so we
@@ -3235,11 +3304,13 @@ internal class BlueprintService : IBlueprintService
     /// CK types this blueprint owns. The matching tenant rows are then
     /// filtered to <c>rtBlueprintSource = blueprint.FullName</c> before
     /// deletion to avoid clobbering rows that other blueprints adopted.
+    /// Erasing an entity removes its associations (graph rule engine), so no association is left pointing to it.
     /// </remarks>
-    private async Task<int> DeleteBlueprintOwnedEntitiesAsync(
+    private async Task DeleteBlueprintOwnedEntitiesAsync(
         string tenantId,
         BlueprintId blueprintId,
         BlueprintUninstallResult result,
+        UninstallRun run,
         CancellationToken cancellationToken)
     {
         var opResult = new OperationResult();
@@ -3249,7 +3320,7 @@ internal class BlueprintService : IBlueprintService
         if (opResult.HasErrors || seedDataPaths.Count == 0)
         {
             // No seed data → nothing to erase.
-            return 0;
+            return;
         }
 
         var variables = await _variableProvider.GetVariablesAsync(tenantId, cancellationToken)
@@ -3262,7 +3333,7 @@ internal class BlueprintService : IBlueprintService
             result.Warnings.AddRange(opResult.Messages
                 .Where(m => m.MessageLevel == MessageLevel.Error)
                 .Select(m => m.MessageText));
-            return 0;
+            return;
         }
 
         var repository = await _runtimeRepositoryProvider
@@ -3274,7 +3345,10 @@ internal class BlueprintService : IBlueprintService
         }
 
         var session = await repository.GetSessionAsync().ConfigureAwait(false);
-        var deletedCount = 0;
+
+        var lockedTargets = new List<UninstallCandidate>();
+        var candidates = new Dictionary<OctoObjectId, UninstallCandidate>();
+        var kept = new List<BlueprintTenantOwnedKeptEntity>();
 
         foreach (var typeGroup in seedRoot.Entities.GroupBy(e => e.CkTypeId))
         {
@@ -3293,18 +3367,36 @@ internal class BlueprintService : IBlueprintService
                 continue;
             }
 
-            var seedKeys = new HashSet<string>(
-                typeGroup
-                    .Select(e => e.RtWellKnownName ?? e.RtId.ToString())
-                    .Where(k => !string.IsNullOrEmpty(k))!,
-                StringComparer.Ordinal);
+            var seedByKey = new Dictionary<string, RtEntityTcDto>(StringComparer.Ordinal);
+            foreach (var seed in typeGroup)
+            {
+                var seedKey = seed.RtWellKnownName ?? seed.RtId.ToString();
+                if (!string.IsNullOrEmpty(seedKey))
+                {
+                    seedByKey[seedKey] = seed;
+                }
+            }
 
+            var tenantAnyByKey = new Dictionary<string, RtEntity>(StringComparer.Ordinal);
+            foreach (var t in tenantEntities.Items)
+            {
+                if (!string.IsNullOrEmpty(t.RtWellKnownName))
+                {
+                    tenantAnyByKey[t.RtWellKnownName] = t;
+                }
+                if (t.RtId.ToString() is { Length: > 0 } tenantRtId)
+                {
+                    tenantAnyByKey[tenantRtId] = t;
+                }
+            }
+
+            // Locked entities and unlocked copies of product-owned seed entities: as before AB#8966, matched by key.
             foreach (var entity in tenantEntities.Items)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var key = entity.RtWellKnownName ?? entity.RtId.ToString();
-                if (string.IsNullOrEmpty(key) || !seedKeys.Contains(key!))
+                if (string.IsNullOrEmpty(key) || !seedByKey.TryGetValue(key!, out var seed))
                 {
                     continue;
                 }
@@ -3317,29 +3409,245 @@ internal class BlueprintService : IBlueprintService
                 }
 
                 var locked = entity.GetAttributeValueOrDefault<bool>("RtBlueprintLocked") ?? true;
-                if (!locked)
+                if (locked)
                 {
-                    result.Warnings.Add(
-                        $"Entity '{key}' (type {ckTypeId}) is unlocked; keeping as user data.");
+                    lockedTargets.Add(new UninstallCandidate(ckTypeId, entity, key!));
                     continue;
                 }
 
-                try
-                {
-                    await repository.DeleteOneRtEntityByRtIdAsync(
-                        session, ckTypeId, entity.RtId, DeleteOptions.Erase).ConfigureAwait(false);
-                    deletedCount++;
-                }
-                catch (Exception ex)
+                if (!IsTenantOwnedSeed(seed))
                 {
                     result.Warnings.Add(
-                        $"Failed to delete entity '{key}' ({ckTypeId}): {ex.Message}");
+                        $"Entity '{key}' (type {ckTypeId}) is unlocked; keeping as user data.");
+                }
+                // Tenant-owned seed entities: classified below.
+            }
+
+            // AB#8966: the unlocked tenant-owned seed entities of this blueprint the tenant holds.
+            _ckCacheService.TryGetRtCkType(tenantId, ckTypeId, out var ckTypeGraph);
+            foreach (var seed in typeGroup.Where(IsTenantOwnedSeed))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var key = seed.RtWellKnownName
+                    ?? (seed.RtId.Equals(OctoObjectId.Empty) ? null : seed.RtId.ToString());
+                if (string.IsNullOrEmpty(key))
+                {
+                    continue;
+                }
+
+                var held = FindTenantEntity(tenantAnyByKey, key!, seed);
+                if (held == null
+                    || held.GetAttributeStringValueOrDefault("RtBlueprintSource") != blueprintId.FullName
+                    || (held.GetAttributeValueOrDefault<bool>("RtBlueprintLocked") ?? true))
+                {
+                    // Deleted by the tenant, adopted by another blueprint, or locked (erased above when matched).
+                    continue;
+                }
+
+                var reason = ClassifyTenantOwnedForUninstall(tenantId, ckTypeGraph, ckTypeId, key!, seed, held);
+                if (reason == null)
+                {
+                    candidates[held.RtId] = new UninstallCandidate(ckTypeId, held, key!);
+                }
+                else
+                {
+                    kept.Add(ToKeptEntity(key!, ckTypeId, held, reason.Value));
                 }
             }
         }
 
-        return deletedCount;
+        if (candidates.Count > 0)
+        {
+            await KeepReferencedCandidatesAsync(repository, session, seedRoot, lockedTargets,
+                    candidates, kept, run)
+                .ConfigureAwait(false);
+        }
+
+        foreach (var target in lockedTargets)
+        {
+            await EraseAsync(repository, session, target, tenantOwned: false, result, run).ConfigureAwait(false);
+        }
+
+        foreach (var target in candidates.Values)
+        {
+            await EraseAsync(repository, session, target, tenantOwned: true, result, run).ConfigureAwait(false);
+        }
+
+        result.TenantOwnedKept.AddRange(kept);
+        if (kept.Count > 0)
+        {
+            result.Warnings.Add(
+                $"{kept.Count} tenant-owned seed entities of '{blueprintId.FullName}' are kept (TenantOwnedKept): " +
+                string.Join(", ", kept.Select(k => $"{k.CkTypeId}/{k.Key} ({k.Reason})")));
+        }
     }
+
+    /// <summary>
+    /// AB#8966: whether an uninstall may erase a held tenant-owned seed entity. <c>null</c>: unedited - it equals the seed
+    /// of the installed version (attributes as compared by the AB#8778 update rule, the same well-known name and the same
+    /// rtId). Anything that cannot be decided keeps the entity.
+    /// </summary>
+    private BlueprintTenantOwnedKeptReason? ClassifyTenantOwnedForUninstall(
+        string tenantId, CkTypeGraph? ckType, RtCkId<CkTypeId> ckTypeId, string key, RtEntityTcDto seed, RtEntity held)
+    {
+        if (ckType == null)
+        {
+            return BlueprintTenantOwnedKeptReason.NotComparable;
+        }
+
+        var sameRtId = seed.RtId.Equals(OctoObjectId.Empty) || held.RtId.Equals(seed.RtId);
+        var sameName = string.IsNullOrEmpty(seed.RtWellKnownName)
+                       || string.Equals(held.RtWellKnownName, seed.RtWellKnownName, StringComparison.Ordinal);
+        if (!sameRtId || !sameName)
+        {
+            return BlueprintTenantOwnedKeptReason.Edited;
+        }
+
+        try
+        {
+            return CompareWithTenant(tenantId, seed, held, ckType).Count == 0
+                ? null
+                : BlueprintTenantOwnedKeptReason.Edited;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Could not compare tenant-owned entity {CkTypeId}/{Key} with its seed", ckTypeId, key);
+            return BlueprintTenantOwnedKeptReason.NotComparable;
+        }
+    }
+
+    /// <summary>
+    /// AB#8966: moves every candidate that an entity staying in the tenant references into <paramref name="kept" />
+    /// (reason <see cref="BlueprintTenantOwnedKeptReason.Referenced" />), until no candidate changes. An association does
+    /// not keep a candidate when its other end is erased in this uninstall (a locked entity, another candidate, an entity
+    /// of a blueprint removed earlier in the cascade), or when the seed declares it on the candidate itself (the
+    /// candidate's own blueprint-seeded link, e.g. to a system entity or to a predecessor version). Every other association
+    /// keeps it: one the tenant created, or one the seed declares on an entity that stays (an edited page keeps the
+    /// version it points to).
+    /// </summary>
+    private static async Task KeepReferencedCandidatesAsync(
+        IRuntimeRepository repository,
+        IOctoSession session,
+        RtModelRootTcDto seedRoot,
+        List<UninstallCandidate> lockedTargets,
+        Dictionary<OctoObjectId, UninstallCandidate> candidates,
+        List<BlueprintTenantOwnedKeptEntity> kept,
+        UninstallRun run)
+    {
+        var associationSet = await repository.GetRtAssociationsAsync(session,
+                candidates.Values.Select(c => new RtEntityId(c.CkTypeId, c.Entity.RtId)).ToList(),
+                RtAssociationExtendedQueryOptions.Create(GraphDirections.Any))
+            .ConfigureAwait(false);
+
+        var associationsByEntity = new Dictionary<OctoObjectId, List<RtAssociation>>();
+        var seen = new HashSet<OctoObjectId>();
+        foreach (var association in associationSet.Values.SelectMany(r => r.Items))
+        {
+            if (!seen.Add(association.AssociationId))
+            {
+                continue;
+            }
+
+            foreach (var end in new[] { association.OriginRtId, association.TargetRtId }.Distinct())
+            {
+                if (!associationsByEntity.TryGetValue(end, out var list))
+                {
+                    associationsByEntity[end] = list = [];
+                }
+                list.Add(association);
+            }
+        }
+
+        var seedDeclared = new HashSet<(OctoObjectId Origin, OctoObjectId Target, string Role)>();
+        foreach (var seed in seedRoot.Entities)
+        {
+            foreach (var association in seed.Associations ?? [])
+            {
+                seedDeclared.Add((seed.RtId, association.TargetRtId, association.RoleId.ToString()));
+            }
+        }
+
+        var lockedIds = new HashSet<OctoObjectId>(lockedTargets.Select(t => t.Entity.RtId));
+        bool changed;
+        do
+        {
+            changed = false;
+            foreach (var candidate in candidates.Values.ToList())
+            {
+                var rtId = candidate.Entity.RtId;
+                var referencedBy = new SortedSet<string>(StringComparer.Ordinal);
+                foreach (var association in associationsByEntity.GetValueOrDefault(rtId) ?? [])
+                {
+                    var other = association.OriginRtId.Equals(rtId) ? association.TargetRtId : association.OriginRtId;
+                    if (candidates.ContainsKey(other) || lockedIds.Contains(other) || run.DeletedRtIds.Contains(other))
+                    {
+                        continue; // erased in this uninstall as well
+                    }
+
+                    if (association.OriginRtId.Equals(rtId) && seedDeclared.Contains(
+                            (association.OriginRtId, association.TargetRtId, association.AssociationRoleId?.ToString() ?? string.Empty)))
+                    {
+                        continue; // the candidate's own blueprint-seeded link; erased with it
+                    }
+
+                    referencedBy.Add(other.ToString() ?? string.Empty);
+                }
+
+                if (referencedBy.Count == 0)
+                {
+                    continue;
+                }
+
+                candidates.Remove(rtId);
+                var keptEntity = ToKeptEntity(candidate.Key, candidate.CkTypeId, candidate.Entity,
+                    BlueprintTenantOwnedKeptReason.Referenced);
+                keptEntity.ReferencedBy.AddRange(referencedBy);
+                kept.Add(keptEntity);
+                changed = true;
+            }
+        } while (changed);
+    }
+
+    private async Task EraseAsync(IRuntimeRepository repository, IOctoSession session, UninstallCandidate target,
+        bool tenantOwned, BlueprintUninstallResult result, UninstallRun run)
+    {
+        if (!run.DryRun)
+        {
+            try
+            {
+                await repository.DeleteOneRtEntityByRtIdAsync(
+                    session, target.CkTypeId, target.Entity.RtId, DeleteOptions.Erase).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                result.Warnings.Add(
+                    $"Failed to delete entity '{target.Key}' ({target.CkTypeId}): {ex.Message}");
+                return;
+            }
+        }
+
+        run.DeletedRtIds.Add(target.Entity.RtId);
+        result.EntitiesDeleted++;
+        result.DeletedEntities.Add(new BlueprintUninstallDeletedEntity
+        {
+            Key = target.Key,
+            CkTypeId = target.CkTypeId.ToString(),
+            EntityId = target.Entity.RtId.ToString(),
+            WellKnownName = target.Entity.RtWellKnownName,
+            TenantOwned = tenantOwned
+        });
+    }
+
+    private static BlueprintTenantOwnedKeptEntity ToKeptEntity(string key, RtCkId<CkTypeId> ckTypeId, RtEntity held,
+        BlueprintTenantOwnedKeptReason reason) => new()
+    {
+        Key = key,
+        CkTypeId = ckTypeId.ToString(),
+        EntityId = held.RtId.ToString(),
+        WellKnownName = held.RtWellKnownName,
+        Reason = reason
+    };
 
     /// <summary>
     /// AB#7991: activates the archives in <paramref name="candidates" /> that the seed import created (and the blueprint

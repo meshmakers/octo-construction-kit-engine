@@ -367,6 +367,7 @@ Rules for a tenant-owned seed entity (`UpdateBlueprint` in `Merge` and `Full` mo
   - **A report of the run.** `TenantOwnedUpdateAvailable` is not stored: applying the same version again lists nothing, although the edit is still there.
   - **No marker on the entity.** The baseline of "unedited" (the *seed content hash* of the rule decided on AB#8450) is the previous seed itself, not a value stored on the entity, so no System CK attribute is needed and entities seeded before AB#8778 follow the same rule: they are unedited exactly when their content equals the previous seed, and after one refresh they equal the new seed. Re-applying the same version is a no-op (target and previous seed are the same).
   - **Versioned content** (for example knowledge pages): ship each content version as its own seed entity with a new key and let the page refer to its current version through an attribute that belongs to the page content. An unedited page then points to the new version; an edited page keeps its reference while the new version entity is created (new key) and is not referenced - a later check can report it from there.
+- **Removed by an uninstall while the tenant has not edited it (AB#8966).** `UninstallBlueprint` compares the tenant entity with the seed of the installed version, with the comparison of the update rule above (no stored hash): an unedited entity is erased, an edited one is kept and listed in `TenantOwnedKept` with the reason `Edited`; an unedited one that an entity staying in the tenant references is kept with the reason `Referenced`. Details in [Uninstall](#uninstall).
 - **Never re-created after a delete.** If the tenant lacks it and the seed of the previously installed version (read from the catalog) contains the same key (`rtWellKnownName`, else `rtId`) with the same CK type, the tenant deleted it and it stays deleted. If that previous seed cannot be read from the catalog, the update does **not** create the absent tenant-owned entities and returns a warning, because it cannot tell a deleted entity from a new one.
 - **The seed decides, not the tenant's stamp.** A tenant that still carries the stamp `rtBlueprintLocked: true` from an earlier version is handled as tenant-owned from the first update whose seed declares the entity unlocked; its edits are kept. The key counts as "contained in the previous seed" whatever flag the previous seed gave it, so an entity that was product-owned and is handed over to the tenant stays deleted if the tenant had deleted it.
 - **Reported.** `PreviewUpdateAsync` lists them in `TenantOwnedSkipped`, `TenantOwnedUpdateAvailable` (a subset of `TenantOwnedSkipped`), `TenantOwnedRefreshed` and `TenantOwnedStaysDeleted`; the apply result carries the same four lists (skipped and stays-deleted counted in `EntitiesSkipped`, refreshed in `EntitiesUpdated`). A forced re-apply or an install over another version applies the same rule and reports the groups as messages of the `OperationResult`.
@@ -909,9 +910,53 @@ if (!result.Success && result.BlockingDependents.Any())
 | Behaviour              | Default                                                                                       |
 |------------------------|-----------------------------------------------------------------------------------------------|
 | **Refcount check**     | If any other installed blueprint depends on this one, uninstall is blocked.                   |
-| **Owned entity erase** | All entities with `rtBlueprintSource == <this blueprint full id>` are erased permanently. The match is version-exact and uses the version named by the installation row, i.e. the version currently in effect. |
-| **Unlocked entities**  | Entities the user released (`rtBlueprintLocked = false`) are kept — they survive the uninstall. |
+| **Owned entity erase** | The seed entities of the blueprint whose tenant copy carries `rtBlueprintSource == <this blueprint full id>` and `rtBlueprintLocked = true` are erased permanently. The match is version-exact and uses the version named by the installation row, i.e. the version currently in effect. |
+| **Tenant-owned seed entities** | Seed entities with `rtBlueprintLocked: false` (AB#8966): erased when the tenant never edited them, kept with a reason otherwise — see below. |
+| **Other unlocked entities** | A product-owned seed entity whose tenant copy the user unlocked (`rtBlueprintLocked = false`) is kept as user data, with a warning. |
 | **Cascade**            | `cascade: true` uninstalls dependents first and orphan-cleans dependencies of the target.     |
+| **Associations**       | Erasing an entity removes its associations, so no association is left pointing to an erased entity. |
+
+### Tenant-owned seed entities on uninstall (AB#8966)
+
+An uninstall gives the tenant back without the content the blueprint seeded and the tenant never touched. For every
+tenant-owned seed entity (the seed sets `rtBlueprintLocked: false`) that the tenant holds with this blueprint's
+`rtBlueprintSource` and unlocked:
+
+- **Unedited → erased.** The tenant entity equals the seed of the installed version, read from the catalog — the comparison
+  of the update rule (AB#8778, see [product-owned and tenant-owned seed entities](#product-owned-and-tenant-owned-seed-entities-ab6383)), with no
+  stored hash — and it has the seed's `rtId` and well-known name. Counted in `EntitiesDeleted`, listed in `DeletedEntities`
+  (`TenantOwned = true`).
+- **Edited → kept**, listed in `TenantOwnedKept` with the reason `Edited` (another attribute value, renamed, or held under
+  another `rtId`). The limits of the update comparison apply: changed `TenantOwned`, `RuntimeState` or `Secret` attributes
+  and edits reverted to the seed count as unedited; associations are not part of the content comparison (see the next point).
+- **Referenced → kept**, reason `Referenced`, with the runtime ids of the referencing entities in `ReferencedBy`. An unedited
+  entity is kept when it shares an association with an entity that stays in the tenant — an entity the tenant created or
+  another blueprint owns, or an edited or referenced entity of this blueprint — unless that association is the entity's own
+  seed-declared link (declared on it in the seed; it is erased with it). Associations to entities this uninstall erases
+  (locked entities, other unedited entities, entities of dependents a cascade removes first) do not count. The rule is applied
+  until nothing changes: an edited page keeps the unedited version it points to, and that version keeps what links to it.
+- **Not comparable → kept**, reason `NotComparable`: the CK type is not in the cache or the comparison failed.
+- Locked entities are erased as before; entities with another blueprint's `rtBlueprintSource` are not touched.
+
+The kept entities are summarised in one warning as well. Installing the blueprint again creates no duplicates: it has no
+installed version any more, so the kept entities are found by key and skipped as held tenant-owned entities (their content
+stays), and the erased ones are created once.
+
+### Dry run
+
+`PreviewUninstallAsync(tenantId, blueprintName, cascade)` runs the same checks and the same classification without changing
+anything: no entity is erased, the installation row stays and no notification is sent. The result carries `DryRun = true`,
+`EntitiesDeleted` and `DeletedEntities` (what the uninstall would erase, cascaded blueprints included) and `TenantOwnedKept`
+(what it would keep, with the reason). With `cascade: true` the dry run treats the entities of the dependents as erased
+first, as the real run does.
+
+```csharp
+var preview = await _blueprintService.PreviewUninstallAsync(tenantId, "System.Ai.Builder", cascade: false, cancellationToken);
+foreach (var kept in preview.TenantOwnedKept)
+{
+    Console.WriteLine($"{kept.CkTypeId}/{kept.Key}: kept ({kept.Reason})");
+}
+```
 
 ## Multi-Blueprint Installation
 

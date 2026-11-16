@@ -558,6 +558,41 @@ public class BlueprintServiceUninstallTenantOwnedTests
     }
 
     [Fact]
+    public async Task Uninstall_SeedEntityAdoptedByAnotherBlueprint_ReferencingTheCandidate_KeepsIt()
+    {
+        // B is in this seed but another blueprint owns it now; it stays, so its link to A keeps A.
+        GivenSeed(new SeedSpec("a", false), new SeedSpec("b", false, 1, "a"));
+        var a = GivenTenantEntity("a", storedLocked: false);
+        var b = GivenTenantEntity("b", storedLocked: false, source: new BlueprintId("Other-1.0.0"));
+        GivenAssociation(b.RtId, a.RtId);
+
+        var result = await Uninstall();
+
+        Assert.Empty(_erased);
+        var kept = Assert.Single(result.TenantOwnedKept);
+        Assert.Equal(BlueprintTenantOwnedKeptReason.Referenced, kept.Reason);
+        Assert.Equal([b.RtId.ToString()], kept.ReferencedBy);
+        Assert.Single(_associations);
+    }
+
+    [Fact]
+    public async Task Uninstall_TenantLinkUnderAnotherRoleBetweenSeedEntities_KeepsTheCandidate()
+    {
+        // The seed declares edited -> b (Related); the tenant added a second association under another role. That one
+        // is tenant content and keeps b.
+        GivenSeed(new SeedSpec("edited", false, 1, "b"), new SeedSpec("b", false));
+        var edited = GivenTenantEntity("edited", storedLocked: false, threshold: 7);
+        var b = GivenTenantEntity("b", storedLocked: false);
+        GivenAssociation(edited.RtId, b.RtId);
+        GivenAssociation(edited.RtId, b.RtId, new RtCkId<CkAssociationRoleId>("Test/Cites"));
+
+        var result = await Uninstall();
+
+        Assert.Empty(_erased);
+        Assert.Equal(BlueprintTenantOwnedKeptReason.Referenced, result.TenantOwnedKept.Single(k => k.Key == "b").Reason);
+    }
+
+    [Fact]
     public async Task Uninstall_SeedLinksBetweenPages_DoNotSpreadAKeep()
     {
         // The edited page links (seed-declared, to-many) to an unedited page, which links on: no propagation. The linked

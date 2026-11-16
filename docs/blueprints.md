@@ -939,7 +939,12 @@ tenant-owned seed entity (the seed sets `rtBlueprintLocked: false`) that the ten
     link out of the blueprint (to a system entity, say) does not count; it is erased with it;
   - **seeded child of an entity that stays**: the seed declares a to-one association from it to a kept entity of this
     blueprint (the seeded version of a kept page). This repeats for children of children;
-  - an association the tenant created between two entities of this blueprint's seed, when the other one stays.
+  - an association the tenant created between two entities of this blueprint's seed, when the other one stays. An
+    association counts as seed-declared only with the same origin, target and role (role compared without the model
+    version); a second association under another role is the tenant's.
+
+  A seed entity the tenant holds under **another blueprint's** `rtBlueprintSource` (adopted) counts as outside this
+  blueprint: it stays, so an association with it keeps the entity like a tenant entity would.
 
   **Associations the seed declares between its own entities do not spread a keep**: a page that stays does not keep the
   pages it links to (seed `LinksTo`, to-many), nor the pages that link to it. Those links go with the erased entities. On

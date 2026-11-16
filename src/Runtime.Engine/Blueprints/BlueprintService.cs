@@ -3400,6 +3400,8 @@ internal class BlueprintService : IBlueprintService
         var lockedTargets = new List<UninstallCandidate>();
         var candidates = new Dictionary<UninstallEntityKey, UninstallCandidate>();
         var kept = new List<BlueprintTenantOwnedKeptEntity>();
+        // Seed entities the tenant holds under another blueprint's source: they stay and belong to that blueprint.
+        var adoptedIdentities = new HashSet<UninstallEntityKey>();
         // Every entity of this blueprint's seed: the seed identities and the tenant entities held for them. A seed-declared
         // link of a candidate is its own only when the other end lies outside this set.
         var seedIdentities = new HashSet<UninstallEntityKey>(seedRoot.Entities
@@ -3460,7 +3462,8 @@ internal class BlueprintService : IBlueprintService
                 var source = entity.GetAttributeStringValueOrDefault("RtBlueprintSource");
                 if (source != blueprintId.FullName)
                 {
-                    // Adopted by another blueprint — leave it alone.
+                    // Adopted by another blueprint — leave it alone; for the reference rules it is outside this blueprint.
+                    adoptedIdentities.Add(UninstallEntityKey.Of(ckTypeId, entity.RtId));
                     continue;
                 }
 
@@ -3499,11 +3502,16 @@ internal class BlueprintService : IBlueprintService
                     continue; // deleted by the tenant
                 }
 
-                seedIdentities.Add(UninstallEntityKey.Of(ckTypeId, held.RtId));
-                if (held.GetAttributeStringValueOrDefault("RtBlueprintSource") != blueprintId.FullName
-                    || (held.GetAttributeValueOrDefault<bool>("RtBlueprintLocked") ?? true))
+                if (held.GetAttributeStringValueOrDefault("RtBlueprintSource") != blueprintId.FullName)
                 {
-                    // Adopted by another blueprint, or locked (erased above when matched).
+                    adoptedIdentities.Add(UninstallEntityKey.Of(ckTypeId, held.RtId));
+                    continue; // adopted by another blueprint: outside this blueprint for the reference rules
+                }
+
+                seedIdentities.Add(UninstallEntityKey.Of(ckTypeId, held.RtId));
+                if (held.GetAttributeValueOrDefault<bool>("RtBlueprintLocked") ?? true)
+                {
+                    // Locked (erased above when matched).
                     continue;
                 }
 
@@ -3521,7 +3529,8 @@ internal class BlueprintService : IBlueprintService
         }
 
         var references = candidates.Count > 0
-            ? await UninstallReferences.LoadAsync(repository, session, seedRoot, seedIdentities, candidates.Values,
+            ? await UninstallReferences.LoadAsync(repository, session, seedRoot, seedIdentities, adoptedIdentities,
+                    candidates.Values,
                     seedIdentities.Concat(lockedTargets.Select(t => t.Identity)).Concat(candidates.Keys)
                         .Concat(run.DeletedEntities),
                     (originType, roleId) => IsToOneOutbound(tenantId, originType, roleId))
@@ -3642,19 +3651,21 @@ internal class BlueprintService : IBlueprintService
     private sealed class UninstallReferences
     {
         private readonly Dictionary<UninstallEntityKey, List<RtAssociation>> _byCandidate;
-        private readonly HashSet<(OctoObjectId Origin, OctoObjectId Target)> _seedDeclared;
-        private readonly HashSet<(UninstallEntityKey Origin, UninstallEntityKey Target)> _seedDeclaredTyped;
+        private readonly HashSet<(OctoObjectId Origin, OctoObjectId Target, string Role)> _seedDeclared;
+        private readonly HashSet<(UninstallEntityKey Origin, UninstallEntityKey Target, string Role)> _seedDeclaredTyped;
+        private readonly HashSet<UninstallEntityKey> _adoptedIdentities;
         private readonly HashSet<UninstallEntityKey> _seedIdentities;
         private readonly HashSet<OctoObjectId> _seedRtIds;
         private readonly HashSet<OctoObjectId> _ambiguousRtIds;
         private readonly Func<RtCkId<CkTypeId>?, RtCkId<CkAssociationRoleId>?, bool?> _isToOne;
 
         private UninstallReferences(Dictionary<UninstallEntityKey, List<RtAssociation>> byCandidate,
-            RtModelRootTcDto seedRoot, HashSet<UninstallEntityKey> seedIdentities, HashSet<OctoObjectId> ambiguousRtIds,
-            Func<RtCkId<CkTypeId>?, RtCkId<CkAssociationRoleId>?, bool?> isToOne)
+            RtModelRootTcDto seedRoot, HashSet<UninstallEntityKey> seedIdentities, HashSet<UninstallEntityKey> adoptedIdentities,
+            HashSet<OctoObjectId> ambiguousRtIds, Func<RtCkId<CkTypeId>?, RtCkId<CkAssociationRoleId>?, bool?> isToOne)
         {
             _byCandidate = byCandidate;
             _seedIdentities = seedIdentities;
+            _adoptedIdentities = adoptedIdentities;
             _seedRtIds = [..seedIdentities.Select(k => k.RtId)];
             _ambiguousRtIds = ambiguousRtIds;
             _isToOne = isToOne;
@@ -3664,9 +3675,10 @@ internal class BlueprintService : IBlueprintService
             {
                 foreach (var association in seed.Associations ?? [])
                 {
-                    _seedDeclared.Add((seed.RtId, association.TargetRtId));
+                    var role = RoleName(association.RoleId);
+                    _seedDeclared.Add((seed.RtId, association.TargetRtId, role));
                     _seedDeclaredTyped.Add((UninstallEntityKey.Of(seed.CkTypeId, seed.RtId),
-                        UninstallEntityKey.Of(association.TargetCkTypeId, association.TargetRtId)));
+                        UninstallEntityKey.Of(association.TargetCkTypeId, association.TargetRtId), role));
                 }
             }
         }
@@ -3677,7 +3689,7 @@ internal class BlueprintService : IBlueprintService
         /// matched by type as well. <c>isToOne</c>: whether a role is to-one outbound from an origin CK type.
         /// </summary>
         public static async Task<UninstallReferences> LoadAsync(IRuntimeRepository repository, IOctoSession session,
-            RtModelRootTcDto seedRoot, HashSet<UninstallEntityKey> seedIdentities,
+            RtModelRootTcDto seedRoot, HashSet<UninstallEntityKey> seedIdentities, HashSet<UninstallEntityKey> adoptedIdentities,
             IReadOnlyCollection<UninstallCandidate> candidates, IEnumerable<UninstallEntityKey> knownEntities,
             Func<RtCkId<CkTypeId>?, RtCkId<CkAssociationRoleId>?, bool?> isToOne)
         {
@@ -3705,7 +3717,7 @@ internal class BlueprintService : IBlueprintService
                 .Select(g => g.Key)
                 .ToHashSet();
 
-            return new UninstallReferences(byCandidate, seedRoot, seedIdentities, ambiguous, isToOne);
+            return new UninstallReferences(byCandidate, seedRoot, seedIdentities, adoptedIdentities, ambiguous, isToOne);
         }
 
         /// <summary>
@@ -3736,14 +3748,15 @@ internal class BlueprintService : IBlueprintService
                         }
 
                         var otherId = other.RtId.ToString() ?? string.Empty;
-                        var declared = selfIsOrigin ? IsSeedDeclared(self, other) : IsSeedDeclared(other, self);
+                        var role = RoleName(association.AssociationRoleId);
+                        var declared = selfIsOrigin ? IsSeedDeclared(self, other, role) : IsSeedDeclared(other, self, role);
                         if (_ambiguousRtIds.Contains(other.RtId) && !_seedIdentities.Contains(other))
                         {
                             referencedBy.Add(otherId); // cannot tell which entity this end is: keep
                             continue;
                         }
 
-                        if (IsInSeed(other))
+                        if (IsInSeed(other) && !_adoptedIdentities.Any(a => SameEntity(other, a)))
                         {
                             if (!declared)
                             {
@@ -3828,10 +3841,15 @@ internal class BlueprintService : IBlueprintService
         private bool IsInSeed(UninstallEntityKey end) =>
             _seedIdentities.Contains(end) || _seedRtIds.Contains(end.RtId);
 
-        private bool IsSeedDeclared(UninstallEntityKey self, UninstallEntityKey other) =>
-            _ambiguousRtIds.Contains(self.RtId) || _ambiguousRtIds.Contains(other.RtId)
-                ? _seedDeclaredTyped.Contains((self, other))
-                : _seedDeclared.Contains((self.RtId, other.RtId));
+        /// <summary>Whether the seed declares this association: same origin, target and role (role without model version).</summary>
+        private bool IsSeedDeclared(UninstallEntityKey origin, UninstallEntityKey target, string role) =>
+            _ambiguousRtIds.Contains(origin.RtId) || _ambiguousRtIds.Contains(target.RtId)
+                ? _seedDeclaredTyped.Contains((origin, target, role))
+                : _seedDeclared.Contains((origin.RtId, target.RtId, role));
+
+        /// <summary>A role id without the model version ("System.Ai-4.7.0/VersionOf" and "System.Ai/VersionOf" are one role).</summary>
+        private static string RoleName(RtCkId<CkAssociationRoleId>? roleId) =>
+            roleId == null ? string.Empty : $"{ModelName(roleId.ModelId)}/{roleId.ElementId}";
     }
 
     /// <returns><c>false</c> when the erase failed (reported as a warning); the entity then stays.</returns>

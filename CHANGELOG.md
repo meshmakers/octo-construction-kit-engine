@@ -67,6 +67,14 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Added
 
+- **Purpose-bound secret envelopes (AB#9127, stage 0).** `ISecretAttributeProtector` gains `Protect(string, SecretPurpose)` and
+  `Unprotect(string, SecretPurpose, SecretAccessContext?)`. The purpose is added to the AES-GCM associated data of the `enc:v2`
+  envelope, so a value protected for a purpose opens only for exactly that purpose and never as the value of a Secret attribute,
+  and a Secret attribute value never opens for a purpose. The stored format is unchanged (`enc:v2:<kid>:...`), key rotation works as
+  for every `enc:v2` value, and the purpose overload accepts only `enc:v2` (no clear text, no `enc:v1`). The new members have default
+  implementations that throw `NotSupportedException`, so other implementations of the interface keep compiling. First consumer: the
+  sealed pipeline-execution values of the communication controller (`ExecutionEnvelope`).
+
 - **Uninstall removes unedited tenant-owned seed entities; dry run (AB#8966).** `IBlueprintService.UninstallAsync` used to keep
   every unlocked seed entity "as user data", so uninstalling `System.Ai.Builder` on kb-test2 erased 0 entities (46 pages and
   versions kept). Now a tenant-owned seed entity (`rtBlueprintLocked: false` in the seed) is erased when it still equals the

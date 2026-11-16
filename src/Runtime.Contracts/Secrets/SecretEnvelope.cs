@@ -42,7 +42,7 @@ public static class SecretEnvelope
     public const string PrefixV1 = "enc:v1:";
 
     /// <summary>
-    ///     The version written by <see cref="ISecretAttributeProtector.Protect" />.
+    ///     The version written by <see cref="ISecretAttributeProtector.Protect(string)" />.
     /// </summary>
     public const int CurrentVersion = 2;
 

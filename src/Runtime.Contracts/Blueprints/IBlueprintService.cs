@@ -301,14 +301,14 @@ public class BlueprintTenantOwnedKeptEntity : BlueprintTenantOwnedEntity
 public enum BlueprintTenantOwnedKeptReason
 {
     /// <summary>
-    /// The tenant edited it: its attributes or its well-known name differ from the seed of the installed version, or
-    /// it is held under another runtime id than the seed gives it.
+    /// The tenant edited it: its attributes or its well-known name differ from the seed of the installed version (a name
+    /// added to an entity the seed leaves unnamed counts), or it is held under another runtime id than the seed gives it.
     /// </summary>
     Edited,
 
     /// <summary>
-    /// Unedited, but it shares an association with an entity that stays in the tenant: any association with a kept entity
-    /// of the same blueprint, or one with an entity outside the blueprint (created by the tenant, owned by another
+    /// Unedited, but it shares an association with an entity that stays in the tenant: any association with an entity of
+    /// the blueprint's seed that stays, or one with an entity outside that seed (created by the tenant, owned by another
     /// blueprint) that is not the entity's own seed-declared link. Erasing it would remove that association.
     /// </summary>
     Referenced,

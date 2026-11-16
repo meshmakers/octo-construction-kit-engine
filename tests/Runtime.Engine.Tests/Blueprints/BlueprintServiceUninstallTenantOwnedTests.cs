@@ -32,6 +32,7 @@ public class BlueprintServiceUninstallTenantOwnedTests
     private const string TenantId = "tenant-a";
     private static readonly BlueprintId V1 = new("Shop-1.0.0");
     private static readonly RtCkId<CkTypeId> RuleType = new("Test-1.0.0/Rule");
+    private static readonly RtCkId<CkTypeId> NoteType = new("Test-1.0.0/Note");
     private static readonly RtCkId<CkAttributeId> LockedAttr = new("System/RtBlueprintLocked");
     private static readonly RtCkId<CkAttributeId> ThresholdAttr = new CkId<CkAttributeId>("Test-1.0.0/Threshold").ToRtCkId();
     private static readonly RtCkId<CkAssociationRoleId> RelatedRole = new("Test-1.0.0/Related");
@@ -40,7 +41,17 @@ public class BlueprintServiceUninstallTenantOwnedTests
     /// One seed entity: key, the seed's lock flag (null = absent, i.e. locked), a payload value and the keys (or raw
     /// rtIds) its seed-declared associations point to.
     /// </summary>
-    private sealed record SeedSpec(string Key, bool? Locked, int Threshold = 1, params string[] Links);
+    private sealed record SeedSpec(string Key, bool? Locked, int Threshold = 1, params string[] Links)
+    {
+        /// <summary>The CK type of the entity (default Rule).</summary>
+        public RtCkId<CkTypeId> Type { get; init; } = RuleType;
+
+        /// <summary>The rtId the seed gives it; default derived from the key.</summary>
+        public string? RtIdKey { get; init; }
+
+        /// <summary>False: the seed gives the entity no well-known name (its key is then its rtId).</summary>
+        public bool Named { get; init; } = true;
+    }
 
     private static OctoObjectId IdOf(string key) =>
         new(Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(key)))[..24]
@@ -62,6 +73,7 @@ public class BlueprintServiceUninstallTenantOwnedTests
     private readonly List<RtEntity> _tenant = [];
     private readonly List<RtAssociation> _associations = [];
     private readonly List<OctoObjectId> _erased = [];
+    private readonly HashSet<OctoObjectId> _failingErase = [];
     private readonly List<RtEntityTcDto> _imported = [];
     private BlueprintInstallation? _installation;
 
@@ -84,20 +96,26 @@ public class BlueprintServiceUninstallTenantOwnedTests
             .Returns(Task.FromResult<IRuntimeRepository?>(_repository));
         A.CallTo(() => _repository.GetRtEntitiesByTypeAsync(A<IOctoSession>._, A<RtCkId<CkTypeId>>._,
                 A<RtEntityQueryOptions>._, A<int?>._, A<int?>._))
-            .ReturnsLazily(() =>
+            .ReturnsLazily((IOctoSession _, RtCkId<CkTypeId> type, RtEntityQueryOptions _, int? _, int? _) =>
             {
                 var set = A.Fake<IResultSet<RtEntity>>();
-                A.CallTo(() => set.Items).Returns(_tenant.ToList());
+                A.CallTo(() => set.Items).Returns(_tenant.Where(t => Equals(t.CkTypeId, type)).ToList());
                 return Task.FromResult(set);
             });
         // The graph rule engine erases an entity together with its associations.
         A.CallTo(() => _repository.DeleteOneRtEntityByRtIdAsync(A<IOctoSession>._, A<RtCkId<CkTypeId>>._,
                 A<OctoObjectId>._, A<DeleteOptions>._))
-            .Invokes((IOctoSession _, RtCkId<CkTypeId> _, OctoObjectId rtId, DeleteOptions _) =>
+            .Invokes((IOctoSession _, RtCkId<CkTypeId> type, OctoObjectId rtId, DeleteOptions _) =>
             {
+                if (_failingErase.Contains(rtId))
+                {
+                    throw new InvalidOperationException("erase refused");
+                }
+
                 _erased.Add(rtId);
-                _tenant.RemoveAll(t => t.RtId.Equals(rtId));
-                _associations.RemoveAll(a => a.OriginRtId.Equals(rtId) || a.TargetRtId.Equals(rtId));
+                _tenant.RemoveAll(t => t.RtId.Equals(rtId) && Equals(t.CkTypeId, type));
+                _associations.RemoveAll(a => (a.OriginRtId.Equals(rtId) && Equals(a.OriginCkTypeId, type))
+                                             || (a.TargetRtId.Equals(rtId) && Equals(a.TargetCkTypeId, type)));
             })
             .Returns(Task.CompletedTask);
         A.CallTo(() => _repository.GetRtAssociationsAsync(A<IOctoSession>._, A<IEnumerable<RtEntityId>>._,
@@ -109,7 +127,8 @@ public class BlueprintServiceUninstallTenantOwnedTests
                 {
                     var set = A.Fake<IResultSet<RtAssociation>>();
                     var items = _associations
-                        .Where(a => a.OriginRtId.Equals(id.RtId) || a.TargetRtId.Equals(id.RtId)).ToList();
+                        .Where(a => (a.OriginRtId.Equals(id.RtId) && Equals(a.OriginCkTypeId, id.CkTypeId))
+                                    || (a.TargetRtId.Equals(id.RtId) && Equals(a.TargetCkTypeId, id.CkTypeId))).ToList();
                     A.CallTo(() => set.Items).Returns(items);
                     result[id] = set;
                 }
@@ -169,7 +188,10 @@ public class BlueprintServiceUninstallTenantOwnedTests
         var root = new RtModelRootTcDto();
         foreach (var spec in specs)
         {
-            var entity = new RtEntityTcDto { RtId = IdOf(spec.Key), CkTypeId = RuleType, RtWellKnownName = spec.Key };
+            var entity = new RtEntityTcDto
+            {
+                RtId = IdOf(spec.RtIdKey ?? spec.Key), CkTypeId = spec.Type, RtWellKnownName = spec.Named ? spec.Key : null
+            };
             entity.Attributes.Add(new RtAttributeTcDto { Id = ThresholdAttr, Value = spec.Threshold });
             if (spec.Locked is { } locked)
             {
@@ -201,9 +223,10 @@ public class BlueprintServiceUninstallTenantOwnedTests
     private void GivenSeed(params SeedSpec[] specs) => _seeds[V1.FullName] = specs;
 
     /// <summary>A tenant entity of the blueprint as the install wrote it (seed value 1), or edited (another value).</summary>
-    private RtEntity GivenTenantEntity(string key, bool storedLocked, int threshold = 1, BlueprintId? source = null)
+    private RtEntity GivenTenantEntity(string key, bool storedLocked, int threshold = 1, BlueprintId? source = null,
+        RtCkId<CkTypeId>? type = null, string? rtIdKey = null)
     {
-        var entity = new RtEntity(RuleType, IdOf(key), new Dictionary<string, object?>
+        var entity = new RtEntity(type ?? RuleType, IdOf(rtIdKey ?? key), new Dictionary<string, object?>
         {
             ["RtBlueprintSource"] = (source ?? V1).FullName,
             ["RtBlueprintLocked"] = storedLocked,
@@ -226,14 +249,15 @@ public class BlueprintServiceUninstallTenantOwnedTests
 
     private int _associationIndex;
 
-    private void GivenAssociation(OctoObjectId origin, OctoObjectId target, RtCkId<CkAssociationRoleId>? role = null) =>
+    private void GivenAssociation(OctoObjectId origin, OctoObjectId target, RtCkId<CkAssociationRoleId>? role = null,
+        RtCkId<CkTypeId>? originType = null, RtCkId<CkTypeId>? targetType = null) =>
         _associations.Add(new RtAssociation(role ?? RelatedRole, new OctoObjectId($"aa{++_associationIndex:x22}"),
             new Dictionary<string, object?>())
         {
             OriginRtId = origin,
-            OriginCkTypeId = RuleType,
+            OriginCkTypeId = originType ?? RuleType,
             TargetRtId = target,
-            TargetCkTypeId = RuleType
+            TargetCkTypeId = targetType ?? RuleType
         });
 
     private void GivenRuleTypeKnown()
@@ -254,6 +278,9 @@ public class BlueprintServiceUninstallTenantOwnedTests
             enableChangeStreamPreAndPostImages: false);
         CkTypeGraph? ignored;
         A.CallTo(() => _cache.TryGetRtCkType(A<string>._, RuleType, out ignored))
+            .Returns(true)
+            .AssignsOutAndRefParameters(graph);
+        A.CallTo(() => _cache.TryGetRtCkType(A<string>._, NoteType, out ignored))
             .Returns(true)
             .AssignsOutAndRefParameters(graph);
     }
@@ -546,6 +573,162 @@ public class BlueprintServiceUninstallTenantOwnedTests
         Assert.Equal(2, result.EntitiesDeleted);
         Assert.Empty(result.TenantOwnedKept);
         Assert.Empty(_associations);
+    }
+
+    // ---- CodeRabbit round 1 -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Uninstall_TenantAddedAWellKnownNameTheSeedDoesNotHave_IsKeptAsEdited()
+    {
+        GivenSeed(new SeedSpec("page", false) { Named = false });
+        var page = GivenTenantEntity("page", storedLocked: false);   // the tenant gave it the name "page"
+
+        var result = await Uninstall();
+
+        Assert.Empty(_erased);
+        var kept = Assert.Single(result.TenantOwnedKept);
+        Assert.Equal(page.RtId.ToString(), kept.Key);
+        Assert.Equal(BlueprintTenantOwnedKeptReason.Edited, kept.Reason);
+    }
+
+    [Fact]
+    public async Task Uninstall_SameRtIdUnderTwoCkTypes_AreTwoEntities()
+    {
+        // Seeds reuse an rtId across CK types. The locked Note "x" is erased; the edited Rule with the same rtId stays, so
+        // the unedited Rule linked to it must stay too.
+        GivenSeed(new SeedSpec("x-note", null) { Type = NoteType, RtIdKey = "x" }, new SeedSpec("x-rule", false) { RtIdKey = "x" },
+            new SeedSpec("child", false));
+        var note = GivenTenantEntity("x-note", storedLocked: true, type: NoteType, rtIdKey: "x");
+        var rule = GivenTenantEntity("x-rule", storedLocked: false, threshold: 7, rtIdKey: "x");
+        var child = GivenTenantEntity("child", storedLocked: false);
+        GivenAssociation(rule.RtId, child.RtId);
+
+        var result = await Uninstall();
+
+        Assert.Equal([note.RtId], _erased);
+        Assert.Equal(["child", "x-rule"], Keys(result.TenantOwnedKept));
+        Assert.Equal(BlueprintTenantOwnedKeptReason.Referenced, result.TenantOwnedKept.Single(k => k.Key == "child").Reason);
+        Assert.Contains(_tenant, t => ReferenceEquals(t, rule));
+    }
+
+    [Fact]
+    public async Task Uninstall_SeedLinkToARenamedUnlockedProductOwnedParent_KeepsTheChild()
+    {
+        // The parent stays (unlocked by the tenant, renamed, so the key match misses it); the child's own seed link to it
+        // points into this blueprint's seed, so the child is kept.
+        GivenSeed(new SeedSpec("parent", null), new SeedSpec("child", false, 1, "parent"));
+        var parent = GivenTenantEntity("parent", storedLocked: false);
+        parent.RtWellKnownName = "renamed-by-tenant";
+        var child = GivenTenantEntity("child", storedLocked: false);
+        GivenAssociation(child.RtId, parent.RtId);
+
+        var result = await Uninstall();
+
+        Assert.Empty(_erased);
+        Assert.Equal(BlueprintTenantOwnedKeptReason.Referenced, Assert.Single(result.TenantOwnedKept).Reason);
+    }
+
+    [Fact]
+    public async Task Uninstall_EraseOfALockedNeighbourFails_KeepsTheLinkedCandidate()
+    {
+        GivenSeed(new SeedSpec("space", null), new SeedSpec("page", false), new SeedSpec("other", false));
+        var space = GivenTenantEntity("space", storedLocked: true);
+        var page = GivenTenantEntity("page", storedLocked: false);
+        var other = GivenTenantEntity("other", storedLocked: false);
+        GivenAssociation(page.RtId, space.RtId);
+        _failingErase.Add(space.RtId);
+
+        var result = await Uninstall();
+
+        Assert.Equal([other.RtId], _erased);
+        var kept = Assert.Single(result.TenantOwnedKept);
+        Assert.Equal("page", kept.Key);
+        Assert.Equal([space.RtId.ToString()], kept.ReferencedBy);
+        Assert.Contains(result.Warnings, w => w.Contains("Failed to delete entity 'space'"));
+        Assert.Single(_associations);
+        Assert.Equal(1, result.EntitiesDeleted);
+    }
+
+    [Fact]
+    public async Task Uninstall_EraseOfACandidateFails_KeepsTheCandidatesLinkedToIt()
+    {
+        GivenSeed(new SeedSpec("a", false), new SeedSpec("b", false));
+        var a = GivenTenantEntity("a", storedLocked: false);
+        var b = GivenTenantEntity("b", storedLocked: false);
+        GivenAssociation(a.RtId, b.RtId);
+        _failingErase.Add(a.RtId);
+
+        var result = await Uninstall();
+
+        Assert.Empty(_erased);
+        Assert.Equal("b", Assert.Single(result.TenantOwnedKept).Key);
+        Assert.Single(_associations);
+    }
+
+    [Fact]
+    public async Task PreviewUninstall_Cascade_DependentAlreadyRemovedByAnEarlierDependent_IsSkipped()
+    {
+        // A and B depend on the base; B also depends on A. The cascade of A removes B first; the base must not fail on B.
+        var a = Installation("A-1.0.0", isDependency: false, V1);
+        var b = Installation("B-1.0.0", isDependency: false, V1, a.BlueprintId);
+        GivenSeed(new SeedSpec("base-page", false));
+        _seeds[a.BlueprintId.FullName] = [new SeedSpec("a-page", false)];
+        _seeds[b.BlueprintId.FullName] = [new SeedSpec("b-page", false)];
+        GivenTenantEntity("base-page", storedLocked: false);
+        GivenTenantEntity("a-page", storedLocked: false, source: a.BlueprintId);
+        GivenTenantEntity("b-page", storedLocked: false, source: b.BlueprintId);
+        GivenInstallations(_installation!, a, b);
+
+        var preview = await CreateService().PreviewUninstallAsync(TenantId, V1.Name, cascade: true,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(preview.Success, string.Join("; ", preview.Errors));
+        Assert.Equal(["A", "B"], preview.CascadedDependencies.Select(d => d.Name).Order(StringComparer.Ordinal));
+        Assert.Equal(["a-page", "b-page", "base-page"], Keys(preview.DeletedEntities));
+    }
+
+    [Fact]
+    public async Task PreviewUninstall_Cascade_ActiveAncestorIsNotOrphanCleanedTwice()
+    {
+        // The base came in as a dependency of A. Previewing the base with cascade previews A first; A's orphan cleanup
+        // must not preview the base again while the outer call handles it.
+        _installation!.IsDependency = true;
+        var a = Installation("A-1.0.0", isDependency: false, V1);
+        GivenSeed(new SeedSpec("base-page", false));
+        _seeds[a.BlueprintId.FullName] = [new SeedSpec("a-page", false)];
+        GivenTenantEntity("base-page", storedLocked: false);
+        GivenTenantEntity("a-page", storedLocked: false, source: a.BlueprintId);
+        a.ResolvedDependencies = [V1];
+        GivenInstallations(_installation!, a);
+
+        var preview = await CreateService().PreviewUninstallAsync(TenantId, V1.Name, cascade: true,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(preview.Success, string.Join("; ", preview.Errors));
+        Assert.Equal(["A"], preview.CascadedDependencies.Select(d => d.Name));
+        Assert.Equal(["a-page", "base-page"], Keys(preview.DeletedEntities));
+        Assert.Equal(2, preview.EntitiesDeleted);
+    }
+
+    private static BlueprintInstallation Installation(string id, bool isDependency, params BlueprintId[] dependencies) => new()
+    {
+        BlueprintId = new BlueprintId(id),
+        InstalledAt = DateTime.UtcNow,
+        LastUpdatedAt = DateTime.UtcNow,
+        IsDependency = isDependency,
+        ResolvedDependencies = dependencies.ToList()
+    };
+
+    private void GivenInstallations(params BlueprintInstallation[] installations)
+    {
+        foreach (var installation in installations)
+        {
+            A.CallTo(() => _installations.GetByBlueprintNameAsync(TenantId, installation.BlueprintId.Name, A<CancellationToken>._))
+                .Returns(Task.FromResult<BlueprintInstallation?>(installation));
+        }
+
+        A.CallTo(() => _installations.GetInstalledAsync(TenantId, A<CancellationToken>._))
+            .Returns(Task.FromResult<IReadOnlyList<BlueprintInstallation>>(installations));
     }
 
     // ---- dry run -------------------------------------------------------------------------------

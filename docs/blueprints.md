@@ -924,22 +924,29 @@ tenant-owned seed entity (the seed sets `rtBlueprintLocked: false`) that the ten
 
 - **Unedited → erased.** The tenant entity equals the seed of the installed version, read from the catalog — the comparison
   of the update rule (AB#8778, see [product-owned and tenant-owned seed entities](#product-owned-and-tenant-owned-seed-entities-ab6383)), with no
-  stored hash — and it has the seed's `rtId` and well-known name. Counted in `EntitiesDeleted`, listed in `DeletedEntities`
+  stored hash — and it has the seed's `rtId` and the seed's well-known name (a name the tenant added to an entity the seed
+  leaves unnamed is an edit). Counted in `EntitiesDeleted`, listed in `DeletedEntities`
   (`TenantOwned = true`).
 - **Edited → kept**, listed in `TenantOwnedKept` with the reason `Edited` (another attribute value, renamed, or held under
   another `rtId`). The limits of the update comparison apply: changed `TenantOwned`, `RuntimeState` or `Secret` attributes
   and edits reverted to the seed count as unedited; associations are not part of the content comparison (see the next point).
 - **Referenced → kept**, reason `Referenced`, with the runtime ids of the referencing entities in `ReferencedBy`. An unedited
   entity is kept when it shares an association with an entity that stays in the tenant:
-  - any association with an entity of this blueprint that stays (an edited, referenced or not comparable tenant-owned entity,
-    or an unlocked copy of a product-owned one), whichever side the seed declares it on;
-  - any association with an entity outside this blueprint (created by the tenant or owned by another blueprint), unless
-    the seed declares it on the entity itself (its own blueprint-seeded link, erased with it). Seed-declared links are
-    matched by origin and target; the role is not compared, because the stored role id is the one the CK cache resolved.
+  - any association with an entity of this blueprint's seed that stays (an edited, referenced or not comparable
+    tenant-owned entity, an unlocked copy of a product-owned one - renamed or not -, or one another blueprint adopted),
+    whichever side the seed declares it on;
+  - any association with an entity outside this blueprint's seed (created by the tenant, owned by another blueprint, a
+    system entity), unless the seed declares it on the entity itself (its own blueprint-seeded link, erased with it).
+    Seed-declared links are matched by origin and target; the role is not compared, because the stored role id is the one
+    the CK cache resolved.
+
+  Entities are identified by CK type and `rtId` (seeds reuse an `rtId` across CK types).
 
   Associations with entities this uninstall erases (locked entities, other unedited entities, entities of dependents a cascade
   removes first) do not count. The rule is applied until nothing changes: an edited page keeps its unedited versions, whether
-  the page points to them or they point to the page, and a version kept that way keeps its successors.
+  the page points to them or they point to the page, and a version kept that way keeps its successors. When an erase fails
+  (reported as a warning, the entity stays), the rule is applied again before the next erase, so the unedited entities
+  linked to it stay as well; entities erased before the failure stay erased.
 - **Not comparable → kept**, reason `NotComparable`: the CK type is not in the cache or the comparison failed.
 - Locked entities are erased as before; entities with another blueprint's `rtBlueprintSource` are not touched.
 
@@ -958,8 +965,9 @@ stays), and the erased ones are created once.
 anything: no entity is erased, the installation row stays and no notification is sent. The result carries `DryRun = true`,
 `EntitiesDeleted` and `DeletedEntities` (what the uninstall would erase, cascaded blueprints included) and `TenantOwnedKept`
 (what it would keep, with the reason). With `cascade: true` the dry run treats the entities of the dependents as erased
-first, as the real run does. An erase that fails in the real run is reported as a warning and not counted, so the real run
-can then delete fewer entities than the dry run announced.
+first, as the real run does. An erase that fails in the real run is reported as a warning and not counted, and it keeps the
+unedited entities linked to it, so the real run can then delete fewer entities than the dry run announced. The real run
+classifies again when it runs; it does not lock the entities between the dry run and the uninstall.
 
 ```csharp
 var preview = await _blueprintService.PreviewUninstallAsync(tenantId, "System.Ai.Builder", cascade: false, cancellationToken);

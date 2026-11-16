@@ -27,7 +27,7 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   every unlocked seed entity "as user data", so uninstalling `System.Ai.Builder` on kb-test2 erased 0 entities (46 pages and
   versions kept). Now a tenant-owned seed entity (`rtBlueprintLocked: false` in the seed) is erased when it still equals the
   seed of the installed version (the AB#8778 comparison, no stored hash) and it shares no association with an entity that
-  stays (any kept entity of the blueprint; outside the blueprint, anything but its own seed-declared links); otherwise it is kept and listed in the new
+  stays (any entity of the blueprint's seed that stays; outside that seed, anything but its own seed-declared links); otherwise it is kept and listed in the new
   `BlueprintUninstallResult.TenantOwnedKept` with the reason `Edited`, `Referenced` (with `ReferencedBy`) or `NotComparable`.
   The new `DeletedEntities` lists what was erased. New `IBlueprintService.PreviewUninstallAsync` is the dry run
   (`DryRun = true`, nothing changed, no notification). Locked entities are erased as before; a reinstall adopts the kept

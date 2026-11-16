@@ -44,7 +44,9 @@ The re-validation writes, in one store call:
 - an audit event (`IArchiveAuditTrail.RecordTransitionAsync`) with the same reason, and a WARN log.
 
 While `HiddenColumns` is not empty the archive's **history stays queryable without those columns**
-(`ArchiveSnapshot.IsFailedOnHiddenColumns`, `ArchiveSnapshot.WithoutHiddenColumns`). The query paths of the CrateDB repository
+(`ArchiveSnapshot.IsFailedOnHiddenColumns`, `ArchiveSnapshot.WithoutHiddenColumns`). Computed columns whose current or
+pending formula reads a Hidden column are hidden as well; formulas use physical column names, so the storage layer
+(engine-mongodb) removes them, in the query paths and in the row export. The query paths of the CrateDB repository
 accept such an archive and resolve its columns from the snapshot without the Hidden ones: they are neither projected by a
 query without explicit columns nor accepted by name. A later model change that makes more columns Hidden updates the recorded
 list without a new transition.

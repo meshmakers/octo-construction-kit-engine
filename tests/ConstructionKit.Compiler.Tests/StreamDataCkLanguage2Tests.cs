@@ -190,15 +190,15 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         result.Messages.Where(m => m.Severity == CkCompileGateSeverity.Error).Select(m => m.Code ?? "").ToArray();
 
     [Fact]
-    public async Task StreamData_Is_1_27_0_OnCkLanguage2_WithMinEngineVersion351_AndPublishedToTheV3RootOnly()
+    public async Task StreamData_Is_1_28_0_OnCkLanguage2_WithMinEngineVersion351_AndPublishedToTheV3RootOnly()
     {
         var compiled = await CompileStreamDataAsync(RealStreamDataSource());
 
         Assert.Equal("System.StreamData", compiled.ModelId.Name);
         // 1.23.0 (AB#8597) raised the language; 1.24.0 (AB#8598) adds the archive lifecycle methods, 1.25.0 (AB#8599) the
         // rollup control methods, 1.26.0 (AB#9016) the rtId sets of the late-delivery recompute, 1.27.0 (AB#6247) the status
-        // reason, the Hidden columns of a Failed archive and RedactHiddenColumns.
-        Assert.Equal(new Version(1, 27, 0), new Version(compiled.ModelId.Version.ToString()));
+        // reason, the Hidden columns of a Failed archive and RedactHiddenColumns, 1.28.0 (AB#8600) the column methods.
+        Assert.Equal(new Version(1, 28, 0), new Version(compiled.ModelId.Version.ToString()));
         Assert.Equal(2, compiled.EffectiveCkLanguage);
         // Pinned exactly: a higher value means every service below it can no longer import System.StreamData. A feature that
         // raises it (e.g. an Archive method with execution.mode) is a deliberate rollout decision and updates this assertion.
@@ -324,9 +324,14 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
 
         var archive = types["Archive"].Methods!.ToDictionary(m => m.MethodId);
         Assert.Equal(["Activate-1", "DeleteArchive-1", "Disable-1", "Enable-1", "RedactHiddenColumns-1", "RetryActivation-1"],
-            archive.Keys.Order(StringComparer.Ordinal));
-        // AB#6247: RedactHiddenColumns replaces no mutation; its contract is pinned in RedactHiddenColumns_*.
+            archive.Keys.Except(ColumnMethodIds).Order(StringComparer.Ordinal));
+        // AB#6247: RedactHiddenColumns replaces no mutation; its contract is pinned in RedactHiddenColumns_*. The column methods
+        // of 1.28.0 (AB#8600) are pinned in ColumnMethods_*.
         archive.Remove("RedactHiddenColumns-1");
+        foreach (var id in ColumnMethodIds)
+        {
+            archive.Remove(id);
+        }
         foreach (var id in new[] { "Activate-1", "Disable-1", "Enable-1", "RetryActivation-1" })
         {
             Assert.Equal(CkMethodKindDto.Instance, archive[id].Kind);
@@ -406,8 +411,9 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         }
 
         var jobInfo = compiled.Records!.Single(r => r.RecordId.Name == "RecomputeJobInfo");
-        Assert.Equal(["DurationMs", "ErrorReason", "FinishedAt", "JobRtId", "LastProgressAt", "RowsProcessed", "StartedAt", "State",
-                "WindowsProcessed"],
+        // ComputedColumnName: AB#8600 (1.28.0), set for the jobs of the computed column methods
+        Assert.Equal(["ComputedColumnName", "DurationMs", "ErrorReason", "FinishedAt", "JobRtId", "LastProgressAt", "RowsProcessed",
+                "StartedAt", "State", "WindowsProcessed"],
             jobInfo.Attributes!.Select(a => a.AttributeName).Order(StringComparer.Ordinal));
     }
 
@@ -450,8 +456,20 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         "types/archive.yaml" => CutFrom(RemoveBlock(yaml, "      # ---------- Status reason and Hidden columns (AB#6247",
             "    # AB#8598 (1.24.0"), "      # AB#6247 (1.27.0)"),
         "attributes/archiveAttributes.yaml" => CutFrom(yaml, "  # ---------- AB#6247 (1.27.0)"),
-        "records/archiveMethodRecords.yaml" => CutFrom(yaml, "  # AB#6247 (1.27.0)"),
+        "records/archiveMethodRecords.yaml" => CutFrom(WithoutStreamData_1_28_0(path, yaml), "  # AB#6247 (1.27.0)"),
         "attributes/archiveMethodAttributes.yaml" => CutFrom(yaml, "  # ---------- ArchiveRedactionResult (AB#6247"),
+        _ => yaml
+    };
+
+    /// <summary>
+    ///     The sources of 1.27.0: the current ones without the AB#8600 additions (the six column methods on Archive,
+    ///     RecomputeJobInfo.ComputedColumnName and its attribute).
+    /// </summary>
+    private static string WithoutStreamData_1_28_0(string path, string yaml) => path switch
+    {
+        "types/archive.yaml" => CutFrom(yaml, "      # AB#8600 (1.28.0"),
+        "records/archiveMethodRecords.yaml" => RemoveBlock(yaml, "      # AB#8600 (1.28.0)", "  # AB#6247 (1.27.0)"),
+        "attributes/archiveMethodAttributes.yaml" => CutFrom(yaml, "  # ---------- Computed column jobs (AB#8600"),
         _ => yaml
     };
 
@@ -519,6 +537,105 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
             var definition = compiled.Attributes!.Single(a => a.AttributeId.Name == $"Archive.{name}");
             Assert.True(definition.IsRuntimeState, name);
         }
+    }
+
+    // ---------- AB#8600 (1.28.0): archive columns and computed columns -----------------------------------------------
+
+    /// <summary>The column methods of 1.28.0 on Archive (AB#8600), one per remaining streamData mutation.</summary>
+    private static readonly string[] ColumnMethodIds =
+    [
+        "AddColumn-1", "AddComputedColumn-1", "RemoveComputedColumn-1", "RepairComputedColumn-1", "RetryComputedColumnBackfill-1",
+        "UpdateComputedColumnFormula-1"
+    ];
+
+    /// <summary>
+    ///     AB#8600: the six column mutations (addComputedColumn, addArchiveColumn, removeComputedColumn,
+    ///     updateComputedColumnFormula, retryComputedColumnBackfill, repairComputedColumn) as instance methods of the abstract
+    ///     Archive, with their arguments and answers, role StreamDataAdmin, the error codes of the archive methods and synchronous
+    ///     execution (the backfills run as background jobs, as with the mutations).
+    /// </summary>
+    [Fact]
+    public async Task ColumnMethods_CarryTheContractOfTheMutations()
+    {
+        var compiled = await CompileStreamDataAsync(RealStreamDataSource());
+        var archive = compiled.Types!.Single(t => t.TypeId.Name == "Archive").Methods!.ToDictionary(m => m.MethodId);
+        Assert.All(ColumnMethodIds, id => Assert.True(archive.ContainsKey(id), id));
+        var columns = ColumnMethodIds.Select(id => archive[id]).ToList();
+
+        static (string, AttributeValueTypesDto, bool)[] Parameters(CkMethodDto m) =>
+            (m.Parameters ?? []).Select(p => (p.Name, p.ValueType, p.IsOptional)).ToArray();
+
+        Assert.Equal(
+            [("name", AttributeValueTypesDto.String, false), ("formula", AttributeValueTypesDto.String, false),
+             ("resultType", AttributeValueTypesDto.Enum, false), ("indexed", AttributeValueTypesDto.Boolean, true)],
+            Parameters(archive["AddComputedColumn-1"]));
+        Assert.Equal("CkComputedColumnResultType",
+            archive["AddComputedColumn-1"].Parameters!.Single(p => p.Name == "resultType").ValueCkEnumId!.ElementId.Name);
+        Assert.Equal([("path", AttributeValueTypesDto.String, false), ("indexed", AttributeValueTypesDto.Boolean, true)],
+            Parameters(archive["AddColumn-1"]));
+        Assert.Equal([("name", AttributeValueTypesDto.String, false)], Parameters(archive["RemoveComputedColumn-1"]));
+        Assert.Equal([("name", AttributeValueTypesDto.String, false), ("formula", AttributeValueTypesDto.String, false)],
+            Parameters(archive["UpdateComputedColumnFormula-1"]));
+        Assert.Equal([("name", AttributeValueTypesDto.String, false)], Parameters(archive["RetryComputedColumnBackfill-1"]));
+        Assert.Equal(
+            [("name", AttributeValueTypesDto.String, false), ("from", AttributeValueTypesDto.DateTime, true),
+             ("to", AttributeValueTypesDto.DateTime, true)],
+            Parameters(archive["RepairComputedColumn-1"]));
+
+        foreach (var id in new[] { "AddComputedColumn-1", "AddColumn-1", "RemoveComputedColumn-1", "UpdateComputedColumnFormula-1" })
+        {
+            Assert.Equal("ArchiveTransitionResult", archive[id].Result!.ValueCkRecordId!.ElementId.Name);
+        }
+
+        foreach (var id in new[] { "RetryComputedColumnBackfill-1", "RepairComputedColumn-1" })
+        {
+            Assert.Equal("RecomputeJobInfo", archive[id].Result!.ValueCkRecordId!.ElementId.Name);
+        }
+
+        // idempotent where the mutation is: an existing path / an already queued job is answered as is
+        Assert.Equal(["AddColumn-1", "RepairComputedColumn-1", "RetryComputedColumnBackfill-1"],
+            columns.Where(m => m.Execution!.Idempotent).Select(m => m.MethodId).Order(StringComparer.Ordinal));
+        Assert.All(columns, m =>
+        {
+            Assert.Equal(CkMethodKindDto.Instance, m.Kind);
+            Assert.Equal(["StreamDataAdmin"], m.Authorization!.Roles!);
+            Assert.Equal(ArchiveMethodErrorCodes, m.Errors!.Select(e => e.Code).Order(StringComparer.Ordinal));
+            Assert.True(m.Execution!.TimeoutSeconds is > 0, m.MethodId);
+            Assert.Null(m.Execution.Mode);
+            Assert.False(m.ReplacesGenericCreate, m.MethodId);
+            Assert.DoesNotContain(m.Parameters ?? [], p => p.Sensitive);
+        });
+
+        var jobColumn = compiled.Records!.Single(r => r.RecordId.Name == "RecomputeJobInfo").Attributes!
+            .Single(a => a.AttributeName == "ComputedColumnName");
+        Assert.True(jobColumn.IsOptional);
+        Assert.True(compiled.Attributes!.Single(a => a.AttributeId.Name == "ArchiveMethod.ComputedColumnName").IsRuntimeState);
+    }
+
+    /// <summary>
+    ///     AB#8600: 1.28.0 against 1.27.0 (the same sources without the column methods and RecomputeJobInfo.ComputedColumnName)
+    ///     is a Minor without acknowledgement: new methods (row M1) and an optional record attribute (row R1).
+    /// </summary>
+    [Fact]
+    public async Task StreamData_1_28_0_AgainstThe_1_27_0_Release_IsAMinor_WithoutAcknowledgement()
+    {
+        var baseline = CopyStreamData("streamdata-1.27.0", (path, yaml) =>
+            path == "ckModel.yaml" ? SetVersion(yaml, "1.27.0") : WithoutStreamData_1_28_0(path, yaml));
+        var compiled = await CompileStreamDataAsync(baseline);
+        Assert.DoesNotContain(compiled.Types!.Single(t => t.TypeId.Name == "Archive").Methods!,
+            m => ColumnMethodIds.Contains(m.MethodId));
+        Assert.Contains(compiled.Types!.Single(t => t.TypeId.Name == "Archive").Methods!,
+            m => m.MethodId == "RedactHiddenColumns-1");
+        await _fixture.Services.GetRequiredService<ICatalogService>().PublishAsync(InMemoryPublishedCatalog.Name, compiled,
+            new OriginFileResolver(baseline), isForced: true);
+
+        var result = await RunGateAsync(RealStreamDataSource());
+
+        Assert.Empty(Errors(result));
+        Assert.Contains("1.27.0", result.Verdict!.BaselineId.ToString());
+        Assert.Equal(CkSemVerLevel.Minor, result.Verdict.RequiredLevel);
+        Assert.DoesNotContain(result.Verdict.ClassifiedChanges, c => c.Level == CkSemVerLevel.Major);
+        Assert.DoesNotContain(result.Verdict.ClassifiedChanges, c => c.RequiresAcknowledge);
     }
 
     /// <summary>The YAML up to (not including) the line that starts with <paramref name="marker" />.</summary>

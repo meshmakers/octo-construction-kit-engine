@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.28.0 - 2026-11-16
+
+_Required bump level: minor._
+
+### Added
+
+- Archive columns and computed columns as CK methods (AB#8600, Feature AB#5697 F4.3), handled by the asset repository, instance
+  methods of `Archive` (inherited by `RawArchive`, `TimeRangeArchive` and `RollupArchive`; a rollup refuses them as the mutations do):
+  - `AddComputedColumn-1` (`name`, `formula`, `resultType` of enum `CkComputedColumnResultType`, optional `indexed`, default true),
+    `AddColumn-1` (`path`, optional `indexed`, default false; idempotent), `RemoveComputedColumn-1` (`name`) and
+    `UpdateComputedColumnFormula-1` (`name`, `formula`), result record `ArchiveTransitionResult`;
+  - `RetryComputedColumnBackfill-1` (`name`) and `RepairComputedColumn-1` (`name`, optional `from`, `to`), result record
+    `RecomputeJobInfo` (the queued job; an already queued job of the column is answered as is; no result when the service has
+    no recompute job store, as with the mutations).
+  - Optional member `RecomputeJobInfo.ComputedColumnName` (attribute `ArchiveMethod.ComputedColumnName`, runtime state): the computed
+    column a backfill or repair job writes, as `computedColumnName` of the mutations' `RecomputeJobInfo`.
+- Role `StreamDataAdmin`, explicit timeouts, the error codes of the archive methods. The backfills and repairs run as background jobs
+  (AB#8002), as with the mutations `addComputedColumn`, `addArchiveColumn`, `removeComputedColumn`, `updateComputedColumnFormula`,
+  `retryComputedColumnBackfill` and `repairComputedColumn`, which stay and are deprecated in the asset repository.
+
+### Compatibility
+
+- Additive, a Minor against 1.27.0 (no acknowledgement; rows M1 and R1 of `docs/ck-semver-rules.md`). `minEngineVersion` unchanged.
+
 ## 1.27.0 - 2026-11-16
 
 _Required bump level: minor._

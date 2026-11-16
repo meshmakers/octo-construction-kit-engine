@@ -1080,7 +1080,7 @@ the ckLanguage 1 release 1.22.0 (`ValidateVersion`: only "ckLanguage changed '1'
 (`RtIdSet` value type in `Runtime.Contracts/StreamData`). `RecomputeOrchestrator` uses them as follows:
 
 - it debounces late-delivery obligations (`NextAttemptAt` at attempt zero, `RecomputeLateDataOptions.LateDataDebounce`);
-- it merges them into one set-scoped job per rollup and interval, capped by `MaxScopedRtIds`;
+- it merges them into one set-scoped job per merged range and interval, capped by `MaxScopedRtIds`;
 - it runs that job through `IArchiveRecomputeExecutor.ExecuteScopedRefreshAsync`, an in-place refresh at the active
   generation in engine-mongodb;
 - the chained rollups inherit the set.

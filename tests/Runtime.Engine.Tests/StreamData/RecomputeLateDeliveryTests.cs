@@ -322,6 +322,42 @@ public class RecomputeLateDeliveryTests
         Assert.Empty(_stateStore.Pending(A02));
     }
 
+    [Fact]
+    public async Task APartlyCoveredSetObligation_StaysSetScoped_InsteadOfWideningToEverySeries()
+    {
+        // A one-hour unscoped obligation overlaps a whole-day set obligation for one series.
+        _stateStore.Pending(A02).Add(new ArchiveRecomputeRange(A02, LateDay.AddHours(8), LateDay.AddHours(9), null, Start));
+        _stateStore.Pending(A02).Add(new ArchiveRecomputeRange(A02, LateDay, LateDay.AddDays(1), null, Start)
+        {
+            RtIdSet = RtIdSet.Of(new[] { M1 }),
+        });
+
+        await NewSut().TickAsync(CancellationToken.None);
+
+        var calls = _executor.Calls.Where(c => c.Rollup == A02).ToList();
+        Assert.Contains(calls, c => c.RtIds is null && c.From == LateDay.AddHours(8) && c.To == LateDay.AddHours(9));
+        Assert.Contains(calls, c => Equals(c.RtIds, RtIdSet.Of(new[] { M1 })) && c.From == LateDay && c.To == LateDay.AddDays(1));
+        Assert.Empty(_stateStore.Pending(A02));
+    }
+
+    [Fact]
+    public async Task ASetRefresh_ReleasesAParkedSingleEntityObligationOfOneOfItsSeries()
+    {
+        var parked = new ArchiveRecomputeRange(A02, LateDay.AddHours(8), LateDay.AddHours(9), M1, Start, 5,
+            ArchiveRecomputeRange.ParkedUntil, "earlier failure");
+        var parkedUnscoped = new ArchiveRecomputeRange(A02, LateDay.AddHours(8), LateDay.AddHours(9), null, Start, 5,
+            ArchiveRecomputeRange.ParkedUntil, "earlier failure");
+        _stateStore.Pending(A02).Add(parked);
+        _stateStore.Pending(A02).Add(parkedUnscoped);
+        LateDelivery(LateDay.AddHours(8), LateDay.AddHours(9), M1, M2);
+
+        await NewSut(debounce: TimeSpan.Zero).TickAsync(CancellationToken.None);
+
+        // The refresh of {M1, M2} repaired M1's parked obligation; the unscoped one needs every series and stays parked.
+        Assert.DoesNotContain(parked, _stateStore.Pending(A02));
+        Assert.Contains(parkedUnscoped, _stateStore.Pending(A02));
+    }
+
     // ---- The active-job guard serialises the refresh with every other recompute ----------------
 
     [Fact]

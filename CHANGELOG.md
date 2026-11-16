@@ -22,12 +22,14 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
     values as after a full recompute of the window;
   - the obligations of late deliveries are held for `StreamData:Recompute:LateDataDebounce` (**new setting**, default
     `00:05:00`, `0` = off), stored as `NextAttemptAt` at attempt zero on the archive entity, so the hold survives replicas
-    and restarts. As soon as the oldest is due, all held obligations of the rollup run together in one job over the union
-    of their series;
+    and restarts. As soon as the oldest is due, all held obligations of the rollup run together: one job per merged range
+    over the union of its series (late deliveries for the same day merge into one job);
   - a write or a merged interval with more than `StreamData:Recompute:MaxScopedRtIds` (**new setting**, default `200`,
     `0` = off) distinct rtIds falls back to the unscoped recompute;
-  - chained rollups inherit the set and run on the same tick without the debounce. Manual recomputes, backfills and manual
-    writes stay unscoped and are not held back. An unscoped obligation absorbs the set-scoped ones it overlaps;
+  - chained rollups inherit the set and follow without waiting for another debounce interval (a multi-level chain over
+    one or more ticks). Manual recomputes, backfills and manual writes keep their scope and are not held back. An
+    unscoped obligation absorbs the set-scoped ones that lie entirely inside its range; a partly covered one stays
+    set-scoped. A set refresh also releases parked single-entity obligations of its series;
   - the active-job guard serialises the refresh with every other recompute of the rollup.
   - **Interface change (agent-operating-rules §2.4a):** `IArchiveRecomputeExecutor.ExecuteScopedRefreshAsync` is a new
     member with a default implementation (one rtId: scoped recompute; several: one unscoped recompute, as before AB#9016), so an implementation built against the

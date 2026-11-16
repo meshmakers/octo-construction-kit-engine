@@ -440,8 +440,10 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
     /// Groups the due obligations of one rollup into the units the drain runs (AB#5189, AB#9016), the unscoped unit
     /// first so the adopted job, which a backfill always creates unscoped, takes an unscoped interval:
     /// <list type="bullet">
-    /// <item>unscoped obligations, plus every set-scoped obligation that overlaps one of them - the unscoped run
-    /// recomputes those series anyway, so refreshing them separately would only cost a second job;</item>
+    /// <item>unscoped obligations, plus every set-scoped obligation that lies entirely inside their merged coverage - the
+    /// unscoped run recomputes those buckets for every series anyway. A set-scoped obligation that is only partly covered
+    /// stays set-scoped: absorbing it would widen its whole range to every series, unbounded by
+    /// <see cref="RecomputeLateDataOptions.MaxScopedRtIds"/>; refreshing its overlap twice costs at most set × buckets;</item>
     /// <item>one unit per single-rtId scope (a manually scoped recompute of one entity), never widened or narrowed;</item>
     /// <item>the remaining set-scoped obligations as one unit: their intervals are merged across sets and each merged
     /// interval refreshes the union of its sets.</item>
@@ -452,7 +454,10 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
     {
         var unscoped = due.Where(r => r.RtIdScope is null && r.RtIdSet is null).ToList();
         var setScoped = due.Where(r => r.RtIdScope is null && r.RtIdSet is not null).ToList();
-        var absorbed = setScoped.Where(r => unscoped.Any(u => u.Overlaps(r.RangeStart, r.RangeEnd))).ToList();
+        var unscopedCoverage = RecomputePlanner.MergeIntervals(unscoped.Select(r => (r.RangeStart, r.RangeEnd)));
+        var absorbed = setScoped
+            .Where(r => unscopedCoverage.Any(c => r.IsContainedIn(c.Start, c.End)))
+            .ToList();
         unscoped.AddRange(absorbed);
         setScoped = setScoped.Except(absorbed).ToList();
 
@@ -1258,7 +1263,10 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             .Where(r => r.IsParked
                         && r.IsContainedIn(from, to)
                         && (rtIdSet is not null
-                            ? r.RtIdSet is { } set && set.IsSubsetOf(rtIdSet)
+                            // A set refresh covers the parked set obligations inside its set and the single-entity
+                            // obligations of one of its series; an unscoped obligation needs every series recomputed.
+                            ? (r.RtIdSet is { } set && set.IsSubsetOf(rtIdSet))
+                              || (r.RtIdScope is { } single && rtIdSet.Contains(single))
                             : rtIdScope is null || r.RtIdScope == rtIdScope))
             .ToList();
         if (released.Count == 0)

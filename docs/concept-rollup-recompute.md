@@ -334,7 +334,11 @@ used, no pointer entry is written, and no superseded generation is swept. Reader
 window. The proof is `ScopedRefreshEquivalenceTests` in engine-mongodb: twin tenants, hourly and daily levels, the
 TimeWeightedAvg carry bucket, rows at generation 0, at an unscoped and at a foreign scoped pointer.
 
-- Each row is replaced by one statement. The active-job guard (§3) serialises the refresh with every other recompute of
+- Each row is replaced by one statement, but the refresh is not atomic across rows: while it runs, or after it failed part
+  way, a reader can see some buckets of the series already refreshed and others not yet. Every written row holds its
+  final value, and the retry (AB#5189) completes the rest. A full recompute keeps the old generation visible until its
+  flip; the refresh trades that for the absence of a new generation and its sweep.
+- The active-job guard (§3) serialises the refresh with every other recompute of
   the rollup, so the pointer entries it read cannot change under it.
 - The forward pass never writes inside the range: the range is clamped to the lag-closed buckets (§4, bucket ownership).
 - **Vanished buckets.** A full recompute leaves a bucket row out of the new generation when its source rows are gone.
@@ -352,13 +356,19 @@ rollup together:
 
 - intervals are merged across sets, and each merged interval refreshes the union of its sets;
 - a union above `MaxScopedRtIds` runs unscoped;
-- an unscoped due obligation absorbs the set-scoped obligations it overlaps.
+- an unscoped due obligation absorbs the set-scoped obligations that lie entirely inside its (merged) range. A
+  set-scoped obligation it only partly covers stays set-scoped, so it is never widened to every series; its overlap is
+  refreshed twice, which costs at most set × buckets.
 
-The number of jobs per late day and rollup is therefore at most the number of debounce intervals in which late data
-arrived.
+Jobs are therefore counted per merged interval: in each debounce interval a rollup runs one job per disjoint merged
+range of late data (and one more per unscoped or single-entity range that is due). Late deliveries for the same day
+overlap or touch and merge into one job, so for day packets the number of jobs per late day and rollup is at most the
+number of debounce intervals in which late data arrived. Deliveries for ranges that neither overlap nor touch stay
+separate jobs.
 
-**Cascade.** A committed refresh enqueues the same set on its direct dependents. They run on the same tick, without a
-debounce, and refresh in place again. A failed refresh hands its remainder back with its set (AB#5189 retry and parking
+**Cascade.** A committed refresh enqueues the same set on its direct dependents. They do not wait for another debounce
+interval and refresh in place again; whether a dependent runs on the same tick or the next one depends on the order in
+which the drain visits the rollups, so a multi-level chain converges over one or more ticks. A failed refresh hands its remainder back with its set (AB#5189 retry and parking
 apply unchanged).
 
 | Setting | Env var | Default | Meaning |

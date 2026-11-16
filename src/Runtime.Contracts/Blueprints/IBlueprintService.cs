@@ -307,9 +307,9 @@ public enum BlueprintTenantOwnedKeptReason
     Edited,
 
     /// <summary>
-    /// Unedited, but it shares an association with an entity that stays in the tenant (an entity the tenant created, an
-    /// edited or referenced entity of the same blueprint, ...), and the association is not the entity's own
-    /// seed-declared link. Erasing it would remove that association.
+    /// Unedited, but it shares an association with an entity that stays in the tenant: any association with a kept entity
+    /// of the same blueprint, or one with an entity outside the blueprint (created by the tenant, owned by another
+    /// blueprint) that is not the entity's own seed-declared link. Erasing it would remove that association.
     /// </summary>
     Referenced,
 

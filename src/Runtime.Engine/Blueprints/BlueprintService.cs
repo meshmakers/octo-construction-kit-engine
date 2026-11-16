@@ -3290,8 +3290,8 @@ internal class BlueprintService : IBlueprintService
     /// AB#8966: tenant-owned seed entities (the seed sets <c>rtBlueprintLocked: false</c>) are erased when they are
     /// unedited - their content equals the seed of the installed version, the comparison of the AB#8778 update rule
     /// (<see cref="BlueprintEntityComparer" />, no stored hash) - and they share no association with an entity that stays
-    /// in the tenant, other than their own seed-declared links. Edited, referenced and not comparable ones are kept and
-    /// listed.
+    /// in the tenant (see <see cref="KeepReferencedCandidatesAsync" />). Edited, referenced and not comparable ones are kept
+    /// and listed.
     /// "Referenced" is decided to a fixpoint: keeping an entity can make another candidate referenced (an edited page
     /// keeps its unedited versions).
     /// </item>
@@ -3349,6 +3349,8 @@ internal class BlueprintService : IBlueprintService
         var lockedTargets = new List<UninstallCandidate>();
         var candidates = new Dictionary<OctoObjectId, UninstallCandidate>();
         var kept = new List<BlueprintTenantOwnedKeptEntity>();
+        // Unlocked copies of product-owned seed entities: they stay as user data.
+        var userDataIds = new HashSet<OctoObjectId>();
 
         foreach (var typeGroup in seedRoot.Entities.GroupBy(e => e.CkTypeId))
         {
@@ -3417,6 +3419,7 @@ internal class BlueprintService : IBlueprintService
 
                 if (!IsTenantOwnedSeed(seed))
                 {
+                    userDataIds.Add(entity.RtId);
                     result.Warnings.Add(
                         $"Entity '{key}' (type {ckTypeId}) is unlocked; keeping as user data.");
                 }
@@ -3459,7 +3462,7 @@ internal class BlueprintService : IBlueprintService
 
         if (candidates.Count > 0)
         {
-            await KeepReferencedCandidatesAsync(repository, session, seedRoot, lockedTargets,
+            await KeepReferencedCandidatesAsync(repository, session, seedRoot, lockedTargets, userDataIds,
                     candidates, kept, run)
                 .ConfigureAwait(false);
         }
@@ -3521,16 +3524,19 @@ internal class BlueprintService : IBlueprintService
     /// AB#8966: moves every candidate that an entity staying in the tenant references into <paramref name="kept" />
     /// (reason <see cref="BlueprintTenantOwnedKeptReason.Referenced" />), until no candidate changes. An association does
     /// not keep a candidate when its other end is erased in this uninstall (a locked entity, another candidate, an entity
-    /// of a blueprint removed earlier in the cascade), or when the seed declares it on the candidate itself (the
-    /// candidate's own blueprint-seeded link, e.g. to a system entity or to a predecessor version). Every other association
-    /// keeps it: one the tenant created, or one the seed declares on an entity that stays (an edited page keeps the
-    /// version it points to).
+    /// of a blueprint removed earlier in the cascade), or when the seed declares it on the candidate itself and its other end
+    /// is no entity this blueprint keeps (the candidate's own blueprint-seeded link, e.g. to a system entity or an entity
+    /// of another blueprint). Every other association keeps it: one the tenant created, and any association with a kept
+    /// entity of this blueprint, whichever side the seed declares it on (an edited page keeps its versions, whether the page
+    /// points to them or they point to the page). Seed-declared links are matched by origin and target only, because the
+    /// stored role id is the one the CK cache resolved, which need not be spelled like the seed's.
     /// </summary>
     private static async Task KeepReferencedCandidatesAsync(
         IRuntimeRepository repository,
         IOctoSession session,
         RtModelRootTcDto seedRoot,
         List<UninstallCandidate> lockedTargets,
+        HashSet<OctoObjectId> userDataIds,
         Dictionary<OctoObjectId, UninstallCandidate> candidates,
         List<BlueprintTenantOwnedKeptEntity> kept,
         UninstallRun run)
@@ -3559,16 +3565,26 @@ internal class BlueprintService : IBlueprintService
             }
         }
 
-        var seedDeclared = new HashSet<(OctoObjectId Origin, OctoObjectId Target, string Role)>();
+        var seedDeclared = new HashSet<(OctoObjectId Origin, OctoObjectId Target)>();
         foreach (var seed in seedRoot.Entities)
         {
             foreach (var association in seed.Associations ?? [])
             {
-                seedDeclared.Add((seed.RtId, association.TargetRtId, association.RoleId.ToString()));
+                seedDeclared.Add((seed.RtId, association.TargetRtId));
             }
         }
 
         var lockedIds = new HashSet<OctoObjectId>(lockedTargets.Select(t => t.Entity.RtId));
+        // The entities of this blueprint that stay: user data and kept tenant-owned entities (grows with the fixpoint).
+        var keptOfBlueprint = new HashSet<OctoObjectId>(userDataIds);
+        foreach (var keptEntity in kept)
+        {
+            if (keptEntity.EntityId is { Length: > 0 } keptRtId)
+            {
+                keptOfBlueprint.Add(new OctoObjectId(keptRtId));
+            }
+        }
+
         bool changed;
         do
         {
@@ -3585,10 +3601,10 @@ internal class BlueprintService : IBlueprintService
                         continue; // erased in this uninstall as well
                     }
 
-                    if (association.OriginRtId.Equals(rtId) && seedDeclared.Contains(
-                            (association.OriginRtId, association.TargetRtId, association.AssociationRoleId?.ToString() ?? string.Empty)))
+                    if (association.OriginRtId.Equals(rtId) && !keptOfBlueprint.Contains(other)
+                        && seedDeclared.Contains((association.OriginRtId, association.TargetRtId)))
                     {
-                        continue; // the candidate's own blueprint-seeded link; erased with it
+                        continue; // the candidate's own blueprint-seeded link out of the blueprint; erased with it
                     }
 
                     referencedBy.Add(other.ToString() ?? string.Empty);
@@ -3600,10 +3616,11 @@ internal class BlueprintService : IBlueprintService
                 }
 
                 candidates.Remove(rtId);
-                var keptEntity = ToKeptEntity(candidate.Key, candidate.CkTypeId, candidate.Entity,
+                keptOfBlueprint.Add(rtId);
+                var referenced = ToKeptEntity(candidate.Key, candidate.CkTypeId, candidate.Entity,
                     BlueprintTenantOwnedKeptReason.Referenced);
-                keptEntity.ReferencedBy.AddRange(referencedBy);
-                kept.Add(keptEntity);
+                referenced.ReferencedBy.AddRange(referencedBy);
+                kept.Add(referenced);
                 changed = true;
             }
         } while (changed);

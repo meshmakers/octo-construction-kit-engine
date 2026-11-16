@@ -541,6 +541,22 @@ public class BlueprintServiceUninstallTenantOwnedTests
         Assert.Single(_associations);
     }
 
+    [Theory]
+    [InlineData("Test-1.0.0/VersionOf")]   // the stored role id carries the model version
+    [InlineData("Test/UnknownRole")]       // a role the CK type does not know: counted as a child, kept
+    public async Task Uninstall_SeededChildLinkUnderAnotherRoleSpelling_StillKeepsTheChild(string storedRole)
+    {
+        GivenSeed(new SeedSpec("page", false), new SeedSpec("page@1", false) { VersionOf = "page" });
+        var page = GivenTenantEntity("page", storedLocked: false, threshold: 7);
+        var version = GivenTenantEntity("page@1", storedLocked: false);
+        GivenAssociation(version.RtId, page.RtId, new RtCkId<CkAssociationRoleId>(storedRole));
+
+        var result = await Uninstall();
+
+        Assert.Empty(_erased);
+        Assert.Equal(["page", "page@1"], Keys(result.TenantOwnedKept));
+    }
+
     [Fact]
     public async Task Uninstall_SeedLinksBetweenPages_DoNotSpreadAKeep()
     {

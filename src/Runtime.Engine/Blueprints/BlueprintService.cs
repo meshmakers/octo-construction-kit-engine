@@ -3634,7 +3634,9 @@ internal class BlueprintService : IBlueprintService
     /// Matching an association end to an entity: by rtId and a CK type that can be the same, because the stored type of an
     /// association end need not be spelled like the seed's (a resolved model version, or missing): see
     /// <c>SameEntity</c>. An rtId that the entities of this uninstall carry under more than one CK type (seeds reuse an rtId
-    /// across types) needs the exact type. When that cannot decide, the end counts as staying and inside the seed.
+    /// across types) needs the exact type. When that cannot decide, the candidate is kept. A to-one role that cannot be
+    /// resolved counts as to-one for a seeded child (kept) and as not to-one for an attachment (Referenced instead of
+    /// Edited) - both keep the candidate.
     /// </para>
     /// </summary>
     private sealed class UninstallReferences
@@ -3645,11 +3647,11 @@ internal class BlueprintService : IBlueprintService
         private readonly HashSet<UninstallEntityKey> _seedIdentities;
         private readonly HashSet<OctoObjectId> _seedRtIds;
         private readonly HashSet<OctoObjectId> _ambiguousRtIds;
-        private readonly Func<RtCkId<CkTypeId>?, RtCkId<CkAssociationRoleId>?, bool> _isToOne;
+        private readonly Func<RtCkId<CkTypeId>?, RtCkId<CkAssociationRoleId>?, bool?> _isToOne;
 
         private UninstallReferences(Dictionary<UninstallEntityKey, List<RtAssociation>> byCandidate,
             RtModelRootTcDto seedRoot, HashSet<UninstallEntityKey> seedIdentities, HashSet<OctoObjectId> ambiguousRtIds,
-            Func<RtCkId<CkTypeId>?, RtCkId<CkAssociationRoleId>?, bool> isToOne)
+            Func<RtCkId<CkTypeId>?, RtCkId<CkAssociationRoleId>?, bool?> isToOne)
         {
             _byCandidate = byCandidate;
             _seedIdentities = seedIdentities;
@@ -3677,7 +3679,7 @@ internal class BlueprintService : IBlueprintService
         public static async Task<UninstallReferences> LoadAsync(IRuntimeRepository repository, IOctoSession session,
             RtModelRootTcDto seedRoot, HashSet<UninstallEntityKey> seedIdentities,
             IReadOnlyCollection<UninstallCandidate> candidates, IEnumerable<UninstallEntityKey> knownEntities,
-            Func<RtCkId<CkTypeId>?, RtCkId<CkAssociationRoleId>?, bool> isToOne)
+            Func<RtCkId<CkTypeId>?, RtCkId<CkAssociationRoleId>?, bool?> isToOne)
         {
             var requested = candidates.ToDictionary(c => c.Identity, c => new RtEntityId(c.CkTypeId, c.Entity.RtId));
             var associationSet = await repository.GetRtAssociationsAsync(session, requested.Values.ToList(),
@@ -3735,15 +3737,22 @@ internal class BlueprintService : IBlueprintService
 
                         var otherId = other.RtId.ToString() ?? string.Empty;
                         var declared = selfIsOrigin ? IsSeedDeclared(self, other) : IsSeedDeclared(other, self);
+                        if (_ambiguousRtIds.Contains(other.RtId) && !_seedIdentities.Contains(other))
+                        {
+                            referencedBy.Add(otherId); // cannot tell which entity this end is: keep
+                            continue;
+                        }
+
                         if (IsInSeed(other))
                         {
                             if (!declared)
                             {
                                 referencedBy.Add(otherId); // the tenant linked two seed entities
                             }
-                            else if (selfIsOrigin && _isToOne(candidate.CkTypeId, association.AssociationRoleId))
+                            else if (selfIsOrigin && _isToOne(candidate.CkTypeId, association.AssociationRoleId) != false)
                             {
-                                referencedBy.Add(otherId); // a seeded child of an entity that stays
+                                // A seeded child of an entity that stays; a role that cannot be resolved counts as one.
+                                referencedBy.Add(otherId);
                             }
 
                             continue; // otherwise a link the seed declares between its own entities: no propagation
@@ -3754,7 +3763,7 @@ internal class BlueprintService : IBlueprintService
                             continue; // the candidate's own blueprint-seeded link out of the blueprint; erased with it
                         }
 
-                        if (!selfIsOrigin && _isToOne(association.OriginCkTypeId, association.AssociationRoleId))
+                        if (!selfIsOrigin && _isToOne(association.OriginCkTypeId, association.AssociationRoleId) == true)
                         {
                             attachedBy.Add(otherId); // an entity outside the seed attached itself: an edit
                         }
@@ -3773,7 +3782,7 @@ internal class BlueprintService : IBlueprintService
                     gone.Remove(self);
                     var keptEntity = ToKeptEntity(candidate.Key, candidate.CkTypeId, candidate.Entity,
                         attachedBy.Count > 0 ? BlueprintTenantOwnedKeptReason.Edited : BlueprintTenantOwnedKeptReason.Referenced);
-                    keptEntity.ReferencedBy.AddRange(attachedBy.Count > 0 ? attachedBy : referencedBy);
+                    keptEntity.ReferencedBy.AddRange(attachedBy.Union(referencedBy, StringComparer.Ordinal).Order(StringComparer.Ordinal));
                     kept.Add(keptEntity);
                     changed = true;
                 }
@@ -3857,17 +3866,41 @@ internal class BlueprintService : IBlueprintService
         return true;
     }
 
-    /// <summary>AB#8966: whether <paramref name="roleId" /> is a to-one association out of <paramref name="originType" />.</summary>
-    private bool IsToOneOutbound(string tenantId, RtCkId<CkTypeId>? originType, RtCkId<CkAssociationRoleId>? roleId)
+    /// <summary>
+    /// AB#8966: whether <paramref name="roleId" /> is a to-one association out of <paramref name="originType" />;
+    /// <c>null</c> when the type or the role cannot be resolved. A role is matched by its id or, when the stored id carries
+    /// another model spelling (a model version), by model name and role name.
+    /// </summary>
+    private bool? IsToOneOutbound(string tenantId, RtCkId<CkTypeId>? originType, RtCkId<CkAssociationRoleId>? roleId)
     {
         if (originType == null || roleId == null
             || !_ckCacheService.TryGetRtCkType(tenantId, originType, out var ckTypeGraph) || ckTypeGraph == null)
         {
-            return false;
+            return null;
         }
 
-        var association = ckTypeGraph.Associations.Out.All.FirstOrDefault(a => a.CkRoleId.ToRtCkId() == roleId);
-        return association is { Multiplicity: MultiplicitiesDto.One or MultiplicitiesDto.ZeroOrOne };
+        var outbound = ckTypeGraph.Associations.Out.All;
+        var association = outbound.FirstOrDefault(a => a.CkRoleId.ToRtCkId() == roleId)
+                          ?? outbound.FirstOrDefault(a => SameRoleName(a.CkRoleId.ToRtCkId(), roleId));
+        return association == null
+            ? null
+            : association.Multiplicity is MultiplicitiesDto.One or MultiplicitiesDto.ZeroOrOne;
+    }
+
+    private static bool SameRoleName(RtCkId<CkAssociationRoleId> a, RtCkId<CkAssociationRoleId> b) =>
+        string.Equals(ModelName(a.ModelId), ModelName(b.ModelId), StringComparison.Ordinal)
+        && string.Equals(a.ElementId.ToString(), b.ElementId.ToString(), StringComparison.Ordinal);
+
+    /// <summary>The model id without a version suffix ("System.Ai-4.7.0" → "System.Ai").</summary>
+    private static string ModelName(string? modelId)
+    {
+        if (string.IsNullOrEmpty(modelId))
+        {
+            return string.Empty;
+        }
+
+        var dash = modelId.LastIndexOf('-');
+        return dash > 0 && dash + 1 < modelId.Length && char.IsDigit(modelId[dash + 1]) ? modelId[..dash] : modelId;
     }
 
     private static BlueprintTenantOwnedKeptEntity ToKeptEntity(string key, RtCkId<CkTypeId> ckTypeId, RtEntity held,

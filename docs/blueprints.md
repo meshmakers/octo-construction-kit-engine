@@ -958,7 +958,14 @@ tenant-owned seed entity (the seed sets `rtBlueprintLocked: false`) that the ten
 - **Not comparable → kept**, reason `NotComparable`: the CK type is not in the cache or the comparison failed.
 - Locked entities are erased as before; entities with another blueprint's `rtBlueprintSource` are not touched.
 
-Limits: only associations are references. An entity that names another one in an **attribute** (for example a page that
+Limits of the uninstall rules:
+- "Seeded child" is generic: any to-one association the seed declares from an entity to a kept entity of the same
+  blueprint. A seed that points its entities at a shared tenant-owned parent through a to-one role, such as a folder that
+  stays, keeps all of them. System.Ai pages have no such role; `VersionOf` is their only to-one link.
+- A kept child does not keep its parent: a version kept from outside does not keep its unedited page.
+- An update (AB#8778) keeps `TenantOwned` values. After an update whose seed changed a `TenantOwned` attribute, the entity
+  differs from the installed seed and counts as edited on uninstall. It is kept, never erased by mistake.
+- Only associations are references. An entity that names another one in an **attribute** (for example a page that
 holds the rtId of its current version, the pattern the update rule recommends for versioned content) does not keep it: an
 edited page can be left with the rtId of an erased version. Installing the blueprint again re-creates that version under the
 same rtId.

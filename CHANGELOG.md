@@ -22,8 +22,6 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   `BlueprintEntityComparer.Compare` gains `includeTenantOwned` (default `false`; the update rule is unchanged). No contract
   change. Rules: `docs/blueprints.md`, "Tenant-owned seed entities on uninstall".
 
-### Changed
-
 - **Late stream-data deliveries recompute rollups only for the affected series, once per debounce interval (AB#9016).**
   Before, every late delivery marked the whole window dirty on the raw archive, and the next tick recomputed the rollup for
   that window over every series, then the whole cascade. Each run used a new generation and cleaned up the old one

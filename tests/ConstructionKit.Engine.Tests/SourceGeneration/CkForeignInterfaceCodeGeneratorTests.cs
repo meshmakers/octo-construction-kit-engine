@@ -78,6 +78,16 @@ public class CkForeignInterfaceCodeGeneratorTests(ITestOutputHelper output)
         ModelId = new CkModelId(App, "1.0.0"),
         CkLanguage = 2,
         Dependencies = [new("System", "1.0.0"), new(Lib, "1.0.0")],
+        Interfaces =
+        [
+            // An interface of the app model that extends an interface of the library model.
+            new()
+            {
+                InterfaceId = "Labeled-1",
+                Extends = [$"{Lib}/Named-1"],
+                Attributes = [new() { CkAttributeId = $"{Lib}/Description", AttributeName = "Description", IsOptional = true }]
+            }
+        ],
         Types =
         [
             new()
@@ -97,7 +107,8 @@ public class CkForeignInterfaceCodeGeneratorTests(ITestOutputHelper output)
             {
                 TypeId = "Tree",
                 Derivable = CkDerivableDto.Any,
-                DerivedFromCkTypeId = $"{App}/NamedEntity"
+                DerivedFromCkTypeId = $"{App}/NamedEntity",
+                Implements = [$"{App}/Labeled-1"]
             },
             new()
             {
@@ -192,7 +203,9 @@ public class CkForeignInterfaceCodeGeneratorTests(ITestOutputHelper output)
                 global::{{LibNs}}.IRtDescribable describable = new RtTree();
                 global::{{LibNs}}.IRtHierarchical hierarchical = new RtTreeNode();
                 global::{{LibNs}}.IRtNamed viaParent = hierarchical;
-                return named.Name + describable.Description + viaParent.Name;
+                IRtLabeled labeled = new RtTree();
+                global::{{LibNs}}.IRtNamed viaForeignBase = labeled;
+                return named.Name + describable.Description + viaParent.Name + labeled.Description + viaForeignBase.Name;
             }
         }
         """;
@@ -217,6 +230,10 @@ public class CkForeignInterfaceCodeGeneratorTests(ITestOutputHelper output)
         Assert.Contains($"  string? global::{LibNs}.IRtDescribable.Description => Description;", namedEntity);
         var treeNode = sources.Single(s => s.Contains("class RtTreeNode"));
         Assert.Contains($"public partial class RtTreeNode : RtNamedEntity, global::{LibNs}.IRtHierarchical", treeNode);
+        Assert.Contains($"public partial interface IRtLabeled : global::{LibNs}.IRtNamed", sources.Single(s => s.Contains("interface IRtLabeled")));
+        var tree = sources.Single(s => s.Contains("class RtTree "));
+        Assert.Contains("public partial class RtTree : RtNamedEntity, IRtLabeled", tree); // own-model interface: short name
+        Assert.Contains($"  string global::{LibNs}.IRtNamed.Name => Name;", tree); // inherited foreign level
 
         var problems = Problems(Compile("AppAsm", sources.Append(Consumer), references));
         Assert.True(problems.Count == 0,
@@ -249,6 +266,25 @@ public class CkForeignInterfaceCodeGeneratorTests(ITestOutputHelper output)
             new[] { "Describable-1", "Hierarchical-1", "Named-1" },
             lookup.Unresolved.Keys.Select(k => k.ElementId.ToString()).OrderBy(n => n, StringComparer.Ordinal));
         Assert.All(lookup.Unresolved.Values, reason => Assert.Contains("no referenced assembly", reason));
+    }
+
+    [Fact]
+    public void Find_ReportsAnAmbiguousInterface_AndMatchesAnEmptyRootNamespace()
+    {
+        var named = new CkId<CkInterfaceId>(new CkModelId("System", "2.7.0"), "Named-1");
+        var describable = new CkId<CkInterfaceId>(new CkModelId("System", "2.7.0"), "Describable-1");
+        var hierarchical = new CkId<CkInterfaceId>(new CkModelId("System", "2.7.0"), "Hierarchical-1");
+        var lookup = new CkGeneratedInterfaceLookup([
+            "A.Generated.System.v2.IRtNamed", "B.Generated.System.v2.IRtNamed", "Generated.System.v2.IRtDescribable",
+            "C.Generated.System.v1.IRtHierarchical", "C.Generated.Identity.System.v2.IRtHierarchical"
+        ]);
+
+        Assert.Null(lookup.Find(named));
+        Assert.Contains("more than one referenced assembly", lookup.Unresolved[named]);
+        Assert.Equal("global::Generated.System.v2.IRtDescribable", lookup.Find(describable));
+        // Other major, other model name with the same suffix: not a match.
+        Assert.Null(lookup.Find(hierarchical));
+        Assert.Contains("Meshmakers.Octo.ConstructionKit.Models.System", lookup.Unresolved[hierarchical]);
     }
 
     [Fact]

@@ -1708,11 +1708,16 @@ of the own model keep the short name, so models without foreign interfaces gener
 overloads without a lookup keep the old (short-name) output. The consuming project must **reference the C# package of
 the other model** (for System: `Meshmakers.Octo.ConstructionKit.Models.System`, depends only on `Runtime.Contracts`); if
 no referenced assembly (or more than one) declares the interface, the generator reports **OM1006** "Interface of another
-CK model not found" naming the interface and the package to add, instead of a bare CS0246. Not covered: member types of a
-foreign interface that are records or enums of that model are still emitted by `AttributeCodeGenerator` with their short
-names (resolve them with a `global using` as for foreign base classes). Pinned by `CkForeignInterfaceCodeGeneratorTests`
+CK model not found" naming the interface and the remedy (add the package / keep only one reference); the short name is
+still emitted, so CS0246 follows in addition. Not covered: (a) member types of a foreign interface that are records or
+enums of that model are still emitted by `AttributeCodeGenerator` with their short names (resolve them with a
+`global using` as for foreign base classes); (b) two CK models generated in the **same** project where one implements
+the other's interface: the other model's interfaces are generator output, not a reference, so OM1006 is reported - put
+the models into separate projects. Cost: the collector runs on every compilation change but walks only assemblies that
+have a `Generated` namespace; the comparer keeps the generation itself cached. Pinned by `CkForeignInterfaceCodeGeneratorTests`
 (two-model fixture, library Roslyn-compiled into its own assembly: qualified output compiles, the old output fails with
-CS0246, a missing reference is reported, own-model output is byte-identical with the lookup).
+CS0246, a foreign `extends` is qualified, a missing reference and an ambiguous match are reported, own-model output is
+byte-identical with the lookup).
 Docs generator: `Interfaces.md` per model (members incl. inherited ones, "Extends" line, association and method
 tables, "Deprecated" marker) plus an "Implements" line and a methods table per type (only when present);
 "Visibility: `Internal`" / "Derivable: `Model`" lines per element and an "(internal)" method marker, written only

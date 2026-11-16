@@ -18,7 +18,7 @@ public static class CkGeneratedInterfaceCollector
     /// </summary>
     public static ImmutableArray<string> Collect(Compilation compilation, CancellationToken cancellationToken = default)
     {
-        var result = new List<string>();
+        var result = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var reference in compilation.References)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -31,11 +31,10 @@ public static class CkGeneratedInterfaceCollector
             Walk(assembly.GlobalNamespace, result);
         }
 
-        result.Sort(StringComparer.Ordinal);
-        return result.Distinct(StringComparer.Ordinal).ToImmutableArray();
+        return result.ToImmutableArray();
     }
 
-    private static void Walk(INamespaceSymbol ns, List<string> result)
+    private static void Walk(INamespaceSymbol ns, SortedSet<string> result)
     {
         foreach (var child in ns.GetNamespaceMembers())
         {
@@ -48,7 +47,7 @@ public static class CkGeneratedInterfaceCollector
         }
 
         var nsName = ns.ToDisplayString();
-        if (nsName.IndexOf(GeneratedSegment, StringComparison.Ordinal) < 0 || !IsMajorSegment(ns.Name))
+        if (("." + nsName).IndexOf(GeneratedSegment, StringComparison.Ordinal) < 0 || !IsMajorSegment(ns.Name))
         {
             return;
         }

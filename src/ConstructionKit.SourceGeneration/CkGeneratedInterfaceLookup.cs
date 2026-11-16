@@ -52,15 +52,18 @@ public sealed class CkGeneratedInterfaceLookup
     {
         var suffix =
             $"{GeneratedSegment}{ckInterfaceId.ModelId.Name}.v{ckInterfaceId.ModelId.Version.Major}.{CkInterfaceCodeGenerator.InterfaceName(ckInterfaceId.ElementId)}";
-        var matches = _fullNames.Where(n => n.EndsWith(suffix, StringComparison.Ordinal)).ToList();
+        // A leading dot, so a project whose root namespace is empty ("Generated.System.v2…") matches too.
+        var matches = _fullNames.Where(n => ("." + n).EndsWith(suffix, StringComparison.Ordinal)).ToList();
         if (matches.Count == 1)
         {
             return "global::" + matches[0];
         }
 
+        var modelName = ckInterfaceId.ModelId.Name;
         _unresolved[ckInterfaceId] = matches.Count == 0
-            ? $"no referenced assembly declares the generated interface '*{suffix}'"
-            : $"more than one referenced assembly declares it: {string.Join(", ", matches)}";
+            ? $"no referenced assembly declares the generated interface '*{suffix}'; add a reference to the C# package of model '{modelName}'" +
+              (modelName == "System" ? " (Meshmakers.Octo.ConstructionKit.Models.System)" : "")
+            : $"more than one referenced assembly declares it ({string.Join(", ", matches)}); keep only one reference to the C# package of model '{modelName}'";
         return null;
     }
 }

@@ -227,8 +227,7 @@ public class CkSourceGenerator : IIncrementalGenerator
             foreach (var unresolved in interfaceLookup.Unresolved)
             {
                 context.ReportDiagnostic(Diagnostic.Create(DiagnosticsDescriptors.UnresolvedForeignInterface, null,
-                    unresolved.Key.FullName, ckCompiledModelRoot.ModelId.Name, unresolved.Value,
-                    unresolved.Key.ModelId.Name));
+                    unresolved.Key.FullName, ckCompiledModelRoot.ModelId.Name, unresolved.Value));
             }
 
             // F1.4-S2: parameter / result records of the methods declared by the model's types.

@@ -55,7 +55,7 @@ internal static class DiagnosticsDescriptors
     public static readonly DiagnosticDescriptor UnresolvedForeignInterface
         = new("OM1006", // id
             "Interface of another CK model not found", // title
-            "Interface '{0}' used by model '{1}' cannot be referenced in the generated C#: {2}. Add a reference to the C# package of model '{3}' (for System: Meshmakers.Octo.ConstructionKit.Models.System).", // message
+            "Interface '{0}' used by model '{1}' cannot be referenced in the generated C#: {2}", // message
             "Construction Kit", // category
             DiagnosticSeverity.Error,
             true);

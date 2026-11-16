@@ -17,7 +17,7 @@ attributes:
     valueCkEnumId: ${this}/CkArchiveStatus
     isRuntimeState: true
   - id: ArchiveMethod.Transition
-    description: "Method result member: name of the transition that ran (Activate, Disable, Enable, RetryActivation)."
+    description: "Method result member: name of the transition or change that ran (Activate, Disable, Enable, RetryActivation, Freeze, Unfreeze, RewindWatermark, AddComputedColumn, AddArchiveColumn, RemoveComputedColumn, UpdateComputedColumnFormula)."
     valueType: String
     isRuntimeState: true
   # ---------- shared create input ---------------------------------------------------------------
@@ -133,4 +133,9 @@ attributes:
   - id: ArchiveMethod.RemovedColumns
     description: "Method result member: the ingested column paths whose columns and stored values Archive.RedactHiddenColumns dropped. Empty when no column reached a Hidden attribute."
     valueType: StringArray
+    isRuntimeState: true
+  # ---------- Computed column jobs (AB#8600, 1.28.0) -----------------------------------------------
+  - id: ArchiveMethod.ComputedColumnName
+    description: "Method result member: the computed column a backfill or repair job writes; null for a rollup recompute."
+    valueType: String
     isRuntimeState: true

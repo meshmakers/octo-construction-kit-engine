@@ -63,10 +63,27 @@ public interface IArchiveLifecycleService
     /// <summary>
     ///     CK v2 (review G3 E-M2): re-checks an archive against attribute access after a CK model change. When an
     ///     ingested column now reaches a Hidden attribute (directly or through a record), an activated archive is set
-    ///     to <see cref="CkArchiveStatus.Failed" /> so it stops ingesting; returns <c>false</c>. Call it for the
-    ///     archives of a tenant after a CK model import. Without a CK cache the check is skipped (<c>true</c>).
+    ///     to <see cref="CkArchiveStatus.Failed" /> so it stops ingesting; returns <c>false</c>. The transition records
+    ///     the reason and every offending column (AB#6247, <see cref="ArchiveSnapshot.StatusReason" />,
+    ///     <see cref="ArchiveSnapshot.HiddenColumns" />); the history stays queryable without those columns. Call it for
+    ///     the archives of a tenant after a CK model import. Without a CK cache the check is skipped (<c>true</c>).
     /// </summary>
     Task<bool> RevalidateAccessAsync(OctoObjectId archiveRtId);
+
+    /// <summary>
+    ///     AB#6247: the documented way out of a Hidden-column failure. Drops every ingested column of the archive that
+    ///     reaches a Hidden attribute under the current CK model — first the physical columns
+    ///     (<see cref="IStreamDataRepository.DropIngestedColumnStorageAsync" />), then the definition — and records the
+    ///     redaction in the audit trail. <b>Destructive: the values stored in these columns are lost</b>; all other
+    ///     columns and rows are kept. An archive the re-validation had set to <see cref="CkArchiveStatus.Failed" /> on
+    ///     Hidden columns is activated again; any other archive keeps its status. Never called automatically.
+    ///     Refused with <see cref="HiddenColumnRedactionBlockedException" /> while a rollup aggregates one of the columns.
+    ///     Idempotent: without a Hidden column it changes nothing (a Failed-on-Hidden archive whose columns are no longer
+    ///     Hidden is still activated again). The default implementation throws <see cref="System.NotSupportedException" />.
+    /// </summary>
+    Task<ArchiveRedactionResult> RedactHiddenColumnsAsync(OctoObjectId archiveRtId) =>
+        throw new System.NotSupportedException(
+            $"{GetType().Name} cannot redact Hidden archive columns (AB#6247); update the lifecycle service.");
 
     /// <summary>
     /// Adds an <em>ingested</em> column for the CK attribute at <paramref name="path"/> to an <c>Activated</c> raw or

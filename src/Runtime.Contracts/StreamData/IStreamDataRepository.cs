@@ -103,6 +103,18 @@ public interface IStreamDataRepository
         EnsureArchiveCreatedAsync(snapshot);
 
     /// <summary>
+    /// Drops the physical columns of the <em>ingested</em> columns at <paramref name="columnPaths"/> from the archive's
+    /// table (AB#6247, <see cref="IArchiveLifecycleService.RedactHiddenColumnsAsync"/>): <c>ALTER TABLE … DROP COLUMN</c>.
+    /// <b>Destructive</b>: the values stored in these columns are lost; every other column and row is kept. Idempotent
+    /// (a column that does not exist is skipped, so is a table that does not exist). The default implementation throws
+    /// <see cref="NotSupportedException"/>.
+    /// </summary>
+    Task DropIngestedColumnStorageAsync(ArchiveSnapshot snapshot, IReadOnlyCollection<string> columnPaths,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException(
+            $"{GetType().Name} cannot drop archive columns (AB#6247); update the stream-data repository.");
+
+    /// <summary>
     /// Adds the physical CrateDB column for the <em>pending</em> version of a computed column
     /// (<c>{base}__v{ComputedVersion+1}</c>) via <c>ALTER TABLE … ADD COLUMN</c> (AB#4189 Phase 7,
     /// formula change). Idempotent. Must run before the pending formula is marked so ingest's

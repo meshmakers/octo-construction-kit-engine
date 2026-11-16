@@ -23,9 +23,19 @@ public interface IArchiveRuntimeStore
     /// Writes a new <see cref="CkArchiveStatus"/> on the archive entity. Implementations are
     /// responsible for any validation hooks (concept §10) and for emitting the corresponding
     /// status-transition event (§14) only if the lifecycle service hasn't already done so via
-    /// <see cref="IArchiveAuditTrail"/>.
+    /// <see cref="IArchiveAuditTrail"/>. A store that keeps the status reason (AB#6247) clears
+    /// <c>Archive.StatusReason</c> and <c>Archive.HiddenColumns</c> with this write.
     /// </summary>
     Task SetStatusAsync(OctoObjectId archiveRtId, CkArchiveStatus newStatus);
+
+    /// <summary>
+    /// Writes a new <see cref="CkArchiveStatus"/> together with its reason (AB#6247): <c>Archive.StatusReason</c> and
+    /// <c>Archive.HiddenColumns</c> (the ingested column paths that reached a Hidden attribute). A <c>null</c> reason and
+    /// an empty list clear both, which every transition other than the one to <see cref="CkArchiveStatus.Failed"/> does.
+    /// The default implementation writes the status only (stores built before AB#6247 keep no reason).
+    /// </summary>
+    Task SetStatusAsync(OctoObjectId archiveRtId, CkArchiveStatus newStatus, string? statusReason,
+        IReadOnlyList<string> hiddenColumns) => SetStatusAsync(archiveRtId, newStatus);
 
     /// <summary>
     /// Soft-deletes the archive entity by setting <c>rtState = Archived</c>. The Crate table is
@@ -71,6 +81,16 @@ public interface IArchiveRuntimeStore
     /// the read path no longer projects); a later re-add of the same name reuses it.
     /// </summary>
     Task RemoveComputedColumnAsync(OctoObjectId archiveRtId, string name);
+
+    /// <summary>
+    /// Removes the <em>ingested</em> columns with the given paths (case-insensitive) from the archive's column set
+    /// (AB#6247, <see cref="IArchiveLifecycleService.RedactHiddenColumnsAsync"/>). Called only after the physical columns
+    /// were dropped, so the definition never names a column the table lacks. Computed columns are never removed here.
+    /// The default implementation throws <see cref="System.NotSupportedException"/>.
+    /// </summary>
+    Task RemoveIngestedColumnsAsync(OctoObjectId archiveRtId, IReadOnlyCollection<string> columnPaths) =>
+        throw new System.NotSupportedException(
+            $"{GetType().Name} cannot remove ingested archive columns (AB#6247); update the archive store.");
 
     /// <summary>
     /// Sets the transient <c>PendingFormula</c> marker on a computed column (AB#4189 Phase 7),

@@ -46,6 +46,13 @@ types:
       - id: ${this}/Archive.LastRecomputeFailureReason
         name: LastRecomputeFailureReason
         isOptional: true
+      # ---------- Status reason and Hidden columns (AB#6247, 1.27.0) ----------
+      - id: ${this}/Archive.StatusReason
+        name: StatusReason
+        isOptional: true
+      - id: ${this}/Archive.HiddenColumns
+        name: HiddenColumns
+        isOptional: true
     # AB#8598 (1.24.0, Feature AB#5697 F4.3): the archive lifecycle as CK methods, handled by the asset repository in-process
     # (execution.handler service; the asset repository owns stream data). They replace the streamData GraphQL mutations
     # activateArchive, disableArchive, enableArchive, retryArchiveActivation and deleteArchive, which stay and are deprecated.
@@ -147,3 +154,24 @@ types:
         execution:
           timeoutSeconds: 120
           idempotent: false
+      # AB#6247 (1.27.0): the way out of a Hidden-column failure. Destructive and never run automatically: the caller must
+      # confirm the data loss explicitly.
+      - methodId: RedactHiddenColumns-1
+        description: "Drops every ingested column of the archive that reaches a Hidden attribute under the current CK model: first the CrateDB columns, then the column definitions. DESTRUCTIVE: the values stored in these columns are lost and cannot be restored; every other column and row is kept. The redaction is recorded in the audit trail. An archive that the access re-validation set to Failed because of Hidden columns is activated again; any other archive keeps its status. Refused while a rollup archive aggregates one of the columns. Requires confirmDataLoss = true; without a Hidden column it changes nothing."
+        parameters:
+          - { name: confirmDataLoss, valueType: Boolean, description: "Must be true: confirms that the values stored in the dropped columns are lost." }
+        result:
+          valueType: Record
+          valueCkRecordId: ${this}/ArchiveRedactionResult
+        errors:
+          - { code: STREAMDATA_ARCHIVE_NOT_FOUND, description: "The archive does not exist." }
+          - { code: STREAMDATA_CONFIRMATION_REQUIRED, description: "confirmDataLoss was not true; nothing was dropped." }
+          - { code: STREAMDATA_REDACTION_BLOCKED, description: "A rollup archive aggregates a column the call would drop; parameter rollupRtIds lists them. Nothing was dropped." }
+          - { code: STREAMDATA_ACTIVATION_FAILED, description: "The columns were dropped, but provisioning the CrateDB table on the resume failed; the archive is Failed and RetryActivation applies." }
+          - { code: STREAMDATA_ERROR, description: "Any other stream-data rule refused the call; parameter message carries the engine text." }
+          - { code: STREAMDATA_NOT_ENABLED, description: "Stream data is not enabled for the tenant." }
+        authorization:
+          roles: [ StreamDataAdmin ]
+        execution:
+          timeoutSeconds: 300
+          idempotent: true

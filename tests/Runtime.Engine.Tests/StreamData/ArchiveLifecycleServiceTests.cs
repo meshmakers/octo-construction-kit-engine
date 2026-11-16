@@ -105,7 +105,10 @@ public class ArchiveLifecycleServiceTests
 
         await Assert.ThrowsAsync<ArchiveActivationFailedException>(() => NewSut().ActivateAsync(Rt));
 
-        A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Failed)).MustHaveHappenedOnceExactly();
+        // AB#6247: the reason is stored on the archive, not only in the audit trail.
+        A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Failed,
+                "Provisioning the CrateDB table failed: crate boom", A<IReadOnlyList<string>>.That.IsEmpty()))
+            .MustHaveHappenedOnceExactly();
         A.CallTo(() => _audit.RecordTransitionAsync(TenantId, Rt, CkArchiveStatus.Created, CkArchiveStatus.Failed, "crate boom"))
             .MustHaveHappenedOnceExactly();
         // Status was never set to Activated.

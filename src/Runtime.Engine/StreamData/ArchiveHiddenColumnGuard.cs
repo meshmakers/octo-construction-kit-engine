@@ -72,21 +72,34 @@ public static class ArchiveHiddenColumnGuard
     public static (string Path, string Attribute)? FindHiddenColumn(ICkCacheService cache, string tenantId,
         ArchiveSnapshot snapshot)
     {
+        var all = FindHiddenColumns(cache, tenantId, snapshot);
+        return all.Count == 0 ? null : all[0];
+    }
+
+    /// <summary>
+    ///     Every ingested column of the archive that reaches a Hidden attribute, in column order (AB#6247: the
+    ///     re-validation records all of them, the redaction drops all of them). Rollup and computed columns are skipped
+    ///     as in <see cref="FindHiddenColumn" />.
+    /// </summary>
+    public static IReadOnlyList<(string Path, string Attribute)> FindHiddenColumns(ICkCacheService cache,
+        string tenantId, ArchiveSnapshot snapshot)
+    {
         if (snapshot.RollupAggregations is not null)
         {
-            return null;
+            return [];
         }
 
+        var found = new List<(string Path, string Attribute)>();
         foreach (var column in snapshot.Columns.Where(c => !c.IsComputed && !string.IsNullOrWhiteSpace(c.Path)))
         {
             var hidden = FindHiddenAttribute(cache, tenantId, snapshot.TargetCkTypeId, column.Path);
             if (hidden != null)
             {
-                return (column.Path, hidden);
+                found.Add((column.Path, hidden));
             }
         }
 
-        return null;
+        return found;
     }
 
     private static CkTypeAttributeGraph? Find(CkTypeWithAttributesGraph scope, string segment) =>

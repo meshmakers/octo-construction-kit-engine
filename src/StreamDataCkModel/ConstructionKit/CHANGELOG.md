@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.27.0 - 2026-11-16
+
+_Required bump level: minor._
+
+### Added
+
+- Status reason and recoverable Hidden-column failures (AB#6247, Feature AB#5697 F4.3):
+  - `Archive.StatusReason` (String, runtime state): why the archive is Failed (a column reached a Hidden attribute, or
+    provisioning the CrateDB table failed); cleared by every other transition.
+  - `Archive.HiddenColumns` (StringArray, runtime state): the ingested columns that reached a Hidden attribute when the
+    access re-validation set the archive to Failed. Such an archive refuses writes, its history stays queryable without
+    these columns.
+  - Method `Archive.RedactHiddenColumns-1` (parameter `confirmDataLoss`, role `StreamDataAdmin`), result record
+    `ArchiveRedactionResult` with the new attribute `ArchiveMethod.RemovedColumns`. **Destructive**: drops the columns
+    that reach Hidden and their stored values, records the redaction in the audit trail and activates an archive that
+    was Failed on Hidden columns again. New error codes `STREAMDATA_CONFIRMATION_REQUIRED` and
+    `STREAMDATA_REDACTION_BLOCKED` (a rollup aggregates one of the columns).
+
+### Compatibility
+
+- Additive, a Minor against 1.26.0 (no acknowledgement). `minEngineVersion` unchanged. Archives stored without the
+  attributes read as no reason and no Hidden columns; no data migration.
+
 ## 1.26.0 - 2026-11-15
 
 _Required bump level: minor._

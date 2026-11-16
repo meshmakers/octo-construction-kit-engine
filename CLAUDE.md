@@ -1050,7 +1050,7 @@ Tests: `SystemInterfacesTests` (Compiler.Tests: members, per-type table, no inde
 
 ## System.StreamData on ckLanguage 2 (AB#8597, Epic AB#5584 F4.3)
 
-`src/StreamDataCkModel` is **System.StreamData-1.24.0** (archive lifecycle methods, below); 1.23.0 was the first ckLanguage 2 release of the model and a **Minor** against
+`src/StreamDataCkModel` is **System.StreamData-1.27.0** (archive lifecycle methods 1.24.0, rollup control 1.25.0, late-delivery sets 1.26.0, Hidden-column failures 1.27.0, below); 1.23.0 was the first ckLanguage 2 release of the model and a **Minor** against
 the ckLanguage 1 release 1.22.0 (`ValidateVersion`: only "ckLanguage changed '1' → '2'"). The rules of the System migration above apply:
 
 - **Every type and record declares `derivable: Any`** (`Archive`, `RawArchive`, `RollupArchive`, `TimeRangeArchive`, `RecomputeJob` and the six
@@ -1093,6 +1093,26 @@ Contract rules for a mixed package set:
 
 Pinned by `RtIdSetAndContractCompatibilityTests`; behaviour by `RecomputeLateDeliveryTests`. Concept:
 `docs/concept-rollup-recompute.md` §4a.
+
+### Hidden columns of an archive (System.StreamData 1.27.0, AB#6247)
+
+1.27.0 adds `Archive.StatusReason` and `Archive.HiddenColumns` (runtime state) and the destructive method
+`Archive.RedactHiddenColumns-1` (parameter `confirmDataLoss`, role `StreamDataAdmin`, result `ArchiveRedactionResult`). A Minor
+against 1.26.0 without acknowledgement. Behaviour:
+
+- `ArchiveLifecycleService.RevalidateAccessAsync` sets an activated archive whose columns now reach Hidden to `Failed` and records
+  the reason and **every** offending column (`ArchiveHiddenColumnGuard.FindHiddenColumns`) with one store call
+  (`IArchiveRuntimeStore.SetStatusAsync(rtId, status, reason, hiddenColumns)`); every other transition uses the plain write, which
+  clears both. A failed table provisioning records its reason too.
+- `ArchiveSnapshot.IsFailedOnHiddenColumns` / `WithoutHiddenColumns()`: such an archive refuses writes, its history stays queryable
+  without the Hidden columns (engine-mongodb query paths).
+- `RedactHiddenColumnsAsync` drops the Hidden columns (CrateDB first, then the definition), audits it and resumes a Failed-on-Hidden
+  archive; refused while a rollup aggregates one of the columns (`HiddenColumnRedactionBlockedException`).
+- Every new interface member has a default implementation (mixed package sets keep compiling); the implementations live in
+  engine-mongodb.
+
+Full description, including the re-validation trigger in services without stream data (octo-common-services): `docs/archive-hidden-columns.md`.
+Tests: `ArchiveHiddenColumnGuardTests`, `StreamDataCkLanguage2Tests` (`StreamData_1_27_0_*`, `RedactHiddenColumns_*`).
 
 ### Archive lifecycle methods (System.StreamData 1.24.0, AB#8598)
 
@@ -1555,7 +1575,8 @@ Notes:
   it; review G3 E-M2). Case-insensitive, `[*]` ignored, rollup and computed columns skipped. `ArchiveLifecycleService`
   applies it on activation, retry and re-provisioning (`HiddenAttributeInArchiveException`), and
   `RevalidateAccessAsync(archiveRtId)` sets an **active** archive to `Failed` (stops ingesting) when a model change
-  made one of its columns reach Hidden. **Wiring owed by the consumers:** the mongodb `TenantContext` passes the CK
+  made one of its columns reach Hidden; since AB#6247 it records the reason and the columns, the history stays readable without
+  them and `RedactHiddenColumnsAsync` resumes the archive (`docs/archive-hidden-columns.md`). **Wiring owed by the consumers:** the mongodb `TenantContext` passes the CK
   cache, calls `RevalidateAccessAsync` for the tenant's archives after a CK model import, and the ingest/column
   builder (`ArchivePathTypeResolver.BuildRecordObject`) skips Hidden sub-attributes like Secret ones; the stream-data
   query paths (asset-repo) refuse columns for which `ArchiveHiddenColumnGuard.FindHiddenAttribute` returns a value.

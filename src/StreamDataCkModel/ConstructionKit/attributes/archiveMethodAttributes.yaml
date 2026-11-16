@@ -129,3 +129,8 @@ attributes:
     description: "Method result member: the last heartbeat of a running job; null before the first chunk."
     valueType: DateTime
     isRuntimeState: true
+  # ---------- ArchiveRedactionResult (AB#6247, 1.27.0) ---------------------------------------------
+  - id: ArchiveMethod.RemovedColumns
+    description: "Method result member: the ingested column paths whose columns and stored values Archive.RedactHiddenColumns dropped. Empty when no column reached a Hidden attribute."
+    valueType: StringArray
+    isRuntimeState: true

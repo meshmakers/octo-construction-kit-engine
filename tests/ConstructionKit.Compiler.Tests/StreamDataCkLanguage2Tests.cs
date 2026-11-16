@@ -36,7 +36,8 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
     ///     default <c>derivable: Model</c>: they are method inputs and answers, not extension points.
     /// </summary>
     internal static readonly string[] MethodRecords =
-        ["ArchiveColumnSpec", "ArchiveTransitionResult", "RecomputeJobInfo", "RollupArchiveCreateInput", "TimeRangeArchiveCreateInput"];
+        ["ArchiveColumnSpec", "ArchiveRedactionResult", "ArchiveTransitionResult", "RecomputeJobInfo", "RollupArchiveCreateInput",
+            "TimeRangeArchiveCreateInput"];
 
     /// <summary>The files that hold only the method records and their attributes (AB#8598).</summary>
     internal static readonly string[] MethodOnlyFiles = ["records/archiveMethodRecords.yaml", "attributes/archiveMethodAttributes.yaml"];
@@ -189,14 +190,15 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         result.Messages.Where(m => m.Severity == CkCompileGateSeverity.Error).Select(m => m.Code ?? "").ToArray();
 
     [Fact]
-    public async Task StreamData_Is_1_26_0_OnCkLanguage2_WithMinEngineVersion351_AndPublishedToTheV3RootOnly()
+    public async Task StreamData_Is_1_27_0_OnCkLanguage2_WithMinEngineVersion351_AndPublishedToTheV3RootOnly()
     {
         var compiled = await CompileStreamDataAsync(RealStreamDataSource());
 
         Assert.Equal("System.StreamData", compiled.ModelId.Name);
         // 1.23.0 (AB#8597) raised the language; 1.24.0 (AB#8598) adds the archive lifecycle methods, 1.25.0 (AB#8599) the
-        // rollup control methods, 1.26.0 (AB#9016) the rtId sets of the late-delivery recompute.
-        Assert.Equal(new Version(1, 26, 0), new Version(compiled.ModelId.Version.ToString()));
+        // rollup control methods, 1.26.0 (AB#9016) the rtId sets of the late-delivery recompute, 1.27.0 (AB#6247) the status
+        // reason, the Hidden columns of a Failed archive and RedactHiddenColumns.
+        Assert.Equal(new Version(1, 27, 0), new Version(compiled.ModelId.Version.ToString()));
         Assert.Equal(2, compiled.EffectiveCkLanguage);
         // Pinned exactly: a higher value means every service below it can no longer import System.StreamData. A feature that
         // raises it (e.g. an Archive method with execution.mode) is a deliberate rollout decision and updates this assertion.
@@ -321,8 +323,10 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         var types = compiled.Types!.ToDictionary(t => t.TypeId.Name);
 
         var archive = types["Archive"].Methods!.ToDictionary(m => m.MethodId);
-        Assert.Equal(["Activate-1", "DeleteArchive-1", "Disable-1", "Enable-1", "RetryActivation-1"],
+        Assert.Equal(["Activate-1", "DeleteArchive-1", "Disable-1", "Enable-1", "RedactHiddenColumns-1", "RetryActivation-1"],
             archive.Keys.Order(StringComparer.Ordinal));
+        // AB#6247: RedactHiddenColumns replaces no mutation; its contract is pinned in RedactHiddenColumns_*.
+        archive.Remove("RedactHiddenColumns-1");
         foreach (var id in new[] { "Activate-1", "Disable-1", "Enable-1", "RetryActivation-1" })
         {
             Assert.Equal(CkMethodKindDto.Instance, archive[id].Kind);
@@ -417,6 +421,8 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         var baseline = CopyStreamData("streamdata-1.24.0", (path, yaml) => path switch
         {
             "ckModel.yaml" => SetVersion(yaml, "1.24.0"),
+            "types/archive.yaml" => WithoutStreamData_1_27_0(path, yaml),
+            "attributes/archiveAttributes.yaml" => WithoutStreamData_1_27_0(path, yaml),
             "types/rollupArchive.yaml" => CutFrom(yaml, "      # AB#8599 (1.25.0)"),
             "records/archiveMethodRecords.yaml" => CutFrom(yaml, "  # AB#8599 (System.StreamData 1.25.0)"),
             "attributes/archiveMethodAttributes.yaml" => CutFrom(yaml, "  # ---------- RecomputeJobInfo (AB#8599"),
@@ -433,6 +439,86 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         Assert.Contains("1.24.0", result.Verdict!.BaselineId.ToString());
         Assert.Equal(CkSemVerLevel.Minor, result.Verdict.RequiredLevel);
         Assert.DoesNotContain(result.Verdict.ClassifiedChanges, c => c.RequiresAcknowledge);
+    }
+
+    /// <summary>
+    ///     The sources of 1.26.0: the current ones without the AB#6247 additions (Archive.StatusReason, Archive.HiddenColumns,
+    ///     RedactHiddenColumns-1, ArchiveRedactionResult, ArchiveMethod.RemovedColumns).
+    /// </summary>
+    private static string WithoutStreamData_1_27_0(string path, string yaml) => path switch
+    {
+        "types/archive.yaml" => CutFrom(RemoveBlock(yaml, "      # ---------- Status reason and Hidden columns (AB#6247",
+            "    # AB#8598 (1.24.0"), "      # AB#6247 (1.27.0)"),
+        "attributes/archiveAttributes.yaml" => CutFrom(yaml, "  # ---------- AB#6247 (1.27.0)"),
+        "records/archiveMethodRecords.yaml" => CutFrom(yaml, "  # AB#6247 (1.27.0)"),
+        "attributes/archiveMethodAttributes.yaml" => CutFrom(yaml, "  # ---------- ArchiveRedactionResult (AB#6247"),
+        _ => yaml
+    };
+
+    /// <summary>The YAML without the lines from <paramref name="startMarker" /> up to (not including) <paramref name="endMarker" />.</summary>
+    private static string RemoveBlock(string yaml, string startMarker, string endMarker)
+    {
+        var start = yaml.IndexOf("\n" + startMarker, StringComparison.Ordinal);
+        var end = yaml.IndexOf("\n" + endMarker, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start, $"block '{startMarker}' .. '{endMarker}' not found");
+        return yaml[..start] + yaml[end..];
+    }
+
+    /// <summary>
+    ///     AB#6247: 1.27.0 against 1.26.0 (the same sources without the status reason, the Hidden columns and the redaction
+    ///     method) is a Minor without acknowledgement.
+    /// </summary>
+    [Fact]
+    public async Task StreamData_1_27_0_AgainstThe_1_26_0_Release_IsAMinor_WithoutAcknowledgement()
+    {
+        var baseline = CopyStreamData("streamdata-1.26.0", (path, yaml) =>
+            path == "ckModel.yaml" ? SetVersion(yaml, "1.26.0") : WithoutStreamData_1_27_0(path, yaml));
+        var compiled = await CompileStreamDataAsync(baseline);
+        Assert.DoesNotContain(compiled.Types!.Single(t => t.TypeId.Name == "Archive").Methods!,
+            m => m.MethodId == "RedactHiddenColumns-1");
+        await _fixture.Services.GetRequiredService<ICatalogService>().PublishAsync(InMemoryPublishedCatalog.Name, compiled,
+            new OriginFileResolver(baseline), isForced: true);
+
+        var result = await RunGateAsync(RealStreamDataSource());
+
+        Assert.Empty(Errors(result));
+        Assert.Contains("1.26.0", result.Verdict!.BaselineId.ToString());
+        Assert.Equal(CkSemVerLevel.Minor, result.Verdict.RequiredLevel);
+        Assert.DoesNotContain(result.Verdict.ClassifiedChanges, c => c.RequiresAcknowledge);
+    }
+
+    /// <summary>
+    ///     AB#6247: the redaction is destructive, so it needs the explicit confirmation parameter and the admin role, and the
+    ///     status reason and Hidden columns are runtime state written by the platform.
+    /// </summary>
+    [Fact]
+    public async Task RedactHiddenColumns_IsAnAdminMethod_WithAnExplicitDataLossConfirmation()
+    {
+        var compiled = await CompileStreamDataAsync(RealStreamDataSource());
+        var archive = compiled.Types!.Single(t => t.TypeId.Name == "Archive");
+        var redact = archive.Methods!.Single(m => m.MethodId == "RedactHiddenColumns-1");
+
+        Assert.Equal(CkMethodKindDto.Instance, redact.Kind);
+        var confirm = Assert.Single(redact.Parameters!);
+        Assert.Equal(("confirmDataLoss", AttributeValueTypesDto.Boolean, false),
+            (confirm.Name, confirm.ValueType, confirm.IsOptional));
+        Assert.Equal("ArchiveRedactionResult", redact.Result!.ValueCkRecordId!.ElementId.Name);
+        Assert.Equal(["StreamDataAdmin"], redact.Authorization!.Roles!);
+        Assert.Contains("DESTRUCTIVE", redact.Description, StringComparison.Ordinal);
+        Assert.Contains("STREAMDATA_CONFIRMATION_REQUIRED", redact.Errors!.Select(e => e.Code));
+        Assert.Contains("STREAMDATA_REDACTION_BLOCKED", redact.Errors!.Select(e => e.Code));
+        Assert.Null(redact.Execution!.Mode);
+
+        var result = compiled.Records!.Single(r => r.RecordId.Name == "ArchiveRedactionResult");
+        Assert.Equal(["ArchiveRtId", "RemovedColumns", "Status"],
+            result.Attributes!.Select(a => a.AttributeName).Order(StringComparer.Ordinal));
+        foreach (var name in new[] { "StatusReason", "HiddenColumns" })
+        {
+            var assignment = archive.Attributes!.Single(a => a.AttributeName == name);
+            Assert.True(assignment.IsOptional, name);
+            var definition = compiled.Attributes!.Single(a => a.AttributeId.Name == $"Archive.{name}");
+            Assert.True(definition.IsRuntimeState, name);
+        }
     }
 
     /// <summary>The YAML up to (not including) the line that starts with <paramref name="marker" />.</summary>

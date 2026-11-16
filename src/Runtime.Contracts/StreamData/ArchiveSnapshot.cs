@@ -98,6 +98,51 @@ public sealed record ArchiveSnapshot(
     /// </remarks>
     public IReadOnlyList<ArchiveConflictKey> ConflictPrecedence { get; init; } =
         System.Array.Empty<ArchiveConflictKey>();
+
+    /// <summary>
+    /// Why the archive is in its current status (AB#6247, <c>Archive.StatusReason</c>): set with the transition to
+    /// <see cref="CkArchiveStatus.Failed"/> (for example "column X reaches the Hidden attribute Y"), cleared by every
+    /// other transition. <c>null</c> when no reason was recorded.
+    /// </summary>
+    public string? StatusReason { get; init; }
+
+    /// <summary>
+    /// The ingested column paths that reached a Hidden attribute when the archive was set to
+    /// <see cref="CkArchiveStatus.Failed"/> by the access re-validation (AB#6247, <c>Archive.HiddenColumns</c>). Empty
+    /// otherwise. While it is not empty the archive refuses every write, but its history stays queryable without these
+    /// columns (<see cref="WithoutHiddenColumns"/>); <c>Archive.RedactHiddenColumns</c> drops them and resumes.
+    /// </summary>
+    public IReadOnlyList<string> HiddenColumns { get; init; } = System.Array.Empty<string>();
+
+    /// <summary>
+    /// True for an archive the access re-validation set to <see cref="CkArchiveStatus.Failed"/> because a column reached
+    /// a Hidden attribute (AB#6247): writes are refused, reads of its history without the Hidden columns are allowed.
+    /// </summary>
+    public bool IsFailedOnHiddenColumns => Status == CkArchiveStatus.Failed && HiddenColumns.Count > 0;
+
+    /// <summary>
+    /// This snapshot without the ingested columns named in <see cref="HiddenColumns"/> (case-insensitive), so the query
+    /// paths neither project nor accept them. Returns the snapshot itself when <see cref="HiddenColumns"/> is empty.
+    /// </summary>
+    public ArchiveSnapshot WithoutHiddenColumns()
+    {
+        if (HiddenColumns.Count == 0)
+        {
+            return this;
+        }
+
+        var hidden = new HashSet<string>(HiddenColumns, System.StringComparer.OrdinalIgnoreCase);
+        var kept = new List<CkArchiveColumnSpec>(Columns.Count);
+        foreach (var column in Columns)
+        {
+            if (column.IsComputed || !hidden.Contains(column.Path))
+            {
+                kept.Add(column);
+            }
+        }
+
+        return this with { Columns = kept };
+    }
 }
 
 /// <summary>

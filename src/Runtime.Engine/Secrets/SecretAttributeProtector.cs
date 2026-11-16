@@ -28,6 +28,9 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
 
     private static readonly byte[] PurposeSeparator = "\0purpose:"u8.ToArray();
 
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false,
+        throwOnInvalidBytes: true);
+
     private static readonly string? DefaultServiceName =
         Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME") is { Length: > 0 } serviceName
             ? serviceName
@@ -346,7 +349,7 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
     private static byte[] GetPurposeBytes(SecretPurpose purpose)
     {
         ArgumentException.ThrowIfNullOrEmpty(purpose.Value, nameof(purpose));
-        return Encoding.UTF8.GetBytes(purpose.Value);
+        return StrictUtf8.GetBytes(purpose.Value);
     }
 
     private static byte[] BuildAssociatedData(string header, byte[]? purposeBytes)

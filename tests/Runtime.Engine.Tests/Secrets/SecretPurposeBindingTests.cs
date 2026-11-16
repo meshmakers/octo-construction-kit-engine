@@ -112,6 +112,18 @@ public class SecretPurposeBindingTests
     }
 
     [Fact]
+    public void Purpose_WithMalformedUtf16_IsRefused()
+    {
+        var protector = CreateProtector();
+        var isolatedHighSurrogate = new SecretPurpose("scope/" + (char)0xD800);
+        var isolatedLowSurrogate = new SecretPurpose("scope/" + (char)0xDC00);
+
+        Assert.ThrowsAny<ArgumentException>(() => protector.Protect("payload", isolatedHighSurrogate));
+        Assert.ThrowsAny<ArgumentException>(() => protector.Protect("payload", isolatedLowSurrogate));
+        Assert.ThrowsAny<ArgumentException>(() => protector.Unprotect("enc:v2:k1:AAAA", isolatedHighSurrogate));
+    }
+
+    [Fact]
     public void Purpose_WithoutConfiguredKey_Throws()
     {
         var options = new SecretEncryptionOptions();

@@ -1694,6 +1694,25 @@ and re-implementing an interface a base class already implements is legal. Assoc
 method members; handlers implement `ICkMethodHandler<…>` of octo-common-services instead). v1 models: nothing emitted,
 type output unchanged. Pinned by `CkInterfaceCodeGeneratorTests` (Roslyn-compiles the generated code against
 `Runtime.Contracts` with a consumer that assigns `RtAccount` to `IRtNamed`).
+
+**Interfaces of another CK model (AB#9096).** A type may implement (and an interface may extend) an interface that
+another model declares, e.g. `Basic/NamedEntity` implements `System/Named-1`. Its C# interface lives in the other
+model's assembly, in `<that project's RootNamespace>.Generated.<Model>.v<Major>`, which the CK cache does not know.
+`CkSourceGenerator` therefore reads the generated interfaces of the compilation's referenced assemblies
+(`CkGeneratedInterfaceCollector.Collect`: public `IRt*` interfaces in namespaces `*.Generated.*.v<n>`, sorted, compared
+by content so the generation reruns only when the references change) and passes a `CkGeneratedInterfaceLookup` to
+`CkTypeCodeGenerator` / `CkInterfaceCodeGenerator`. A foreign interface is emitted **fully qualified**
+(`RtNamedEntity : RtEntity, global::Meshmakers.Octo.ConstructionKit.Models.System.Generated.System.v2.IRtNamed`, and
+`string global::….IRtNamed.Name => Name;`), matched by model name, the model's major and the interface name. Interfaces
+of the own model keep the short name, so models without foreign interfaces generate byte-identical code; the API
+overloads without a lookup keep the old (short-name) output. The consuming project must **reference the C# package of
+the other model** (for System: `Meshmakers.Octo.ConstructionKit.Models.System`, depends only on `Runtime.Contracts`); if
+no referenced assembly (or more than one) declares the interface, the generator reports **OM1006** "Interface of another
+CK model not found" naming the interface and the package to add, instead of a bare CS0246. Not covered: member types of a
+foreign interface that are records or enums of that model are still emitted by `AttributeCodeGenerator` with their short
+names (resolve them with a `global using` as for foreign base classes). Pinned by `CkForeignInterfaceCodeGeneratorTests`
+(two-model fixture, library Roslyn-compiled into its own assembly: qualified output compiles, the old output fails with
+CS0246, a missing reference is reported, own-model output is byte-identical with the lookup).
 Docs generator: `Interfaces.md` per model (members incl. inherited ones, "Extends" line, association and method
 tables, "Deprecated" marker) plus an "Implements" line and a methods table per type (only when present);
 "Visibility: `Internal`" / "Derivable: `Model`" lines per element and an "(internal)" method marker, written only

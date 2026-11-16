@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
@@ -96,10 +97,29 @@ public class CkSourceGenerator : IIncrementalGenerator
             ))
             .Where(static x => x.IsValid);
 
-        context.RegisterSourceOutput(inputs, GenerateCode);
+        // AB#9096: the generated CK interfaces of the referenced assemblies, so an implemented interface of another
+        // model is emitted fully qualified. Compared by content: the generation reruns only when they change.
+        var referencedInterfaces = context.CompilationProvider
+            .Select(static (c, ct) => CkGeneratedInterfaceCollector.Collect(c, ct))
+            .WithComparer(ImmutableArrayContentComparer.Instance);
+
+        context.RegisterSourceOutput(inputs.Combine(referencedInterfaces),
+            (ctx, x) => GenerateCode(ctx, x.Left, new CkGeneratedInterfaceLookup(x.Right)));
     }
 
-    private void GenerateCode(SourceProductionContext context, FileOptions fileOptions)
+    private sealed class ImmutableArrayContentComparer : IEqualityComparer<ImmutableArray<string>>
+    {
+        public static readonly ImmutableArrayContentComparer Instance = new();
+
+        public bool Equals(ImmutableArray<string> x, ImmutableArray<string> y) =>
+            x.SequenceEqual(y, StringComparer.Ordinal);
+
+        public int GetHashCode(ImmutableArray<string> obj) =>
+            obj.Aggregate(17, (hash, s) => unchecked(hash * 31 + StringComparer.Ordinal.GetHashCode(s)));
+    }
+
+    private void GenerateCode(SourceProductionContext context, FileOptions fileOptions,
+        CkGeneratedInterfaceLookup interfaceLookup)
     {
         // Set the current context for diagnostic logging
         _currentContext = context;
@@ -183,7 +203,7 @@ public class CkSourceGenerator : IIncrementalGenerator
                     }
 
                     var code = CkTypeCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckTypeDto, tenantId,
-                        ckCacheService, ckCompiledModelRoot.EffectiveCkLanguage);
+                        ckCacheService, ckCompiledModelRoot.EffectiveCkLanguage, interfaceLookup);
                     if (!string.IsNullOrWhiteSpace(code))
                     {
                         var fileName = $"{ns}.{ckTypeDto.TypeId.Name}.{ckTypeDto.TypeId.Version}.g.cs";
@@ -197,10 +217,18 @@ public class CkSourceGenerator : IIncrementalGenerator
             foreach (var ckInterfaceDto in ckCompiledModelRoot.Interfaces ?? [])
             {
                 var code = CkInterfaceCodeGenerator.Generate(ns, ckCompiledModelRoot.ModelId, ckInterfaceDto, tenantId,
-                    ckCacheService);
+                    ckCacheService, interfaceLookup);
                 context.AddSource($"{ns}.Interface.{ckInterfaceDto.InterfaceId.Name}.{ckInterfaceDto.InterfaceId.Version}.g.cs",
                     code);
                 LogDiagnostic(DiagnosticSeverity.Info, $"Generated interface: {ckInterfaceDto.InterfaceId.FullName}");
+            }
+
+            // AB#9096: an implemented or extended interface of another model whose C# package is not referenced.
+            foreach (var unresolved in interfaceLookup.Unresolved)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(DiagnosticsDescriptors.UnresolvedForeignInterface, null,
+                    unresolved.Key.FullName, ckCompiledModelRoot.ModelId.Name, unresolved.Value,
+                    unresolved.Key.ModelId.Name));
             }
 
             // F1.4-S2: parameter / result records of the methods declared by the model's types.

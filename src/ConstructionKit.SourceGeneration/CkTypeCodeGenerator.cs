@@ -33,6 +33,16 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
     /// </summary>
     public string Generate(string ns, CkModelId modelId, CkTypeDto ckType, string cacheTenantId,
         ICkCacheService cacheService, int ckLanguage)
+        => Generate(ns, modelId, ckType, cacheTenantId, cacheService, ckLanguage, null);
+
+    /// <summary>
+    ///     Generates the Rt class of a type. AB#9096: an implemented interface of another CK model is referenced by
+    ///     its fully qualified name, resolved through <paramref name="interfaceLookup" /> from the referenced
+    ///     assemblies; interfaces of the own model keep the short name, so models without foreign interfaces generate
+    ///     unchanged code.
+    /// </summary>
+    public string Generate(string ns, CkModelId modelId, CkTypeDto ckType, string cacheTenantId,
+        ICkCacheService cacheService, int ckLanguage, CkGeneratedInterfaceLookup? interfaceLookup)
     {
         string ckBaseType;
         if (ckType.DerivedFromCkTypeId != null)
@@ -50,7 +60,7 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
         if (implements.Count > 0)
         {
             ckBaseType += (ckBaseType.TrimStart().StartsWith(":") ? ", " : " : ") +
-                          string.Join(", ", implements.Select(i => CkInterfaceCodeGenerator.InterfaceName(i.ElementId)));
+                          string.Join(", ", implements.Select(i => CkGeneratedInterfaceLookup.Reference(i, modelId, interfaceLookup)));
         }
 
         StringBuilder sb = new();
@@ -106,7 +116,7 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
         {
             var typeGraph = cacheService.GetRtCkType(cacheTenantId, new RtCkId<CkTypeId>(modelId.Name, ckType.TypeId));
             CkInterfaceCodeGenerator.GenerateExplicitImplementations(sb, typeGraph, implements, cacheTenantId,
-                cacheService);
+                cacheService, modelId, interfaceLookup);
         }
 
         sb.AppendLine("}");

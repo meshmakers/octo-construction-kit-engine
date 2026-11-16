@@ -22,10 +22,19 @@ public static class CkInterfaceCodeGenerator
     /// <summary>Generates the interface source.</summary>
     public static string Generate(string ns, CkModelId modelId, CkInterfaceDto ckInterface, string cacheTenantId,
         ICkCacheService cacheService)
+        => Generate(ns, modelId, ckInterface, cacheTenantId, cacheService, null);
+
+    /// <summary>
+    ///     Generates the interface source. AB#9096: an extended interface of another CK model is referenced by its fully
+    ///     qualified name through <paramref name="interfaceLookup" />.
+    /// </summary>
+    public static string Generate(string ns, CkModelId modelId, CkInterfaceDto ckInterface, string cacheTenantId,
+        ICkCacheService cacheService, CkGeneratedInterfaceLookup? interfaceLookup)
     {
         var interfaceGraph = cacheService.GetRtCkInterface(cacheTenantId,
             new RtCkId<CkInterfaceId>(modelId.Name, ckInterface.InterfaceId));
-        var bases = interfaceGraph.DeclaredExtends.Select(e => InterfaceName(e.ElementId)).ToList();
+        var bases = interfaceGraph.DeclaredExtends
+            .Select(e => CkGeneratedInterfaceLookup.Reference(e, modelId, interfaceLookup)).ToList();
         // A member repeated identically from a parent would hide it (CS0108); the parent already declares it.
         var inherited = new HashSet<CkId<CkAttributeId>>(interfaceGraph.AllExtendedInterfaces
             .SelectMany(e => cacheService.GetRtCkInterface(cacheTenantId, e.ToRtCkId()).Attributes.Keys));
@@ -68,6 +77,17 @@ public static class CkInterfaceCodeGenerator
     /// </summary>
     public static void GenerateExplicitImplementations(StringBuilder sb, CkTypeGraph typeGraph,
         IEnumerable<CkId<CkInterfaceId>> declared, string cacheTenantId, ICkCacheService cacheService)
+        => GenerateExplicitImplementations(sb, typeGraph, declared, cacheTenantId, cacheService,
+            typeGraph.CkTypeId.ModelId, null);
+
+    /// <summary>
+    ///     Explicit implementations as above; AB#9096: an interface of another CK model than
+    ///     <paramref name="ownModel" /> is qualified through <paramref name="interfaceLookup" />
+    ///     (<c>string global::Ns.Generated.System.v2.IRtNamed.Name => Name;</c>).
+    /// </summary>
+    public static void GenerateExplicitImplementations(StringBuilder sb, CkTypeGraph typeGraph,
+        IEnumerable<CkId<CkInterfaceId>> declared, string cacheTenantId, ICkCacheService cacheService,
+        CkModelId ownModel, CkGeneratedInterfaceLookup? interfaceLookup)
     {
         var emitted = new HashSet<(CkId<CkInterfaceId>, string)>();
         foreach (var ckInterfaceId in declared)
@@ -96,7 +116,7 @@ public static class CkInterfaceCodeGenerator
                             ? member.AttributeName
                             : "default";
                         sb.AppendLine(
-                            $"  {type} {InterfaceName(level.CkInterfaceId.ElementId)}.{member.AttributeName} => {body};");
+                            $"  {type} {CkGeneratedInterfaceLookup.Reference(level.CkInterfaceId, ownModel, interfaceLookup)}.{member.AttributeName} => {body};");
                     }
                 }
             }

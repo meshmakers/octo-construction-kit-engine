@@ -61,6 +61,11 @@ internal static class BlueprintEntityComparer
     /// AB#6315: string attributes whose old/new text is reported as a value-free summary (the
     /// attributes the blanking guard lists). JSON texts are always masked, whether listed or not.
     /// </param>
+    /// <param name="includeTenantOwned">
+    /// AB#8966: also compare the <see cref="AttributeOwnershipDto.TenantOwned" /> attributes. The uninstall asks whether
+    /// the tenant edited the entity at all, and TenantOwned attributes are exactly the content the tenant edits (a page's
+    /// summary, sections, status); the upsert preserving them is irrelevant there. RuntimeState and Secret stay excluded.
+    /// </param>
     internal static List<BlueprintAttributeChange> Compare(
         RtEntityTcDto seed,
         RtEntity tenant,
@@ -68,7 +73,8 @@ internal static class BlueprintEntityComparer
         Func<object?, object?> toTransport,
         Func<CkId<CkEnumId>, CkEnumGraph?> resolveEnum,
         Func<RtCkId<CkRecordId>, CkRecordGraph?>? resolveRecord = null,
-        IReadOnlySet<string>? maskedAttributeNames = null)
+        IReadOnlySet<string>? maskedAttributeNames = null,
+        bool includeTenantOwned = false)
     {
         var changes = new List<BlueprintAttributeChange>();
 
@@ -87,7 +93,8 @@ internal static class BlueprintEntityComparer
                 continue;
             }
 
-            if (attribute.Ownership.IsPreservedOnUpsert())
+            if (attribute.Ownership.IsPreservedOnUpsert()
+                && !(includeTenantOwned && attribute.Ownership == AttributeOwnershipDto.TenantOwned))
             {
                 // The apply carries the stored value over (ImportRtModelCommand.PreserveAttributesForEntity);
                 // whatever the seed says here never lands.

@@ -37,6 +37,12 @@ public class BlueprintServiceUninstallTenantOwnedTests
     private static readonly RtCkId<CkAttributeId> ThresholdAttr = new CkId<CkAttributeId>("Test-1.0.0/Threshold").ToRtCkId();
     private static readonly RtCkId<CkAssociationRoleId> RelatedRole = new("Test-1.0.0/Related");
 
+    /// <summary>A to-one role out of Rule (a version belongs to one page); Related is to-many (links between pages).</summary>
+    private static readonly RtCkId<CkAssociationRoleId> VersionOfRole =
+        new CkId<CkAssociationRoleId>("Test-1.0.0/VersionOf").ToRtCkId();
+
+    private static readonly RtCkId<CkAttributeId> SummaryAttr = new CkId<CkAttributeId>("Test-1.0.0/Summary").ToRtCkId();
+
     /// <summary>
     /// One seed entity: key, the seed's lock flag (null = absent, i.e. locked), a payload value and the keys (or raw
     /// rtIds) its seed-declared associations point to.
@@ -51,6 +57,12 @@ public class BlueprintServiceUninstallTenantOwnedTests
 
         /// <summary>False: the seed gives the entity no well-known name (its key is then its rtId).</summary>
         public bool Named { get; init; } = true;
+
+        /// <summary>The key of the entity this one is a seeded child of (to-one VersionOf association).</summary>
+        public string? VersionOf { get; init; }
+
+        /// <summary>A TenantOwned content attribute (a page's summary).</summary>
+        public string? Summary { get; init; }
     }
 
     private static OctoObjectId IdOf(string key) =>
@@ -198,16 +210,30 @@ public class BlueprintServiceUninstallTenantOwnedTests
                 entity.Attributes.Add(new RtAttributeTcDto { Id = LockedAttr, Value = locked });
             }
 
-            if (spec.Links.Length > 0)
+            if (spec.Summary != null)
             {
-                entity.Associations = spec.Links
-                    .Select(target => new RtAssociationTcDto
-                    {
-                        RoleId = RelatedRole,
-                        TargetRtId = TargetId(target),
-                        TargetCkTypeId = RuleType
-                    })
-                    .ToList();
+                entity.Attributes.Add(new RtAttributeTcDto { Id = SummaryAttr, Value = spec.Summary });
+            }
+
+            var associations = spec.Links
+                .Select(target => new RtAssociationTcDto
+                {
+                    RoleId = RelatedRole,
+                    TargetRtId = TargetId(target),
+                    TargetCkTypeId = RuleType
+                })
+                .ToList();
+            if (spec.VersionOf != null)
+            {
+                associations.Add(new RtAssociationTcDto
+                {
+                    RoleId = VersionOfRole, TargetRtId = TargetId(spec.VersionOf), TargetCkTypeId = RuleType
+                });
+            }
+
+            if (associations.Count > 0)
+            {
+                entity.Associations = associations;
             }
 
             root.Entities.Add(entity);
@@ -224,14 +250,20 @@ public class BlueprintServiceUninstallTenantOwnedTests
 
     /// <summary>A tenant entity of the blueprint as the install wrote it (seed value 1), or edited (another value).</summary>
     private RtEntity GivenTenantEntity(string key, bool storedLocked, int threshold = 1, BlueprintId? source = null,
-        RtCkId<CkTypeId>? type = null, string? rtIdKey = null)
+        RtCkId<CkTypeId>? type = null, string? rtIdKey = null, string? summary = null)
     {
-        var entity = new RtEntity(type ?? RuleType, IdOf(rtIdKey ?? key), new Dictionary<string, object?>
+        var attributes = new Dictionary<string, object?>
         {
             ["RtBlueprintSource"] = (source ?? V1).FullName,
             ["RtBlueprintLocked"] = storedLocked,
             ["Threshold"] = threshold
-        })
+        };
+        if (summary != null)
+        {
+            attributes["Summary"] = summary;
+        }
+
+        var entity = new RtEntity(type ?? RuleType, IdOf(rtIdKey ?? key), attributes)
         {
             RtWellKnownName = key
         };
@@ -269,12 +301,35 @@ public class BlueprintServiceUninstallTenantOwnedTests
             {
                 AttributeId = "Threshold", ValueType = AttributeValueTypesDto.Integer
             }));
-        var graph = new CkTypeGraph(new CkId<CkTypeId>("Test-1.0.0/Rule"), isAbstract: false, isFinal: false,
+        var summaryId = new CkId<CkAttributeId>("Test-1.0.0/Summary");
+        var summary = new CkTypeAttributeGraph(summaryId,
+            new CkTypeAttributeDto
+            {
+                CkAttributeId = summaryId, AttributeName = "Summary", IsOptional = true,
+                Ownership = AttributeOwnershipDto.TenantOwned
+            },
+            new CkAttributeGraph(summaryId, new CkAttributeDto
+            {
+                AttributeId = "Summary", ValueType = AttributeValueTypesDto.String
+            }));
+        var ruleId = new CkId<CkTypeId>("Test-1.0.0/Rule");
+        var outbound = new CkGraphAssociationInheritance(
+        [
+            new CkTypeAssociationGraph("versionOf", MultiplicitiesDto.ZeroOrOne,
+                new CkId<CkAssociationRoleId>("Test-1.0.0/VersionOf"), ruleId, ruleId, null),
+            new CkTypeAssociationGraph("related", MultiplicitiesDto.N,
+                new CkId<CkAssociationRoleId>("Test-1.0.0/Related"), ruleId, ruleId, null)
+        ], []);
+        var graph = new CkTypeGraph(ruleId, isAbstract: false, isFinal: false,
             isCollectionRoot: false, baseTypes: [], derivedFromCkTypeId: null, definingCollectionRootCkTypeId: null,
             derivedTypes: [], definedAttributes: [],
-            allAttributes: new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> { [attrId] = threshold },
+            allAttributes: new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>
+            {
+                [attrId] = threshold, [summaryId] = summary
+            },
             indexes: [],
-            associations: new CkGraphDirectedAssociations([]), description: "test",
+            associations: new CkGraphDirectedAssociations([], new CkGraphAssociationInheritance(), outbound),
+            description: "test",
             enableChangeStreamPreAndPostImages: false);
         CkTypeGraph? ignored;
         A.CallTo(() => _cache.TryGetRtCkType(A<string>._, RuleType, out ignored))
@@ -465,14 +520,15 @@ public class BlueprintServiceUninstallTenantOwnedTests
     }
 
     [Fact]
-    public async Task Uninstall_EditedPage_KeepsTheUneditedVersionItPointsTo()
+    public async Task Uninstall_EditedPage_KeepsItsSeededVersion()
     {
-        // Fixpoint: the edited page stays, so its version - unedited itself - must stay with it.
-        GivenSeed(new SeedSpec("page", false, 1, "page@1"), new SeedSpec("page@1", false), new SeedSpec("other", false));
+        // The version is a seeded child of the page (to-one VersionOf, declared on the version): it stays with the page.
+        GivenSeed(new SeedSpec("page", false), new SeedSpec("page@1", false) { VersionOf = "page" },
+            new SeedSpec("other", false));
         var page = GivenTenantEntity("page", storedLocked: false, threshold: 7);
         var version = GivenTenantEntity("page@1", storedLocked: false);
         var other = GivenTenantEntity("other", storedLocked: false);
-        GivenAssociation(page.RtId, version.RtId);
+        GivenAssociation(version.RtId, page.RtId, VersionOfRole);
 
         var result = await Uninstall();
 
@@ -485,25 +541,183 @@ public class BlueprintServiceUninstallTenantOwnedTests
         Assert.Single(_associations);
     }
 
-    [Fact]
-    public async Task Uninstall_EditedPage_KeepsTheUneditedVersionsThatPointToIt()
+    [Theory]
+    [InlineData("Test-1.0.0/VersionOf")]   // the stored role id carries the model version
+    [InlineData("Test/UnknownRole")]       // a role the CK type does not know: counted as a child, kept
+    public async Task Uninstall_SeededChildLinkUnderAnotherRoleSpelling_StillKeepsTheChild(string storedRole)
     {
-        // The child declares the link to its parent (version -> page). Its own seed link must not let it go while the
-        // page it belongs to stays; the same holds for a successor that links to a kept predecessor.
-        GivenSeed(new SeedSpec("page", false), new SeedSpec("page@1", false, 1, "page"),
-            new SeedSpec("page@2", false, 1, "page@1"));
+        GivenSeed(new SeedSpec("page", false), new SeedSpec("page@1", false) { VersionOf = "page" });
         var page = GivenTenantEntity("page", storedLocked: false, threshold: 7);
         var version = GivenTenantEntity("page@1", storedLocked: false);
-        var successor = GivenTenantEntity("page@2", storedLocked: false);
-        GivenAssociation(version.RtId, page.RtId);
-        GivenAssociation(successor.RtId, version.RtId);
+        GivenAssociation(version.RtId, page.RtId, new RtCkId<CkAssociationRoleId>(storedRole));
 
         var result = await Uninstall();
 
         Assert.Empty(_erased);
-        Assert.Equal(["page", "page@1", "page@2"], Keys(result.TenantOwnedKept));
-        Assert.Equal([page.RtId.ToString()], result.TenantOwnedKept.Single(k => k.Key == "page@1").ReferencedBy);
-        Assert.Equal([version.RtId.ToString()], result.TenantOwnedKept.Single(k => k.Key == "page@2").ReferencedBy);
+        Assert.Equal(["page", "page@1"], Keys(result.TenantOwnedKept));
+    }
+
+    [Fact]
+    public async Task Uninstall_SeedEntityAdoptedByAnotherBlueprint_ReferencingTheCandidate_KeepsIt()
+    {
+        // B is in this seed but another blueprint owns it now; it stays, so its link to A keeps A.
+        GivenSeed(new SeedSpec("a", false), new SeedSpec("b", false, 1, "a"));
+        var a = GivenTenantEntity("a", storedLocked: false);
+        var b = GivenTenantEntity("b", storedLocked: false, source: new BlueprintId("Other-1.0.0"));
+        GivenAssociation(b.RtId, a.RtId);
+
+        var result = await Uninstall();
+
+        Assert.Empty(_erased);
+        var kept = Assert.Single(result.TenantOwnedKept);
+        Assert.Equal(BlueprintTenantOwnedKeptReason.Referenced, kept.Reason);
+        Assert.Equal([b.RtId.ToString()], kept.ReferencedBy);
+        Assert.Single(_associations);
+    }
+
+    [Fact]
+    public async Task Uninstall_TenantLinkUnderAnotherRoleBetweenSeedEntities_KeepsTheCandidate()
+    {
+        // The seed declares edited -> b (Related); the tenant added a second association under another role. That one
+        // is tenant content and keeps b.
+        GivenSeed(new SeedSpec("edited", false, 1, "b"), new SeedSpec("b", false));
+        var edited = GivenTenantEntity("edited", storedLocked: false, threshold: 7);
+        var b = GivenTenantEntity("b", storedLocked: false);
+        GivenAssociation(edited.RtId, b.RtId);
+        GivenAssociation(edited.RtId, b.RtId, new RtCkId<CkAssociationRoleId>("Test/Cites"));
+
+        var result = await Uninstall();
+
+        Assert.Empty(_erased);
+        Assert.Equal(BlueprintTenantOwnedKeptReason.Referenced, result.TenantOwnedKept.Single(k => k.Key == "b").Reason);
+    }
+
+    [Fact]
+    public async Task Uninstall_TenantReferencesAVersion_KeepsTheVersionAndItsPageOnly()
+    {
+        // A kept child keeps its to-one parent, so its VersionOf never points to an erased page; nothing spreads over the
+        // to-many LinksTo between pages.
+        GivenSeed(new SeedSpec("p1", false, 1, "p2"), new SeedSpec("p1@1", false) { VersionOf = "p1" },
+            new SeedSpec("p2", false, 1, "p1"), new SeedSpec("p2@1", false) { VersionOf = "p2" });
+        var p1 = GivenTenantEntity("p1", storedLocked: false);
+        var v1 = GivenTenantEntity("p1@1", storedLocked: false);
+        var p2 = GivenTenantEntity("p2", storedLocked: false);
+        var v2 = GivenTenantEntity("p2@1", storedLocked: false);
+        GivenAssociation(v1.RtId, p1.RtId, VersionOfRole);
+        GivenAssociation(v2.RtId, p2.RtId, VersionOfRole);
+        GivenAssociation(p1.RtId, p2.RtId);
+        GivenAssociation(p2.RtId, p1.RtId);
+        var user = GivenUserEntity("cc00000000000000000000b1");
+        GivenAssociation(user.RtId, v1.RtId);
+
+        var result = await Uninstall();
+
+        Assert.Equal(new[] { p2.RtId, v2.RtId }.Order(), _erased.Order());
+        Assert.Equal(["p1", "p1@1"], Keys(result.TenantOwnedKept));
+        Assert.Equal([user.RtId.ToString()], result.TenantOwnedKept.Single(k => k.Key == "p1@1").ReferencedBy);
+        Assert.Equal([v1.RtId.ToString()], result.TenantOwnedKept.Single(k => k.Key == "p1").ReferencedBy);
+        Assert.DoesNotContain(_associations, a => _erased.Contains(a.OriginRtId) || _erased.Contains(a.TargetRtId));
+    }
+
+    [Fact]
+    public async Task Uninstall_ExternalEntitySharingTheRtIdOfASeedEntityOfAnotherType_IsOutsideTheSeed()
+    {
+        // The seed has Note "x" (declaring a Related link to c); an external Rule "x" with the same rtId links to c under
+        // the same role. It is not the seed's Note, so it keeps c, and its association stays.
+        GivenSeed(new SeedSpec("x-note", false, 1, "c") { Type = NoteType, RtIdKey = "x" }, new SeedSpec("c", false));
+        GivenTenantEntity("x-note", storedLocked: false, type: NoteType, rtIdKey: "x", threshold: 7);
+        var c = GivenTenantEntity("c", storedLocked: false);
+        var external = GivenUserEntity(IdOf("x").ToString()!);
+        GivenAssociation(external.RtId, c.RtId);
+
+        var result = await Uninstall();
+
+        Assert.Empty(_erased);
+        Assert.Equal(BlueprintTenantOwnedKeptReason.Referenced, result.TenantOwnedKept.Single(k => k.Key == "c").Reason);
+        Assert.Single(_associations);
+    }
+
+    [Fact]
+    public async Task Uninstall_SeedLinksBetweenPages_DoNotSpreadAKeep()
+    {
+        // The edited page links (seed-declared, to-many) to an unedited page, which links on: no propagation. The linked
+        // pages are erased; their links to the kept page go with them.
+        GivenSeed(new SeedSpec("edited", false, 1, "b"), new SeedSpec("b", false, 1, "c", "edited"),
+            new SeedSpec("c", false, 1, "b"));
+        var edited = GivenTenantEntity("edited", storedLocked: false, threshold: 7);
+        var b = GivenTenantEntity("b", storedLocked: false);
+        var c = GivenTenantEntity("c", storedLocked: false);
+        GivenAssociation(edited.RtId, b.RtId);
+        GivenAssociation(b.RtId, c.RtId);
+        GivenAssociation(b.RtId, edited.RtId);
+        GivenAssociation(c.RtId, b.RtId);
+
+        var result = await Uninstall();
+
+        Assert.Equal(new[] { b.RtId, c.RtId }.Order(), _erased.Order());
+        Assert.Equal(["edited"], Keys(result.TenantOwnedKept));
+        Assert.Empty(_associations);
+    }
+
+    [Fact]
+    public async Task Uninstall_KbTest2Shape_KeepsOnlyTheReferencedAndTheEditedPageWithTheirVersions()
+    {
+        // System.Ai.Builder on kb-test2 (AB#8966 comment 6667842): 23 pages, every page links to every other page (seed
+        // LinksTo), each page has its version (VersionOf). A tenant answer page links to one page; the tenant added a new
+        // version to another page. Expected: those two pages and their seeded versions stay, 21 pages + versions go.
+        const int pages = 23;
+        var keys = Enumerable.Range(1, pages).Select(i => $"p{i:00}").ToList();
+        var seed = new List<SeedSpec>();
+        foreach (var key in keys)
+        {
+            seed.Add(new SeedSpec(key, false, 1, keys.Where(k => k != key).ToArray()));
+            seed.Add(new SeedSpec($"{key}@1", false) { VersionOf = key });
+        }
+        GivenSeed(seed.ToArray());
+        foreach (var key in keys)
+        {
+            var page = GivenTenantEntity(key, storedLocked: false);
+            var version = GivenTenantEntity($"{key}@1", storedLocked: false);
+            GivenAssociation(version.RtId, page.RtId, VersionOfRole);
+            foreach (var target in keys.Where(k => k != key))
+            {
+                GivenAssociation(page.RtId, IdOf(target));
+            }
+        }
+
+        var answer = GivenUserEntity("cc00000000000000000000a1");
+        GivenAssociation(answer.RtId, IdOf("p01"));
+        var tenantVersion = GivenUserEntity("cc00000000000000000000a2");
+        GivenAssociation(tenantVersion.RtId, IdOf("p02"), VersionOfRole);
+
+        var preview = await PreviewUninstall();
+        var result = await Uninstall();
+
+        Assert.Equal(["p01", "p01@1", "p02", "p02@1"], Keys(result.TenantOwnedKept));
+        Assert.Equal(BlueprintTenantOwnedKeptReason.Referenced, result.TenantOwnedKept.Single(k => k.Key == "p01").Reason);
+        Assert.Equal([answer.RtId.ToString()], result.TenantOwnedKept.Single(k => k.Key == "p01").ReferencedBy);
+        Assert.Equal(BlueprintTenantOwnedKeptReason.Edited, result.TenantOwnedKept.Single(k => k.Key == "p02").Reason);
+        Assert.Equal([tenantVersion.RtId.ToString()], result.TenantOwnedKept.Single(k => k.Key == "p02").ReferencedBy);
+        Assert.Equal(BlueprintTenantOwnedKeptReason.Referenced, result.TenantOwnedKept.Single(k => k.Key == "p01@1").Reason);
+        Assert.Equal(42, result.EntitiesDeleted);
+        Assert.Equal(Keys(preview.DeletedEntities), Keys(result.DeletedEntities));
+        Assert.Equal(Keys(preview.TenantOwnedKept), Keys(result.TenantOwnedKept));
+        // No association points to an erased entity.
+        Assert.DoesNotContain(_associations, a => _erased.Contains(a.OriginRtId) || _erased.Contains(a.TargetRtId));
+    }
+
+    [Fact]
+    public async Task Uninstall_TenantOwnedContentChanged_IsEdited()
+    {
+        // TenantOwned attributes are the content a tenant edits (a page's summary); a change there is an edit.
+        GivenSeed(new SeedSpec("page", false) { Summary = "seeded" }, new SeedSpec("same", false) { Summary = "seeded" });
+        GivenTenantEntity("page", storedLocked: false, summary: "rewritten by the tenant");
+        var same = GivenTenantEntity("same", storedLocked: false, summary: "seeded");
+
+        var result = await Uninstall();
+
+        Assert.Equal([same.RtId], _erased);
+        Assert.Equal(BlueprintTenantOwnedKeptReason.Edited, Assert.Single(result.TenantOwnedKept).Reason);
     }
 
     [Fact]
@@ -614,13 +828,13 @@ public class BlueprintServiceUninstallTenantOwnedTests
     [Fact]
     public async Task Uninstall_SeedLinkToARenamedUnlockedProductOwnedParent_KeepsTheChild()
     {
-        // The parent stays (unlocked by the tenant, renamed, so the key match misses it); the child's own seed link to it
-        // points into this blueprint's seed, so the child is kept.
-        GivenSeed(new SeedSpec("parent", null), new SeedSpec("child", false, 1, "parent"));
+        // The parent stays (unlocked by the tenant, renamed, so the key match misses it); the child is its seeded child
+        // (to-one link into this blueprint's seed), so the child is kept.
+        GivenSeed(new SeedSpec("parent", null), new SeedSpec("child", false) { VersionOf = "parent" });
         var parent = GivenTenantEntity("parent", storedLocked: false);
         parent.RtWellKnownName = "renamed-by-tenant";
         var child = GivenTenantEntity("child", storedLocked: false);
-        GivenAssociation(child.RtId, parent.RtId);
+        GivenAssociation(child.RtId, parent.RtId, VersionOfRole);
 
         var result = await Uninstall();
 

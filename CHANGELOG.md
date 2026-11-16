@@ -9,6 +9,20 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Changed
 
+- **Uninstall: keeps only what is referenced from outside or edited (AB#8966, follow-up of #371).** On kb-test2 the uninstall
+  of System.Ai.Builder erased 0 of 46 entities. The `Referenced` rule spread along the seed's own `LinksTo` links between
+  pages, and `Edited` never fired because the comparison left out `TenantOwned` attributes. The rules are now:
+  - `Referenced` means a direct reference from an entity outside the blueprint, plus the seeded to-one children of a kept
+    entity (its versions) and the to-one parents of a kept entity (a kept version keeps its page), so no kept entity points
+    to an erased one. Associations the seed declares between its own entities no longer spread a keep, and they go with
+    the erased entities.
+  - The uninstall comparison counts `TenantOwned` attributes.
+  - An entity outside the blueprint that attaches itself to a seed entity through a to-one association (a tenant-written page
+    version) marks it `Edited`.
+
+  `BlueprintEntityComparer.Compare` gains `includeTenantOwned` (default `false`; the update rule is unchanged). No contract
+  change. Rules: `docs/blueprints.md`, "Tenant-owned seed entities on uninstall".
+
 - **Late stream-data deliveries recompute rollups only for the affected series, once per debounce interval (AB#9016).**
   Before, every late delivery marked the whole window dirty on the raw archive, and the next tick recomputed the rollup for
   that window over every series, then the whole cascade. Each run used a new generation and cleaned up the old one

@@ -367,7 +367,7 @@ Rules for a tenant-owned seed entity (`UpdateBlueprint` in `Merge` and `Full` mo
   - **A report of the run.** `TenantOwnedUpdateAvailable` is not stored: applying the same version again lists nothing, although the edit is still there.
   - **No marker on the entity.** The baseline of "unedited" (the *seed content hash* of the rule decided on AB#8450) is the previous seed itself, not a value stored on the entity, so no System CK attribute is needed and entities seeded before AB#8778 follow the same rule: they are unedited exactly when their content equals the previous seed, and after one refresh they equal the new seed. Re-applying the same version is a no-op (target and previous seed are the same).
   - **Versioned content** (for example knowledge pages): ship each content version as its own seed entity with a new key and let the page refer to its current version through an attribute that belongs to the page content. An unedited page then points to the new version; an edited page keeps its reference while the new version entity is created (new key) and is not referenced - a later check can report it from there.
-- **Removed by an uninstall while the tenant has not edited it (AB#8966).** `UninstallBlueprint` compares the tenant entity with the seed of the installed version, with the comparison of the update rule above (no stored hash): an unedited entity is erased, an edited one is kept and listed in `TenantOwnedKept` with the reason `Edited`; an unedited one that an entity staying in the tenant references is kept with the reason `Referenced`. Details in [Uninstall](#uninstall).
+- **Removed by an uninstall while the tenant has not edited it (AB#8966).** `UninstallBlueprint` compares the tenant entity with the seed of the installed version, with the comparison of the update rule above plus the `TenantOwned` attributes (no stored hash): an unedited entity is erased, an edited one is kept and listed in `TenantOwnedKept` with the reason `Edited`; an unedited one that an entity staying in the tenant references is kept with the reason `Referenced`. Details in [Uninstall](#uninstall).
 - **Never re-created after a delete.** If the tenant lacks it and the seed of the previously installed version (read from the catalog) contains the same key (`rtWellKnownName`, else `rtId`) with the same CK type, the tenant deleted it and it stays deleted. If that previous seed cannot be read from the catalog, the update does **not** create the absent tenant-owned entities and returns a warning, because it cannot tell a deleted entity from a new one.
 - **The seed decides, not the tenant's stamp.** A tenant that still carries the stamp `rtBlueprintLocked: true` from an earlier version is handled as tenant-owned from the first update whose seed declares the entity unlocked; its edits are kept. The key counts as "contained in the previous seed" whatever flag the previous seed gave it, so an entity that was product-owned and is handed over to the tenant stays deleted if the tenant had deleted it.
 - **Reported.** `PreviewUpdateAsync` lists them in `TenantOwnedSkipped`, `TenantOwnedUpdateAvailable` (a subset of `TenantOwnedSkipped`), `TenantOwnedRefreshed` and `TenantOwnedStaysDeleted`; the apply result carries the same four lists (skipped and stays-deleted counted in `EntitiesSkipped`, refreshed in `EntitiesUpdated`). A forced re-apply or an install over another version applies the same rule and reports the groups as messages of the `OperationResult`.
@@ -923,38 +923,56 @@ tenant-owned seed entity (the seed sets `rtBlueprintLocked: false`) that the ten
 `rtBlueprintSource` and unlocked:
 
 - **Unedited → erased.** The tenant entity equals the seed of the installed version, read from the catalog — the comparison
-  of the update rule (AB#8778, see [product-owned and tenant-owned seed entities](#product-owned-and-tenant-owned-seed-entities-ab6383)), with no
-  stored hash — and it has the seed's `rtId` and the seed's well-known name (a name the tenant added to an entity the seed
-  leaves unnamed is an edit). Counted in `EntitiesDeleted`, listed in `DeletedEntities`
-  (`TenantOwned = true`).
-- **Edited → kept**, listed in `TenantOwnedKept` with the reason `Edited` (another attribute value, renamed, or held under
-  another `rtId`). The limits of the update comparison apply: changed `TenantOwned`, `RuntimeState` or `Secret` attributes
-  and edits reverted to the seed count as unedited; associations are not part of the content comparison (see the next point).
-- **Referenced → kept**, reason `Referenced`, with the runtime ids of the referencing entities in `ReferencedBy`. An unedited
-  entity is kept when it shares an association with an entity that stays in the tenant:
-  - any association with an entity of this blueprint's seed that stays (an edited, referenced or not comparable
-    tenant-owned entity, an unlocked copy of a product-owned one - renamed or not -, or one another blueprint adopted),
-    whichever side the seed declares it on;
-  - any association with an entity outside this blueprint's seed (created by the tenant, owned by another blueprint, a
-    system entity), unless the seed declares it on the entity itself (its own blueprint-seeded link, erased with it).
-    Seed-declared links are matched by origin and target; the role is not compared, because the stored role id is the one
-    the CK cache resolved.
+  of the update rule (AB#8778, see [product-owned and tenant-owned seed entities](#product-owned-and-tenant-owned-seed-entities-ab6383)),
+  with no stored hash, **plus the `TenantOwned` attributes**, because they hold the content a tenant edits (a page's summary,
+  sections, status) — and it has the seed's `rtId` and the seed's well-known name (a name the tenant added to an entity the
+  seed leaves unnamed is an edit). Counted in `EntitiesDeleted`, listed in `DeletedEntities` (`TenantOwned = true`).
+- **Edited → kept**, listed in `TenantOwnedKept` with the reason `Edited`:
+  - another attribute value (including `TenantOwned` ones), renamed, or held under another `rtId`;
+  - or an entity outside the blueprint attached itself to it through a **to-one** association (a version the tenant wrote
+    for a seeded page: `VersionOf` is to-one out of the version). `ReferencedBy` then names the attached entity.
+
+  Not compared: `RuntimeState` and `Secret` attributes, and edits reverted to the seed count as unedited.
+- **Referenced → kept**, reason `Referenced`, with the runtime ids of the referencing entities in `ReferencedBy`:
+  - **directly referenced from outside the blueprint**: an entity the tenant created, another blueprint's entity or a
+    system entity shares an association with it (a tenant page links to a seeded page). The entity's own seed-declared
+    link out of the blueprint (to a system entity, say) does not count; it is erased with it;
+  - **seeded child of an entity that stays**: the seed declares a to-one association from it to a kept entity of this
+    blueprint (the seeded version of a kept page). This repeats for children of children;
+  - **to-one parent of an entity that stays**: a kept entity's to-one association within the seed keeps its target (a
+    version referenced from outside keeps its page), so no kept entity is left pointing to an erased one. This repeats
+    upward along to-one roles only;
+  - an association the tenant created between two entities of this blueprint's seed, when the other one stays. An
+    association counts as seed-declared only with the same origin, target and role (role compared without the model
+    version); a second association under another role is the tenant's.
+
+  A seed entity the tenant holds under **another blueprint's** `rtBlueprintSource` (adopted) counts as outside this
+  blueprint: it stays, so an association with it keeps the entity like a tenant entity would.
+
+  **Associations the seed declares between its own entities do not spread a keep**: a page that stays does not keep the
+  pages it links to (seed `LinksTo`, to-many), nor the pages that link to it. Those links go with the erased entities. On
+  kb-test2 one tenant link and one tenant version used to keep all 23 pages of System.Ai.Builder. Now they keep 2 pages
+  and their seeded versions; the other 21 pages and their versions are erased.
 
   An association end is matched to an entity by `rtId` and a CK type that can be the same: equal, missing on one side, or
   the same type name under another model spelling (its stored CK type need not be spelled like the seed's). An `rtId` the
   entities of the uninstall carry under several CK types (seeds reuse an `rtId` across types) needs the exact type. When that
-  cannot decide, the end counts as staying, so the entity is kept.
+  cannot decide, the end counts as staying.
 
   Associations with entities this uninstall erases (locked entities, other unedited entities, entities of dependents a cascade
-  removes first) do not count. The rule is applied until nothing changes: an edited page keeps its unedited versions, whether
-  the page points to them or they point to the page, and a version kept that way keeps its successors. When an erase fails
-  (reported as a warning, the entity stays and a tenant-owned one is listed with the reason `EraseFailed`), the rule is
-  applied again before the next erase, so the unedited entities linked to it stay as well; entities erased before the
-  failure stay erased.
+  removes first) do not count. When an erase fails (reported as a warning, the entity stays and a tenant-owned one is listed
+  with the reason `EraseFailed`), the rules are applied again before the next erase; entities erased before the failure stay
+  erased.
 - **Not comparable → kept**, reason `NotComparable`: the CK type is not in the cache or the comparison failed.
 - Locked entities are erased as before; entities with another blueprint's `rtBlueprintSource` are not touched.
 
-Limits: only associations are references. An entity that names another one in an **attribute** (for example a page that
+Limits of the uninstall rules:
+- "Seeded child" is generic: any to-one association the seed declares from an entity to a kept entity of the same
+  blueprint. A seed that points its entities at a shared tenant-owned parent through a to-one role, such as a folder that
+  stays, keeps all of them. System.Ai pages have no such role; `VersionOf` is their only to-one link.
+- An update (AB#8778) keeps `TenantOwned` values. After an update whose seed changed a `TenantOwned` attribute, the entity
+  differs from the installed seed and counts as edited on uninstall. It is kept, never erased by mistake.
+- Only associations are references. An entity that names another one in an **attribute** (for example a page that
 holds the rtId of its current version, the pattern the update rule recommends for versioned content) does not keep it: an
 edited page can be left with the rtId of an erased version. Installing the blueprint again re-creates that version under the
 same rtId.

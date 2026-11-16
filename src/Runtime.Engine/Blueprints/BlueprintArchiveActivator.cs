@@ -482,7 +482,9 @@ internal sealed class BlueprintArchiveActivator(IStreamDataTenantServicesProvide
             var snapshot = await archiveStore.GetAsync(rtId).ConfigureAwait(false);
             if (snapshot is { Status: CkArchiveStatus.Created or CkArchiveStatus.Disabled })
             {
-                await archiveStore.SetStatusAsync(rtId, CkArchiveStatus.Failed).ConfigureAwait(false);
+                // AB#6247: the reason is kept on the archive (Archive.StatusReason).
+                await archiveStore.SetStatusAsync(rtId, CkArchiveStatus.Failed,
+                    reason.Length <= 2000 ? reason : reason[..2000], []).ConfigureAwait(false);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

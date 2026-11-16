@@ -160,6 +160,29 @@ public sealed class HiddenAttributeInArchiveException : StreamDataException
 }
 
 /// <summary>
+/// AB#6247: <see cref="IArchiveLifecycleService.RedactHiddenColumnsAsync"/> was refused because rollup archives aggregate
+/// columns it would drop. Change or delete those rollups first; nothing was dropped.
+/// </summary>
+public sealed class HiddenColumnRedactionBlockedException : StreamDataException
+{
+    /// <summary>The columns that would be dropped.</summary>
+    public IReadOnlyList<string> ColumnPaths { get; }
+
+    /// <summary>The rollup archives that aggregate at least one of them.</summary>
+    public IReadOnlyList<OctoObjectId> DependentRollupRtIds { get; }
+
+    public HiddenColumnRedactionBlockedException(OctoObjectId archiveRtId, IReadOnlyList<string> columnPaths,
+        IReadOnlyList<OctoObjectId> dependentRollupRtIds)
+        : base($"Archive {Describe(archiveRtId)} cannot drop the Hidden columns '{string.Join("', '", columnPaths)}': the " +
+               $"rollup archives {string.Join(", ", dependentRollupRtIds)} aggregate them. Change or delete those rollups " +
+               "first.", archiveRtId)
+    {
+        ColumnPaths = columnPaths;
+        DependentRollupRtIds = dependentRollupRtIds;
+    }
+}
+
+/// <summary>
 /// An import (seed, blueprint update, <c>ImportRt</c>) committed its entities, but one or more columns it declared for
 /// activated archives could not be added (AB#7997). The archive definitions do not name these columns, so the archives
 /// stay consistent with their tables; running the same import again retries the additions.

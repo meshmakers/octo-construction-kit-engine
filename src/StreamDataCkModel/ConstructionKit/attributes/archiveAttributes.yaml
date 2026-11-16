@@ -76,3 +76,12 @@ attributes:
     description: "Engine-managed transient marker for an in-progress formula change on a computed column (AB#4189 Phase 7). While set, the column keeps serving its previous formula's values (Formula at ComputedVersion N) and a backfill populates the new formula into the versioned physical column {base}__v{N+1}; ingest dual-writes both. Null in steady state. On backfill completion the engine swaps Formula <- PendingFormula, ComputedVersion <- N+1, and clears this field atomically."
     valueType: String
     isRuntimeState: true
+  # ---------- AB#6247 (1.27.0): reason of the status and the Hidden columns of a Failed archive ----------
+  - id: Archive.StatusReason
+    description: "Why the archive is in its current status (AB#6247), written by the platform with the transition to Failed: a column reached a Hidden attribute after a CK model change, or provisioning the CrateDB table failed. Cleared by every other transition. Null when no reason was recorded."
+    valueType: String
+    isRuntimeState: true
+  - id: Archive.HiddenColumns
+    description: "The ingested column paths that reached a Hidden attribute when the access re-validation set the archive to Failed (AB#6247). While the list is not empty the archive refuses every write, but its history stays queryable without these columns. Archive.RedactHiddenColumns drops them (their stored values are lost) and resumes the archive. Empty otherwise."
+    valueType: StringArray
+    isRuntimeState: true

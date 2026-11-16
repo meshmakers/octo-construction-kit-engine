@@ -99,3 +99,14 @@ records:
       - id: ${this}/ArchiveMethod.LastProgressAt
         name: LastProgressAt
         isOptional: true
+  # AB#6247 (1.27.0): result of Archive.RedactHiddenColumns.
+  - recordId: ArchiveRedactionResult
+    description: "Result of Archive.RedactHiddenColumns: the archive, its status after the call and the column paths whose columns and stored values were dropped."
+    isFinal: true
+    attributes:
+      - id: ${this}/ArchiveMethod.ArchiveRtId
+        name: ArchiveRtId
+      - id: ${this}/ArchiveMethod.Status
+        name: Status
+      - id: ${this}/ArchiveMethod.RemovedColumns
+        name: RemovedColumns

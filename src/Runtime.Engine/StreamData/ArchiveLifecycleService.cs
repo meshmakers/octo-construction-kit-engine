@@ -48,6 +48,9 @@ public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
     private readonly ICkCacheService? _ckCacheService;
     private readonly ComputedColumnBackfillRunner _backfillRunner;
 
+    /// <summary>Upper bound of a stored <c>Archive.StatusReason</c> (AB#6247), as for the rollup failure reason.</summary>
+    private const int MaxStatusReasonLength = 2000;
+
     /// <summary>
     /// Constructs the lifecycle service. The store and stream-data repository must be
     /// tenant-scoped; the audit trail can be either tenant-scoped or shared (the tenant id is
@@ -153,21 +156,166 @@ public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
         }
 
         var snapshot = await LoadAsync(archiveRtId);
-        if (ArchiveHiddenColumnGuard.FindHiddenColumn(_ckCacheService, _tenantId, snapshot) is not { } hidden)
+        var hidden = ArchiveHiddenColumnGuard.FindHiddenColumns(_ckCacheService, _tenantId, snapshot);
+        if (hidden.Count == 0)
         {
             return true;
         }
 
+        // Rollups are not readable without their aggregations; they record no Hidden columns and stay unreadable.
+        var paths = snapshot.RollupAggregations is null ? hidden.Select(h => h.Path).ToList() : [];
+        var reason = Truncate(DescribeHiddenColumns(hidden));
         _logger.LogWarning(
-            "Archive {ArchiveRtId} captures column {ColumnPath}, which now reaches the Hidden attribute {Attribute}; " +
-            "the archive is set to Failed and stops ingesting", archiveRtId, hidden.Path, hidden.Attribute);
+            "Archive {ArchiveRtId} captures columns that now reach Hidden attributes ({Columns}); the archive is set to " +
+            "Failed and stops ingesting, its history stays queryable without these columns", archiveRtId, reason);
         if (snapshot.Status == CkArchiveStatus.Activated)
         {
-            await TransitionAsync(snapshot, CkArchiveStatus.Failed);
+            await TransitionAsync(snapshot, CkArchiveStatus.Failed, reason, paths);
+        }
+        else if (snapshot.IsFailedOnHiddenColumns &&
+                 !paths.SequenceEqual(snapshot.HiddenColumns, StringComparer.OrdinalIgnoreCase))
+        {
+            // AB#6247: a later model change made more (or other) columns Hidden; keep the recorded set current so the
+            // query paths hide all of them and the redaction drops all of them. No status change, no transition event.
+            await _store.SetStatusAsync(archiveRtId, CkArchiveStatus.Failed, reason, paths);
         }
 
         return false;
     }
+
+    /// <inheritdoc />
+    public async Task<ArchiveRedactionResult> RedactHiddenColumnsAsync(OctoObjectId archiveRtId)
+    {
+        if (_ckCacheService == null)
+        {
+            throw new InvalidOperationException(
+                $"Archive {archiveRtId}: the Hidden columns cannot be determined without the CK cache.");
+        }
+
+        var snapshot = await LoadAsync(archiveRtId);
+        if (snapshot.RollupAggregations is not null)
+        {
+            // A rollup's columns are derived from its aggregations: change or delete the rollup instead.
+            throw new InvalidArchiveStateTransitionException(archiveRtId, snapshot.Status,
+                "redact the Hidden columns of a rollup archive (change or delete the rollup instead)");
+        }
+
+        var hidden = ArchiveHiddenColumnGuard.FindHiddenColumns(_ckCacheService, _tenantId, snapshot);
+        var paths = hidden.Select(h => h.Path).ToList();
+
+        if (paths.Count > 0)
+        {
+            if (snapshot.Status == CkArchiveStatus.Activated)
+            {
+                // Ingest and re-provisioning still work from the definition while the columns are dropped; the access
+                // re-validation sets such an archive to Failed, or the operator disables it first.
+                throw new InvalidArchiveStateTransitionException(archiveRtId, snapshot.Status,
+                    "redact the Hidden columns of an activated archive (disable it first)");
+            }
+
+            // A conflict key that names a dropped column would make every write of the resumed archive fail.
+            var hiddenPaths = new HashSet<string>(paths, StringComparer.OrdinalIgnoreCase);
+            var keyedPaths = snapshot.ConflictPrecedence
+                .Where(k => !k.IsOrigin && hiddenPaths.Contains(k.Column))
+                .Select(k => k.Column)
+                .ToList();
+            if (keyedPaths.Count > 0)
+            {
+                throw new InvalidArchiveStateTransitionException(archiveRtId, snapshot.Status,
+                    $"redact the Hidden columns while ConflictPrecedence still names {string.Join(", ", keyedPaths)} " +
+                    "(change the conflict precedence first)");
+            }
+
+            // A computed column whose formula - current or pending (a formula change in progress) - reads a dropped
+            // column would dangle: refuse before anything is dropped.
+            var remaining = snapshot.Columns.Where(c => c.IsComputed || !hiddenPaths.Contains(c.Path)).ToList();
+            await _repository.ValidateComputedColumnsAsync(archiveRtId, remaining);
+            if (remaining.Any(c => c.HasPendingFormula))
+            {
+                await _repository.ValidateComputedColumnsAsync(archiveRtId,
+                    remaining.Select(c => c.HasPendingFormula ? c with { Formula = c.PendingFormula } : c).ToList());
+            }
+
+            // Best-effort: a rollup created between this check and the drop is not seen (rollup creation is not
+            // serialised with the redaction).
+            var dependents = await FindRollupsAggregatingAsync(archiveRtId, paths);
+            if (dependents.Count > 0)
+            {
+                throw new HiddenColumnRedactionBlockedException(archiveRtId, paths, dependents);
+            }
+
+            // Audited before anything is dropped, as the attempt: if the audit were written after the drop and failed, a
+            // retry would find no Hidden column any more and the deletion would have no audit entry. A failed attempt is
+            // retried with the same definition, so every attempt is recorded.
+            var redactedReason =
+                Truncate($"RedactHiddenColumns drops the columns {DescribeHiddenColumns(hidden)} and their stored values");
+            await _audit.RecordTransitionAsync(_tenantId, archiveRtId, snapshot.Status, snapshot.Status, redactedReason);
+            _logger.LogWarning("Archive {ArchiveRtId}: {Reason}", archiveRtId, redactedReason);
+
+            // Crate first (idempotent DROP COLUMN), entity store last (§11): a failure in between leaves the definition
+            // naming columns the table no longer has, which a retry of this call converges.
+            await _repository.DropIngestedColumnStorageAsync(snapshot, paths);
+            await _store.RemoveIngestedColumnsAsync(archiveRtId, paths);
+        }
+
+        var status = snapshot.Status;
+        if (snapshot.IsFailedOnHiddenColumns)
+        {
+            // Resume: the same path as RetryActivation, on the redacted definition.
+            var redacted = await LoadAsync(archiveRtId);
+            EnsureNoHiddenColumns(redacted);
+            await ValidateRollupForActivationAsync(archiveRtId);
+            await EnsureCrateProvisionedAsync(redacted);
+            await EnsureRollupWatermarkInitialisedAsync(archiveRtId);
+            await EnsureRollupColumnsPersistedAsync(archiveRtId);
+            await TransitionAsync(redacted, CkArchiveStatus.Activated);
+            status = CkArchiveStatus.Activated;
+        }
+
+        return new ArchiveRedactionResult(archiveRtId, status, paths);
+    }
+
+    /// <summary>
+    ///     AB#6247: the rollup archives that aggregate one of <paramref name="paths" /> of the source archive. Dropping such
+    ///     a column would break the rollup, so the redaction is refused while one exists.
+    /// </summary>
+    private async Task<IReadOnlyList<OctoObjectId>> FindRollupsAggregatingAsync(OctoObjectId sourceRtId,
+        IReadOnlyCollection<string> paths)
+    {
+        if (_rollupStore is null)
+        {
+            return [];
+        }
+
+        var wanted = new HashSet<string>(paths, StringComparer.OrdinalIgnoreCase);
+        var dependents = new List<OctoObjectId>();
+        await foreach (var archive in _store.EnumerateAsync())
+        {
+            if (archive.RollupAggregations is null)
+            {
+                continue;
+            }
+
+            var rollup = await _rollupStore.GetAsync(archive.RtId);
+            if (rollup is null || !rollup.HasSource(sourceRtId))
+            {
+                continue;
+            }
+
+            if (rollup.Aggregations.Any(a => wanted.Contains(a.SourcePath)))
+            {
+                dependents.Add(archive.RtId);
+            }
+        }
+
+        return dependents;
+    }
+
+    private static string Truncate(string reason) =>
+        reason.Length <= MaxStatusReasonLength ? reason : reason[..MaxStatusReasonLength];
+
+    private static string DescribeHiddenColumns(IEnumerable<(string Path, string Attribute)> hidden) =>
+        string.Join(", ", hidden.Select(h => $"'{h.Path}' (reaches the Hidden attribute '{h.Attribute}')"));
 
     /// <inheritdoc />
     public async Task DisableAsync(OctoObjectId archiveRtId)
@@ -786,7 +934,9 @@ public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
             // outer exception still surfaces; the next reconciliation pass (T23) closes the loop.
             try
             {
-                await _store.SetStatusAsync(snapshot.RtId, CkArchiveStatus.Failed);
+                // AB#6247: the reason is kept on the archive (Archive.StatusReason), not only in the log.
+                await _store.SetStatusAsync(snapshot.RtId, CkArchiveStatus.Failed,
+                    Truncate($"Provisioning the CrateDB table failed: {ex.Message}"), []);
                 await _audit.RecordTransitionAsync(_tenantId, snapshot.RtId, snapshot.Status, CkArchiveStatus.Failed, ex.Message);
 
                 StreamDataDiagnostics.StatusTransitions.Add(1,
@@ -805,10 +955,25 @@ public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
         }
     }
 
-    private async Task TransitionAsync(ArchiveSnapshot from, CkArchiveStatus toStatus)
+    /// <summary>
+    ///     Writes the status and its reason in one store call (AB#6247): a transition to Failed carries the reason and
+    ///     the Hidden columns; every other transition uses the plain status write, which clears both. The audit event
+    ///     carries the same reason.
+    /// </summary>
+    private async Task TransitionAsync(ArchiveSnapshot from, CkArchiveStatus toStatus, string? reason = null,
+        IReadOnlyList<string>? hiddenColumns = null)
     {
-        await _store.SetStatusAsync(from.RtId, toStatus);
-        await _audit.RecordTransitionAsync(_tenantId, from.RtId, from.Status, toStatus, reason: null);
+        if (reason is null && (hiddenColumns is null || hiddenColumns.Count == 0))
+        {
+            // No reason: the plain write, which clears a recorded reason in stores that keep one.
+            await _store.SetStatusAsync(from.RtId, toStatus);
+        }
+        else
+        {
+            await _store.SetStatusAsync(from.RtId, toStatus, reason, hiddenColumns ?? []);
+        }
+
+        await _audit.RecordTransitionAsync(_tenantId, from.RtId, from.Status, toStatus, reason);
 
         StreamDataDiagnostics.StatusTransitions.Add(1,
             new("archive", from.RtId.ToString()),

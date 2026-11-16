@@ -23,6 +23,19 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Added
 
+- **Uninstall removes unedited tenant-owned seed entities; dry run (AB#8966).** `IBlueprintService.UninstallAsync` used to keep
+  every unlocked seed entity "as user data", so uninstalling `System.Ai.Builder` on kb-test2 erased 0 entities (46 pages and
+  versions kept). Now a tenant-owned seed entity (`rtBlueprintLocked: false` in the seed) is erased when it still equals the
+  seed of the installed version (the AB#8778 comparison, no stored hash) and it shares no association with an entity that
+  stays (any entity of the blueprint's seed that stays; outside that seed, anything but its own seed-declared links); otherwise it is kept and listed in the new
+  `BlueprintUninstallResult.TenantOwnedKept` with the reason `Edited`, `Referenced` (with `ReferencedBy`), `NotComparable` or `EraseFailed`.
+  The new `DeletedEntities` lists what was erased. New `IBlueprintService.PreviewUninstallAsync` is the dry run
+  (`DryRun = true`, nothing changed, no notification). Locked entities are erased as before; a reinstall adopts the kept
+  entities and creates the erased ones once. Rules: `docs/blueprints.md`, "Uninstall".
+  - **Behaviour change:** unedited, unreferenced tenant-owned seed entities are erased by an uninstall instead of kept.
+  - Additive contract change: one new interface member (only `BlueprintService` implements `IBlueprintService`), new result
+    properties with empty defaults.
+
 - **Blueprint seeds: escape for runtime placeholders (AB#8995).** A seed value with `$${name}` is stored as the literal
   `${name}`, without a variable lookup and without the "Unknown blueprint variable" warning (message 27). Use it for
   placeholders that are filled at run time, such as notification templates (`${count}`) or KPI formulas. It applies to

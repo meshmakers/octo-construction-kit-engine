@@ -93,9 +93,10 @@ and no Hidden columns; `RetryActivation` applies.
 
 ## Backups (AB#9141)
 
-A tenant backup never carries the values of a column that reaches a Hidden attribute, in either format, and neither the
-staging copy nor the final artefact holds them. The rule lives in `CrateDbStreamDataRepository` (engine-mongodb); the
-contracts are unchanged.
+A tenant backup leaves out the values of every column known to reach a Hidden attribute, in either format, from the staging
+copy and from the final artefact. Known means: found in the archive's CK type, or recorded on the archive. When the type
+cannot be read, only the recorded columns are known, so such a backup can hold Hidden values (residual risk, below). The rule
+lives in `CrateDbStreamDataRepository` (engine-mongodb); the contracts are unchanged.
 
 What a backup leaves out of an archive:
 
@@ -114,7 +115,7 @@ recorded yet, can end up in the backup.
 
 | Path | What changes |
 |---|---|
-| Native copy (format 2) | The plan describes the data table without these columns, so the manifest lists only the columns the dump holds. Each data slice is copied with an explicit column list, `COPY <table> ("a", "b", …) WHERE … TO DIRECTORY … WITH (format = 'json_object', …)`: the staged files written by CrateDB never contain the values. A generation map holds no attribute values and is copied as before. |
+| Native copy (format 2) | The plan describes the data table without these columns, so the manifest lists only the columns the dump holds. Each data slice is copied with an explicit column list, `COPY <table> ("a", "b", …) WHERE … TO DIRECTORY … WITH (format = 'json_object', …)`: the staged files written by CrateDB do not contain the left-out values. A generation map holds no attribute values and is copied as before. |
 | Row path (format 1) and the archive data export | `ExportRowsAsync` leaves out the same columns (it used to leave out only the recorded ones of an archive Failed on Hidden columns). |
 
 What a restore does with such an archive (octo-bot-services, both formats). Before the archive's table is touched, the

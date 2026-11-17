@@ -183,6 +183,34 @@ public sealed class HiddenColumnRedactionBlockedException : StreamDataException
 }
 
 /// <summary>
+/// <see cref="IArchiveLifecycleService.RedactConfirmedHiddenColumnsAsync"/> was refused
+/// because the columns that reach a Hidden attribute at execution time are not exactly the columns the caller confirmed:
+/// another CK model change made a column Hidden or visible since the caller read the archive, or the caller named an
+/// unknown column. Nothing was audited or dropped; read the archive again and confirm the current columns.
+/// </summary>
+public sealed class HiddenColumnRedactionColumnsChangedException : StreamDataException
+{
+    /// <summary>The column paths the caller confirmed, without duplicates.</summary>
+    public IReadOnlyList<string> ExpectedColumns { get; }
+
+    /// <summary>The column paths that reach a Hidden attribute at execution time - the ones the call would drop.</summary>
+    public IReadOnlyList<string> CurrentColumns { get; }
+
+    public HiddenColumnRedactionColumnsChangedException(OctoObjectId archiveRtId, IReadOnlyList<string> expectedColumns,
+        IReadOnlyList<string> currentColumns)
+        : base($"Archive {Describe(archiveRtId)}: the redaction was confirmed for the columns {Render(expectedColumns)}, but " +
+               $"the columns that reach a Hidden attribute now are {Render(currentColumns)}. Nothing was dropped; read the " +
+               "archive again and confirm the current columns.", archiveRtId)
+    {
+        ExpectedColumns = expectedColumns;
+        CurrentColumns = currentColumns;
+    }
+
+    private static string Render(IReadOnlyList<string> columns) =>
+        columns.Count == 0 ? "(none)" : $"'{string.Join("', '", columns)}'";
+}
+
+/// <summary>
 /// An import (seed, blueprint update, <c>ImportRt</c>) committed its entities, but one or more columns it declared for
 /// activated archives could not be added (AB#7997). The archive definitions do not name these columns, so the archives
 /// stay consistent with their tables; running the same import again retries the additions.

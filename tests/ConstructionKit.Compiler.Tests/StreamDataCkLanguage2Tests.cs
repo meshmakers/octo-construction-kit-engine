@@ -190,15 +190,16 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         result.Messages.Where(m => m.Severity == CkCompileGateSeverity.Error).Select(m => m.Code ?? "").ToArray();
 
     [Fact]
-    public async Task StreamData_Is_1_28_0_OnCkLanguage2_WithMinEngineVersion351_AndPublishedToTheV3RootOnly()
+    public async Task StreamData_Is_1_29_0_OnCkLanguage2_WithMinEngineVersion351_AndPublishedToTheV3RootOnly()
     {
         var compiled = await CompileStreamDataAsync(RealStreamDataSource());
 
         Assert.Equal("System.StreamData", compiled.ModelId.Name);
         // 1.23.0 (AB#8597) raised the language; 1.24.0 (AB#8598) adds the archive lifecycle methods, 1.25.0 (AB#8599) the
         // rollup control methods, 1.26.0 (AB#9016) the rtId sets of the late-delivery recompute, 1.27.0 (AB#6247) the status
-        // reason, the Hidden columns of a Failed archive and RedactHiddenColumns, 1.28.0 (AB#8600) the column methods.
-        Assert.Equal(new Version(1, 28, 0), new Version(compiled.ModelId.Version.ToString()));
+        // reason, the Hidden columns of a Failed archive and RedactHiddenColumns, 1.28.0 (AB#8600) the column methods, 1.29.0
+        // RedactHiddenColumns-2 with the confirmed columns.
+        Assert.Equal(new Version(1, 29, 0), new Version(compiled.ModelId.Version.ToString()));
         Assert.Equal(2, compiled.EffectiveCkLanguage);
         // Pinned exactly: a higher value means every service below it can no longer import System.StreamData. A feature that
         // raises it (e.g. an Archive method with execution.mode) is a deliberate rollout decision and updates this assertion.
@@ -323,11 +324,13 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         var types = compiled.Types!.ToDictionary(t => t.TypeId.Name);
 
         var archive = types["Archive"].Methods!.ToDictionary(m => m.MethodId);
-        Assert.Equal(["Activate-1", "DeleteArchive-1", "Disable-1", "Enable-1", "RedactHiddenColumns-1", "RetryActivation-1"],
+        Assert.Equal(["Activate-1", "DeleteArchive-1", "Disable-1", "Enable-1", "RedactHiddenColumns-1", "RedactHiddenColumns-2",
+                "RetryActivation-1"],
             archive.Keys.Except(ColumnMethodIds).Order(StringComparer.Ordinal));
         // AB#6247: RedactHiddenColumns replaces no mutation; its contract is pinned in RedactHiddenColumns_*. The column methods
         // of 1.28.0 (AB#8600) are pinned in ColumnMethods_*.
         archive.Remove("RedactHiddenColumns-1");
+        archive.Remove("RedactHiddenColumns-2");
         foreach (var id in ColumnMethodIds)
         {
             archive.Remove(id);
@@ -467,11 +470,30 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
     /// </summary>
     private static string WithoutStreamData_1_28_0(string path, string yaml) => path switch
     {
-        "types/archive.yaml" => CutFrom(yaml, "      # AB#8600 (1.28.0"),
+        "types/archive.yaml" => CutFrom(WithoutStreamData_1_29_0(path, yaml), "      # AB#8600 (1.28.0"),
         "records/archiveMethodRecords.yaml" => RemoveBlock(yaml, "      # AB#8600 (1.28.0)", "  # AB#6247 (1.27.0)"),
         "attributes/archiveMethodAttributes.yaml" => CutFrom(yaml, "  # ---------- Computed column jobs (AB#8600"),
         _ => yaml
     };
+
+    /// <summary>
+    ///     The sources of 1.28.0: the current ones without RedactHiddenColumns-2 and with the description of
+    ///     RedactHiddenColumns-1 as published in 1.28.0 (without the deprecation note).
+    /// </summary>
+    private static string WithoutStreamData_1_29_0(string path, string yaml)
+    {
+        if (path != "types/archive.yaml")
+        {
+            return yaml;
+        }
+
+        const string deprecation = " DEPRECATED (1.29.0): drops whatever is Hidden at execution time, also columns that became " +
+                                   "Hidden after the caller read the archive; call RedactHiddenColumns-2, which drops only the " +
+                                   "columns the caller confirmed. Removed in the next major of System.StreamData.";
+        Assert.Contains(deprecation, yaml, StringComparison.Ordinal);
+        return RemoveBlock(yaml.Replace(deprecation, string.Empty, StringComparison.Ordinal),
+            "      # 1.29.0: the redaction with the columns the caller confirmed", "      # AB#8600 (1.28.0");
+    }
 
     /// <summary>The YAML without the lines from <paramref name="startMarker" /> up to (not including) <paramref name="endMarker" />.</summary>
     private static string RemoveBlock(string yaml, string startMarker, string endMarker)
@@ -668,6 +690,66 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
 
         Assert.Empty(Errors(result));
         Assert.Contains("1.23.0", result.Verdict!.BaselineId.ToString());
+        Assert.Equal(CkSemVerLevel.Minor, result.Verdict.RequiredLevel);
+        Assert.DoesNotContain(result.Verdict.ClassifiedChanges, c => c.Level == CkSemVerLevel.Major);
+        Assert.DoesNotContain(result.Verdict.ClassifiedChanges, c => c.RequiresAcknowledge);
+    }
+
+    // ---------- 1.29.0: redaction against the confirmed columns -------------------------------------------------------
+
+    /// <summary>
+    ///     RedactHiddenColumns-2 carries the contract of -1 (role, confirmation, result, errors) plus the required
+    ///     expectedColumns and the error for a changed column set. It is not idempotent, so that a retry with an idempotency
+    ///     key is answered from the stored result. -1 keeps its contract and is marked deprecated.
+    /// </summary>
+    [Fact]
+    public async Task RedactHiddenColumns2_RequiresTheConfirmedColumns_AndDeclaresTheChangedSetError()
+    {
+        var compiled = await CompileStreamDataAsync(RealStreamDataSource());
+        var archive = compiled.Types!.Single(t => t.TypeId.Name == "Archive").Methods!.ToDictionary(m => m.MethodId);
+        var v1 = archive["RedactHiddenColumns-1"];
+        var v2 = archive["RedactHiddenColumns-2"];
+
+        Assert.Equal(CkMethodKindDto.Instance, v2.Kind);
+        Assert.Equal(
+            [("confirmDataLoss", AttributeValueTypesDto.Boolean, false), ("expectedColumns", AttributeValueTypesDto.StringArray, false)],
+            v2.Parameters!.Select(p => (p.Name, p.ValueType, p.IsOptional)).ToArray());
+        Assert.DoesNotContain(v2.Parameters!, p => p.Sensitive);
+        Assert.Equal("ArchiveRedactionResult", v2.Result!.ValueCkRecordId!.ElementId.Name);
+        Assert.Equal(["StreamDataAdmin"], v2.Authorization!.Roles!);
+        Assert.Contains("DESTRUCTIVE", v2.Description, StringComparison.Ordinal);
+        Assert.Equal(v1.Errors!.Select(e => e.Code).Append("STREAMDATA_REDACTION_COLUMNS_CHANGED").Order(StringComparer.Ordinal),
+            v2.Errors!.Select(e => e.Code).Order(StringComparer.Ordinal));
+        Assert.False(v2.Execution!.Idempotent);
+        Assert.Equal(v1.Execution!.TimeoutSeconds, v2.Execution.TimeoutSeconds);
+        Assert.Null(v2.Execution.Mode);
+
+        Assert.Single(v1.Parameters!);
+        Assert.Contains("DEPRECATED", v1.Description, StringComparison.Ordinal);
+        Assert.Contains("RedactHiddenColumns-2", v1.Description, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     1.29.0 against 1.28.0 (the same sources without RedactHiddenColumns-2 and the deprecation note of -1) is a Minor
+    ///     without acknowledgement: a method added (row M1) and a description changed (row M14). Adding the parameter and the
+    ///     error code to -1 instead would be a Major (rows M3/M8).
+    /// </summary>
+    [Fact]
+    public async Task StreamData_1_29_0_AgainstThe_1_28_0_Release_IsAMinor_WithoutAcknowledgement()
+    {
+        var baseline = CopyStreamData("streamdata-1.28.0", (path, yaml) =>
+            path == "ckModel.yaml" ? SetVersion(yaml, "1.28.0") : WithoutStreamData_1_29_0(path, yaml));
+        var compiled = await CompileStreamDataAsync(baseline);
+        var methods = compiled.Types!.Single(t => t.TypeId.Name == "Archive").Methods!;
+        Assert.DoesNotContain(methods, m => m.MethodId == "RedactHiddenColumns-2");
+        Assert.Contains(methods, m => m.MethodId == "AddColumn-1");
+        await _fixture.Services.GetRequiredService<ICatalogService>().PublishAsync(InMemoryPublishedCatalog.Name, compiled,
+            new OriginFileResolver(baseline), isForced: true);
+
+        var result = await RunGateAsync(RealStreamDataSource());
+
+        Assert.Empty(Errors(result));
+        Assert.Contains("1.28.0", result.Verdict!.BaselineId.ToString());
         Assert.Equal(CkSemVerLevel.Minor, result.Verdict.RequiredLevel);
         Assert.DoesNotContain(result.Verdict.ClassifiedChanges, c => c.Level == CkSemVerLevel.Major);
         Assert.DoesNotContain(result.Verdict.ClassifiedChanges, c => c.RequiresAcknowledge);

@@ -184,7 +184,23 @@ public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
     }
 
     /// <inheritdoc />
-    public async Task<ArchiveRedactionResult> RedactHiddenColumnsAsync(OctoObjectId archiveRtId)
+    public Task<ArchiveRedactionResult> RedactHiddenColumnsAsync(OctoObjectId archiveRtId) =>
+        RedactAsync(archiveRtId, null);
+
+    /// <inheritdoc />
+    public Task<ArchiveRedactionResult> RedactConfirmedHiddenColumnsAsync(OctoObjectId archiveRtId,
+        IReadOnlyCollection<string> expectedColumns)
+    {
+        ArgumentNullException.ThrowIfNull(expectedColumns);
+        return RedactAsync(archiveRtId, expectedColumns);
+    }
+
+    /// <summary>
+    ///     The redaction of <see cref="RedactHiddenColumnsAsync" /> and <see cref="RedactConfirmedHiddenColumnsAsync" />;
+    ///     <paramref name="expectedColumns" /> <c>null</c> drops whatever is Hidden at execution time.
+    /// </summary>
+    private async Task<ArchiveRedactionResult> RedactAsync(OctoObjectId archiveRtId,
+        IReadOnlyCollection<string>? expectedColumns)
     {
         if (_ckCacheService == null)
         {
@@ -202,6 +218,16 @@ public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
 
         var hidden = ArchiveHiddenColumnGuard.FindHiddenColumns(_ckCacheService, _tenantId, snapshot);
         var paths = hidden.Select(h => h.Path).ToList();
+
+        // The caller's confirmation is checked against exactly the set this call drops, before the state, conflict-key,
+        // computed-column and rollup refusals, the audit entry and the drop. A CK model change after this check and before the drop is not serialised with the call (a
+        // window of milliseconds, against minutes between the caller's read and the call); that residual race is accepted.
+        if (expectedColumns is not null &&
+            !new HashSet<string>(expectedColumns, StringComparer.OrdinalIgnoreCase).SetEquals(paths))
+        {
+            throw new HiddenColumnRedactionColumnsChangedException(archiveRtId,
+                expectedColumns.Distinct(StringComparer.OrdinalIgnoreCase).ToList(), paths);
+        }
 
         if (paths.Count > 0)
         {
@@ -248,7 +274,8 @@ public sealed partial class ArchiveLifecycleService : IArchiveLifecycleService
             // retry would find no Hidden column any more and the deletion would have no audit entry. A failed attempt is
             // retried with the same definition, so every attempt is recorded.
             var redactedReason =
-                Truncate($"RedactHiddenColumns drops the columns {DescribeHiddenColumns(hidden)} and their stored values");
+                Truncate($"RedactHiddenColumns drops the columns {DescribeHiddenColumns(hidden)} and their stored values" +
+                         (expectedColumns is null ? string.Empty : " (confirmed by the caller)"));
             await _audit.RecordTransitionAsync(_tenantId, archiveRtId, snapshot.Status, snapshot.Status, redactedReason);
             _logger.LogWarning("Archive {ArchiveRtId}: {Reason}", archiveRtId, redactedReason);
 

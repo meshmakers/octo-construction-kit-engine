@@ -65,8 +65,37 @@ Both attributes are runtime state of System.StreamData 1.27.0 and are visible wh
 
 ## Resume: `RedactHiddenColumns` (destructive)
 
-`IArchiveLifecycleService.RedactHiddenColumnsAsync`, exposed as the CK method `System.StreamData/Archive.RedactHiddenColumns-1`
-(role `StreamDataAdmin`, parameter `confirmDataLoss` must be `true`). It is never called automatically.
+Two entry points, both role `StreamDataAdmin`, parameter `confirmDataLoss` must be `true`, never called automatically:
+
+| CK method (System.StreamData) | Engine | Drops |
+|---|---|---|
+| `Archive.RedactHiddenColumns-2` (1.29.0) | `IArchiveLifecycleService.RedactConfirmedHiddenColumnsAsync(rtId, expectedColumns)` | only the columns the caller confirmed in `expectedColumns` (required) |
+| `Archive.RedactHiddenColumns-1` (1.27.0, **deprecated**) | `IArchiveLifecycleService.RedactHiddenColumnsAsync(rtId)` | whatever is Hidden at execution time |
+
+**Why `-2`.** A caller (Refinery Studio) shows the administrator the Hidden columns from an earlier read of the archive and
+asks for the confirmation. When another CK model change makes more columns Hidden in between, `-1` drops those too: columns
+the administrator never saw, irreversibly. `-2` drops only the confirmed set. Interactive callers use `-2`; `-1` keeps its
+contract in 1.x and is removed in the next major of System.StreamData. The confirmation is a new method version and not an
+optional parameter of `-1`, because a new error code on an existing method is a Major (row M8 of `ck-semver-rules.md`).
+
+**The confirmed set.** `expectedColumns` lists column paths, compared with the columns step 1 finds **ignoring case, order and
+duplicates**. They must be exactly equal: a column that became Hidden since the read, a confirmed column that is no longer
+Hidden and an unknown path all refuse the call with `HiddenColumnRedactionColumnsChangedException`
+(`STREAMDATA_REDACTION_COLUMNS_CHANGED`, parameters `expectedColumns` and `currentColumns`). The check runs right after step 1,
+before the other refusals of steps 1-3, the audit entry and the drop (a missing archive and a rollup archive are refused
+before it), so a refused call changes nothing: confirm the `currentColumns` of the refusal, or read the archive again.
+`Archive.HiddenColumns` is not always the current set: it is recorded only when the re-validation fails an activated
+archive, is empty for a Disabled archive with Hidden columns and is not cleared when a model change makes the columns
+visible again; the refusal's `currentColumns` is authoritative. The audit reason of a `-2` redaction carries
+`(confirmed by the caller)`. An empty list confirms that no column is Hidden (the call then only resumes a Failed-on-Hidden archive
+whose columns are visible again). A repeat after a success finds no Hidden column and is refused, so `-2` is declared not
+idempotent: a retry with an idempotency key is answered from the stored result.
+
+**Accepted race.** The check and the drop are not serialised with CK model changes: a model change in the moment between the
+check and the drop (milliseconds, against minutes between the read and the call) is not seen. It is accepted; the same holds
+for `-1` and for the rollup check of step 3.
+
+The steps (both entry points; `-2` adds the check above after step 1):
 
 1. Determine the columns that reach Hidden under the **current** CK model. A rollup archive is refused, and so is an
    **activated** archive with Hidden columns: ingest and re-provisioning still work from its definition while the columns
@@ -156,6 +185,7 @@ The new members are default interface members, so implementations built against 
 | `IArchiveRuntimeStore.RemoveIngestedColumnsAsync` | throws `NotSupportedException` |
 | `IStreamDataRepository.DropIngestedColumnStorageAsync` | throws `NotSupportedException` |
 | `IArchiveLifecycleService.RedactHiddenColumnsAsync` | throws `NotSupportedException` |
+| `IArchiveLifecycleService.RedactConfirmedHiddenColumnsAsync` (System.StreamData 1.29.0) | throws `NotSupportedException` |
 
 `ArchiveSnapshot.StatusReason` and `HiddenColumns` are init-only properties (empty by default). Implementations in the
 monorepo: `MongoArchiveRuntimeStore` and `CrateDbStreamDataRepository` (octo-construction-kit-engine-mongodb).
@@ -168,7 +198,8 @@ monorepo: `MongoArchiveRuntimeStore` and `CrateDbStreamDataRepository` (octo-con
 - A `PosUpdateTenant` that arrives while the same tenant's update is being handled in that service is dropped (existing
   behaviour of the consumer); its re-check runs with the next update or the next import.
 
-Tests: `ArchiveHiddenColumnGuardTests` (Runtime.Engine.Tests), `StreamDataCkLanguage2Tests` (Compiler.Tests);
+Tests: `ArchiveHiddenColumnGuardTests` (Runtime.Engine.Tests, `RedactConfirmed_*` for the confirmed set),
+`StreamDataCkLanguage2Tests` (Compiler.Tests, `RedactHiddenColumns2_*` and the Minor of 1.29.0);
 engine-mongodb `ArchiveHiddenAccessTests`, `ArchiveHiddenColumnBackupIntegrationTests` (real CrateDB: dump, staged files,
 manifest, row export, restore, redaction) and `HiddenColumnExclusionTests`; octo-bot-services `RestoreRepositoryNativeTests`
 and `RestoreRepositoryArchiveDataTests` (the restore paths).

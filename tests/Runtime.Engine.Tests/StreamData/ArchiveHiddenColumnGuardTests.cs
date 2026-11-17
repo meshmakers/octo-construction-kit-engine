@@ -447,6 +447,134 @@ public class ArchiveHiddenColumnGuardTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => Sut(withCache: false).RedactHiddenColumnsAsync(Rt));
     }
 
+    // ---------- Redaction against the columns the caller confirmed ----------------------------------------------------
+
+    [Fact]
+    public async Task RedactConfirmed_WithExactlyTheHiddenColumns_Drops_IgnoringCaseOrderAndDuplicates()
+    {
+        A.CallTo(() => _store.GetAsync(Rt)).ReturnsNextFromSequence(
+            Snapshot(CkArchiveStatus.Failed, _sensor, ["Secret", "Reading"], "Temperature", "Secret", "Reading"),
+            Snapshot(CkArchiveStatus.Failed, _sensor, ["Secret", "Reading"], "Temperature"));
+        A.CallTo(() => _store.EnumerateAsync()).Returns(AsyncEnumerable.Empty<ArchiveSnapshot>());
+
+        var result = await Sut().RedactConfirmedHiddenColumnsAsync(Rt, ["reading", "SECRET", "Secret"]);
+
+        Assert.Equal(CkArchiveStatus.Activated, result.Status);
+        Assert.Equal(["Secret", "Reading"], result.RemovedColumns);
+        A.CallTo(() => _repo.DropIngestedColumnStorageAsync(A<ArchiveSnapshot>._,
+                A<IReadOnlyCollection<string>>.That.IsSameSequenceAs(new[] { "Secret", "Reading" }),
+                A<System.Threading.CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _store.RemoveIngestedColumnsAsync(Rt,
+            A<IReadOnlyCollection<string>>.That.IsSameSequenceAs(new[] { "Secret", "Reading" }))).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task RedactConfirmed_WhenAnotherColumnBecameHiddenSinceTheRead_IsRefused_AndNothingIsDropped()
+    {
+        // The caller saw only Secret; a later model change made Reading Hidden as well.
+        A.CallTo(() => _store.GetAsync(Rt)).Returns(
+            Snapshot(CkArchiveStatus.Failed, _sensor, ["Secret"], "Temperature", "Secret", "Reading"));
+
+        var ex = await Assert.ThrowsAsync<HiddenColumnRedactionColumnsChangedException>(
+            () => Sut().RedactConfirmedHiddenColumnsAsync(Rt, ["Secret"]));
+
+        Assert.Equal(["Secret"], ex.ExpectedColumns);
+        Assert.Equal(["Secret", "Reading"], ex.CurrentColumns);
+        Assert.Equal(Rt, ex.ArchiveRtId);
+        AssertNothingWasRedacted();
+    }
+
+    [Fact]
+    public async Task RedactConfirmed_WhenAConfirmedColumnIsNoLongerHidden_IsRefused_AndNothingIsDropped()
+    {
+        A.CallTo(() => _store.GetAsync(Rt)).Returns(
+            Snapshot(CkArchiveStatus.Failed, _sensor, ["Secret", "Temperature"], "Temperature", "Secret"));
+
+        var ex = await Assert.ThrowsAsync<HiddenColumnRedactionColumnsChangedException>(
+            () => Sut().RedactConfirmedHiddenColumnsAsync(Rt, ["Secret", "Temperature"]));
+
+        Assert.Equal(["Secret"], ex.CurrentColumns);
+        AssertNothingWasRedacted();
+    }
+
+    [Fact]
+    public async Task RedactConfirmed_WithAnUnknownColumn_IsRefused_AndNothingIsDropped()
+    {
+        A.CallTo(() => _store.GetAsync(Rt)).Returns(
+            Snapshot(CkArchiveStatus.Failed, _sensor, ["Secret"], "Temperature", "Secret"));
+
+        var ex = await Assert.ThrowsAsync<HiddenColumnRedactionColumnsChangedException>(
+            () => Sut().RedactConfirmedHiddenColumnsAsync(Rt, ["Secret", "NoSuchColumn"]));
+
+        Assert.Equal(["Secret", "NoSuchColumn"], ex.ExpectedColumns);
+        Assert.Equal(["Secret"], ex.CurrentColumns);
+        AssertNothingWasRedacted();
+    }
+
+    [Fact]
+    public async Task RedactConfirmed_WithAnEmptyList_WhileAColumnIsHidden_IsRefused_AndNothingIsDropped()
+    {
+        Stub(CkArchiveStatus.Disabled, "Temperature", "Secret");
+
+        var ex = await Assert.ThrowsAsync<HiddenColumnRedactionColumnsChangedException>(
+            () => Sut().RedactConfirmedHiddenColumnsAsync(Rt, []));
+
+        Assert.Empty(ex.ExpectedColumns);
+        Assert.Equal(["Secret"], ex.CurrentColumns);
+        AssertNothingWasRedacted();
+    }
+
+    [Fact]
+    public async Task RedactConfirmed_RepeatedAfterASuccess_IsRefused_BecauseNoColumnIsHiddenAnyMore()
+    {
+        Stub(CkArchiveStatus.Activated, "Temperature");
+
+        var ex = await Assert.ThrowsAsync<HiddenColumnRedactionColumnsChangedException>(
+            () => Sut().RedactConfirmedHiddenColumnsAsync(Rt, ["Secret"]));
+
+        Assert.Empty(ex.CurrentColumns);
+        AssertNothingWasRedacted();
+    }
+
+    [Fact]
+    public async Task RedactConfirmed_WithAnEmptyList_AndNoHiddenColumn_ChangesNothing()
+    {
+        Stub(CkArchiveStatus.Activated, "Temperature", "Reading.Value");
+
+        var result = await Sut().RedactConfirmedHiddenColumnsAsync(Rt, []);
+
+        Assert.Empty(result.RemovedColumns);
+        Assert.Equal(CkArchiveStatus.Activated, result.Status);
+        AssertNothingWasRedacted();
+    }
+
+    [Fact]
+    public async Task RedactConfirmed_IsCheckedBeforeTheActivatedArchiveRefusal()
+    {
+        // The changed set is the more precise answer for the caller: it must read the archive again in any case.
+        Stub(CkArchiveStatus.Activated, "Temperature", "Secret");
+
+        await Assert.ThrowsAsync<HiddenColumnRedactionColumnsChangedException>(
+            () => Sut().RedactConfirmedHiddenColumnsAsync(Rt, ["Temperature"]));
+
+        AssertNothingWasRedacted();
+    }
+
+    /// <summary>No audit entry, no dropped storage, no definition change and no status write.</summary>
+    private void AssertNothingWasRedacted()
+    {
+        A.CallTo(() => _audit.RecordTransitionAsync(A<string>._, A<OctoObjectId>._, A<CkArchiveStatus>._,
+            A<CkArchiveStatus>._, A<string?>._)).MustNotHaveHappened();
+        A.CallTo(() => _repo.DropIngestedColumnStorageAsync(A<ArchiveSnapshot>._, A<IReadOnlyCollection<string>>._,
+            A<System.Threading.CancellationToken>._)).MustNotHaveHappened();
+        A.CallTo(() => _store.RemoveIngestedColumnsAsync(A<OctoObjectId>._, A<IReadOnlyCollection<string>>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _store.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._)).MustNotHaveHappened();
+        A.CallTo(() => _store.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._, A<string?>._,
+            A<IReadOnlyList<string>>._)).MustNotHaveHappened();
+    }
+
     [Fact]
     public void Snapshot_WithoutHiddenColumns_HidesThemFromTheQueryPaths_CaseInsensitive()
     {

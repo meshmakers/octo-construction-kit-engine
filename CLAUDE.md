@@ -1050,7 +1050,7 @@ Tests: `SystemInterfacesTests` (Compiler.Tests: members, per-type table, no inde
 
 ## System.StreamData on ckLanguage 2 (AB#8597, Epic AB#5584 F4.3)
 
-`src/StreamDataCkModel` is **System.StreamData-1.28.0** (archive lifecycle methods 1.24.0, rollup control 1.25.0, late-delivery sets 1.26.0, Hidden-column failures 1.27.0, column methods 1.28.0, below); 1.23.0 was the first ckLanguage 2 release of the model and a **Minor** against
+`src/StreamDataCkModel` is **System.StreamData-1.29.0** (archive lifecycle methods 1.24.0, rollup control 1.25.0, late-delivery sets 1.26.0, Hidden-column failures 1.27.0, column methods 1.28.0, confirmed redaction 1.29.0, below); 1.23.0 was the first ckLanguage 2 release of the model and a **Minor** against
 the ckLanguage 1 release 1.22.0 (`ValidateVersion`: only "ckLanguage changed '1' → '2'"). The rules of the System migration above apply:
 
 - **Every type and record declares `derivable: Any`** (`Archive`, `RawArchive`, `RollupArchive`, `TimeRangeArchive`, `RecomputeJob` and the six
@@ -1117,6 +1117,15 @@ against 1.26.0 without acknowledgement. Behaviour:
 
 Full description, including the re-validation trigger in services without stream data (octo-common-services): `docs/archive-hidden-columns.md`.
 Tests: `ArchiveHiddenColumnGuardTests`, `StreamDataCkLanguage2Tests` (`StreamData_1_27_0_*`, `RedactHiddenColumns_*`).
+
+**Confirmed redaction (1.29.0).** `Archive.RedactHiddenColumns-2` (parameters `confirmDataLoss`, `expectedColumns` StringArray,
+required; error `STREAMDATA_REDACTION_COLUMNS_CHANGED`; not idempotent) maps to
+`IArchiveLifecycleService.RedactConfirmedHiddenColumnsAsync`: it drops only when the Hidden set at execution time equals
+`expectedColumns` (ignoring case, order, duplicates) and otherwise throws `HiddenColumnRedactionColumnsChangedException` before any
+other refusal, the audit and the drop. `-1` is deprecated (description only), removed at the next major. A separate engine method
+name, not an overload, so the `cref`s to `RedactHiddenColumnsAsync` in consumers stay unambiguous. A new method version, not an
+optional parameter on `-1`: an added error code is a Major (row M8). Tests: `ArchiveHiddenColumnGuardTests` (`RedactConfirmed_*`),
+`StreamDataCkLanguage2Tests` (`RedactHiddenColumns2_*`, `StreamData_1_29_0_*`).
 
 ### Archive lifecycle, rollup and column methods (System.StreamData 1.24.0, AB#8598; 1.25.0, AB#8599; 1.28.0, AB#8600)
 

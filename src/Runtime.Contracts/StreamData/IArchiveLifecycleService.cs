@@ -86,6 +86,24 @@ public interface IArchiveLifecycleService
             $"{GetType().Name} cannot redact Hidden archive columns (AB#6247); update the lifecycle service.");
 
     /// <summary>
+    ///     The redaction of <see cref="RedactHiddenColumnsAsync" />, guarded by the columns the caller confirmed: it drops
+    ///     only when the columns that reach a Hidden attribute at execution time are exactly
+    ///     <paramref name="expectedColumns" /> (compared ignoring case, order and duplicates; an empty collection confirms
+    ///     that no column is Hidden). Otherwise it throws <see cref="HiddenColumnRedactionColumnsChangedException" /> before
+    ///     any other refusal, the audit entry and the drop. Between the caller's read and the call another CK model change
+    ///     can make more columns Hidden; without this guard they would be dropped too. Every other rule, the audit entry,
+    ///     the drop and the resume are those of <see cref="RedactHiddenColumnsAsync" />. The default implementation throws
+    ///     <see cref="System.NotSupportedException" />.
+    /// </summary>
+    /// <exception cref="HiddenColumnRedactionColumnsChangedException">
+    ///     The Hidden columns at execution time differ from <paramref name="expectedColumns" />; nothing was dropped.
+    /// </exception>
+    Task<ArchiveRedactionResult> RedactConfirmedHiddenColumnsAsync(OctoObjectId archiveRtId,
+        System.Collections.Generic.IReadOnlyCollection<string> expectedColumns) =>
+        throw new System.NotSupportedException(
+            $"{GetType().Name} cannot redact Hidden archive columns against confirmed columns; update the lifecycle service.");
+
+    /// <summary>
     /// Adds an <em>ingested</em> column for the CK attribute at <paramref name="path"/> to an <c>Activated</c> raw or
     /// time-range archive without recreating it (AB#7997). The physical column is added first (nullable: existing rows
     /// keep their data and read NULL for it), then the archive definition; the next ingested rows fill it. Returns

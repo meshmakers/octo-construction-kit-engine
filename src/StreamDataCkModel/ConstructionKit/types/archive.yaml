@@ -157,7 +157,7 @@ types:
       # AB#6247 (1.27.0): the way out of a Hidden-column failure. Destructive and never run automatically: the caller must
       # confirm the data loss explicitly.
       - methodId: RedactHiddenColumns-1
-        description: "Drops every ingested column of the archive that reaches a Hidden attribute under the current CK model: first the CrateDB columns, then the column definitions. DESTRUCTIVE: the values stored in these columns are lost and cannot be restored; every other column and row is kept. The redaction is recorded in the audit trail. An archive that the access re-validation set to Failed because of Hidden columns is activated again; any other archive keeps its status. Refused while a rollup archive aggregates one of the columns. Requires confirmDataLoss = true; without a Hidden column it changes nothing."
+        description: "Drops every ingested column of the archive that reaches a Hidden attribute under the current CK model: first the CrateDB columns, then the column definitions. DESTRUCTIVE: the values stored in these columns are lost and cannot be restored; every other column and row is kept. The redaction is recorded in the audit trail. An archive that the access re-validation set to Failed because of Hidden columns is activated again; any other archive keeps its status. Refused while a rollup archive aggregates one of the columns. Requires confirmDataLoss = true; without a Hidden column it changes nothing. DEPRECATED (1.29.0): drops whatever is Hidden at execution time, also columns that became Hidden after the caller read the archive; call RedactHiddenColumns-2, which drops only the columns the caller confirmed. Removed in the next major of System.StreamData."
         parameters:
           - { name: confirmDataLoss, valueType: Boolean, description: "Must be true: confirms that the values stored in the dropped columns are lost." }
         result:
@@ -175,6 +175,31 @@ types:
         execution:
           timeoutSeconds: 300
           idempotent: true
+      # 1.29.0: the redaction with the columns the caller confirmed. Between the caller's read and the call another CK model
+      # change can make more columns Hidden; -1 would drop them too. -2 drops only when the caller names exactly the columns it
+      # drops. Not idempotent on purpose: a repeat after a success finds no Hidden column and is refused, so a retry with an
+      # idempotency key is answered from the stored result instead.
+      - methodId: RedactHiddenColumns-2
+        description: "Drops the ingested columns of the archive that reach a Hidden attribute under the current CK model, but only when they are exactly the columns the caller confirmed in expectedColumns: first the CrateDB columns, then the column definitions. DESTRUCTIVE: the values stored in these columns are lost and cannot be restored; every other column and row is kept. The redaction is recorded in the audit trail. When the Hidden columns at execution time differ from expectedColumns (a column was added, removed or is unknown), the call is refused with STREAMDATA_REDACTION_COLUMNS_CHANGED and nothing is dropped; read the archive again and confirm the new set. An archive that the access re-validation set to Failed because of Hidden columns is activated again; any other archive keeps its status. Refused while a rollup archive aggregates one of the columns. Requires confirmDataLoss = true."
+        parameters:
+          - { name: confirmDataLoss, valueType: Boolean, description: "Must be true: confirms that the values stored in the dropped columns are lost." }
+          - { name: expectedColumns, valueType: StringArray, description: "The column paths the administrator confirmed (as listed in Archive.HiddenColumns or by the caller's own check). Compared with the Hidden columns at execution time ignoring case, order and duplicates; an empty list confirms that no column is Hidden." }
+        result:
+          valueType: Record
+          valueCkRecordId: ${this}/ArchiveRedactionResult
+        errors:
+          - { code: STREAMDATA_ARCHIVE_NOT_FOUND, description: "The archive does not exist." }
+          - { code: STREAMDATA_CONFIRMATION_REQUIRED, description: "confirmDataLoss was not true; nothing was dropped." }
+          - { code: STREAMDATA_REDACTION_COLUMNS_CHANGED, description: "The Hidden columns at execution time are not exactly expectedColumns; parameters expectedColumns and currentColumns list both (comma-separated). Nothing was dropped." }
+          - { code: STREAMDATA_REDACTION_BLOCKED, description: "A rollup archive aggregates a column the call would drop; parameter rollupRtIds lists them. Nothing was dropped." }
+          - { code: STREAMDATA_ACTIVATION_FAILED, description: "The columns were dropped, but provisioning the CrateDB table on the resume failed; the archive is Failed and RetryActivation applies." }
+          - { code: STREAMDATA_ERROR, description: "Any other stream-data rule refused the call; parameter message carries the engine text." }
+          - { code: STREAMDATA_NOT_ENABLED, description: "Stream data is not enabled for the tenant." }
+        authorization:
+          roles: [ StreamDataAdmin ]
+        execution:
+          timeoutSeconds: 300
+          idempotent: false
       # AB#8600 (1.28.0, Feature AB#5697 F4.3): archive columns and computed columns as CK methods, mirroring the streamData
       # mutations addComputedColumn, addArchiveColumn, removeComputedColumn, updateComputedColumnFormula,
       # retryComputedColumnBackfill and repairComputedColumn, which stay and are deprecated. The backfills and repairs run as

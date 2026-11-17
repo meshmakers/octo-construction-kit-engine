@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.29.0 - 2026-11-17
+
+_Required bump level: minor._
+
+### Added
+
+- Method `Archive.RedactHiddenColumns-2` (role `StreamDataAdmin`, result record `ArchiveRedactionResult`): the redaction of
+  Hidden archive columns with the columns the administrator confirmed. Parameters `confirmDataLoss` (must be true) and
+  `expectedColumns` (StringArray, **required**). The call drops only when the Hidden columns at execution time are exactly
+  `expectedColumns` (ignoring case, order and duplicates); otherwise it is refused with the new error
+  `STREAMDATA_REDACTION_COLUMNS_CHANGED` (parameters `expectedColumns` and `currentColumns`) and nothing is dropped. Declared
+  not idempotent: a repeat after a success finds no Hidden column and is refused, so a retry with an idempotency key is
+  answered from the stored result.
+
+### Deprecated
+
+- `Archive.RedactHiddenColumns-1`: it drops whatever is Hidden at execution time, also columns that became Hidden after the
+  caller read the archive. Its contract is unchanged; only its description says so. It is removed in the next major of
+  System.StreamData; interactive callers use `RedactHiddenColumns-2`.
+
+### Compatibility
+
+- Additive, a Minor against 1.28.0 (method added, row M1 of `docs/ck-semver-rules.md`; the description of `-1` is row M14). No
+  acknowledgement, `minEngineVersion` unchanged.
+
 ## 1.28.0 - 2026-11-16
 
 _Required bump level: minor._

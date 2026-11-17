@@ -82,8 +82,12 @@ optional parameter of `-1`, because a new error code on an existing method is a 
 duplicates**. They must be exactly equal: a column that became Hidden since the read, a confirmed column that is no longer
 Hidden and an unknown path all refuse the call with `HiddenColumnRedactionColumnsChangedException`
 (`STREAMDATA_REDACTION_COLUMNS_CHANGED`, parameters `expectedColumns` and `currentColumns`). The check runs right after step 1,
-before every other refusal, the audit entry and the drop, so a refused call changes nothing: read the archive again and
-confirm the current set. An empty list confirms that no column is Hidden (the call then only resumes a Failed-on-Hidden archive
+before the other refusals of steps 1-3, the audit entry and the drop (a missing archive and a rollup archive are refused
+before it), so a refused call changes nothing: confirm the `currentColumns` of the refusal, or read the archive again.
+`Archive.HiddenColumns` is not always the current set: it is recorded only when the re-validation fails an activated
+archive, is empty for a Disabled archive with Hidden columns and is not cleared when a model change makes the columns
+visible again; the refusal's `currentColumns` is authoritative. The audit reason of a `-2` redaction carries
+`(confirmed by the caller)`. An empty list confirms that no column is Hidden (the call then only resumes a Failed-on-Hidden archive
 whose columns are visible again). A repeat after a success finds no Hidden column and is refused, so `-2` is declared not
 idempotent: a retry with an idempotency key is answered from the stored result.
 

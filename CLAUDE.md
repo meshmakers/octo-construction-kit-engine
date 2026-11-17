@@ -1121,8 +1121,8 @@ Tests: `ArchiveHiddenColumnGuardTests`, `StreamDataCkLanguage2Tests` (`StreamDat
 **Confirmed redaction (1.29.0).** `Archive.RedactHiddenColumns-2` (parameters `confirmDataLoss`, `expectedColumns` StringArray,
 required; error `STREAMDATA_REDACTION_COLUMNS_CHANGED`; not idempotent) maps to
 `IArchiveLifecycleService.RedactConfirmedHiddenColumnsAsync`: it drops only when the Hidden set at execution time equals
-`expectedColumns` (ignoring case, order, duplicates) and otherwise throws `HiddenColumnRedactionColumnsChangedException` before any
-other refusal, the audit and the drop. `-1` is deprecated (description only), removed at the next major. A separate engine method
+`expectedColumns` (ignoring case, order, duplicates) and otherwise throws `HiddenColumnRedactionColumnsChangedException` before the
+state, conflict-key, computed-column and rollup refusals, the audit and the drop. `-1` is deprecated (description only), removed at the next major. A separate engine method
 name, not an overload, so the `cref`s to `RedactHiddenColumnsAsync` in consumers stay unambiguous. A new method version, not an
 optional parameter on `-1`: an added error code is a Major (row M8). Tests: `ArchiveHiddenColumnGuardTests` (`RedactConfirmed_*`),
 `StreamDataCkLanguage2Tests` (`RedactHiddenColumns2_*`, `StreamData_1_29_0_*`).

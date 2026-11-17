@@ -90,7 +90,8 @@ public interface IArchiveLifecycleService
     ///     only when the columns that reach a Hidden attribute at execution time are exactly
     ///     <paramref name="expectedColumns" /> (compared ignoring case, order and duplicates; an empty collection confirms
     ///     that no column is Hidden). Otherwise it throws <see cref="HiddenColumnRedactionColumnsChangedException" /> before
-    ///     any other refusal, the audit entry and the drop. Between the caller's read and the call another CK model change
+    ///     the state, conflict-key, computed-column and rollup refusals, the audit entry and the drop (a missing archive, a
+    ///     missing CK cache and a rollup archive are refused first). Between the caller's read and the call another CK model change
     ///     can make more columns Hidden; without this guard they would be dropped too. Every other rule, the audit entry,
     ///     the drop and the resume are those of <see cref="RedactHiddenColumnsAsync" />. The default implementation throws
     ///     <see cref="System.NotSupportedException" />.

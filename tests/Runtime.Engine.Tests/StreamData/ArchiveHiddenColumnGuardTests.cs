@@ -156,6 +156,9 @@ public class ArchiveHiddenColumnGuardTests
         A.CallTo(() => _store.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._)).MustNotHaveHappened();
         A.CallTo(() => _store.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._, A<string?>._,
             A<IReadOnlyList<string>>._)).MustNotHaveHappened();
+        // no resume either: the table is not provisioned again
+        A.CallTo(_repo).Where(call => call.Method.Name == nameof(IStreamDataRepository.EnsureArchiveCreatedAsync))
+            .MustNotHaveHappened();
     }
 
     private static ArchiveSnapshot Snapshot(CkArchiveStatus status, RtCkId<CkTypeId> type, string[] hidden,
@@ -458,6 +461,8 @@ public class ArchiveHiddenColumnGuardTests
         A.CallTo(() => _store.EnumerateAsync()).Returns(AsyncEnumerable.Empty<ArchiveSnapshot>());
 
         var result = await Sut().RedactConfirmedHiddenColumnsAsync(Rt, ["reading", "SECRET", "Secret"]);
+        A.CallTo(() => _audit.RecordTransitionAsync(TenantId, Rt, CkArchiveStatus.Failed, CkArchiveStatus.Failed,
+            A<string>.That.EndsWith("(confirmed by the caller)"))).MustHaveHappenedOnceExactly();
 
         Assert.Equal(CkArchiveStatus.Activated, result.Status);
         Assert.Equal(["Secret", "Reading"], result.RemovedColumns);

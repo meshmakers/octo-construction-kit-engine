@@ -35,7 +35,7 @@ public sealed record SecretAccessContext(
 public interface ISecretAttributeProtector
 {
     /// <summary>
-    ///     True when an active key is configured, i.e. <see cref="Protect" /> can work.
+    ///     True when an active key is configured, i.e. <see cref="Protect(string)" /> can work.
     /// </summary>
     bool IsConfigured { get; }
 
@@ -111,6 +111,37 @@ public interface ISecretAttributeProtector
     /// <exception cref="UnknownSecretKeyIdException">The envelope's key id is not in the key ring</exception>
     /// <exception cref="System.Security.Cryptography.CryptographicException">The value was tampered with or the key is wrong</exception>
     string Unprotect(string storedValue, SecretAccessContext? context = null);
+
+    /// <summary>
+    ///     Encrypts a plaintext with the active key for one <paramref name="purpose" />: an <c>enc:v2</c> envelope whose
+    ///     associated data is the header plus the purpose. It opens only through
+    ///     <see cref="Unprotect(string, SecretPurpose, SecretAccessContext?)" /> with the same purpose, never as the value
+    ///     of a Secret attribute; key rotation works as for every <c>enc:v2</c> value.
+    /// </summary>
+    /// <exception cref="ArgumentException">The purpose is empty</exception>
+    /// <exception cref="SecretEncryptionNotConfiguredException">No active key</exception>
+    /// <exception cref="NotSupportedException">The implementation cannot bind a purpose</exception>
+    RtSecretValue Protect(string plaintext, SecretPurpose purpose)
+    {
+        throw new NotSupportedException("This secret protector cannot bind a value to a purpose.");
+    }
+
+    /// <summary>
+    ///     Returns the plaintext of an envelope produced by <see cref="Protect(string, SecretPurpose)" /> for the same
+    ///     <paramref name="purpose" />. Accepts only an <c>enc:v2</c> envelope: clear text, <c>enc:v1</c>, a value of a
+    ///     Secret attribute or a value protected for another purpose throws.
+    /// </summary>
+    /// <exception cref="ArgumentException">The purpose is empty</exception>
+    /// <exception cref="SecretEncryptionNotConfiguredException">No keys are configured</exception>
+    /// <exception cref="UnknownSecretKeyIdException">The envelope's key id is not in the key ring</exception>
+    /// <exception cref="System.Security.Cryptography.CryptographicException">
+    ///     Not an <c>enc:v2</c> envelope, tampered with, wrong key or another purpose
+    /// </exception>
+    /// <exception cref="NotSupportedException">The implementation cannot bind a purpose</exception>
+    string Unprotect(string storedValue, SecretPurpose purpose, SecretAccessContext? context = null)
+    {
+        throw new NotSupportedException("This secret protector cannot bind a value to a purpose.");
+    }
 
     /// <summary>
     ///     Classifies a value for readers (decisions 2026-10-06, item 2) without decrypting it:

@@ -26,6 +26,11 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
     private const string UnreadableCorrupt = "corrupt";
     private const string UnreadableDecryptFailed = "decrypt_failed";
 
+    private static readonly byte[] PurposeSeparator = "\0purpose:"u8.ToArray();
+
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false,
+        throwOnInvalidBytes: true);
+
     private static readonly string? DefaultServiceName =
         Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME") is { Length: > 0 } serviceName
             ? serviceName
@@ -65,6 +70,30 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
     /// <inheritdoc />
     public RtSecretValue Protect(string plaintext)
     {
+        return Encrypt(plaintext, purposeBytes: null);
+    }
+
+    /// <inheritdoc />
+    public RtSecretValue Protect(string plaintext, SecretPurpose purpose)
+    {
+        return Encrypt(plaintext, GetPurposeBytes(purpose));
+    }
+
+    /// <inheritdoc />
+    public string Unprotect(string storedValue, SecretPurpose purpose, SecretAccessContext? context = null)
+    {
+        ArgumentNullException.ThrowIfNull(storedValue);
+        var purposeBytes = GetPurposeBytes(purpose);
+        if (!storedValue.StartsWith(SecretEnvelope.PrefixV2, StringComparison.Ordinal))
+        {
+            throw new CryptographicException("A purpose-bound value must be an 'enc:v2' envelope.");
+        }
+
+        return Decrypt(storedValue, context, purposeBytes);
+    }
+
+    private RtSecretValue Encrypt(string plaintext, byte[]? purposeBytes)
+    {
         ArgumentNullException.ThrowIfNull(plaintext);
         var keyRing = _keyRing.Value;
         if (keyRing.ActiveKeyId == null || keyRing.ActiveKey == null)
@@ -75,7 +104,7 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
         }
 
         var header = SecretEnvelope.BuildHeaderV2(keyRing.ActiveKeyId);
-        var aad = Encoding.ASCII.GetBytes(header);
+        var aad = BuildAssociatedData(header, purposeBytes);
         var plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
 
         var combined = new byte[SecretEnvelope.NonceLength + SecretEnvelope.TagLength + plaintextBytes.Length];
@@ -317,7 +346,28 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
         };
     }
 
-    private string Decrypt(string envelope, SecretAccessContext? context)
+    private static byte[] GetPurposeBytes(SecretPurpose purpose)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(purpose.Value, nameof(purpose));
+        return StrictUtf8.GetBytes(purpose.Value);
+    }
+
+    private static byte[] BuildAssociatedData(string header, byte[]? purposeBytes)
+    {
+        var headerBytes = Encoding.ASCII.GetBytes(header);
+        if (purposeBytes == null)
+        {
+            return headerBytes;
+        }
+
+        var associatedData = new byte[headerBytes.Length + PurposeSeparator.Length + purposeBytes.Length];
+        headerBytes.CopyTo(associatedData, 0);
+        PurposeSeparator.CopyTo(associatedData, headerBytes.Length);
+        purposeBytes.CopyTo(associatedData, headerBytes.Length + PurposeSeparator.Length);
+        return associatedData;
+    }
+
+    private string Decrypt(string envelope, SecretAccessContext? context, byte[]? purposeBytes = null)
     {
         if (!SecretEnvelope.TryParse(envelope, out var info, out var header, out var payload))
         {
@@ -357,9 +407,9 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
 
         using (var aes = new AesGcm(key, SecretEnvelope.TagLength))
         {
-            // Associated data = the header exactly as stored: a changed version or key id fails the
-            // tag check even when the other key would be in the ring.
-            aes.Decrypt(nonce, ciphertext, tag, plaintextBytes, Encoding.ASCII.GetBytes(header));
+            // Associated data = the header exactly as stored (plus the purpose of a purpose-bound value): a changed
+            // version, key id or purpose fails the tag check even when the other key would be in the ring.
+            aes.Decrypt(nonce, ciphertext, tag, plaintextBytes, BuildAssociatedData(header, purposeBytes));
         }
 
         var plaintext = Encoding.UTF8.GetString(plaintextBytes);

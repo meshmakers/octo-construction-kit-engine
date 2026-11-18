@@ -1127,7 +1127,7 @@ name, not an overload, so the `cref`s to `RedactHiddenColumnsAsync` in consumers
 optional parameter on `-1`: an added error code is a Major (row M8). Tests: `ArchiveHiddenColumnGuardTests` (`RedactConfirmed_*`),
 `StreamDataCkLanguage2Tests` (`RedactHiddenColumns2_*`, `StreamData_1_29_0_*`).
 
-### Archive lifecycle, rollup and column methods (System.StreamData 1.24.0, AB#8598; 1.25.0, AB#8599; 1.28.0, AB#8600)
+### Archive lifecycle, rollup and column methods (System.StreamData 1.24.0, AB#8598; 1.25.0, AB#8599; 1.28.0, AB#8600; 1.30.0, AB#9056)
 
 1.24.0 adds the archive lifecycle as CK methods (Minor against 1.23.0, no acknowledgement, `minEngineVersion` unchanged 3.5.1). They
 replace the hand-written `streamData` GraphQL mutations of octo-asset-repo-services, which stay and are deprecated there:
@@ -1146,6 +1146,8 @@ replace the hand-written `streamData` GraphQL mutations of octo-asset-repo-servi
 | `RollupArchive.RewindWatermark-1` (1.25.0) | instance, parameter `toBucketEnd: DateTime` | `ArchiveTransitionResult` | `rewindRollupWatermark` |
 | `RollupArchive.Recompute-1` (1.25.0) | instance, `from`, `to: DateTime`, optional `rtIdScope` | `RecomputeJobInfo` | `recomputeArchive` |
 | `RollupArchive.BackfillFromSource-1` (1.25.0) | instance | `RecomputeJobInfo` (none for an empty source) | `backfillRollupFromSource` |
+| `RollupArchive.Recompute-2` (1.30.0, async) | instance, as `Recompute-1` | operation handle; the operation ends with `RecomputeJobInfo` | `recomputeArchive` (deprecation names `-2`) |
+| `RollupArchive.BackfillFromSource-2` (1.30.0, async) | instance | operation handle; the operation ends with `RecomputeJobInfo` (none for an empty source) | `backfillRollupFromSource` (deprecation names `-2`) |
 | `Archive.AddComputedColumn-1` (1.28.0) | instance, `name`, `formula`, `resultType: CkComputedColumnResultType`, optional `indexed` (default true) | `ArchiveTransitionResult` | `addComputedColumn` |
 | `Archive.AddColumn-1` (1.28.0) | instance, `path`, optional `indexed` (default false); idempotent | `ArchiveTransitionResult` (transition `AddArchiveColumn`) | `addArchiveColumn` |
 | `Archive.RemoveComputedColumn-1` (1.28.0) | instance, `name` | `ArchiveTransitionResult` | `removeComputedColumn` |
@@ -1168,7 +1170,16 @@ replace the hand-written `streamData` GraphQL mutations of octo-asset-repo-servi
   `ComputedColumnName` (row R1, Minor). A path that reaches a Hidden attribute is refused by the engine (AB#6247), so `AddColumn-1`
   answers `STREAMDATA_ERROR` like the mutation.
 - `Recompute-1` and `BackfillFromSource-1` (1.25.0, AB#8599) are synchronous like the mutations: they answer the job
-  (`RecomputeJobInfo`, state Pending/Running/... or Failed for a refused precondition); async methods are a later decision (F3.6).
+  (`RecomputeJobInfo`, state Pending/Running/... or Failed for a refused precondition). Deprecated since 1.30.0 (description only).
+- **1.30.0 (AB#9056): `RollupArchive.Recompute-2` and `BackfillFromSource-2`** with `execution.mode: async` (the asynchronous
+  versions; a mode change is a Major of the method version, row M19, so they are new versions). Same parameters, role, data access
+  and result as `-1`, `timeoutSeconds: 30` (the accept step), plus the error `STREAMDATA_RECOMPUTE_FAILED` (`jobRtId`, `reason`)
+  for a job that ended Failed. The mutations `recomputeArchive` / `backfillRollupFromSource` of the asset repository are deprecated
+  to the `-2` ids. The mode key raises the compiled `minEngineVersion` of System.StreamData from 3.5.1 to 3.5.67
+  (`CkEngineVersion.ExecutionModeMinEngineVersion`): services on an older engine cannot load 1.30.0 (rollout note in the model's
+  CHANGELOG). Tests: `RecomputeAndBackfill2_AreAsync_AndDeprecateTheSyncVersions`,
+  `StreamData_1_30_0_AgainstThe_1_29_0_Release_IsAMinor_WithoutAcknowledgement`, the pinned `minEngineVersion` in
+  `StreamData_Is_1_30_0_OnCkLanguage2_WithMinEngineVersion3567_AndPublishedToTheV3RootOnly`.
 - Tests: `StreamDataCkLanguage2Tests` (`ArchiveLifecycleMethods_CarryTheContractOfTheMutations`, `RollupControlMethods_CarryTheContractOfTheMutations`, `ColumnMethods_CarryTheContractOfTheMutations`, `StreamData_1_28_0_AgainstThe_1_27_0_Release_IsAMinor_WithoutAcknowledgement`, `StreamData_1_24_0_AgainstTheMethodlessRelease_1_23_0_IsAMinor_WithoutAcknowledgement`, `StreamData_1_25_0_AgainstThe_1_24_0_Release_IsAMinor_WithoutAcknowledgement`;
   the ckLanguage 1 baseline copy strips the `methods:` blocks and the method-only files).
 

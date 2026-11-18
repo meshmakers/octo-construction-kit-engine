@@ -73,8 +73,8 @@ types:
           idempotent: false
       # AB#8599 (1.25.0): rollup control and recomputation, mirroring the streamData mutations freezeRollupArchive,
       # unfreezeRollupArchive, rewindRollupWatermark, recomputeArchive and backfillRollupFromSource. Recompute and
-      # BackfillFromSource stay synchronous (mode sync, answer the job as the mutations do); moving them to async methods is a
-      # later decision after F3.6.
+      # BackfillFromSource stay synchronous (mode sync, answer the job as the mutations do); 1.30.0 adds the asynchronous
+      # versions Recompute-2 and BackfillFromSource-2 (AB#9056) and deprecates these two.
       - methodId: Freeze-1
         description: "Sets FrozenUntil on the rollup: the orchestrator stops producing buckets whose end falls in the frozen range. Monotonic - an earlier value than the current FrozenUntil is refused (use Unfreeze) (mutation streamData.freezeRollupArchive)."
         parameters:
@@ -139,7 +139,7 @@ types:
           timeoutSeconds: 60
           idempotent: true
       - methodId: Recompute-1
-        description: "Recomputes the rollup over [from, to) into a staging generation and swaps the generation pointer atomically (AB#4184). Answers the recompute job; a refused precondition (archive missing or not activated) is a job in state Failed, as with the mutation (mutation streamData.recomputeArchive)."
+        description: "Recomputes the rollup over [from, to) into a staging generation and swaps the generation pointer atomically (AB#4184). Answers the recompute job; a refused precondition (archive missing or not activated) is a job in state Failed, as with the mutation (mutation streamData.recomputeArchive). DEPRECATED (1.30.0): the call blocks until the recompute ended; call Recompute-2, which returns an operation handle at once that runtime.operations follows. Removed in the next major of System.StreamData."
         parameters:
           - { name: from, valueType: DateTime, description: "Inclusive range start (UTC), aligned down to the bucket grid." }
           - { name: to, valueType: DateTime, description: "Exclusive range end (UTC), aligned to the bucket grid." }
@@ -162,7 +162,7 @@ types:
           timeoutSeconds: 300
           idempotent: false
       - methodId: BackfillFromSource-1
-        description: "Queues a durable background backfill of the rollup over the entire history of its source archive and answers the Pending job at once; the recompute runs later on the background orchestrator. No result (null) when the source archive holds no data (mutation streamData.backfillRollupFromSource)."
+        description: "Queues a durable background backfill of the rollup over the entire history of its source archive and answers the Pending job at once; the recompute runs later on the background orchestrator. No result (null) when the source archive holds no data (mutation streamData.backfillRollupFromSource). DEPRECATED (1.30.0): the answer is the Pending job only; call BackfillFromSource-2, which returns an operation handle that runtime.operations follows until the backfill ended. Removed in the next major of System.StreamData."
         result:
           valueType: Record
           valueCkRecordId: ${this}/RecomputeJobInfo
@@ -179,4 +179,55 @@ types:
           roles: [ StreamDataAdmin ]
         execution:
           timeoutSeconds: 60
+          idempotent: false
+      # AB#9056 (1.30.0, Feature AB#5702 F5.4): Recompute and BackfillFromSource as asynchronous methods (execution.mode async,
+      # F3.6). A mode change is a contract change of the method version (row M19), so they are new versions; -1 stay and are
+      # deprecated. The call is authorized when it is accepted (role, tenant of the token, write grant on the rollup) and
+      # returns an operation handle at once; the work then runs in the asset repository, detached from the caller, and
+      # runtime.operations shows it Running and then Succeeded with the job or Failed with the declared error.
+      - methodId: Recompute-2
+        description: "Starts a recompute of the rollup over [from, to) into a staging generation with the atomic generation-pointer swap (AB#4184) and returns an operation handle at once. The operation (runtime.operations) runs until the recompute ended: Succeeded with the completed job, Failed with STREAMDATA_RECOMPUTE_FAILED (and the job id) when the job ended Failed - a refused precondition (archive missing or not activated) is such a job, as with Recompute-1. The job is also listed in the recompute jobs of the archive. A caller that disconnects does not stop it."
+        parameters:
+          - { name: from, valueType: DateTime, description: "Inclusive range start (UTC), aligned down to the bucket grid." }
+          - { name: to, valueType: DateTime, description: "Exclusive range end (UTC), aligned to the bucket grid." }
+          - { name: rtIdScope, valueType: String, isOptional: true, description: "Optional runtime id of a single entity (metering point, stream) the recompute is restricted to." }
+        result:
+          valueType: Record
+          valueCkRecordId: ${this}/RecomputeJobInfo
+        errors:
+          - { code: STREAMDATA_ARCHIVE_NOT_FOUND, description: "The rollup archive does not exist (as the mutation)." }
+          - { code: STREAMDATA_ARCHIVE_NOT_ACTIVATED, description: "An archive the call needs is not activated (as the mutation)." }
+          - { code: STREAMDATA_INVALID_TRANSITION, description: "The change is not allowed in the current state; parameters fromStatus and attemptedTransition (as the mutation)." }
+          - { code: STREAMDATA_SCHEMA_IMMUTABLE, description: "The archive schema cannot change in its current state (as the mutation)." }
+          - { code: STREAMDATA_PATH_INVALID, description: "A column path does not resolve on the target CK type; parameter path (as the mutation)." }
+          - { code: STREAMDATA_ACTIVATION_FAILED, description: "Provisioning a CrateDB table failed (as the mutation)." }
+          - { code: STREAMDATA_ERROR, description: "Any other stream-data rule refused the call; parameter message carries the engine text (as the mutation)." }
+          - { code: STREAMDATA_NOT_ENABLED, description: "Stream data is not enabled for the tenant (the mutation answers this as a generic error)." }
+          - { code: STREAMDATA_RECOMPUTE_FAILED, description: "The recompute job ended in state Failed; parameter jobRtId names the job (recompute jobs of the archive), parameter reason carries its error reason." }
+        authorization:
+          roles: [ StreamDataAdmin ]
+        execution:
+          mode: async
+          timeoutSeconds: 30
+          idempotent: false
+      - methodId: BackfillFromSource-2
+        description: "Queues a durable background backfill of the rollup over the entire history of its source archive and returns an operation handle at once. The operation (runtime.operations) reports the job id as soon as the job is queued (progress stage QUEUED, parameter jobRtId) and runs until the backfill ended: Succeeded with the completed job, or with no result (null) when the source archive holds no data; Failed with STREAMDATA_RECOMPUTE_FAILED (and the job id) when the job ended Failed. The queued work survives a restart of the asset repository; the operation then ends as METHOD_OUTCOME_UNKNOWN and the job stays readable in the recompute jobs of the archive."
+        result:
+          valueType: Record
+          valueCkRecordId: ${this}/RecomputeJobInfo
+        errors:
+          - { code: STREAMDATA_ARCHIVE_NOT_FOUND, description: "The rollup archive does not exist (as the mutation)." }
+          - { code: STREAMDATA_ARCHIVE_NOT_ACTIVATED, description: "An archive the call needs is not activated (as the mutation)." }
+          - { code: STREAMDATA_INVALID_TRANSITION, description: "The change is not allowed in the current state; parameters fromStatus and attemptedTransition (as the mutation)." }
+          - { code: STREAMDATA_SCHEMA_IMMUTABLE, description: "The archive schema cannot change in its current state (as the mutation)." }
+          - { code: STREAMDATA_PATH_INVALID, description: "A column path does not resolve on the target CK type; parameter path (as the mutation)." }
+          - { code: STREAMDATA_ACTIVATION_FAILED, description: "Provisioning a CrateDB table failed (as the mutation)." }
+          - { code: STREAMDATA_ERROR, description: "Any other stream-data rule refused the call; parameter message carries the engine text (as the mutation)." }
+          - { code: STREAMDATA_NOT_ENABLED, description: "Stream data is not enabled for the tenant (the mutation answers this as a generic error)." }
+          - { code: STREAMDATA_RECOMPUTE_FAILED, description: "The recompute job ended in state Failed; parameter jobRtId names the job (recompute jobs of the archive), parameter reason carries its error reason." }
+        authorization:
+          roles: [ StreamDataAdmin ]
+        execution:
+          mode: async
+          timeoutSeconds: 30
           idempotent: false

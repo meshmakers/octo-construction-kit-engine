@@ -7,6 +7,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Engine.SemVer;
+using Meshmakers.Octo.ConstructionKit.Engine.Versioning;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Tests;
@@ -190,7 +191,7 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         result.Messages.Where(m => m.Severity == CkCompileGateSeverity.Error).Select(m => m.Code ?? "").ToArray();
 
     [Fact]
-    public async Task StreamData_Is_1_29_0_OnCkLanguage2_WithMinEngineVersion351_AndPublishedToTheV3RootOnly()
+    public async Task StreamData_Is_1_30_0_OnCkLanguage2_WithMinEngineVersion3567_AndPublishedToTheV3RootOnly()
     {
         var compiled = await CompileStreamDataAsync(RealStreamDataSource());
 
@@ -198,12 +199,15 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         // 1.23.0 (AB#8597) raised the language; 1.24.0 (AB#8598) adds the archive lifecycle methods, 1.25.0 (AB#8599) the
         // rollup control methods, 1.26.0 (AB#9016) the rtId sets of the late-delivery recompute, 1.27.0 (AB#6247) the status
         // reason, the Hidden columns of a Failed archive and RedactHiddenColumns, 1.28.0 (AB#8600) the column methods, 1.29.0
-        // RedactHiddenColumns-2 with the confirmed columns.
-        Assert.Equal(new Version(1, 29, 0), new Version(compiled.ModelId.Version.ToString()));
+        // RedactHiddenColumns-2 with the confirmed columns, 1.30.0 (AB#9056) the asynchronous Recompute-2 and
+        // BackfillFromSource-2.
+        Assert.Equal(new Version(1, 30, 0), new Version(compiled.ModelId.Version.ToString()));
         Assert.Equal(2, compiled.EffectiveCkLanguage);
         // Pinned exactly: a higher value means every service below it can no longer import System.StreamData. A feature that
-        // raises it (e.g. an Archive method with execution.mode) is a deliberate rollout decision and updates this assertion.
-        Assert.Equal("3.5.1", compiled.MinEngineVersion);
+        // raises it is a deliberate rollout decision and updates this assertion. 1.30.0 (AB#9056) raised it from 3.5.1 to the
+        // engine that reads execution.mode (released 2026-11-07), for the asynchronous Recompute-2 and BackfillFromSource-2.
+        Assert.Equal(CkEngineVersion.ExecutionModeMinEngineVersion, compiled.MinEngineVersion);
+        Assert.Equal("3.5.67", compiled.MinEngineVersion);
         Assert.True(CkCatalogLayout.RequiresV3(compiled));
         Assert.Equal(CkCatalogLayout.V3Root, CkCatalogLayout.GetPublishRoot(compiled));
     }
@@ -361,7 +365,11 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         Assert.Null(types["RawArchive"].Methods);
         Assert.Null(types["RecomputeJob"].Methods);
 
-        var all = archive.Values.Concat(types["TimeRangeArchive"].Methods!).Concat(types["RollupArchive"].Methods!).ToList();
+        // Recompute-2 and BackfillFromSource-2 (1.30.0, AB#9056) are asynchronous and add STREAMDATA_RECOMPUTE_FAILED; their
+        // contract is pinned in RecomputeAndBackfill2_AreAsync_AndDeprecateTheSyncVersions
+        var all = archive.Values.Concat(types["TimeRangeArchive"].Methods!)
+            .Concat(types["RollupArchive"].Methods!.Where(m => m.MethodId is not ("Recompute-2" or "BackfillFromSource-2")))
+            .ToList();
         Assert.Equal(12, all.Count);
         Assert.All(all, m =>
         {
@@ -384,7 +392,9 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         var compiled = await CompileStreamDataAsync(RealStreamDataSource());
         var rollup = compiled.Types!.Single(t => t.TypeId.Name == "RollupArchive").Methods!.ToDictionary(m => m.MethodId);
 
-        Assert.Equal(["BackfillFromSource-1", "CreateArchive-1", "Freeze-1", "Recompute-1", "RewindWatermark-1", "Unfreeze-1"],
+        // Recompute-2 and BackfillFromSource-2: AB#9056 (1.30.0), see RecomputeAndBackfill2_AreAsync_AndDeprecateTheSyncVersions
+        Assert.Equal(["BackfillFromSource-1", "BackfillFromSource-2", "CreateArchive-1", "Freeze-1", "Recompute-1", "Recompute-2",
+                "RewindWatermark-1", "Unfreeze-1"],
             rollup.Keys.Order(StringComparer.Ordinal));
         Assert.All(rollup.Values.Where(m => m.MethodId != "CreateArchive-1"),
             m => Assert.Equal(CkMethodKindDto.Instance, m.Kind));
@@ -410,7 +420,7 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         {
             Assert.Equal("RecomputeJobInfo", rollup[id].Result!.ValueCkRecordId!.ElementId.Name);
             Assert.False(rollup[id].Execution!.Idempotent, id);
-            Assert.Null(rollup[id].Execution!.Mode); // synchronous, as the mutations; async is a later decision (F3.6)
+            Assert.Null(rollup[id].Execution!.Mode); // synchronous, as the mutations; the async versions are -2 (1.30.0)
         }
 
         var jobInfo = compiled.Records!.Single(r => r.RecordId.Name == "RecomputeJobInfo");
@@ -473,6 +483,8 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         "types/archive.yaml" => CutFrom(WithoutStreamData_1_29_0(path, yaml), "      # AB#8600 (1.28.0"),
         "records/archiveMethodRecords.yaml" => RemoveBlock(yaml, "      # AB#8600 (1.28.0)", "  # AB#6247 (1.27.0)"),
         "attributes/archiveMethodAttributes.yaml" => CutFrom(yaml, "  # ---------- Computed column jobs (AB#8600"),
+        // the published 1.27.0 has neither the -2 rollup methods nor their deprecation notes (1.30.0)
+        "types/rollupArchive.yaml" => WithoutStreamData_1_30_0(path, yaml),
         _ => yaml
     };
 
@@ -482,6 +494,7 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
     /// </summary>
     private static string WithoutStreamData_1_29_0(string path, string yaml)
     {
+        yaml = WithoutStreamData_1_30_0(path, yaml);
         if (path != "types/archive.yaml")
         {
             return yaml;
@@ -494,6 +507,35 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         return RemoveBlock(yaml.Replace(deprecation, string.Empty, StringComparison.Ordinal),
             "      # 1.29.0: the redaction with the columns the caller confirmed", "      # AB#8600 (1.28.0");
     }
+
+    /// <summary>
+    ///     The sources of 1.29.0: the current ones without Recompute-2 and BackfillFromSource-2 and with the descriptions of
+    ///     Recompute-1 and BackfillFromSource-1 as published in 1.29.0 (without the deprecation notes).
+    /// </summary>
+    private static string WithoutStreamData_1_30_0(string path, string yaml)
+    {
+        if (path != "types/rollupArchive.yaml")
+        {
+            return yaml;
+        }
+
+        foreach (var deprecation in StreamData_1_30_0_Deprecations)
+        {
+            Assert.Contains(deprecation, yaml, StringComparison.Ordinal);
+            yaml = yaml.Replace(deprecation, string.Empty, StringComparison.Ordinal);
+        }
+
+        return CutFrom(yaml, "      # AB#9056 (1.30.0");
+    }
+
+    /// <summary>The deprecation notes 1.30.0 appended to the descriptions of Recompute-1 and BackfillFromSource-1.</summary>
+    private static readonly string[] StreamData_1_30_0_Deprecations =
+    [
+        " DEPRECATED (1.30.0): the call blocks until the recompute ended; call Recompute-2, which returns an operation handle " +
+        "at once that runtime.operations follows. Removed in the next major of System.StreamData.",
+        " DEPRECATED (1.30.0): the answer is the Pending job only; call BackfillFromSource-2, which returns an operation handle " +
+        "that runtime.operations follows until the backfill ended. Removed in the next major of System.StreamData."
+    ];
 
     /// <summary>The YAML without the lines from <paramref name="startMarker" /> up to (not including) <paramref name="endMarker" />.</summary>
     private static string RemoveBlock(string yaml, string startMarker, string endMarker)
@@ -750,6 +792,71 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
 
         Assert.Empty(Errors(result));
         Assert.Contains("1.28.0", result.Verdict!.BaselineId.ToString());
+        Assert.Equal(CkSemVerLevel.Minor, result.Verdict.RequiredLevel);
+        Assert.DoesNotContain(result.Verdict.ClassifiedChanges, c => c.Level == CkSemVerLevel.Major);
+        Assert.DoesNotContain(result.Verdict.ClassifiedChanges, c => c.RequiresAcknowledge);
+    }
+    // ---------- 1.30.0: asynchronous recompute and backfill ----------------------------------------------------------------
+
+    /// <summary>
+    ///     AB#9056: Recompute-2 and BackfillFromSource-2 carry the contract of -1 (parameters, role, result) with
+    ///     execution.mode async, an accept timeout and the added error STREAMDATA_RECOMPUTE_FAILED for a job that ended Failed.
+    ///     The -1 versions keep their contract (synchronous) and are marked deprecated with the -2 id.
+    /// </summary>
+    [Fact]
+    public async Task RecomputeAndBackfill2_AreAsync_AndDeprecateTheSyncVersions()
+    {
+        var compiled = await CompileStreamDataAsync(RealStreamDataSource());
+        var rollup = compiled.Types!.Single(t => t.TypeId.Name == "RollupArchive").Methods!.ToDictionary(m => m.MethodId);
+
+        foreach (var (v1Id, v2Id) in new[] { ("Recompute-1", "Recompute-2"), ("BackfillFromSource-1", "BackfillFromSource-2") })
+        {
+            var v1 = rollup[v1Id];
+            var v2 = rollup[v2Id];
+
+            Assert.Equal(CkMethodKindDto.Instance, v2.Kind);
+            Assert.Equal((v1.Parameters ?? []).Select(p => (p.Name, p.ValueType, p.IsOptional)),
+                (v2.Parameters ?? []).Select(p => (p.Name, p.ValueType, p.IsOptional)));
+            Assert.Equal("RecomputeJobInfo", v2.Result!.ValueCkRecordId!.ElementId.Name);
+            Assert.Equal(["StreamDataAdmin"], v2.Authorization!.Roles!);
+            // no right widened: the default data access (write grant on the rollup), as -1
+            Assert.Equal(CkMethodAuthorization.Resolve(v1.Authorization), CkMethodAuthorization.Resolve(v2.Authorization));
+            Assert.Equal(CkMethodDataAccessDto.Write, CkMethodAuthorization.Resolve(v2.Authorization));
+            Assert.Equal(v1.Errors!.Select(e => e.Code).Append("STREAMDATA_RECOMPUTE_FAILED").Order(StringComparer.Ordinal),
+                v2.Errors!.Select(e => e.Code).Order(StringComparer.Ordinal));
+            Assert.Equal(CkMethodModes.Async, v2.Execution!.Mode);
+            Assert.False(v2.Execution.Idempotent);
+            Assert.Equal(30, v2.Execution.TimeoutSeconds); // bounds the accept step only (row M19, OD-5)
+
+            Assert.Null(v1.Execution!.Mode);
+            Assert.Contains("DEPRECATED (1.30.0)", v1.Description, StringComparison.Ordinal);
+            Assert.Contains(v2Id, v1.Description, StringComparison.Ordinal);
+            Assert.DoesNotContain("DEPRECATED", v2.Description, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    ///     AB#9056: 1.30.0 against 1.29.0 (the same sources without the -2 methods and the deprecation notes of -1) is a Minor
+    ///     without acknowledgement: methods added (row M1) and descriptions changed (row M14). Switching -1 to async instead
+    ///     would be a Major (row M19).
+    /// </summary>
+    [Fact]
+    public async Task StreamData_1_30_0_AgainstThe_1_29_0_Release_IsAMinor_WithoutAcknowledgement()
+    {
+        var baseline = CopyStreamData("streamdata-1.29.0", (path, yaml) =>
+            path == "ckModel.yaml" ? SetVersion(yaml, "1.29.0") : WithoutStreamData_1_30_0(path, yaml));
+        var compiled = await CompileStreamDataAsync(baseline);
+        var methods = compiled.Types!.Single(t => t.TypeId.Name == "RollupArchive").Methods!;
+        Assert.DoesNotContain(methods, m => m.MethodId is "Recompute-2" or "BackfillFromSource-2");
+        Assert.Contains(methods, m => m.MethodId == "Recompute-1");
+        Assert.Equal("3.5.1", compiled.MinEngineVersion);
+        await _fixture.Services.GetRequiredService<ICatalogService>().PublishAsync(InMemoryPublishedCatalog.Name, compiled,
+            new OriginFileResolver(baseline), isForced: true);
+
+        var result = await RunGateAsync(RealStreamDataSource());
+
+        Assert.Empty(Errors(result));
+        Assert.Contains("1.29.0", result.Verdict!.BaselineId.ToString());
         Assert.Equal(CkSemVerLevel.Minor, result.Verdict.RequiredLevel);
         Assert.DoesNotContain(result.Verdict.ClassifiedChanges, c => c.Level == CkSemVerLevel.Major);
         Assert.DoesNotContain(result.Verdict.ClassifiedChanges, c => c.RequiresAcknowledge);

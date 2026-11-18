@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.30.0 - Unreleased
+
+_Required bump level: minor._
+
+### Added
+
+- Methods `RollupArchive.Recompute-2` and `RollupArchive.BackfillFromSource-2` (AB#9056, Feature AB#5702 F5.4) with
+  `execution.mode: async`: the call returns an operation handle at once and the caller follows it through `runtime.operations`.
+  Parameters, role (`StreamDataAdmin`), data access (write grant on the rollup) and result record (`RecomputeJobInfo`) as `-1`;
+  `timeoutSeconds: 30` bounds the accept step only. The operation ends `SUCCEEDED` with the job, or with no result for a backfill
+  of an empty source, or `FAILED` with the new error `STREAMDATA_RECOMPUTE_FAILED` (parameters `jobRtId`, `reason`) when the job
+  ended Failed. `BackfillFromSource-2` reports the queued job as progress (stage `QUEUED`, parameter `jobRtId`).
+
+### Deprecated
+
+- `RollupArchive.Recompute-1` and `RollupArchive.BackfillFromSource-1`: synchronous (`Recompute-1` blocks until the recompute
+  ended, `BackfillFromSource-1` answers the Pending job only). Their contract is unchanged; only their descriptions say so and
+  name the `-2` id. They are removed in the next major of System.StreamData.
+
+### Compatibility
+
+- Additive, a Minor against 1.29.0 (methods added, row M1 of `docs/ck-semver-rules.md`; the descriptions of `-1` are row M14).
+  A mode change on `-1` would be a Major (row M19), hence new versions. No acknowledgement.
+- **Rollout note: `minEngineVersion` rises from 3.5.1 to 3.5.67** (`CkEngineVersion.ExecutionModeMinEngineVersion`, the first
+  engine that reads `execution.mode`, libs release r3.5.67 of 2026-11-07). Services with an engine older than 3.5.67 cannot load
+  System.StreamData 1.30.0 (message 126); in a tenant that holds 1.30.0 they miss the model. Every service that embeds
+  octo-construction-kit-engine-mongodb loads it (asset repository, identity, bot, communication controller, report, platform,
+  AI and MCP services, and the mesh adapters through `MeshAdapter.Sdk`); edge mesh adapters that carry their own, older engine
+  version are the consumers that may lag. The communication operator does not load CK models.
+
 ## 1.29.0 - 2026-11-17
 
 _Required bump level: minor._

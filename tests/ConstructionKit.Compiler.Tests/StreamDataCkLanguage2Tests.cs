@@ -483,6 +483,8 @@ public sealed class StreamDataCkLanguage2Tests : IDisposable
         "types/archive.yaml" => CutFrom(WithoutStreamData_1_29_0(path, yaml), "      # AB#8600 (1.28.0"),
         "records/archiveMethodRecords.yaml" => RemoveBlock(yaml, "      # AB#8600 (1.28.0)", "  # AB#6247 (1.27.0)"),
         "attributes/archiveMethodAttributes.yaml" => CutFrom(yaml, "  # ---------- Computed column jobs (AB#8600"),
+        // the published 1.27.0 has neither the -2 rollup methods nor their deprecation notes (1.30.0)
+        "types/rollupArchive.yaml" => WithoutStreamData_1_30_0(path, yaml),
         _ => yaml
     };
 

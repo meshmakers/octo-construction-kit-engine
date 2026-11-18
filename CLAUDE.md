@@ -1050,13 +1050,15 @@ Tests: `SystemInterfacesTests` (Compiler.Tests: members, per-type table, no inde
 
 ## System.StreamData on ckLanguage 2 (AB#8597, Epic AB#5584 F4.3)
 
-`src/StreamDataCkModel` is **System.StreamData-1.29.0** (archive lifecycle methods 1.24.0, rollup control 1.25.0, late-delivery sets 1.26.0, Hidden-column failures 1.27.0, column methods 1.28.0, confirmed redaction 1.29.0, below); 1.23.0 was the first ckLanguage 2 release of the model and a **Minor** against
+`src/StreamDataCkModel` is **System.StreamData-1.30.0** (archive lifecycle methods 1.24.0, rollup control 1.25.0, late-delivery sets 1.26.0, Hidden-column failures 1.27.0, column methods 1.28.0, confirmed redaction 1.29.0, asynchronous recompute and backfill 1.30.0, below); 1.23.0 was the first ckLanguage 2 release of the model and a **Minor** against
 the ckLanguage 1 release 1.22.0 (`ValidateVersion`: only "ckLanguage changed '1' → '2'"). The rules of the System migration above apply:
 
 - **Every type and record declares `derivable: Any`** (`Archive`, `RawArchive`, `RollupArchive`, `TimeRangeArchive`, `RecomputeJob` and the six
   `Ck*` records). Without it the ckLanguage 2 default `Model` is a Major (row T6) and a model deriving from `Archive` fails with message 113.
   A **new** type or record defaults to `Model`; give it `derivable: Any` when other models should derive from it.
-- **minEngineVersion 3.5.1, `ck-models/v3/` only** — unchanged against 1.18.0–1.22.0, which were already range-retaining.
+- **minEngineVersion 3.5.1, `ck-models/v3/` only** — unchanged against 1.18.0–1.22.0, which were already range-retaining. **Since 1.30.0
+  the minEngineVersion is 3.5.67** (`execution.mode` of `Recompute-2` / `BackfillFromSource-2`, `CkEngineVersion.ExecutionModeMinEngineVersion`):
+  services on an older engine cannot load 1.30.0.
 - **No interface.** No type carries `System/Name`, `System/Description`, `System/Enabled` or a `System/ParentChild` role, so none implements
   `Named-1`, `Describable-1`, `Enableable-1` or `Hierarchical-1`. (Raising the System floor to 2.7 would be allowed as a Minor, row D1:
   1.22.0 resolved System 2.8.0.)
@@ -1068,7 +1070,7 @@ the ckLanguage 1 release 1.22.0 (`ValidateVersion`: only "ckLanguage changed '1'
   of the model: from 1.24.0 on the baseline is ckLanguage 2 and row T7 applies unchanged.
 - **Dependents.** No CK model depends on System.StreamData (`ValidateCascade`: 0 dependents); blueprints and seeds pin `System.StreamData-[1.x,2.0)`.
 - **Proof.** The compiled 1.23.0 equals the published 1.22.0 after removing the version, `ckLanguage`, `minEngineVersion`, `derivable` and the
-  model description. Tests: `StreamDataCkLanguage2Tests` (Compiler.Tests: version, language, minEngineVersion 3.5.1 pinned, v3 root, `derivable:
+  model description. Tests: `StreamDataCkLanguage2Tests` (Compiler.Tests: version, language, minEngineVersion pinned - 3.5.1, since 1.30.0 3.5.67 -, v3 root, `derivable:
   Any` on every element, nothing tightened or implemented, Minor against a ckLanguage 1 copy of the sources, negative control without
   `derivable: Any` = `OCTO-CK200`, a dependent model derives from `Archive` and `CkArchiveColumn` without message 113). The Mongo round-trip gate
   (`CkMetaModelReflectionGateTests` in engine-mongodb) covers the model through the package.

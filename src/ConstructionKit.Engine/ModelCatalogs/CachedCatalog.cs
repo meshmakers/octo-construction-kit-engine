@@ -141,7 +141,27 @@ public abstract class CachedCatalog(
             }
         }
 
+        // A partial cache cannot say "does not exist" (AB#9388).
+        ThrowIfPartial(catalog);
         return false;
+    }
+
+    /// <summary>
+    ///     AB#9388: a cache that the last refresh read only partly is not answered as a complete inventory (OCTO-CK202).
+    ///     An empty flagged cache - the source was not reachable at all - keeps answering from what is there.
+    /// </summary>
+    /// <remarks>
+    ///     A catalog that can ask its repository is exempt: its readers that need a complete answer (dependency
+    ///     resolution, baseline, cascade) complete the cache answer from the source of truth (AB#6588).
+    /// </remarks>
+    private void ThrowIfPartial(CacheTypes.CacheCatalog catalog)
+    {
+        if (catalog.Partial && this is not IAuthoritativeVersionCatalog { IsAuthoritativeReadAvailable: true })
+        {
+            throw ModelCatalogException.CatalogUnreachable(CatalogName,
+                "the last cache refresh read it only partly (an index of its GitHub Pages mirror did not answer in " +
+                "time or was missing). This is usually transient: refresh the catalog cache and retry");
+        }
     }
 
     /// <inheritdoc />
@@ -166,6 +186,7 @@ public abstract class CachedCatalog(
         }
 
         var catalog = await ReadCacheAsync(true).ConfigureAwait(false);
+        ThrowIfPartial(catalog);
 
         foreach (var cacheModelEntry in catalog.Models.Values)
         {
@@ -191,6 +212,7 @@ public abstract class CachedCatalog(
 
         searchTerm = searchTerm?.Trim() ?? string.Empty;
         var catalog = await ReadCacheAsync(true).ConfigureAwait(false);
+        ThrowIfPartial(catalog);
 
         foreach (var cacheModelEntry in catalog.Models.Values)
         {

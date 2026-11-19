@@ -16,7 +16,8 @@ internal sealed class SilentTcpServer : IDisposable
     private readonly Func<string, string?>? _answer;
     private int _acceptedConnections;
 
-    /// <param name="answer">Returns the body for a request path it answers, null to stay silent.</param>
+    /// <param name="answer">Returns the body for a request path it answers ("404"/"500" for that status), null to stay
+    /// silent.</param>
     public SilentTcpServer(Func<string, string?>? answer = null)
     {
         _answer = answer;
@@ -68,9 +69,11 @@ internal sealed class SilentTcpServer : IDisposable
                 return; // silent: the connection stays open without a byte
             }
 
-            var payload = System.Text.Encoding.UTF8.GetBytes(body);
+            // "404" and "500" answer with that status and no body; anything else is a 200 with that body.
+            var status = body switch { "404" => "404 Not Found", "500" => "500 Internal Server Error", _ => "200 OK" };
+            var payload = System.Text.Encoding.UTF8.GetBytes(status == "200 OK" ? body : "");
             var head = System.Text.Encoding.ASCII.GetBytes(
-                $"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {payload.Length}\r\nConnection: close\r\n\r\n");
+                $"HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {payload.Length}\r\nConnection: close\r\n\r\n");
             await stream.WriteAsync(head, _stop.Token).ConfigureAwait(false);
             await stream.WriteAsync(payload, _stop.Token).ConfigureAwait(false);
             await stream.FlushAsync(_stop.Token).ConfigureAwait(false);

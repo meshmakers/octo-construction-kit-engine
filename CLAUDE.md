@@ -807,7 +807,10 @@ further indexes after a library or major-version index). `CkCompile`/`CkRestore`
 run their work through `CatalogTaskRunner` (5-minute limit + MSBuild `ICancelableTask.Cancel`), whose token cancels the refresh. The token
 overloads live on separate interfaces (`ICancellableCatalogRefresh`, `ICancellableCatalogCacheRefresh`, `ICancellableHttpClientWrapper`) so the
 public interfaces keep their signatures for implementers and FakeItEasy expressions in other repos (contracts target netstandard2.0: no DIMs). Tests run against
-a real silent TCP server: `CatalogRequestTimeoutTests`, `CkTaskCatalogTimeoutTests`.
+a real silent TCP server: `CatalogRequestTimeoutTests`, `CkTaskCatalogTimeoutTests`. A refresh with a read root index and a failed other
+index writes `CacheCatalog.Partial` (internal, `[JsonInclude]`); `CachedCatalog.ListAsync`/`SearchAsync` and `IsExistingAsync(CkModelId)`
+for a missing version (not for catalogs with an authoritative read: their readers complete the answer from the repository) throw `CatalogUnreachable` (OCTO-CK202) for it; an
+empty flagged cache answers as before (`CatalogPartialCacheTests`).
 12-model wave measured with `CatalogApiBudgetTests`: 2882 -> 340 requests (docs/ck-semver-rules.md, "The API budget of the catalog reads").
 
 ## `RtPathEvaluator.SetValue` and explicit null (AB#8625)

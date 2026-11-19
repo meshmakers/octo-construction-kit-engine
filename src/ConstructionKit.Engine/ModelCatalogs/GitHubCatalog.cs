@@ -1240,6 +1240,8 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
         // A canceled refresh never publishes the cache it may have read only partly.
         cancellationToken.ThrowIfCancellationRequested();
         cacheCatalog.SourceUnreachable = sourceUnreachable;
+        // Partial: at least one root index was read, and something else failed (AB#9388).
+        cacheCatalog.Partial = sourceUnreachable && catalogs.Count > 0;
         await WriteCacheAsync(cacheCatalog).ConfigureAwait(false);
     }
 

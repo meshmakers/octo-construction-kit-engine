@@ -20,7 +20,13 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   failing mirror, and stops asking the silent mirror (no v3 root after a timed-out v2 root, no further indexes after a
   timed-out library or major-version index) - and the time limit of
   `CkCompile`/`CkRestore` (and an MSBuild cancel) cancels the refresh through a `CancellationToken`; a canceled
-  `CkCompile` neither runs the compatibility gate nor publishes. API (additive, no existing signature changes): the new
+  `CkCompile` neither runs the compatibility gate nor publishes. A refresh that read a GitHub catalog only partly (a root
+  index was read, another index failed) marks its cache as partial: `ListAsync` and `SearchAsync` of that catalog, and
+  `IsExistingAsync(CkModelId)` for a version the partial cache lacks, then fail with `OCTO-CK202` naming the catalog
+  and saying the condition is usually transient, instead of answering an incomplete inventory. A cache of a source that
+  was not reachable at all (offline, no internet, 5xx for the root index) answers as before, so offline machines keep
+  listing their local and embedded models. A catalog that can ask its repository (token, API reads) keeps answering
+  from the partial cache, because its readers that need a complete answer complete it from the repository (AB#6588). API (additive, no existing signature changes): the new
   interfaces `ICancellableCatalogRefresh` (implemented by `CachedCatalog`: the GitHub and local file system catalogs),
   `ICancellableCatalogCacheRefresh` (engine catalog service and catalog manager) and `ICancellableHttpClientWrapper`
   add overloads with a required `CancellationToken`; `ICatalog`, `ICatalogService`, `ICatalogManager` and

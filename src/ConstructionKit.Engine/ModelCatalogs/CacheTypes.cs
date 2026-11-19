@@ -30,6 +30,14 @@ public class CacheTypes
         public bool SourceUnreachable { get; set; }
 
         /// <summary>
+        /// AB#9388: true when the last refresh read the catalog only partly - a root index was read, but another index
+        /// (root, library or major version) failed. A partial cache is never answered as a complete inventory; an empty
+        /// flagged cache (the source was not reachable at all) is. Internal, so the public cache type is unchanged.
+        /// </summary>
+        [System.Text.Json.Serialization.JsonInclude]
+        internal bool Partial { get; set; }
+
+        /// <summary>
         /// Gets a dictionary of all models in the catalog, keyed by model id
         /// </summary>
         public Dictionary<string, CacheModelEntry> Models { get; set; } = [];

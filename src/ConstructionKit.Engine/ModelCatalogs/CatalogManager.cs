@@ -550,7 +550,8 @@ internal class CatalogManager : ICatalogManager
         await catalog.RefreshCatalogAsync(null, forceRefresh).ConfigureAwait(false);
     }
 
-    public async Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool forceRefresh = false)
+    public async Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool forceRefresh = false,
+        CancellationToken cancellationToken = default)
     {
         foreach (var catalog in _catalogs.OrderBy(x => x.Order))
         {
@@ -559,7 +560,8 @@ internal class CatalogManager : ICatalogManager
                 continue;
             }
 
-            await catalog.RefreshCatalogAsync(sourceIdentifier, forceRefresh).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            await catalog.RefreshCatalogAsync(sourceIdentifier, forceRefresh, cancellationToken).ConfigureAwait(false);
         }
     }
 }

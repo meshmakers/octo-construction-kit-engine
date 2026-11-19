@@ -24,7 +24,8 @@ internal sealed class InMemoryPublishedCatalog : ICatalog
     public bool CanWrite => true;
     public bool CanRead => true;
 
-    public Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false) => Task.CompletedTask;
+    public Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false,
+        CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public bool IsSupportingSourceIdentifier(object? sourceIdentifier = null) => true;
 

@@ -9,8 +9,9 @@ public interface IHttpClientWrapper
     /// Sends an HTTP GET request and returns the response body as a string asynchronously.
     /// </summary>
     /// <param name="requestUri">The request URI.</param>
-    /// <returns>The response body as a string.</returns>
-    Task<string?> GetStringAsync(string? requestUri);
+    /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
+    /// <returns>The response body as a string; null when the server answers 404.</returns>
+    Task<string?> GetStringAsync(string? requestUri, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Sends an HTTP GET request asynchronously.

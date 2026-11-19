@@ -9,6 +9,20 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Changed
 
+- **A catalog server that never answers no longer hangs the CK build (AB#9388).** A GitHub Pages connection that was
+  accepted but never sent response headers kept a CK compile at "Refreshing construction kit model library cache" for
+  20 minutes and more: every catalog request waited 3 x 100 s (HttpClient's default timeout, two retries), the refresh
+  treated a timed-out root index like an unreachable source and went on with the next request and the next catalog, and
+  the 5-minute limit of `CkCompile`/`CkRestore` only stopped waiting while the request ran on. Now each attempt of a
+  catalog request has its own timeout of 30 s (two retries), a request that times out in every attempt stops the refresh
+  with a `ModelCatalogException` naming the catalog and the URL (`IsRequestTimeout`) - except for a reader that can ask
+  the repository (token and API reads, e.g. a CI publish), whose refresh flags the cache as unreachable as for any failing
+  mirror and skips the v3 root - and the time limit of
+  `CkCompile`/`CkRestore` (and an MSBuild cancel) cancels the refresh through a `CancellationToken`. API: `ICatalog.RefreshCatalogAsync`,
+  `ICatalogManager.RefreshAllCatalogCachesAsync`, `ICatalogService.RefreshAllCatalogCachesAsync` and
+  `IHttpClientWrapper.GetStringAsync` take an optional `CancellationToken`; implementations of `ICatalog` outside this
+  repository need the new parameter.
+
 - **Generated C# implements interfaces of another CK model (AB#9096).** A type that implements an interface declared in
   another model (e.g. `System/Named-1` on `Basic/NamedEntity`) generated the short name `IRtNamed`, and the build failed
   with CS0246. The source generator now finds the other model's generated interface in the referenced assemblies and

@@ -41,7 +41,8 @@ internal sealed class StubCatalog : ICatalog, IReplaceablePublishCatalog
 
     public void Seed(CkCompiledModelRoot model) => _models[model.ModelId] = model;
 
-    public Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false)
+    public Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false,
+        CancellationToken cancellationToken = default)
     {
         RefreshCount++;
         OnRefresh?.Invoke(RefreshCount);
@@ -320,7 +321,7 @@ internal sealed class InMemoryGitHubRepository : IGitHubClientWrapper, IGitHubTr
             : answer;
     }
 
-    public Task<string?> GetStringAsync(string? requestUri) =>
+    public Task<string?> GetStringAsync(string? requestUri, CancellationToken cancellationToken = default) =>
         PagesAnswerFor(requestUri) switch
         {
             PagesAnswer.Serve => Task.FromResult<string?>(PagesFiles[requestUri!]),

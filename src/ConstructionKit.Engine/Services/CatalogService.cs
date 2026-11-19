@@ -523,9 +523,10 @@ internal class CatalogService : ICatalogService
         return _catalogManager.RefreshCatalogCacheAsync(catalogName, sourceIdentifier, forceRefresh);
     }
 
-    public Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool forceRefresh = false)
+    public Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool forceRefresh = false,
+        CancellationToken cancellationToken = default)
     {
-        return _catalogManager.RefreshAllCatalogCachesAsync(sourceIdentifier, forceRefresh);
+        return _catalogManager.RefreshAllCatalogCachesAsync(sourceIdentifier, forceRefresh, cancellationToken);
     }
 
     private async Task<string> CreateCacheFileAsync(ICkModelGraph ckModelGraph, CkModelId ckModelId, string outputPath)

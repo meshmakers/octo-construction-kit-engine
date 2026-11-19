@@ -21,7 +21,7 @@ public sealed class GitHubCatalogMirrorFlagTests : IDisposable
 
     private async Task<bool> UnreachableAfterRefreshAsync()
     {
-        await CatalogUnderTest.RefreshCatalogAsync(null, true);
+        await CatalogUnderTest.RefreshCatalogAsync(null, true, cancellationToken: TestContext.Current.CancellationToken);
         var answer = await CatalogUnderTest.IsExistingAsync(new CkModelIdVersionRange("GateModel", "[1.0.0,2.0.0)"));
         return answer.SourceUnreachable;
     }
@@ -79,6 +79,6 @@ public sealed class GitHubCatalogMirrorFlagTests : IDisposable
         await PublishAsync();
         _h.Repository.PagesBehavior = path => path == "ck-models/v3/g/GateModel/1/catalog.json" ? PagesAnswer.NotFound : PagesAnswer.Serve;
 
-        await Assert.ThrowsAsync<ModelCatalogException>(() => CatalogUnderTest.RefreshCatalogAsync(null, true));
+        await Assert.ThrowsAsync<ModelCatalogException>(() => CatalogUnderTest.RefreshCatalogAsync(null, true, cancellationToken: TestContext.Current.CancellationToken));
     }
 }

@@ -35,6 +35,11 @@ public class ModelCatalogException : Exception
     /// </summary>
     public bool IsModelNotFound { get; private init; }
 
+    /// <summary>
+    /// True when a catalog request got no answer in time in any of its attempts (AB#9388).
+    /// </summary>
+    public bool IsRequestTimeout { get; private init; }
+
     internal static Exception PublishFailed(CkModelId modelId, string catalogName, Exception exception)
     {
         return new ModelCatalogException($"Publishing model '{modelId}' to catalog '{catalogName}' failed: {exception.Message}", exception);
@@ -183,6 +188,19 @@ public class ModelCatalogException : Exception
     {
         return new ModelCatalogException(
             $"Request to GitHub repository '{repositoryName}' at '{valueGitHubPagesUri}' timed out.");
+    }
+
+    /// <summary>
+    ///     AB#9388: a catalog index request got no answer in time (a server that accepts the connection and never
+    ///     responds); the refresh fails instead of hanging the build.
+    /// </summary>
+    internal static Exception CatalogRequestTimedOut(string catalogName, string url, Exception innerException)
+    {
+        return new ModelCatalogException(
+            $"Catalog '{catalogName}' did not answer the request for '{url}' in time: " +
+            $"{innerException.InnerException?.Message ?? innerException.Message} " +
+            "The catalog refresh was stopped; check the network connection to the catalog's GitHub Pages site.",
+            innerException) { IsRequestTimeout = true };
     }
 
     internal static Exception CannotReadExistingModelVersionCatalog(CkModelId modelId, string catalogName, string catalogPath)

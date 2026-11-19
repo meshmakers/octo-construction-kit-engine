@@ -51,7 +51,8 @@ public class LocalFileSystemCatalog : CachedCatalog
     public override bool CanWrite => _options.Value.IsEnabled;
 
     /// <inheritdoc />
-    public override Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false)
+    public override Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false,
+        CancellationToken cancellationToken = default)
     {
         return RefreshCatalogAsync(forceRefresh, sourceIdentifier);
     }

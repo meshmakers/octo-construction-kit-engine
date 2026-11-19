@@ -294,7 +294,7 @@ public class LocalFileSystemCatalogTests : IDisposable
             await catalog.PublishAsync(new CkCompiledModelRoot { ModelId = modelId }, force: true);
         }, TestContext.Current.CancellationToken)));
 
-        await _repository.RefreshCatalogAsync(forceRefresh: true);
+        await _repository.RefreshCatalogAsync(forceRefresh: true, cancellationToken: TestContext.Current.CancellationToken);
         var listed = _repository.ListAsync(null)
             .ToBlockingEnumerable(cancellationToken: TestContext.Current.CancellationToken)
             .Select(r => r.ModelId)

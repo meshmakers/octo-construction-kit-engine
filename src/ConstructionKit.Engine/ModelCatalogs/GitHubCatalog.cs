@@ -879,6 +879,11 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
 
     private static string CreatePath(string root, CkModelId ckModelId) => CkCatalogLayout.ModelFilePath(root, ckModelId);
 
+    /// <summary>AB#9388: the refresh error for a catalog request that timed out in every attempt.</summary>
+    private Exception RequestTimedOut(string catalogPath, Exception timeout) =>
+        ModelCatalogException.CatalogRequestTimedOut(CatalogName,
+            $"{_gitHubOptions.GitHubPagesUri?.TrimEnd('/')}/{catalogPath}", timeout);
+
     private IHttpClientWrapper CreateHttpClient()
     {
         if (string.IsNullOrWhiteSpace(_gitHubOptions.GitHubPagesUri) ||
@@ -898,9 +903,10 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
     /// <param name="root">The catalog root (F1.1-S6: <c>ck-models/v2/</c> or <c>ck-models/v3/</c>)</param>
     /// <param name="modelName">The model ID (without version)</param>
     /// <param name="majorVersion">The major version number</param>
+    /// <param name="cancellationToken">Cancels the request</param>
     /// <returns>The major version catalog content or null if not found</returns>
     private async Task<SharedCatalogTypes.ModelLibraryVersionsCatalog?> GetModelLibraryVersionsCatalogAsync(
-        string root, string modelName, int majorVersion)
+        string root, string modelName, int majorVersion, CancellationToken cancellationToken)
     {
         var catalogPath = $"{CkCatalogLayout.ModelDirectory(root, modelName)}{majorVersion}/{CatalogFileName}";
 
@@ -910,11 +916,15 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             var httpClient = CreateHttpClient();
             try
             {
-                response = await httpClient.GetStringAsync(catalogPath).ConfigureAwait(false);
+                response = await httpClient.GetStringAsync(catalogPath, cancellationToken).ConfigureAwait(false);
             }
             catch (HttpRequestException)
             {
                 throw ModelCatalogException.InvalidGitHubRepository(CatalogName, _gitHubOptions.GitHubPagesUri);
+            }
+            catch (TaskCanceledException e) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw RequestTimedOut(catalogPath, e);
             }
         }
         else
@@ -1051,12 +1061,13 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
     /// <summary>
     /// Refreshes the catalog file by scanning all model directories
     /// </summary>
-    public override Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false)
+    public override Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false,
+        CancellationToken cancellationToken = default)
     {
-        return RefreshCatalogAsync(forceRefresh);
+        return RefreshCatalogAsync(forceRefresh, cancellationToken);
     }
 
-    private async Task RefreshCatalogAsync(bool forceRefresh)
+    private async Task RefreshCatalogAsync(bool forceRefresh, CancellationToken cancellationToken = default)
     {
         var maxAge = TimeSpan.FromSeconds(MaxCacheFileAgeSeconds);
         if (!forceRefresh && IsCacheFileRecentlyUpdatedAsync(maxAge))
@@ -1082,7 +1093,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
                 notFoundRetryBudget--;
                 if (notFoundRetryDelay > TimeSpan.Zero)
                 {
-                    await Task.Delay(notFoundRetryDelay).ConfigureAwait(false);
+                    await Task.Delay(notFoundRetryDelay, cancellationToken).ConfigureAwait(false);
                 }
 
                 result = await read().ConfigureAwait(false);
@@ -1091,8 +1102,8 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             return result;
         }
 
-        var (catalog, sourceUnreachable) =
-            await GetRootCatalogWithReachabilityAsync(CkCatalogLayout.V2Root).ConfigureAwait(false);
+        var (catalog, sourceUnreachable, mirrorTimedOut) =
+            await GetRootCatalogWithReachabilityAsync(CkCatalogLayout.V2Root, cancellationToken).ConfigureAwait(false);
         while (catalog == null && !sourceUnreachable && notFoundRetryBudget > 0)
         {
             // A missing root index is either a genuinely empty catalog or the deploy swap —
@@ -1100,11 +1111,11 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             notFoundRetryBudget--;
             if (notFoundRetryDelay > TimeSpan.Zero)
             {
-                await Task.Delay(notFoundRetryDelay).ConfigureAwait(false);
+                await Task.Delay(notFoundRetryDelay, cancellationToken).ConfigureAwait(false);
             }
 
-            (catalog, sourceUnreachable) =
-                await GetRootCatalogWithReachabilityAsync(CkCatalogLayout.V2Root).ConfigureAwait(false);
+            (catalog, sourceUnreachable, mirrorTimedOut) =
+                await GetRootCatalogWithReachabilityAsync(CkCatalogLayout.V2Root, cancellationToken).ConfigureAwait(false);
         }
 
         // F1.1-S6: the ck-models/v3 root (ckLanguage 2 / range-retaining models) is optional — a catalog without
@@ -1118,8 +1129,10 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             sourceUnreachable = true;
         }
 
-        var (v3Catalog, v3Unreachable) =
-            await GetRootCatalogWithReachabilityAsync(CkCatalogLayout.V3Root).ConfigureAwait(false);
+        // AB#9388: a mirror that did not answer the v2 root in time is not asked again for the v3 root.
+        var (v3Catalog, v3Unreachable, _) = mirrorTimedOut
+            ? (null, true, true)
+            : await GetRootCatalogWithReachabilityAsync(CkCatalogLayout.V3Root, cancellationToken).ConfigureAwait(false);
         sourceUnreachable |= v3Unreachable;
         var catalogs = new List<(string Root, SharedCatalogTypes.RootCatalog Catalog)>();
         if (v3Catalog != null)
@@ -1142,7 +1155,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             foreach (var rootCatalogEntry in rootCatalog.Models)
             {
                 var modelLibraryCatalog = await ReadWithNotFoundRetryAsync(() =>
-                    GetModelLibraryCatalogAsync(rootCatalogEntry.CatalogPath)).ConfigureAwait(false);
+                    GetModelLibraryCatalogAsync(rootCatalogEntry.CatalogPath, cancellationToken)).ConfigureAwait(false);
 
                 if (modelLibraryCatalog == null)
                 {
@@ -1168,7 +1181,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
                     var versionsCatalog = await ReadWithNotFoundRetryAsync(() =>
                         GetModelLibraryVersionsCatalogAsync(root,
                             rootCatalogEntry.ModelName,
-                            modelLibraryCatalogEntry.MajorVersion)).ConfigureAwait(false);
+                            modelLibraryCatalogEntry.MajorVersion, cancellationToken)).ConfigureAwait(false);
 
                     if (versionsCatalog == null)
                     {
@@ -1228,8 +1241,8 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
     }
 
 
-    private async Task<(SharedCatalogTypes.RootCatalog? Catalog, bool SourceUnreachable)>
-        GetRootCatalogWithReachabilityAsync(string root)
+    private async Task<(SharedCatalogTypes.RootCatalog? Catalog, bool SourceUnreachable, bool TimedOut)>
+        GetRootCatalogWithReachabilityAsync(string root, CancellationToken cancellationToken)
     {
         var catalogPath = $"{root}{CatalogFileName}";
 
@@ -1239,18 +1252,18 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             var httpClient = CreateHttpClient();
             try
             {
-                var httpResponse = await httpClient.GetAsync(catalogPath, CancellationToken.None)
+                using var httpResponse = await httpClient.GetAsync(catalogPath, cancellationToken)
                     .ConfigureAwait(false);
                 if (httpResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
                     // The source responded: the catalog simply does not exist (empty catalog)
-                    return (null, false);
+                    return (null, false, false);
                 }
 
                 if (!httpResponse.IsSuccessStatusCode)
                 {
                     // Server error — the source of truth is unavailable.
-                    return (null, true);
+                    return (null, true, false);
                 }
 
                 response = await httpResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -1260,12 +1273,21 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
                 // Network-level failure — the source of truth is unreachable.
                 // The refresh still writes a cache, but flags it so that a "model not found"
                 // answer is not mistaken for "model does not exist" (silent-failure guard).
-                return (null, true);
+                return (null, true, false);
             }
-            catch (TaskCanceledException)
+            catch (TaskCanceledException e) when (!cancellationToken.IsCancellationRequested)
             {
-                // Request timeout — treat like an unreachable source
-                return (null, true);
+                // AB#9388: every attempt timed out - a server that accepts the connection and never answers. Unlike a
+                // refused connection this does not end quickly. A reader that can ask the repository (token, API reads)
+                // still has its source of truth: the cache is flagged, as for any unreachable mirror (AB#6580). For
+                // everybody else the refresh stops here instead of waiting for the mirror request after request (and
+                // catalog after catalog) until the build's own time limit.
+                if (CanReadViaApi)
+                {
+                    return (null, true, true);
+                }
+
+                throw RequestTimedOut(catalogPath, e);
             }
         }
         else
@@ -1277,7 +1299,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             var r = await gitHubClient.GetFileAsync(catalogPath).ConfigureAwait(false);
             if (r == null)
             {
-                return (null, false);
+                return (null, false, false);
             }
 
             response = r.Value.Item1;
@@ -1285,16 +1307,17 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
 
         if (string.IsNullOrEmpty(response) || response == null)
         {
-            return (null, false);
+            return (null, false, false);
         }
 
         return (System.Text.Json.JsonSerializer.Deserialize<SharedCatalogTypes.RootCatalog>(
             response,
             new System.Text.Json.JsonSerializerOptions
-                { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }), false);
+                { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }), false, false);
     }
 
-    private async Task<SharedCatalogTypes.ModelLibraryCatalog?> GetModelLibraryCatalogAsync(string catalogPath)
+    private async Task<SharedCatalogTypes.ModelLibraryCatalog?> GetModelLibraryCatalogAsync(string catalogPath,
+        CancellationToken cancellationToken)
     {
         string? response;
         if (IsPagesUriConfigured)
@@ -1302,12 +1325,16 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             var httpClient = CreateHttpClient();
             try
             {
-                response = await httpClient.GetStringAsync(catalogPath).ConfigureAwait(false);
+                response = await httpClient.GetStringAsync(catalogPath, cancellationToken).ConfigureAwait(false);
             }
             catch (HttpRequestException)
             {
                 // Catalog doesn't exist or couldn't be fetched
                 return null;
+            }
+            catch (TaskCanceledException e) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw RequestTimedOut(catalogPath, e);
             }
         }
         else

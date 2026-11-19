@@ -799,6 +799,12 @@ dependency resolution, the Remote baseline and the cascade ask it only when `Git
 never reads the API. `ReadVersionsAsync` memoises index files per path for the life of the process (`ForgetReadMemo()` on every own write and on a lost race); the whole-catalog
 read is one request through `IGitHubTreeReader` (recursive tree, versions from file names; a truncated tree walks the indexes). An exhausted limit with a reset more than
 2 minutes away throws `GitHubRateLimitExhaustedException` ("GitHub rate limit exhausted, resets at HH:MMZ.") instead of waiting for the 5-minute `CkCompile`/`CkRestore` timeout.
+Catalog requests (AB#9388): `HttpClientWrapper` gives each attempt its own timeout (30 s, `HttpClient.Timeout` is off) and retries twice; a
+request that times out in every attempt throws `TaskCanceledException` with an inner `TimeoutException` (URL, timeout, attempts), and the
+`GitHubCatalog` refresh turns it into `ModelCatalogException` (`IsRequestTimeout`, catalog + URL) instead of walking on (a reader with
+`CanReadViaApi` flags `SourceUnreachable` for a timed-out root index instead and skips the v3 root). `CkCompile`/`CkRestore`
+run their work through `CatalogTaskRunner` (5-minute limit + MSBuild `ICancelableTask.Cancel`), whose token cancels the refresh. Tests run against
+a real silent TCP server: `CatalogRequestTimeoutTests`, `CkTaskCatalogTimeoutTests`.
 12-model wave measured with `CatalogApiBudgetTests`: 2882 -> 340 requests (docs/ck-semver-rules.md, "The API budget of the catalog reads").
 
 ## `RtPathEvaluator.SetValue` and explicit null (AB#8625)

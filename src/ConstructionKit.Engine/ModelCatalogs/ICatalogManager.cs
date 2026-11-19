@@ -239,8 +239,10 @@ internal interface ICatalogManager
     /// that describes the source
     /// which the catalog should search set it to null to use default</param>
     /// <param name="forceRefresh">When true, the refresh bypasses the cache freshness window</param>
+    /// <param name="cancellationToken">Cancels the refresh, e.g. when the caller's time limit is reached (AB#9388)</param>
     /// <returns></returns>
-    Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool forceRefresh = false);
+    Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool forceRefresh = false,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Reads the versions of a model (all models when <paramref name="modelName" /> is null) from the source of truth of

@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Diagnostics;
 using Meshmakers.Octo.ConstructionKit.Engine.Tests.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.MsBuildTasks;
 using Microsoft.Build.Framework;
@@ -92,12 +91,11 @@ public sealed class CkTaskCatalogTimeoutTests : IDisposable
 
     private void AssertFailsWithTimeLimit(Func<bool> execute, RecordingBuildEngine engine, string operation)
     {
-        var stopwatch = Stopwatch.StartNew();
+        // Execute runs under its own bound, so a regression fails the test instead of hanging it.
+        var run = System.Threading.Tasks.Task.Run(execute, TestContext.Current.CancellationToken);
+        Assert.True(run.Wait(Bounded, TestContext.Current.CancellationToken), $"Execute did not return within {Bounded}");
 
-        var success = execute();
-
-        Assert.False(success);
-        Assert.True(stopwatch.Elapsed < Bounded, $"took {stopwatch.Elapsed}");
+        Assert.False(run.Result);
         var error = Assert.Single(engine.Errors);
         Assert.Contains($"Construction kit {operation} did not complete within", error);
         Assert.Contains("was canceled", error);

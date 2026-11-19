@@ -15,13 +15,19 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   treated a timed-out root index like an unreachable source and went on with the next request and the next catalog, and
   the 5-minute limit of `CkCompile`/`CkRestore` only stopped waiting while the request ran on. Now each attempt of a
   catalog request has its own timeout of 30 s (two retries), a request that times out in every attempt stops the refresh
-  with a `ModelCatalogException` naming the catalog and the URL (`IsRequestTimeout`) - except for a reader that can ask
-  the repository (token and API reads, e.g. a CI publish), whose refresh flags the cache as unreachable as for any failing
-  mirror and skips the v3 root - and the time limit of
+  with a `ModelCatalogException` naming the catalog and the URL (`IsRequestTimeout`) - except for a timed-out root index
+  read by a reader that can ask the repository (token and API reads, e.g. a CI publish): its refresh flags the cache as
+  unreachable, as for any failing mirror, and skips the v3 root - and the time limit of
   `CkCompile`/`CkRestore` (and an MSBuild cancel) cancels the refresh through a `CancellationToken`. API: `ICatalog.RefreshCatalogAsync`,
   `ICatalogManager.RefreshAllCatalogCachesAsync`, `ICatalogService.RefreshAllCatalogCachesAsync` and
-  `IHttpClientWrapper.GetStringAsync` take an optional `CancellationToken`; implementations of `ICatalog` outside this
-  repository need the new parameter.
+  `IHttpClientWrapper.GetStringAsync` take an optional `CancellationToken` (the one-parameter `GetStringAsync` is
+  replaced, not overloaded). Callers stay source compatible, but the change is binary breaking: code compiled against an
+  earlier engine version that calls these members, implements `ICatalog`/`IHttpClientWrapper` or overrides
+  `CachedCatalog.RefreshCatalogAsync` (`MissingMethodException` / `TypeLoadException`) must be rebuilt against this
+  version, and implementations need the new parameter. In the monorepo only octo-asset-repo-services calls
+  `ICatalogService.RefreshAllCatalogCachesAsync`; it must be rebuilt against the new package. No implementation outside
+  this repository exists. A canceled `CkCompile` neither runs the compatibility gate nor
+  publishes.
 
 - **Generated C# implements interfaces of another CK model (AB#9096).** A type that implements an interface declared in
   another model (e.g. `System/Named-1` on `Basic/NamedEntity`) generated the short name `IRtNamed`, and the build failed

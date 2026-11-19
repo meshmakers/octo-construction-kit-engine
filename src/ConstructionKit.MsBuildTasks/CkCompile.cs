@@ -282,6 +282,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task, ICancelableTask
                     localCatalogOptions.RootPath, localCatalogOptions.IsEnabled);
                 foreach (var constructionKitFolder in ConstructionKitFolders)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var operationResult = new OperationResult();
                     try
                     {
@@ -318,6 +319,9 @@ public class CkCompile : Microsoft.Build.Utilities.Task, ICancelableTask
                             {
                                 cacheFiles.Add(compileResult.CompiledModelCacheFilePath);
                             }
+
+                            // AB#9388: nothing is judged or published once the time limit or MSBuild canceled the work.
+                            cancellationToken.ThrowIfCancellationRequested();
 
                             // AB#6294: compatibility gate (concept §4.3.3, gate 1) — after compiling and BEFORE any
                             // PublishAsync; it never writes to a catalog. Runs whether or not the model is published.
@@ -382,6 +386,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task, ICancelableTask
                                 // makes Execute() return false. PublishAsync additionally throws now, so
                                 // the "published" line below cannot be reached for a model that is not
                                 // in the catalog.
+                                cancellationToken.ThrowIfCancellationRequested();
                                 await catalogService.PublishAsync(PublishCatalogName, ckCompiledModelRoot,
                                     originFileResolver, true, operationResult);
                                 Log.LogMessage(MessageImportance.High,
@@ -399,6 +404,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task, ICancelableTask
                                     // cannot be resolved must not enter ANY catalog. A silently missing
                                     // local entry surfaces later as a confusing "unknown model" while a
                                     // sibling project compiles, far from its cause.
+                                    cancellationToken.ThrowIfCancellationRequested();
                                     await catalogService.PublishAsync(LocalFileSystemCatalog.Name,
                                         ckCompiledModelRoot, originFileResolver, true, operationResult);
                                     Log.LogMessage(MessageImportance.High,

@@ -179,6 +179,7 @@ public class CkRestore : Microsoft.Build.Utilities.Task, ICancelableTask
             {
                 foreach (var item in ConstructionKitModelConfigFiles)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var operationResult = new OperationResult();
                     try
                     {

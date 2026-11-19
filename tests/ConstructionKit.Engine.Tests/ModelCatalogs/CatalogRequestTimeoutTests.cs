@@ -167,6 +167,21 @@ public sealed class CatalogRequestTimeoutTests : IDisposable
     }
 
     [Fact]
+    public void After_an_early_build_cancellation_the_task_runner_waits_only_the_grace_period()
+    {
+        using var build = new CancellationTokenSource();
+        build.CancelAfter(ShortTimeout);
+        var stopwatch = Stopwatch.StartNew();
+
+        // Work that ignores its token, a five-minute limit: only the grace period after the cancellation may pass.
+        var outcome = CatalogTaskRunner.Run(_ => Task.Delay(TimeSpan.FromSeconds(60)),
+            TimeSpan.FromMinutes(5), ShortTimeout, build.Token);
+
+        Assert.Equal(CatalogTaskRunner.Outcome.Hung, outcome);
+        Assert.True(stopwatch.Elapsed < Bounded, $"took {stopwatch.Elapsed}");
+    }
+
+    [Fact]
     public void The_task_runner_passes_other_failures_on()
     {
         var aggregate = Assert.Throws<AggregateException>(() => CatalogTaskRunner.Run(

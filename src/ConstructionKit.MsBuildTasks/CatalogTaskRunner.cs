@@ -9,15 +9,15 @@ namespace Meshmakers.Octo.ConstructionKit.MsBuildTasks;
 /// <remarks>
 ///     The work gets a token that is canceled when the time limit is reached or MSBuild cancels the build
 ///     (<c>ICancelableTask.Cancel</c>, e.g. Ctrl+C), so a hanging catalog request ends with the task instead of running on
-///     in the MSBuild node. Code that does not observe the token is still bounded: the runner waits at most
-///     <c>timeout + grace</c> before it gives up on the work.
+///     in the MSBuild node. Code that does not observe the token is still bounded: after the cancellation the runner waits
+///     at most <c>grace</c> before it gives up on the work.
 /// </remarks>
 internal static class CatalogTaskRunner
 {
     /// <summary>The time limit of CkCompile and CkRestore.</summary>
     internal static readonly TimeSpan DefaultTimeout = TimeSpan.FromMinutes(5);
 
-    /// <summary>How long the runner waits after the cancellation for the work to end.</summary>
+    /// <summary>How long the runner waits after the cancellation (time limit or MSBuild cancel) for the work to end.</summary>
     internal static readonly TimeSpan DefaultGrace = TimeSpan.FromSeconds(30);
 
     internal enum Outcome
@@ -50,7 +50,10 @@ internal static class CatalogTaskRunner
         var task = Task.Run(() => work(token), CancellationToken.None);
         try
         {
-            if (!task.Wait(timeout + grace))
+            // Wait for the work or its cancellation (time limit or MSBuild cancel), whichever comes first; after the
+            // cancellation the work gets only the grace period to end.
+            WaitHandle.WaitAny([((IAsyncResult)task).AsyncWaitHandle, token.WaitHandle]);
+            if (!task.Wait(task.IsCompleted ? TimeSpan.Zero : grace))
             {
                 return Outcome.Hung;
             }

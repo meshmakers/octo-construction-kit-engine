@@ -54,6 +54,8 @@ public class LocalFileSystemCatalog : CachedCatalog
     public override Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false,
         CancellationToken cancellationToken = default)
     {
+        // A local disk read is short; a refresh that is canceled already does not start.
+        cancellationToken.ThrowIfCancellationRequested();
         return RefreshCatalogAsync(forceRefresh, sourceIdentifier);
     }
 

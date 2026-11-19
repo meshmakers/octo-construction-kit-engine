@@ -1154,6 +1154,8 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
         {
             foreach (var rootCatalogEntry in rootCatalog.Models)
             {
+                // The repository reads (Octokit) take no token: a canceled refresh stops before the next read.
+                cancellationToken.ThrowIfCancellationRequested();
                 var modelLibraryCatalog = await ReadWithNotFoundRetryAsync(() =>
                     GetModelLibraryCatalogAsync(rootCatalogEntry.CatalogPath, cancellationToken)).ConfigureAwait(false);
 
@@ -1178,6 +1180,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
 
                 foreach (var modelLibraryCatalogEntry in modelLibraryCatalog.MajorVersions)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var versionsCatalog = await ReadWithNotFoundRetryAsync(() =>
                         GetModelLibraryVersionsCatalogAsync(root,
                             rootCatalogEntry.ModelName,
@@ -1206,6 +1209,8 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             }
         }
 
+        // A canceled refresh never publishes the cache it may have read only partly.
+        cancellationToken.ThrowIfCancellationRequested();
         cacheCatalog.SourceUnreachable = sourceUnreachable;
         await WriteCacheAsync(cacheCatalog).ConfigureAwait(false);
     }

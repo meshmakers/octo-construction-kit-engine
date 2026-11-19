@@ -125,16 +125,26 @@ public sealed class CatalogPartialCacheTests : IDisposable
         A.CallTo(() => other.IsSupportingSourceIdentifier(A<object?>._)).Returns(true);
         A.CallTo(() => other.IsExistingAsync(A<CkModelId>._, A<object?>._))
             .ReturnsLazily((CkModelId id, object? _) => id.Name == "Beta");
+        var beta = new Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.CkCompiledModelRoot
+            { ModelId = new CkModelId("Beta", "1.0.0") };
+        A.CallTo(() => other.GetAsync(A<CkModelId>.That.Matches(id => id.Name == "Beta"), A<OperationResult>._,
+                A<object?>._, A<CancellationToken?>._))
+            .Returns(beta);
         var manager = new CatalogManager(
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CatalogManager>.Instance, [partial, other]);
 
         Assert.True(await manager.IsExistingAsync(new CkModelId("Beta", "1.0.0")));
+        Assert.Same(beta, await manager.GetAsync(new CkModelId("Beta", "1.0.0"), new OperationResult()));
+        Assert.Same(beta, await manager.TryGetAsync(new CkModelId("Beta", "1.0.0"), new OperationResult()));
+        A.CallTo(() => other.GetAsync(A<CkModelId>._, A<OperationResult>._, A<object?>._, A<CancellationToken?>._))
+            .MustHaveHappenedTwiceExactly();
         var exception = await Assert.ThrowsAsync<ModelCatalogException>(() =>
             manager.IsExistingAsync(new CkModelId("Gamma", "1.0.0")));
         Assert.Contains("'PrivateGitHubCatalog'", exception.Message);
         Assert.False(exception.IsModelNotFound);
-        await Assert.ThrowsAsync<ModelCatalogException>(() =>
+        var tryGet = await Assert.ThrowsAsync<ModelCatalogException>(() =>
             manager.TryGetAsync(new CkModelId("Gamma", "1.0.0"), new OperationResult()));
+        Assert.Contains("'PrivateGitHubCatalog'", tryGet.Message);
         var notFound = await Assert.ThrowsAsync<ModelCatalogException>(() =>
             manager.GetAsync(new CkModelId("Gamma", "1.0.0"), new OperationResult()));
         Assert.Contains("OCTO-CK202", notFound.Message);

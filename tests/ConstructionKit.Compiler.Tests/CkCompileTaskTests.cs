@@ -31,6 +31,7 @@ public sealed class CkCompileTaskTests : IDisposable
     {
         public List<string> Errors { get; } = [];
         public List<string> Messages { get; } = [];
+        public Action<string>? OnMessage { get; set; }
         public bool ContinueOnError => false;
         public int LineNumberOfTaskNode => 0;
         public int ColumnNumberOfTaskNode => 0;
@@ -38,7 +39,11 @@ public sealed class CkCompileTaskTests : IDisposable
 
         public void LogErrorEvent(BuildErrorEventArgs e) => Errors.Add($"{e.Code}: {e.Message}");
         public void LogWarningEvent(BuildWarningEventArgs e) => Messages.Add($"warning {e.Code}: {e.Message}");
-        public void LogMessageEvent(BuildMessageEventArgs e) => Messages.Add(e.Message ?? "");
+        public void LogMessageEvent(BuildMessageEventArgs e)
+        {
+            Messages.Add(e.Message ?? "");
+            OnMessage?.Invoke(e.Message ?? "");
+        }
         public void LogCustomEvent(CustomBuildEventArgs e) { }
 
         public bool BuildProjectFile(string projectFileName, string[] targetNames, IDictionary globalProperties,
@@ -61,11 +66,18 @@ public sealed class CkCompileTaskTests : IDisposable
     }
 
     private (bool Success, RecordingBuildEngine Engine) Run(string folder, bool publish = true,
-        string? baseline = "Local", string? rangeRetention = null)
+        string? baseline = "Local", string? rangeRetention = null) =>
+        Run(CreateTask(folder, publish, baseline, rangeRetention));
+
+    private static (bool Success, RecordingBuildEngine Engine) Run(CkCompile task) =>
+        (task.Execute(), (RecordingBuildEngine)task.BuildEngine);
+
+    private CkCompile CreateTask(string folder, bool publish = true, string? baseline = "Local",
+        string? rangeRetention = null)
     {
         var engine = new RecordingBuildEngine();
         var output = Path.Combine(_fixture.Root, "task-out", $"run{_run++}");
-        var task = new CkCompile
+        return new CkCompile
         {
             BuildEngine = engine,
             ConstructionKitFolders = [new TaskItem(folder)],
@@ -84,7 +96,29 @@ public sealed class CkCompileTaskTests : IDisposable
             CompatibilityBaseline = baseline,
             RangeRetention = rangeRetention
         };
-        return (task.Execute(), engine);
+    }
+
+    // AB#9388: MSBuild cancels the compile while CompileAsync runs (the cancel arrives with the "Compiling" line, right
+    // before it). The task stops before the compatibility gate and publishes nothing.
+    [Fact]
+    public void A_compile_canceled_before_the_gate_neither_judges_nor_publishes()
+    {
+        var task = CreateTask(WriteModel("2.4.0"));
+        var engine = (RecordingBuildEngine)task.BuildEngine;
+        engine.OnMessage = message =>
+        {
+            if (message.StartsWith("Compiling construction kit model in", StringComparison.Ordinal))
+            {
+                task.Cancel();
+            }
+        };
+
+        var (success, _) = Run(task);
+
+        Assert.False(success);
+        Assert.Contains(engine.Errors, e => e.Contains("Construction kit compile was canceled."));
+        Assert.DoesNotContain(engine.Messages, m => m.StartsWith("Compatibility", StringComparison.Ordinal));
+        Assert.False(IsPublished("taskmodel-2.4.0"), "a canceled compile must not publish");
     }
 
     private bool IsPublished(string modelId) =>

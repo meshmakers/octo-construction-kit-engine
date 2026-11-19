@@ -130,6 +130,35 @@ public sealed class CatalogRequestTimeoutTests : IDisposable
     }
 
     [Fact]
+    public async Task A_canceled_refresh_of_a_repository_backed_catalog_starts_no_repository_read()
+    {
+        // Without a Pages URI the refresh reads through the repository (Octokit), whose reads take no token: the
+        // refresh has to stop before the first one.
+        var gitHubClientFactory = A.Fake<IGitHubClientFactory>();
+        var catalog = new PrivateGitHubCatalog(A.Fake<ICkJsonSerializer>(), A.Fake<IHttpClientFactory>(),
+            gitHubClientFactory, Options.Create(new PrivateGitHubCatalogOptions
+            {
+                CacheDirectory = _cacheDirectory,
+                GitHubPagesUri = "",
+                GitHubRepositoryOwner = "testowner",
+                GitHubRepositoryName = "testrepo",
+                GitHubRepositoryBranch = "main",
+                GitHubApiToken = "test-token",
+                ApiReads = CatalogApiReadMode.Enabled,
+                RefreshNotFoundRetryCount = 0,
+                RefreshNotFoundRetryDelaySeconds = 0
+            }));
+        using var canceled = new CancellationTokenSource();
+        await canceled.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            catalog.RefreshCatalogAsync(null, true, canceled.Token));
+
+        A.CallTo(gitHubClientFactory).MustNotHaveHappened();
+        Assert.Empty(Directory.GetFiles(_cacheDirectory, "*", SearchOption.AllDirectories));
+    }
+
+    [Fact]
     public async Task The_refresh_through_the_catalog_manager_ends_when_its_token_is_canceled()
     {
         // Default request timeout (30 s): only the token can end the refresh this quickly.

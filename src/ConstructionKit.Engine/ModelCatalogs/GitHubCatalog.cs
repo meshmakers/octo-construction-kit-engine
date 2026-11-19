@@ -1075,6 +1075,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             return;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         var cache = await ReadCacheAsync(false).ConfigureAwait(false);
 
         // gh-pages briefly serves 404 for the whole site while a Pages deployment is being
@@ -1103,6 +1104,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             return result;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         var (catalog, sourceUnreachable, mirrorTimedOut) =
             await GetRootCatalogWithReachabilityAsync(CkCatalogLayout.V2Root, cancellationToken).ConfigureAwait(false);
         while (catalog == null && !sourceUnreachable && notFoundRetryBudget > 0)

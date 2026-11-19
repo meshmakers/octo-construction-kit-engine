@@ -1,5 +1,6 @@
 using FakeItEasy;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
@@ -110,6 +111,33 @@ public sealed class CatalogPartialCacheTests : IDisposable
 
         Assert.Equal("Alpha-1.0.0", Assert.Single(listed).ModelId.FullName);
         Assert.False(await catalog.IsExistingAsync(new CkModelId("Beta", "1.0.0")));
+    }
+
+    [Fact]
+    public async Task The_catalog_manager_finds_a_model_in_the_next_catalog_and_fails_loudly_only_when_none_holds_it()
+    {
+        using var server = new SilentTcpServer(PartialMirror);
+        var partial = await RefreshedAsync(server);
+        var other = A.Fake<ICatalog>();
+        A.CallTo(() => other.CatalogName).Returns("OtherCatalog");
+        A.CallTo(() => other.Order).Returns(partial.Order + 1);
+        A.CallTo(() => other.CanRead).Returns(true);
+        A.CallTo(() => other.IsSupportingSourceIdentifier(A<object?>._)).Returns(true);
+        A.CallTo(() => other.IsExistingAsync(A<CkModelId>._, A<object?>._))
+            .ReturnsLazily((CkModelId id, object? _) => id.Name == "Beta");
+        var manager = new CatalogManager(
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<CatalogManager>.Instance, [partial, other]);
+
+        Assert.True(await manager.IsExistingAsync(new CkModelId("Beta", "1.0.0")));
+        var exception = await Assert.ThrowsAsync<ModelCatalogException>(() =>
+            manager.IsExistingAsync(new CkModelId("Gamma", "1.0.0")));
+        Assert.Contains("'PrivateGitHubCatalog'", exception.Message);
+        Assert.False(exception.IsModelNotFound);
+        await Assert.ThrowsAsync<ModelCatalogException>(() =>
+            manager.TryGetAsync(new CkModelId("Gamma", "1.0.0"), new OperationResult()));
+        var notFound = await Assert.ThrowsAsync<ModelCatalogException>(() =>
+            manager.GetAsync(new CkModelId("Gamma", "1.0.0"), new OperationResult()));
+        Assert.Contains("OCTO-CK202", notFound.Message);
     }
 
     [Fact]

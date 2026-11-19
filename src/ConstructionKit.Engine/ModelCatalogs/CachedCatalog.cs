@@ -158,9 +158,7 @@ public abstract class CachedCatalog(
     {
         if (catalog.Partial && this is not IAuthoritativeVersionCatalog { IsAuthoritativeReadAvailable: true })
         {
-            throw ModelCatalogException.CatalogUnreachable(CatalogName,
-                "the last cache refresh read it only partly (an index of its GitHub Pages mirror did not answer in " +
-                "time or was missing). This is usually transient: refresh the catalog cache and retry");
+            throw ModelCatalogException.PartialCache(CatalogName);
         }
     }
 

@@ -240,6 +240,7 @@ internal class CatalogManager : ICatalogManager, ICancellableCatalogCacheRefresh
     {
         _logger.LogInformation("Looking up CK model with id {CkModelId} in catalogs", ckModelId);
 
+        ModelCatalogException? partialCache = null;
         foreach (var catalog in _catalogs.OrderBy(x => x.Order))
         {
             if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
@@ -250,14 +251,21 @@ internal class CatalogManager : ICatalogManager, ICancellableCatalogCacheRefresh
             _logger.LogInformation("Checking catalog {CatalogName} for model {CkModelId}",
                 catalog.CatalogName, ckModelId);
 
-            var hasBeenFound = await IsExistingWithSourceOfTruthAsync(catalog, ckModelId, sourceIdentifier)
+            var (hasBeenFound, partial) = await IsExistingOrPartialAsync(catalog, ckModelId, sourceIdentifier)
                 .ConfigureAwait(false);
+            partialCache ??= partial;
             if (hasBeenFound)
             {
                 _logger.LogInformation("Found model {CkModelId} in catalog {CatalogName}", ckModelId, catalog.CatalogName);
                 return await catalog.GetAsync(ckModelId, operationResult, sourceIdentifier)
                     .ConfigureAwait(false);
             }
+        }
+
+        // AB#9388: not found, but a catalog could not say "not there" - fail loudly instead of "no such model".
+        if (partialCache != null)
+        {
+            throw partialCache;
         }
 
         return null;
@@ -298,6 +306,7 @@ internal class CatalogManager : ICatalogManager, ICancellableCatalogCacheRefresh
     {
         _logger.LogInformation("Looking up CK model with id {CkModelId} in catalogs", ckModelId);
 
+        ModelCatalogException? partialCache = null;
         foreach (var catalog in _catalogs.OrderBy(x => x.Order))
         {
             if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
@@ -308,14 +317,20 @@ internal class CatalogManager : ICatalogManager, ICancellableCatalogCacheRefresh
             _logger.LogInformation("Checking catalog {CatalogName} for model {CkModelId}",
                 catalog.CatalogName, ckModelId);
 
-            var hasBeenFound = await IsExistingWithSourceOfTruthAsync(catalog, ckModelId, sourceIdentifier)
+            var (hasBeenFound, partial) = await IsExistingOrPartialAsync(catalog, ckModelId, sourceIdentifier)
                 .ConfigureAwait(false);
+            partialCache ??= partial;
             if (hasBeenFound)
             {
                 _logger.LogInformation("Found model {CkModelId} in catalog {CatalogName}", ckModelId, catalog.CatalogName);
                 return await catalog.GetAsync(ckModelId, operationResult, sourceIdentifier)
                     .ConfigureAwait(false);
             }
+        }
+
+        if (partialCache != null)
+        {
+            throw partialCache;
         }
 
         throw ModelCatalogException.ModelNotFoundInCatalogs(ckModelId);
@@ -471,6 +486,7 @@ internal class CatalogManager : ICatalogManager, ICancellableCatalogCacheRefresh
 
     public async Task<bool> IsExistingAsync(CkModelId ckModelId, object? sourceIdentifier = null)
     {
+        ModelCatalogException? partialCache = null;
         foreach (var catalog in _catalogs.OrderBy(x => x.Order))
         {
             if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
@@ -478,15 +494,39 @@ internal class CatalogManager : ICatalogManager, ICancellableCatalogCacheRefresh
                 continue;
             }
 
-            var isExisting = await IsExistingWithSourceOfTruthAsync(catalog, ckModelId, sourceIdentifier)
+            var (isExisting, partial) = await IsExistingOrPartialAsync(catalog, ckModelId, sourceIdentifier)
                 .ConfigureAwait(false);
+            partialCache ??= partial;
             if (isExisting)
             {
                 return true;
             }
         }
 
+        if (partialCache != null)
+        {
+            throw partialCache;
+        }
+
         return false;
+    }
+
+    /// <summary>
+    ///     AB#9388: a catalog whose cache was read only partly cannot deny the model; the lookup goes on with the next
+    ///     catalog and fails with that catalog's error only when no catalog holds the model.
+    /// </summary>
+    private static async Task<(bool Exists, ModelCatalogException? PartialCache)> IsExistingOrPartialAsync(
+        ICatalog catalog, CkModelId ckModelId, object? sourceIdentifier)
+    {
+        try
+        {
+            return (await IsExistingWithSourceOfTruthAsync(catalog, ckModelId, sourceIdentifier).ConfigureAwait(false),
+                null);
+        }
+        catch (ModelCatalogException e) when (e.IsPartialCache)
+        {
+            return (false, e);
+        }
     }
 
     public async Task<ModelExistingResult> IsExistingAsync(CkModelIdVersionRange ckModelIdVersionRange,

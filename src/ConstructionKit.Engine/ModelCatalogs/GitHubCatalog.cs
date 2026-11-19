@@ -1096,6 +1096,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
                     await Task.Delay(notFoundRetryDelay, cancellationToken).ConfigureAwait(false);
                 }
 
+                cancellationToken.ThrowIfCancellationRequested();
                 result = await read().ConfigureAwait(false);
             }
 
@@ -1114,6 +1115,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
                 await Task.Delay(notFoundRetryDelay, cancellationToken).ConfigureAwait(false);
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             (catalog, sourceUnreachable, mirrorTimedOut) =
                 await GetRootCatalogWithReachabilityAsync(CkCatalogLayout.V2Root, cancellationToken).ConfigureAwait(false);
         }
@@ -1124,12 +1126,13 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
         // A publisher asks it; a mirror that disagrees (lagging or being replaced) is an unreachable source, never an
         // empty catalog. Anonymous readers have only the mirror.
         if (catalog == null && !sourceUnreachable &&
-            !await RootIndexAbsentConfirmedAsync(CkCatalogLayout.V2Root).ConfigureAwait(false))
+            !await RootIndexAbsentConfirmedAsync(CkCatalogLayout.V2Root, cancellationToken).ConfigureAwait(false))
         {
             sourceUnreachable = true;
         }
 
         // AB#9388: a mirror that did not answer the v2 root in time is not asked again for the v3 root.
+        cancellationToken.ThrowIfCancellationRequested();
         var (v3Catalog, v3Unreachable, _) = mirrorTimedOut
             ? (null, true, true)
             : await GetRootCatalogWithReachabilityAsync(CkCatalogLayout.V3Root, cancellationToken).ConfigureAwait(false);
@@ -1220,7 +1223,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
     ///     or when the reader has no token to ask with. False when the repository holds the index, does not exist, or
     ///     could not be asked.
     /// </summary>
-    private async Task<bool> RootIndexAbsentConfirmedAsync(string root)
+    private async Task<bool> RootIndexAbsentConfirmedAsync(string root, CancellationToken cancellationToken)
     {
         if (!CanReadViaApi)
         {
@@ -1230,16 +1233,19 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
         try
         {
             var gitHubClient = CreateGitHubClient();
-            return await gitHubClient.GetRepositoryStateAsync().ConfigureAwait(false) switch
+            cancellationToken.ThrowIfCancellationRequested();
+            var state = await gitHubClient.GetRepositoryStateAsync().ConfigureAwait(false);
+            if (state != GitHubRepositoryState.Ready)
             {
-                GitHubRepositoryState.Empty => true,
-                GitHubRepositoryState.Ready => await gitHubClient.GetFileAsync($"{root}{CatalogFileName}")
-                    .ConfigureAwait(false) == null,
-                _ => false
-            };
+                return state == GitHubRepositoryState.Empty;
+            }
+
+            // The repository reads take no token: a canceled refresh does not start the next one (AB#9388).
+            cancellationToken.ThrowIfCancellationRequested();
+            return await gitHubClient.GetFileAsync($"{root}{CatalogFileName}").ConfigureAwait(false) == null;
         }
-        catch (Exception e) when (e is ApiException or HttpRequestException or OperationCanceledException
-                                      or ModelCatalogException)
+        catch (Exception e) when ((e is ApiException or HttpRequestException or OperationCanceledException
+                                       or ModelCatalogException) && !cancellationToken.IsCancellationRequested)
         {
             return false;
         }

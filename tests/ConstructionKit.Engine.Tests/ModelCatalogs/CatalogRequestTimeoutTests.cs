@@ -116,6 +116,20 @@ public sealed class CatalogRequestTimeoutTests : IDisposable
     }
 
     [Fact]
+    public async Task A_canceled_refresh_reads_nothing_and_writes_no_cache()
+    {
+        var catalog = CreateCatalog(new HttpClientWrapperFactory(ShortTimeout, NoBackoff), apiReader: true);
+        using var canceled = new CancellationTokenSource();
+        await canceled.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            catalog.RefreshCatalogAsync(null, true, canceled.Token));
+
+        Assert.Equal(0, _server.AcceptedConnections);
+        Assert.Empty(Directory.GetFiles(_cacheDirectory, "*", SearchOption.AllDirectories));
+    }
+
+    [Fact]
     public async Task The_refresh_through_the_catalog_manager_ends_when_its_token_is_canceled()
     {
         // Default request timeout (30 s): only the token can end the refresh this quickly.

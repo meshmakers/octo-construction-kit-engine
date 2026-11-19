@@ -227,7 +227,7 @@ public sealed class CkPublishGateFailClosedTests : IDisposable
         // The cache of a reader that refreshed while the mirror was being replaced: empty and not flagged.
         var catalog = _h.Get<IEnumerable<Contracts.ModelCatalogs.ICatalog>>().Single(c => c.CatalogName == Catalog);
         Repo.PagesBehavior = _ => PagesAnswer.NotFound;
-        await catalog.RefreshCatalogAsync(null, true, cancellationToken: TestContext.Current.CancellationToken);
+        await catalog.RefreshCatalogAsync(null, true);
 
         var result = await EvaluateAsync(Breaking());
 

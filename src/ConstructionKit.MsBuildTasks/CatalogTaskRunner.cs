@@ -1,4 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using TaskLoggingHelper = Microsoft.Build.Utilities.TaskLoggingHelper;
 
 namespace Meshmakers.Octo.ConstructionKit.MsBuildTasks;
@@ -99,6 +100,21 @@ internal static class CatalogTaskRunner
                     operation, timeout.TotalMinutes);
                 return false;
         }
+    }
+
+    /// <summary>
+    ///     Refreshes all catalog caches through the cancellable member when the service has it (the engine's does).
+    /// </summary>
+    internal static Task RefreshAllCatalogCachesAsync(ICatalogService catalogService,
+        CancellationToken cancellationToken)
+    {
+        if (catalogService is ICancellableCatalogCacheRefresh cancellable)
+        {
+            return cancellable.RefreshAllCatalogCachesAsync(null, false, cancellationToken);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return catalogService.RefreshAllCatalogCachesAsync();
     }
 
     /// <summary>

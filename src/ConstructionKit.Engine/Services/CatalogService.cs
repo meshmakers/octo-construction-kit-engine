@@ -20,7 +20,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
 /// <summary>
 ///     Manages the CK model repositories
 /// </summary>
-internal class CatalogService : ICatalogService
+internal class CatalogService : ICatalogService, ICancellableCatalogCacheRefresh
 {
     private readonly ILogger<CatalogService> _logger;
     private readonly ICatalogManager _catalogManager;
@@ -523,10 +523,23 @@ internal class CatalogService : ICatalogService
         return _catalogManager.RefreshCatalogCacheAsync(catalogName, sourceIdentifier, forceRefresh);
     }
 
-    public Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool forceRefresh = false,
-        CancellationToken cancellationToken = default)
+    public Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool forceRefresh = false)
     {
-        return _catalogManager.RefreshAllCatalogCachesAsync(sourceIdentifier, forceRefresh, cancellationToken);
+        return _catalogManager.RefreshAllCatalogCachesAsync(sourceIdentifier, forceRefresh);
+    }
+
+    /// <inheritdoc />
+    public Task RefreshAllCatalogCachesAsync(object? sourceIdentifier, bool forceRefresh,
+        CancellationToken cancellationToken)
+    {
+        // AB#9388: the engine's catalog manager is cancellable; another ICatalogManager runs without the token.
+        if (_catalogManager is ICancellableCatalogCacheRefresh cancellable)
+        {
+            return cancellable.RefreshAllCatalogCachesAsync(sourceIdentifier, forceRefresh, cancellationToken);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return _catalogManager.RefreshAllCatalogCachesAsync(sourceIdentifier, forceRefresh);
     }
 
     private async Task<string> CreateCacheFileAsync(ICkModelGraph ckModelGraph, CkModelId ckModelId, string outputPath)

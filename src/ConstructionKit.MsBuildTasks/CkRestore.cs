@@ -188,7 +188,7 @@ public class CkRestore : Microsoft.Build.Utilities.Task, ICancelableTask
                         if (File.Exists(ckModelConfigFilePath))
                         {
                             Log.LogMessage(MessageImportance.High, "Refreshing construction kit model library cache");
-                            await catalogService.RefreshAllCatalogCachesAsync(cancellationToken: cancellationToken);
+                            await CatalogTaskRunner.RefreshAllCatalogCachesAsync(catalogService, cancellationToken);
 
                             Log.LogMessage(MessageImportance.High,
                                 "Restoring construction kit model libraries in '{0}'",

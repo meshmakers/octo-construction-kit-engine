@@ -40,10 +40,8 @@ public interface ICatalog
     /// set it to null to use default</param>
     /// <param name="forceRefresh">When true, the refresh bypasses the cache freshness window and always
     /// contacts the source</param>
-    /// <param name="cancellationToken">Cancels the refresh, e.g. when the caller's time limit is reached (AB#9388)</param>
     /// <returns></returns>
-    Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false,
-        CancellationToken cancellationToken = default);
+    Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false);
 
     /// <summary>
     ///     Returns true, if the defined source identifier ist supported by the catalog.

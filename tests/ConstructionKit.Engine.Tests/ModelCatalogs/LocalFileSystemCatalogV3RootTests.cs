@@ -77,7 +77,7 @@ public sealed class LocalFileSystemCatalogV3RootTests : IDisposable
         Assert.Equal("3.4.0", v2.MinEngineVersion);
         Assert.Null((await _catalog.GetAsync(new CkModelId("Demo", "1.0.0"), operationResult)).MinEngineVersion);
 
-        await _catalog.RefreshCatalogAsync(forceRefresh: true, cancellationToken: TestContext.Current.CancellationToken);
+        await _catalog.RefreshCatalogAsync(forceRefresh: true);
         var listed = _catalog.ListAsync(null).ToBlockingEnumerable(TestContext.Current.CancellationToken)
             .Select(i => i.ModelId.FullName).OrderBy(m => m).ToList();
         Assert.Equal(["Demo-1.0.0", "Demo-1.1.0"], listed);

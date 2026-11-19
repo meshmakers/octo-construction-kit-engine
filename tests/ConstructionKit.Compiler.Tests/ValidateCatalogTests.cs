@@ -32,8 +32,7 @@ internal sealed class NamedStubCatalog(string name, int order) : ICatalog
 
     public void Seed(CkCompiledModelRoot model) => _models[model.ModelId] = model;
 
-    public Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false,
-        CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false) => Task.CompletedTask;
     public bool IsSupportingSourceIdentifier(object? sourceIdentifier = null) => sourceIdentifier == null;
 
     public Task<ModelExistingResult> IsExistingAsync(CkModelIdVersionRange range, object? sourceIdentifier = null)

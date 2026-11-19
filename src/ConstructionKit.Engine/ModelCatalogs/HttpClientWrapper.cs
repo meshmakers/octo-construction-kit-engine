@@ -2,7 +2,7 @@ using Meshmakers.Common.Shared;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 
-internal class HttpClientWrapper : IHttpClientWrapper
+internal class HttpClientWrapper : ICancellableHttpClientWrapper
 {
     /// <summary>
     ///     Time one attempt of a catalog request may take, response body included (AB#9388). Catalog index files are a
@@ -49,7 +49,9 @@ internal class HttpClientWrapper : IHttpClientWrapper
         _client = new HttpClient { BaseAddress = baseUri, Timeout = System.Threading.Timeout.InfiniteTimeSpan };
     }
 
-    public async Task<string?> GetStringAsync(string? requestUri, CancellationToken cancellationToken = default)
+    public Task<string?> GetStringAsync(string? requestUri) => GetStringAsync(requestUri, CancellationToken.None);
+
+    public async Task<string?> GetStringAsync(string? requestUri, CancellationToken cancellationToken)
     {
         var uri = _baseUri.AbsolutePath.EnsureEndsWith("/") + requestUri;
         using var response = await SendWithRetryAsync(uri, cancellationToken).ConfigureAwait(false);

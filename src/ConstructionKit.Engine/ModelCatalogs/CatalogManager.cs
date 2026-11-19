@@ -1,3 +1,4 @@
+using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
@@ -8,7 +9,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 /// <summary>
 ///     Manages the catalogs that can be used to look up a compiled model.
 /// </summary>
-internal class CatalogManager : ICatalogManager
+internal class CatalogManager : ICatalogManager, ICancellableCatalogCacheRefresh
 {
     private readonly ILogger<CatalogManager> _logger;
     private readonly IEnumerable<ICatalog> _catalogs;
@@ -550,8 +551,12 @@ internal class CatalogManager : ICatalogManager
         await catalog.RefreshCatalogAsync(null, forceRefresh).ConfigureAwait(false);
     }
 
-    public async Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool forceRefresh = false,
-        CancellationToken cancellationToken = default)
+    public Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool forceRefresh = false) =>
+        RefreshAllCatalogCachesAsync(sourceIdentifier, forceRefresh, CancellationToken.None);
+
+    /// <inheritdoc />
+    public async Task RefreshAllCatalogCachesAsync(object? sourceIdentifier, bool forceRefresh,
+        CancellationToken cancellationToken)
     {
         foreach (var catalog in _catalogs.OrderBy(x => x.Order))
         {
@@ -561,7 +566,10 @@ internal class CatalogManager : ICatalogManager
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            await catalog.RefreshCatalogAsync(sourceIdentifier, forceRefresh, cancellationToken).ConfigureAwait(false);
+            await (catalog is ICancellableCatalogRefresh cancellable
+                    ? cancellable.RefreshCatalogAsync(sourceIdentifier, forceRefresh, cancellationToken)
+                    : catalog.RefreshCatalogAsync(sourceIdentifier, forceRefresh))
+                .ConfigureAwait(false);
         }
     }
 }

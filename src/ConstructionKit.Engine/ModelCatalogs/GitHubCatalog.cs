@@ -879,6 +879,13 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
 
     private static string CreatePath(string root, CkModelId ckModelId) => CkCatalogLayout.ModelFilePath(root, ckModelId);
 
+    /// <summary>AB#9388: a cancellable string read when the client supports it.</summary>
+    private static Task<string?> GetStringAsync(IHttpClientWrapper httpClient, string path,
+        CancellationToken cancellationToken) =>
+        httpClient is ICancellableHttpClientWrapper cancellable
+            ? cancellable.GetStringAsync(path, cancellationToken)
+            : httpClient.GetStringAsync(path);
+
     /// <summary>AB#9388: the refresh error for a catalog request that timed out in every attempt.</summary>
     private Exception RequestTimedOut(string catalogPath, Exception timeout) =>
         ModelCatalogException.CatalogRequestTimedOut(CatalogName,
@@ -916,7 +923,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             var httpClient = CreateHttpClient();
             try
             {
-                response = await httpClient.GetStringAsync(catalogPath, cancellationToken).ConfigureAwait(false);
+                response = await GetStringAsync(httpClient, catalogPath, cancellationToken).ConfigureAwait(false);
             }
             catch (HttpRequestException)
             {
@@ -1061,8 +1068,14 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
     /// <summary>
     /// Refreshes the catalog file by scanning all model directories
     /// </summary>
-    public override Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false,
-        CancellationToken cancellationToken = default)
+    public override Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false)
+    {
+        return RefreshCatalogAsync(forceRefresh, CancellationToken.None);
+    }
+
+    /// <inheritdoc />
+    public override Task RefreshCatalogAsync(object? sourceIdentifier, bool forceRefresh,
+        CancellationToken cancellationToken)
     {
         return RefreshCatalogAsync(forceRefresh, cancellationToken);
     }
@@ -1338,7 +1351,7 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             var httpClient = CreateHttpClient();
             try
             {
-                response = await httpClient.GetStringAsync(catalogPath, cancellationToken).ConfigureAwait(false);
+                response = await GetStringAsync(httpClient, catalogPath, cancellationToken).ConfigureAwait(false);
             }
             catch (HttpRequestException)
             {

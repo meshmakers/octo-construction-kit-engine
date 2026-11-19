@@ -803,7 +803,9 @@ Catalog requests (AB#9388): `HttpClientWrapper` gives each attempt its own timeo
 request that times out in every attempt throws `TaskCanceledException` with an inner `TimeoutException` (URL, timeout, attempts), and the
 `GitHubCatalog` refresh turns it into `ModelCatalogException` (`IsRequestTimeout`, catalog + URL) instead of walking on (a reader with
 `CanReadViaApi` flags `SourceUnreachable` for a timed-out root index instead and skips the v3 root). `CkCompile`/`CkRestore`
-run their work through `CatalogTaskRunner` (5-minute limit + MSBuild `ICancelableTask.Cancel`), whose token cancels the refresh. Tests run against
+run their work through `CatalogTaskRunner` (5-minute limit + MSBuild `ICancelableTask.Cancel`), whose token cancels the refresh. The token
+overloads live on separate interfaces (`ICancellableCatalogRefresh`, `ICancellableCatalogCacheRefresh`, `ICancellableHttpClientWrapper`) so the
+public interfaces keep their signatures for implementers and FakeItEasy expressions in other repos (contracts target netstandard2.0: no DIMs). Tests run against
 a real silent TCP server: `CatalogRequestTimeoutTests`, `CkTaskCatalogTimeoutTests`.
 12-model wave measured with `CatalogApiBudgetTests`: 2882 -> 340 requests (docs/ck-semver-rules.md, "The API budget of the catalog reads").
 

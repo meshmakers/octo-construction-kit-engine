@@ -276,8 +276,6 @@ public interface ICatalogService
     /// which the catalog should search set it to null to use default</param>
     /// <param name="forceRefresh">When true, the refresh bypasses the cache freshness window and always
     /// contacts the source</param>
-    /// <param name="cancellationToken">Cancels the refresh, e.g. when the caller's time limit is reached (AB#9388)</param>
     /// <returns></returns>
-    Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool forceRefresh = false,
-        CancellationToken cancellationToken = default);
+    Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool forceRefresh = false);
 }

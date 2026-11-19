@@ -300,7 +300,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task, ICancelableTask
                             {
                                 Log.LogMessage(MessageImportance.High,
                                     "Refreshing construction kit model library cache");
-                                await catalogService.RefreshAllCatalogCachesAsync(cancellationToken: cancellationToken);
+                                await CatalogTaskRunner.RefreshAllCatalogCachesAsync(catalogService, cancellationToken);
                             }
                             else
                             {

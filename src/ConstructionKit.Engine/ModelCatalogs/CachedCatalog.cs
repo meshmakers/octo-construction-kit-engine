@@ -21,7 +21,7 @@ public abstract class CachedCatalog(
     string description,
     bool canWrite,
     bool canRead,
-    CatalogOptions catalogOptions) : ICatalog
+    CatalogOptions catalogOptions) : ICatalog, ICancellableCatalogRefresh
 {
     /// <inheritdoc />
     public int Order { get; } = order;
@@ -47,8 +47,19 @@ public abstract class CachedCatalog(
     public virtual bool CanRead { get; } = canRead;
 
     /// <inheritdoc />
-    public abstract Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false,
-        CancellationToken cancellationToken = default);
+    public abstract Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false);
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     The default does not start a refresh that is canceled already and otherwise runs the refresh without the
+    ///     token; catalogs that read a remote source override it (AB#9388).
+    /// </remarks>
+    public virtual Task RefreshCatalogAsync(object? sourceIdentifier, bool forceRefresh,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return RefreshCatalogAsync(sourceIdentifier, forceRefresh);
+    }
 
     /// <inheritdoc />
     public abstract bool IsSupportingSourceIdentifier(object? sourceIdentifier = null);

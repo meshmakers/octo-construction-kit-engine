@@ -802,7 +802,8 @@ read is one request through `IGitHubTreeReader` (recursive tree, versions from f
 Catalog requests (AB#9388): `HttpClientWrapper` gives each attempt its own timeout (30 s, `HttpClient.Timeout` is off) and retries twice; a
 request that times out in every attempt throws `TaskCanceledException` with an inner `TimeoutException` (URL, timeout, attempts), and the
 `GitHubCatalog` refresh turns it into `ModelCatalogException` (`IsRequestTimeout`, catalog + URL) instead of walking on (a reader with
-`CanReadViaApi` flags `SourceUnreachable` for a timed-out root index instead and skips the v3 root). `CkCompile`/`CkRestore`
+`CanReadViaApi` flags `SourceUnreachable` for any timed-out index instead and stops asking the mirror: no v3 root after the v2 root, no
+further indexes after a library or major-version index). `CkCompile`/`CkRestore`
 run their work through `CatalogTaskRunner` (5-minute limit + MSBuild `ICancelableTask.Cancel`), whose token cancels the refresh. The token
 overloads live on separate interfaces (`ICancellableCatalogRefresh`, `ICancellableCatalogCacheRefresh`, `ICancellableHttpClientWrapper`) so the
 public interfaces keep their signatures for implementers and FakeItEasy expressions in other repos (contracts target netstandard2.0: no DIMs). Tests run against

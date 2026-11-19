@@ -1168,63 +1168,73 @@ public abstract class GitHubCatalog : CachedCatalog, IReplaceablePublishCatalog,
             UpdatedAt = DateTime.UtcNow
         };
 
-        foreach (var (root, rootCatalog) in catalogs)
+        try
         {
-            foreach (var rootCatalogEntry in rootCatalog.Models)
+            foreach (var (root, rootCatalog) in catalogs)
             {
-                // The repository reads (Octokit) take no token: a canceled refresh stops before the next read.
-                cancellationToken.ThrowIfCancellationRequested();
-                var modelLibraryCatalog = await ReadWithNotFoundRetryAsync(() =>
-                    GetModelLibraryCatalogAsync(rootCatalogEntry.CatalogPath, cancellationToken)).ConfigureAwait(false);
-
-                if (modelLibraryCatalog == null)
+                foreach (var rootCatalogEntry in rootCatalog.Models)
                 {
-                    // The root index lists the model, so its index should exist: the mirror failed to deliver it
-                    // (AB#6580). The cache is written anyway, flagged, and never reads as "the model does not exist".
-                    sourceUnreachable = true;
-                    continue;
-                }
-
-                // A model may have versions under both roots.
-                if (!cacheCatalog.Models.TryGetValue(rootCatalogEntry.ModelName, out var modelEntry))
-                {
-                    modelEntry = new CacheTypes.CacheModelEntry
-                    {
-                        ModelId = modelLibraryCatalog.ModelId,
-                        Versions = new Dictionary<string, CacheTypes.CacheModelVersionEntry>()
-                    };
-                    cacheCatalog.Models.Add(rootCatalogEntry.ModelName, modelEntry);
-                }
-
-                foreach (var modelLibraryCatalogEntry in modelLibraryCatalog.MajorVersions)
-                {
+                    // The repository reads (Octokit) take no token: a canceled refresh stops before the next read.
                     cancellationToken.ThrowIfCancellationRequested();
-                    var versionsCatalog = await ReadWithNotFoundRetryAsync(() =>
-                        GetModelLibraryVersionsCatalogAsync(root,
-                            rootCatalogEntry.ModelName,
-                            modelLibraryCatalogEntry.MajorVersion, cancellationToken)).ConfigureAwait(false);
+                    var modelLibraryCatalog = await ReadWithNotFoundRetryAsync(() =>
+                        GetModelLibraryCatalogAsync(rootCatalogEntry.CatalogPath, cancellationToken)).ConfigureAwait(false);
 
-                    if (versionsCatalog == null)
+                    if (modelLibraryCatalog == null)
                     {
+                        // The root index lists the model, so its index should exist: the mirror failed to deliver it
+                        // (AB#6580). The cache is written anyway, flagged, and never reads as "the model does not exist".
                         sourceUnreachable = true;
                         continue;
                     }
 
-                    foreach (var modelLibraryVersionsCatalogEntry in versionsCatalog.Versions)
+                    // A model may have versions under both roots.
+                    if (!cacheCatalog.Models.TryGetValue(rootCatalogEntry.ModelName, out var modelEntry))
                     {
-                        var ckVersion = new CkVersion(modelLibraryVersionsCatalogEntry.Version);
-                        if (!modelEntry.Versions.ContainsKey(ckVersion.ToString()))
+                        modelEntry = new CacheTypes.CacheModelEntry
                         {
-                            modelEntry.Versions.Add(ckVersion.ToString(), new CacheTypes.CacheModelVersionEntry
+                            ModelId = modelLibraryCatalog.ModelId,
+                            Versions = new Dictionary<string, CacheTypes.CacheModelVersionEntry>()
+                        };
+                        cacheCatalog.Models.Add(rootCatalogEntry.ModelName, modelEntry);
+                    }
+
+                    foreach (var modelLibraryCatalogEntry in modelLibraryCatalog.MajorVersions)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var versionsCatalog = await ReadWithNotFoundRetryAsync(() =>
+                            GetModelLibraryVersionsCatalogAsync(root,
+                                rootCatalogEntry.ModelName,
+                                modelLibraryCatalogEntry.MajorVersion, cancellationToken)).ConfigureAwait(false);
+
+                        if (versionsCatalog == null)
+                        {
+                            sourceUnreachable = true;
+                            continue;
+                        }
+
+                        foreach (var modelLibraryVersionsCatalogEntry in versionsCatalog.Versions)
+                        {
+                            var ckVersion = new CkVersion(modelLibraryVersionsCatalogEntry.Version);
+                            if (!modelEntry.Versions.ContainsKey(ckVersion.ToString()))
                             {
-                                Version = ckVersion,
-                                Description = versionsCatalog.Description,
-                                FilePath = modelLibraryVersionsCatalogEntry.FilePath
-                            });
+                                modelEntry.Versions.Add(ckVersion.ToString(), new CacheTypes.CacheModelVersionEntry
+                                {
+                                    Version = ckVersion,
+                                    Description = versionsCatalog.Description,
+                                    FilePath = modelLibraryVersionsCatalogEntry.FilePath
+                                });
+                            }
                         }
                     }
                 }
             }
+        }
+        catch (ModelCatalogException e) when (e.IsRequestTimeout && CanReadViaApi)
+        {
+            // AB#9388: the mirror did not answer a library or major-version index in time. A reader that can ask the
+            // repository treats it like a timed-out root index: the cache keeps what was read so far, is flagged as
+            // unreachable (AB#6580), and the silent mirror is not asked for the remaining indexes.
+            sourceUnreachable = true;
         }
 
         // A canceled refresh never publishes the cache it may have read only partly.

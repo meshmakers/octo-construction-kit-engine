@@ -108,11 +108,7 @@ public sealed class CatalogRequestTimeoutTests : IDisposable
 
         Assert.True(stopwatch.Elapsed < Bounded, $"took {stopwatch.Elapsed}");
         Assert.Equal(3, _server.AcceptedConnections);
-        var cacheFile = Assert.Single(Directory.GetFiles(_cacheDirectory, "*", SearchOption.AllDirectories));
-        using var cache = System.Text.Json.JsonDocument.Parse(File.ReadAllText(cacheFile));
-        var flag = cache.RootElement.EnumerateObject()
-            .Single(p => string.Equals(p.Name, "SourceUnreachable", StringComparison.OrdinalIgnoreCase));
-        Assert.True(flag.Value.GetBoolean());
+        Assert.True(ReadSourceUnreachable());
     }
 
     [Fact]
@@ -156,6 +152,44 @@ public sealed class CatalogRequestTimeoutTests : IDisposable
 
         A.CallTo(gitHubClientFactory).MustNotHaveHappened();
         Assert.Empty(Directory.GetFiles(_cacheDirectory, "*", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public async Task A_reader_that_can_ask_the_repository_flags_a_silent_library_index_instead_of_failing()
+    {
+        // The mirror answers the v2 root index (two models) and nothing else. A publisher keeps the repository as its
+        // source of truth: the refresh flags the cache and does not ask the silent mirror for the second model.
+        const string rootIndex =
+            "{\"models\":[{\"modelName\":\"A\",\"catalogPath\":\"ck-models/v2/a/A/catalog.json\"}," +
+            "{\"modelName\":\"B\",\"catalogPath\":\"ck-models/v2/b/B/catalog.json\"}]}";
+        using var server = new SilentTcpServer(path => path.EndsWith("/ck-models/v2/catalog.json") ? rootIndex : null);
+        var catalog = CreateCatalog(new HttpClientWrapperFactory(ShortTimeout, NoBackoff), apiReader: true,
+            pagesUri: server.BaseUri);
+        var stopwatch = Stopwatch.StartNew();
+
+        await catalog.RefreshCatalogAsync(null, true, TestContext.Current.CancellationToken);
+
+        Assert.True(stopwatch.Elapsed < Bounded, $"took {stopwatch.Elapsed}");
+        // root v2 (answered) + v3 root (silent, 3 attempts) or not, then 3 attempts for model A - never model B.
+        Assert.True(server.AcceptedConnections <= 7, $"connections: {server.AcceptedConnections}");
+        Assert.True(ReadSourceUnreachable());
+    }
+
+    [Fact]
+    public async Task An_anonymous_reader_fails_on_a_silent_library_index_with_catalog_and_url()
+    {
+        const string rootIndex =
+            "{\"models\":[{\"modelName\":\"A\",\"catalogPath\":\"ck-models/v2/a/A/catalog.json\"}]}";
+        using var server = new SilentTcpServer(path =>
+            path.EndsWith("/ck-models/v2/catalog.json") ? rootIndex
+            : path.EndsWith("/ck-models/v3/catalog.json") ? "{\"models\":[]}" : null);
+        var catalog = CreateCatalog(new HttpClientWrapperFactory(ShortTimeout, NoBackoff), pagesUri: server.BaseUri);
+
+        var exception = await Assert.ThrowsAsync<ModelCatalogException>(() =>
+            catalog.RefreshCatalogAsync(null, true, TestContext.Current.CancellationToken));
+
+        Assert.True(exception.IsRequestTimeout);
+        Assert.Contains($"{server.BaseUri}/ck-models/v2/a/A/catalog.json", exception.Message);
     }
 
     [Fact]
@@ -250,12 +284,22 @@ public sealed class CatalogRequestTimeoutTests : IDisposable
             new AggregateException(new TaskCanceledException("other"))));
     }
 
-    private PrivateGitHubCatalog CreateCatalog(IHttpClientFactory httpClientFactory, bool apiReader = false) =>
+    private bool ReadSourceUnreachable()
+    {
+        var cacheFile = Assert.Single(Directory.GetFiles(_cacheDirectory, "*", SearchOption.AllDirectories));
+        using var cache = System.Text.Json.JsonDocument.Parse(File.ReadAllText(cacheFile));
+        return cache.RootElement.EnumerateObject()
+            .Single(p => string.Equals(p.Name, "SourceUnreachable", StringComparison.OrdinalIgnoreCase)).Value
+            .GetBoolean();
+    }
+
+    private PrivateGitHubCatalog CreateCatalog(IHttpClientFactory httpClientFactory, bool apiReader = false,
+        Uri? pagesUri = null) =>
         new(A.Fake<ICkJsonSerializer>(), httpClientFactory, A.Fake<IGitHubClientFactory>(),
             Options.Create(new PrivateGitHubCatalogOptions
             {
                 CacheDirectory = _cacheDirectory,
-                GitHubPagesUri = _server.BaseUri.ToString(),
+                GitHubPagesUri = (pagesUri ?? _server.BaseUri).ToString(),
                 GitHubRepositoryOwner = "testowner",
                 GitHubRepositoryName = "testrepo",
                 GitHubRepositoryBranch = "main",

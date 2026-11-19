@@ -15,9 +15,10 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   treated a timed-out root index like an unreachable source and went on with the next request and the next catalog, and
   the 5-minute limit of `CkCompile`/`CkRestore` only stopped waiting while the request ran on. Now each attempt of a
   catalog request has its own timeout of 30 s (two retries), a request that times out in every attempt stops the refresh
-  with a `ModelCatalogException` naming the catalog and the URL (`IsRequestTimeout`) - except for a timed-out root index
-  read by a reader that can ask the repository (token and API reads, e.g. a CI publish): its refresh flags the cache as
-  unreachable, as for any failing mirror, and skips the v3 root - and the time limit of
+  with a `ModelCatalogException` naming the catalog and the URL (`IsRequestTimeout`) - except for a reader that can ask
+  the repository (token and API reads, e.g. a CI publish): its refresh flags the cache as unreachable, as for any
+  failing mirror, and stops asking the silent mirror (no v3 root after a timed-out v2 root, no further indexes after a
+  timed-out library or major-version index) - and the time limit of
   `CkCompile`/`CkRestore` (and an MSBuild cancel) cancels the refresh through a `CancellationToken`; a canceled
   `CkCompile` neither runs the compatibility gate nor publishes. API (additive, no existing signature changes): the new
   interfaces `ICancellableCatalogRefresh` (implemented by `CachedCatalog`: the GitHub and local file system catalogs),

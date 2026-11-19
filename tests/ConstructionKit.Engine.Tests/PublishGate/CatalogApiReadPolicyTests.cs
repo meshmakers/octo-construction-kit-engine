@@ -137,7 +137,7 @@ public sealed class CatalogApiReadPolicyTests : IDisposable
             Path.Combine(_h.Root, "cache"), apiReads: CatalogApiReadMode.Enabled, token: null);
 
         Assert.False(anonymous.IsAuthoritativeReadAvailable);
-        await anonymous.RefreshCatalogAsync(null, true);
+        await anonymous.RefreshCatalogAsync(null, true, TestContext.Current.CancellationToken);
         Assert.True(await anonymous.IsExistingAsync(new CkModelId(GateModels.Name, "1.0.0")));
         Assert.Equal(0, Repo.ApiCallCount);
     }

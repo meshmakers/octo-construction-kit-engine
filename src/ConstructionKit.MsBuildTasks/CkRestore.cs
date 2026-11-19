@@ -17,8 +17,19 @@ namespace Meshmakers.Octo.ConstructionKit.MsBuildTasks;
 /// <summary>
 /// Restores a construction kit using msbuild
 /// </summary>
-public class CkRestore : Microsoft.Build.Utilities.Task
+public class CkRestore : Microsoft.Build.Utilities.Task, ICancelableTask
 {
+    // AB#9388: canceled by MSBuild (Ctrl+C, build abort); the running work observes it together with the time limit.
+    private readonly CancellationTokenSource _buildCancellation = new();
+
+    /// <inheritdoc />
+    public void Cancel() => _buildCancellation.Cancel();
+
+    /// <summary>
+    ///     Time limit of the task's work (catalog refresh included); tests shorten it. Not an MSBuild parameter.
+    /// </summary>
+    internal TimeSpan TaskTimeout { get; set; } = CatalogTaskRunner.DefaultTimeout;
+
     /// <summary>
     /// A list of folders containing construction kits
     /// </summary>
@@ -161,13 +172,14 @@ public class CkRestore : Microsoft.Build.Utilities.Task
         var compiledModelFiles = new List<string>();
         var cacheFiles = new List<string>();
         // See CkCompile.Execute for the rationale on this fail-fast.
-        const int taskTimeoutMs = 5 * 60 * 1000;
+        var taskTimeout = TaskTimeout;
         try
         {
-            var task = Task.Run(async () =>
+            var outcome = CatalogTaskRunner.Run(async cancellationToken =>
             {
                 foreach (var item in ConstructionKitModelConfigFiles)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var operationResult = new OperationResult();
                     try
                     {
@@ -176,7 +188,7 @@ public class CkRestore : Microsoft.Build.Utilities.Task
                         if (File.Exists(ckModelConfigFilePath))
                         {
                             Log.LogMessage(MessageImportance.High, "Refreshing construction kit model library cache");
-                            await catalogService.RefreshAllCatalogCachesAsync();
+                            await CatalogTaskRunner.RefreshAllCatalogCachesAsync(catalogService, cancellationToken);
 
                             Log.LogMessage(MessageImportance.High,
                                 "Restoring construction kit model libraries in '{0}'",
@@ -212,19 +224,20 @@ public class CkRestore : Microsoft.Build.Utilities.Task
                         LogOperationResults(operationResult);
                     }
                 }
-            });
-            if (!task.Wait(taskTimeoutMs))
+            }, taskTimeout, CatalogTaskRunner.DefaultGrace, _buildCancellation.Token);
+            if (!CatalogTaskRunner.Report(Log, outcome, "restore", taskTimeout))
             {
-                Log.LogError(
-                    "Construction kit restore did not complete within {0} minutes. This usually means a remote " +
-                    "catalog (PublicGitHub/PrivateGitHub) call is hanging. Verify network connectivity to " +
-                    "api.github.com and that the catalog API tokens are not rate-limited.",
-                    taskTimeoutMs / 60_000);
                 return false;
             }
 
             CompiledModelFiles = compiledModelFiles.ToArray();
             CacheFiles = cacheFiles.ToArray();
+        }
+        catch (AggregateException ae) when (CatalogTaskRunner.FindCatalogRequestTimeout(ae) is { } catalogTimeout)
+        {
+            // AB#9388: a catalog accepted the connection and did not answer; the message names catalog and URL.
+            Log.LogError(catalogTimeout.Message);
+            return false;
         }
         catch (AggregateException ae)
             when (ae.GetBaseException() is TaskCanceledException or OperationCanceledException)

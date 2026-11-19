@@ -21,7 +21,7 @@ public abstract class CachedCatalog(
     string description,
     bool canWrite,
     bool canRead,
-    CatalogOptions catalogOptions) : ICatalog
+    CatalogOptions catalogOptions) : ICatalog, ICancellableCatalogRefresh
 {
     /// <inheritdoc />
     public int Order { get; } = order;
@@ -48,6 +48,18 @@ public abstract class CachedCatalog(
 
     /// <inheritdoc />
     public abstract Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false);
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     The default does not start a refresh that is canceled already and otherwise runs the refresh without the
+    ///     token; catalogs that read a remote source override it (AB#9388).
+    /// </remarks>
+    public virtual Task RefreshCatalogAsync(object? sourceIdentifier, bool forceRefresh,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return RefreshCatalogAsync(sourceIdentifier, forceRefresh);
+    }
 
     /// <inheritdoc />
     public abstract bool IsSupportingSourceIdentifier(object? sourceIdentifier = null);
@@ -129,7 +141,25 @@ public abstract class CachedCatalog(
             }
         }
 
+        // A partial cache cannot say "does not exist" (AB#9388).
+        ThrowIfPartial(catalog);
         return false;
+    }
+
+    /// <summary>
+    ///     AB#9388: a cache that the last refresh read only partly is not answered as a complete inventory (OCTO-CK202).
+    ///     An empty flagged cache - the source was not reachable at all - keeps answering from what is there.
+    /// </summary>
+    /// <remarks>
+    ///     A catalog that can ask its repository is exempt: its readers that need a complete answer (dependency
+    ///     resolution, baseline, cascade) complete the cache answer from the source of truth (AB#6588).
+    /// </remarks>
+    private void ThrowIfPartial(CacheTypes.CacheCatalog catalog)
+    {
+        if (catalog.Partial && this is not IAuthoritativeVersionCatalog { IsAuthoritativeReadAvailable: true })
+        {
+            throw ModelCatalogException.PartialCache(CatalogName);
+        }
     }
 
     /// <inheritdoc />
@@ -154,6 +184,7 @@ public abstract class CachedCatalog(
         }
 
         var catalog = await ReadCacheAsync(true).ConfigureAwait(false);
+        ThrowIfPartial(catalog);
 
         foreach (var cacheModelEntry in catalog.Models.Values)
         {
@@ -179,6 +210,7 @@ public abstract class CachedCatalog(
 
         searchTerm = searchTerm?.Trim() ?? string.Empty;
         var catalog = await ReadCacheAsync(true).ConfigureAwait(false);
+        ThrowIfPartial(catalog);
 
         foreach (var cacheModelEntry in catalog.Models.Values)
         {

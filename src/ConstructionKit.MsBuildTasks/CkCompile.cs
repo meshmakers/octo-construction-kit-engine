@@ -23,8 +23,19 @@ namespace Meshmakers.Octo.ConstructionKit.MsBuildTasks;
 /// <summary>
 /// Compiles a construction kit using msbuild
 /// </summary>
-public class CkCompile : Microsoft.Build.Utilities.Task
+public class CkCompile : Microsoft.Build.Utilities.Task, ICancelableTask
 {
+    // AB#9388: canceled by MSBuild (Ctrl+C, build abort); the running work observes it together with the time limit.
+    private readonly CancellationTokenSource _buildCancellation = new();
+
+    /// <inheritdoc />
+    public void Cancel() => _buildCancellation.Cancel();
+
+    /// <summary>
+    ///     Time limit of the task's work (catalog refresh included); tests shorten it. Not an MSBuild parameter.
+    /// </summary>
+    internal TimeSpan TaskTimeout { get; set; } = CatalogTaskRunner.DefaultTimeout;
+
     /// <summary>
     /// A list of folders containing construction kits
     /// </summary>
@@ -254,13 +265,13 @@ public class CkCompile : Microsoft.Build.Utilities.Task
 
         var compiledModelFiles = new List<string>();
         var cacheFiles = new List<string>();
-        // Fail-fast for hung remote-catalog calls. HttpClient's own default is 100 s per request,
-        // but a stuck dependency chain (multiple sequential GitHub fetches) can still chain past that.
-        // 5 minutes is generous for the slowest healthy first-time fetch we've seen.
-        const int taskTimeoutMs = 5 * 60 * 1000;
+        // Fail-fast for hung remote-catalog calls: every catalog request has its own timeout (HttpClientWrapper), and
+        // the whole compile a limit of 5 minutes - generous for the slowest healthy first-time fetch we've seen. The
+        // limit cancels the catalog refresh through its token (AB#9388) instead of only giving up waiting for it.
+        var taskTimeout = TaskTimeout;
         try
         {
-            var task = Task.Run(async () =>
+            var outcome = CatalogTaskRunner.Run(async cancellationToken =>
             {
                 Log.LogMessage(MessageImportance.High, "Using construction kit compiler located at '{0}'",
                     compilerService.GetType().Assembly.Location);
@@ -271,6 +282,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                     localCatalogOptions.RootPath, localCatalogOptions.IsEnabled);
                 foreach (var constructionKitFolder in ConstructionKitFolders)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var operationResult = new OperationResult();
                     try
                     {
@@ -288,7 +300,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                             {
                                 Log.LogMessage(MessageImportance.High,
                                     "Refreshing construction kit model library cache");
-                                await catalogService.RefreshAllCatalogCachesAsync();
+                                await CatalogTaskRunner.RefreshAllCatalogCachesAsync(catalogService, cancellationToken);
                             }
                             else
                             {
@@ -307,6 +319,9 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                             {
                                 cacheFiles.Add(compileResult.CompiledModelCacheFilePath);
                             }
+
+                            // AB#9388: nothing is judged or published once the time limit or MSBuild canceled the work.
+                            cancellationToken.ThrowIfCancellationRequested();
 
                             // AB#6294: compatibility gate (concept §4.3.3, gate 1) — after compiling and BEFORE any
                             // PublishAsync; it never writes to a catalog. Runs whether or not the model is published.
@@ -371,6 +386,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                 // makes Execute() return false. PublishAsync additionally throws now, so
                                 // the "published" line below cannot be reached for a model that is not
                                 // in the catalog.
+                                cancellationToken.ThrowIfCancellationRequested();
                                 await catalogService.PublishAsync(PublishCatalogName, ckCompiledModelRoot,
                                     originFileResolver, true, operationResult);
                                 Log.LogMessage(MessageImportance.High,
@@ -388,6 +404,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                     // cannot be resolved must not enter ANY catalog. A silently missing
                                     // local entry surfaces later as a confusing "unknown model" while a
                                     // sibling project compiles, far from its cause.
+                                    cancellationToken.ThrowIfCancellationRequested();
                                     await catalogService.PublishAsync(LocalFileSystemCatalog.Name,
                                         ckCompiledModelRoot, originFileResolver, true, operationResult);
                                     Log.LogMessage(MessageImportance.High,
@@ -467,19 +484,20 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                         LogOperationResults(operationResult);
                     }
                 }
-            });
-            if (!task.Wait(taskTimeoutMs))
+            }, taskTimeout, CatalogTaskRunner.DefaultGrace, _buildCancellation.Token);
+            if (!CatalogTaskRunner.Report(Log, outcome, "compile", taskTimeout))
             {
-                Log.LogError(
-                    "Construction kit compile did not complete within {0} minutes. This usually means a remote " +
-                    "catalog (PublicGitHub/PrivateGitHub) call is hanging. Verify network connectivity to " +
-                    "api.github.com and that the catalog API tokens are not rate-limited.",
-                    taskTimeoutMs / 60_000);
                 return false;
             }
 
             CompiledModelFiles = compiledModelFiles.ToArray();
             CacheFiles = cacheFiles.ToArray();
+        }
+        catch (AggregateException ae) when (CatalogTaskRunner.FindCatalogRequestTimeout(ae) is { } catalogTimeout)
+        {
+            // AB#9388: a catalog accepted the connection and did not answer; the message names catalog and URL.
+            Log.LogError(catalogTimeout.Message);
+            return false;
         }
         catch (AggregateException ae)
             when (ae.GetBaseException() is TaskCanceledException or OperationCanceledException)

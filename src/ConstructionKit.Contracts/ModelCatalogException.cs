@@ -35,6 +35,16 @@ public class ModelCatalogException : Exception
     /// </summary>
     public bool IsModelNotFound { get; private init; }
 
+    /// <summary>
+    /// True when a catalog request got no answer in time in any of its attempts (AB#9388).
+    /// </summary>
+    public bool IsRequestTimeout { get; private init; }
+
+    /// <summary>
+    /// AB#9388: the catalog's cache was read only partly by its last refresh; another catalog may still hold the model.
+    /// </summary>
+    internal bool IsPartialCache { get; private init; }
+
     internal static Exception PublishFailed(CkModelId modelId, string catalogName, Exception exception)
     {
         return new ModelCatalogException($"Publishing model '{modelId}' to catalog '{catalogName}' failed: {exception.Message}", exception);
@@ -183,6 +193,30 @@ public class ModelCatalogException : Exception
     {
         return new ModelCatalogException(
             $"Request to GitHub repository '{repositoryName}' at '{valueGitHubPagesUri}' timed out.");
+    }
+
+    /// <summary>
+    ///     AB#9388: the last refresh read the catalog only partly, so its cache cannot answer as a complete inventory.
+    /// </summary>
+    internal static ModelCatalogException PartialCache(string catalogName)
+    {
+        return new ModelCatalogException(
+            $"OCTO-CK202: catalog '{catalogName}' could not be read: the last cache refresh read it only partly (an " +
+            "index of its GitHub Pages mirror did not answer in time or was missing). This is usually transient: " +
+            "refresh the catalog cache and retry. Nothing was changed.") { IsPartialCache = true };
+    }
+
+    /// <summary>
+    ///     AB#9388: a catalog index request got no answer in time (a server that accepts the connection and never
+    ///     responds); the refresh fails instead of hanging the build.
+    /// </summary>
+    internal static Exception CatalogRequestTimedOut(string catalogName, string url, Exception innerException)
+    {
+        return new ModelCatalogException(
+            $"Catalog '{catalogName}' did not answer the request for '{url}' in time: " +
+            $"{innerException.InnerException?.Message ?? innerException.Message} " +
+            "The catalog refresh was stopped; check the network connection to the catalog's GitHub Pages site.",
+            innerException) { IsRequestTimeout = true };
     }
 
     internal static Exception CannotReadExistingModelVersionCatalog(CkModelId modelId, string catalogName, string catalogPath)

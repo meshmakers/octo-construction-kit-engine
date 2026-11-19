@@ -251,7 +251,7 @@ public class PublicGitHubCatalogWithoutTokenTests : PublicGitHubCatalogTestsBase
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/3/catalog.json"))
             .Returns(Data.TestModelVersionsCatalog3Multiple);
 
-        await Catalog.RefreshCatalogAsync();
+        await Catalog.RefreshCatalogAsync(null, false, TestContext.Current.CancellationToken);
 
         // Verify HTTP client was used
         A.CallTo(() => HttpClientWrapper.GetStringAsync(A<string>._)).MustHaveHappened();
@@ -324,12 +324,12 @@ public class PublicGitHubCatalogWithoutTokenTests : PublicGitHubCatalogTestsBase
 
         // First refresh writes the cache; the second non-forced refresh within the 60s
         // freshness window must be a no-op, a forced refresh must contact the source again.
-        await Catalog.RefreshCatalogAsync();
-        await Catalog.RefreshCatalogAsync();
+        await Catalog.RefreshCatalogAsync(null, false, TestContext.Current.CancellationToken);
+        await Catalog.RefreshCatalogAsync(null, false, TestContext.Current.CancellationToken);
         A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/catalog.json", A<CancellationToken>._))
             .MustHaveHappened(1, Times.Exactly);
 
-        await Catalog.RefreshCatalogAsync(null, forceRefresh: true);
+        await Catalog.RefreshCatalogAsync(null, true, TestContext.Current.CancellationToken);
         A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/catalog.json", A<CancellationToken>._))
             .MustHaveHappened(2, Times.Exactly);
     }
@@ -340,7 +340,7 @@ public class PublicGitHubCatalogWithoutTokenTests : PublicGitHubCatalogTestsBase
         A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/catalog.json", A<CancellationToken>._))
             .Throws<HttpRequestException>();
 
-        await Catalog.RefreshCatalogAsync(null, forceRefresh: true);
+        await Catalog.RefreshCatalogAsync(null, true, TestContext.Current.CancellationToken);
         var result = await Catalog.IsExistingAsync(CreateTestVersionRange(range: "[0.0,)"));
 
         Assert.False(result.Exists);
@@ -355,7 +355,7 @@ public class PublicGitHubCatalogWithoutTokenTests : PublicGitHubCatalogTestsBase
         A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/catalog.json", A<CancellationToken>._))
             .ReturnsLazily(() => new HttpResponseMessage(HttpStatusCode.NotFound));
 
-        await Catalog.RefreshCatalogAsync(null, forceRefresh: true);
+        await Catalog.RefreshCatalogAsync(null, true, TestContext.Current.CancellationToken);
         var result = await Catalog.IsExistingAsync(CreateTestVersionRange(range: "[0.0,)"));
 
         Assert.False(result.Exists);
@@ -378,7 +378,7 @@ public class PublicGitHubCatalogWithoutTokenTests : PublicGitHubCatalogTestsBase
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
             .Returns(Data.TestModelVersionsCatalog1Multiple);
 
-        await Catalog.RefreshCatalogAsync(null, forceRefresh: true);
+        await Catalog.RefreshCatalogAsync(null, true, TestContext.Current.CancellationToken);
         var result = await Catalog.IsExistingAsync(CreateTestVersionRange(range: "[1.0.5]"));
 
         Assert.True(result.Exists);
@@ -403,7 +403,7 @@ public class PublicGitHubCatalogWithoutTokenTests : PublicGitHubCatalogTestsBase
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
             .Returns(Data.TestModelVersionsCatalog1Multiple);
 
-        await Catalog.RefreshCatalogAsync(null, forceRefresh: true);
+        await Catalog.RefreshCatalogAsync(null, true, TestContext.Current.CancellationToken);
         var result = await Catalog.IsExistingAsync(CreateTestVersionRange(range: "[1.0.5]"));
 
         Assert.True(result.Exists);
@@ -422,7 +422,7 @@ public class PublicGitHubCatalogWithoutTokenTests : PublicGitHubCatalogTestsBase
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
             .Returns((string?)null);
 
-        await Catalog.RefreshCatalogAsync(null, forceRefresh: true);
+        await Catalog.RefreshCatalogAsync(null, true, TestContext.Current.CancellationToken);
         var result = await Catalog.IsExistingAsync(CreateTestVersionRange(range: "[0.0,)"));
 
         Assert.False(result.Exists);
@@ -484,7 +484,7 @@ public class PublicGitHubCatalogV3RootTests() : PublicGitHubCatalogTestsBase(wit
     {
         StubBothRoots();
 
-        await Catalog.RefreshCatalogAsync(forceRefresh: true);
+        await Catalog.RefreshCatalogAsync(null, true, TestContext.Current.CancellationToken);
         var result = Catalog.ListAsync(null)
             .ToBlockingEnumerable(cancellationToken: TestContext.Current.CancellationToken).ToList();
 
@@ -495,7 +495,7 @@ public class PublicGitHubCatalogV3RootTests() : PublicGitHubCatalogTestsBase(wit
     public async Task GetAsync_UsesTheRootKnownFromTheCache()
     {
         StubBothRoots();
-        await Catalog.RefreshCatalogAsync(forceRefresh: true);
+        await Catalog.RefreshCatalogAsync(null, true, TestContext.Current.CancellationToken);
         A.CallTo(() => HttpClientWrapper.GetAsync(A<string>.That.Matches(p => p.Contains("/ck-test")),
                 A<CancellationToken>._))
             .ReturnsLazily(() => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") });
@@ -677,7 +677,7 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/3/catalog.json"))
             .Returns(Data.TestModelVersionsCatalog3Multiple);
 
-        await Catalog.RefreshCatalogAsync();
+        await Catalog.RefreshCatalogAsync(null, false, TestContext.Current.CancellationToken);
 
         A.CallTo(() => HttpClientWrapper.GetStringAsync(A<string>._)).MustHaveHappened();
         A.CallTo(() => GitHubClientWrapper.GetFileAsync(A<string>._)).MustNotHaveHappened();

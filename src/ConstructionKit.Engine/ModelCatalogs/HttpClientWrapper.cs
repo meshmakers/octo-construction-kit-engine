@@ -2,9 +2,13 @@ using Meshmakers.Common.Shared;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 
-internal class HttpClientWrapper(Uri baseUri) : IHttpClientWrapper
+internal class HttpClientWrapper : ICancellableHttpClientWrapper
 {
-    private readonly HttpClient _client = new() { BaseAddress = baseUri };
+    /// <summary>
+    ///     Time one attempt of a catalog request may take, response body included (AB#9388). Catalog index files are a
+    ///     few KB and model files a few MB: a healthy GitHub Pages answer takes well under a second.
+    /// </summary>
+    internal static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(30);
 
     // Retry settings for transient GitHub-catalog failures. Build #35172 (r3.4.13)
     // hit a one-off `TaskCanceledException` against api.github.com during a CK
@@ -13,45 +17,80 @@ internal class HttpClientWrapper(Uri baseUri) : IHttpClientWrapper
     // manual re-run a few seconds later. Three attempts (initial + 2 retries)
     // with a short fixed-then-exponential backoff turns that class of one-off
     // network glitches into a non-event without masking real outages.
-    private const int MaxRetries = 2;
-    private static readonly TimeSpan[] RetryBackoffs =
+    private static readonly TimeSpan[] DefaultRetryBackoffs =
         [TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5)];
 
-    public async Task<string?> GetStringAsync(string? requestUri)
+    private readonly Uri _baseUri;
+    private readonly TimeSpan _requestTimeout;
+    private readonly IReadOnlyList<TimeSpan> _retryBackoffs;
+
+    // The timeout is applied per attempt with a CancellationTokenSource of our own (below), so the client's own
+    // timeout is off: it would otherwise cover all attempts of one call together with its default of 100 s.
+    private readonly HttpClient _client;
+
+    public HttpClientWrapper(Uri baseUri) : this(baseUri, DefaultRequestTimeout, DefaultRetryBackoffs)
     {
-        var uri = baseUri.AbsolutePath.EnsureEndsWith("/") + requestUri;
-        var response = await SendWithRetryAsync(uri, CancellationToken.None).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     Creates the wrapper with its own per-attempt timeout and retry backoffs (one backoff per retry).
+    /// </summary>
+    internal HttpClientWrapper(Uri baseUri, TimeSpan requestTimeout, IReadOnlyList<TimeSpan> retryBackoffs)
+    {
+        if (requestTimeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(requestTimeout), requestTimeout,
+                "The request timeout must be positive.");
+        }
+
+        _baseUri = baseUri;
+        _requestTimeout = requestTimeout;
+        _retryBackoffs = retryBackoffs;
+        _client = new HttpClient { BaseAddress = baseUri, Timeout = System.Threading.Timeout.InfiniteTimeSpan };
+    }
+
+    public Task<string?> GetStringAsync(string? requestUri) => GetStringAsync(requestUri, CancellationToken.None);
+
+    public async Task<string?> GetStringAsync(string? requestUri, CancellationToken cancellationToken)
+    {
+        var uri = _baseUri.AbsolutePath.EnsureEndsWith("/") + requestUri;
+        using var response = await SendWithRetryAsync(uri, cancellationToken).ConfigureAwait(false);
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
             return null;
         }
         response.EnsureSuccessStatusCode();
+        // The content was buffered inside the attempt (HttpCompletionOption.ResponseContentRead), under its timeout.
         return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
     }
 
     public async Task<HttpResponseMessage> GetAsync(string? requestUri, CancellationToken cancellationToken)
     {
-        var uri = baseUri.AbsolutePath.EnsureEndsWith("/") + requestUri;
+        var uri = _baseUri.AbsolutePath.EnsureEndsWith("/") + requestUri;
         return await SendWithRetryAsync(uri, cancellationToken).ConfigureAwait(false);
     }
 
     // Single GET with retry on transient failures. Conditions worth retrying:
     //   - HttpRequestException (DNS, TCP reset, TLS handshake glitch)
-    //   - TaskCanceledException with the caller's token NOT canceled (= our own
-    //     HttpClient timeout fired — distinguish from a real upstream cancel)
+    //   - the attempt's own timeout (a server that accepts the connection and never answers, AB#9388) - told apart
+    //     from the caller's cancellation, which ends the call at once
     //   - 5xx server errors and 408 / 429 (transient throttling)
     // Non-transient (404, 4xx other than 408/429) returns immediately so the
     // caller's existing semantics — e.g. GetStringAsync mapping 404→null —
     // keep working.
+    // When every attempt timed out, the call throws a TaskCanceledException (as HttpClient does for its own timeout)
+    // whose inner TimeoutException names the URL, the timeout and the number of attempts.
     private async Task<HttpResponseMessage> SendWithRetryAsync(string uri, CancellationToken cancellationToken)
     {
-        Exception? lastException = null;
-        for (var attempt = 0; attempt <= MaxRetries; attempt++)
+        var maxRetries = _retryBackoffs.Count;
+        for (var attempt = 0; ; attempt++)
         {
+            using var attemptTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            attemptTimeout.CancelAfter(_requestTimeout);
             try
             {
-                var response = await _client.GetAsync(uri, cancellationToken).ConfigureAwait(false);
-                if (!IsTransientStatus(response.StatusCode) || attempt == MaxRetries)
+                var response = await _client.GetAsync(uri, attemptTimeout.Token).ConfigureAwait(false);
+                if (!IsTransientStatus(response.StatusCode) || attempt == maxRetries)
                 {
                     return response;
                 }
@@ -60,24 +99,24 @@ internal class HttpClientWrapper(Uri baseUri) : IHttpClientWrapper
                 // a constrained CI agent the next retry can stall waiting for a slot.
                 response.Dispose();
             }
-            catch (HttpRequestException ex)
+            catch (HttpRequestException) when (attempt < maxRetries && !cancellationToken.IsCancellationRequested)
             {
-                lastException = ex;
-                if (attempt == MaxRetries) throw;
+                // retried below
             }
-            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
             {
-                // Our own HttpClient timeout, not a caller-initiated cancel.
-                lastException = ex;
-                if (attempt == MaxRetries) throw;
+                // The attempt's own timeout, not a caller-initiated cancel.
+                if (attempt == maxRetries)
+                {
+                    var timeout = new TimeoutException(
+                        $"GET {new Uri(_baseUri, uri)} got no complete response within " +
+                        $"{_requestTimeout.TotalSeconds:0.###} s in each of {attempt + 1} attempt(s).", ex);
+                    throw new TaskCanceledException(timeout.Message, timeout);
+                }
             }
 
-            await Task.Delay(RetryBackoffs[attempt], cancellationToken).ConfigureAwait(false);
+            await Task.Delay(_retryBackoffs[attempt], cancellationToken).ConfigureAwait(false);
         }
-
-        // Unreachable in practice — last attempt either returns or rethrows above.
-        // Keep the safety net so the compiler is happy.
-        throw lastException ?? new HttpRequestException("Retry loop exhausted without a captured exception.");
     }
 
     private static bool IsTransientStatus(System.Net.HttpStatusCode statusCode) =>

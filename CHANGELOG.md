@@ -9,6 +9,31 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Changed
 
+- **A catalog server that never answers no longer hangs the CK build (AB#9388).** A GitHub Pages connection that was
+  accepted but never sent response headers kept a CK compile at "Refreshing construction kit model library cache" for
+  20 minutes and more: every catalog request waited 3 x 100 s (HttpClient's default timeout, two retries), the refresh
+  treated a timed-out root index like an unreachable source and went on with the next request and the next catalog, and
+  the 5-minute limit of `CkCompile`/`CkRestore` only stopped waiting while the request ran on. Now each attempt of a
+  catalog request has its own timeout of 30 s (two retries), a request that times out in every attempt stops the refresh
+  with a `ModelCatalogException` naming the catalog and the URL (`IsRequestTimeout`) - except for a reader that can ask
+  the repository (token and API reads, e.g. a CI publish): its refresh flags the cache as unreachable, as for any
+  failing mirror, and stops asking the silent mirror (no v3 root after a timed-out v2 root, no further indexes after a
+  timed-out library or major-version index) - and the time limit of
+  `CkCompile`/`CkRestore` (and an MSBuild cancel) cancels the refresh through a `CancellationToken`; a canceled
+  `CkCompile` neither runs the compatibility gate nor publishes. A refresh that read a GitHub catalog only partly (a root
+  index was read, another index failed) marks its cache as partial: `ListAsync` and `SearchAsync` of that catalog, and
+  `IsExistingAsync(CkModelId)` for a version the partial cache lacks, then fail with `OCTO-CK202` naming the catalog
+  and saying the condition is usually transient, instead of answering an incomplete inventory; the catalog manager's
+  single-model lookups (`GetAsync`, `TryGetAsync`, `IsExistingAsync(CkModelId)`) go on with the next catalog and fail
+  with that error only when no catalog holds the model. A cache of a source that
+  was not reachable at all (offline, no internet, 5xx for the root index) answers as before, so offline machines keep
+  listing their local and embedded models. A catalog that can ask its repository (token, API reads) keeps answering
+  from the partial cache, because its readers that need a complete answer complete it from the repository (AB#6588). API (additive, no existing signature changes): the new
+  interfaces `ICancellableCatalogRefresh` (implemented by `CachedCatalog`: the GitHub and local file system catalogs),
+  `ICancellableCatalogCacheRefresh` (engine catalog service and catalog manager) and `ICancellableHttpClientWrapper`
+  add overloads with a required `CancellationToken`; `ICatalog`, `ICatalogService`, `ICatalogManager` and
+  `IHttpClientWrapper` are unchanged, so their implementations and fakes in other repositories keep compiling.
+
 - **Generated C# implements interfaces of another CK model (AB#9096).** A type that implements an interface declared in
   another model (e.g. `System/Named-1` on `Basic/NamedEntity`) generated the short name `IRtNamed`, and the build failed
   with CS0246. The source generator now finds the other model's generated interface in the referenced assemblies and

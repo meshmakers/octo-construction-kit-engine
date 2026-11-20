@@ -32,10 +32,10 @@ internal static class WriteTargetExistence
 
             var storedById = await ReadStoredEntitiesAsync(session, repositoryDataSource, ckTypeGraph,
                 targetsOfType.Key, targetsOfType.ToList(), storedEntitiesReadByGuard).ConfigureAwait(false);
-            var acceptedTypeNames = AcceptedStoredTypeNames(ckTypeGraph);
+            var acceptedTypeNames = StoredTypeMatch.AcceptedStoredTypeNames(ckTypeGraph);
             var missingTarget = targetsOfType.FirstOrDefault(target =>
                 !storedById.TryGetValue(target.RtId, out var storedEntity) ||
-                !IsStoredAsAcceptedType(storedEntity, acceptedTypeNames));
+                !StoredTypeMatch.IsStoredAsAcceptedType(storedEntity, acceptedTypeNames));
             if (missingTarget != null)
             {
                 return missingTarget;
@@ -78,11 +78,4 @@ internal static class WriteTargetExistence
 
         return storedById;
     }
-
-    private static HashSet<string> AcceptedStoredTypeNames(CkTypeGraph ckTypeGraph) =>
-        new(ckTypeGraph.GetAllDerivedTypes(true).Select(typeId => typeId.ToRtCkId().SemanticVersionedFullName),
-            StringComparer.Ordinal);
-
-    private static bool IsStoredAsAcceptedType(RtEntity storedEntity, HashSet<string> acceptedTypeNames) =>
-        storedEntity.CkTypeId == null || acceptedTypeNames.Contains(storedEntity.CkTypeId.SemanticVersionedFullName);
 }

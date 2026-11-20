@@ -2070,7 +2070,9 @@ the classification):
   (`EntityRuleEngine`, `GraphRuleEngine`). The existence step runs for every caller, system sessions and tenants
   without policies included: an update, replace or delete target, or an association origin, that is not stored as the
   addressed type or one of its derived types (stored `CkTypeId`, compared like the read filter by
-  `SemanticVersionedFullName`; a stored entity without `CkTypeId` counts as matching) answers through the same
+  `SemanticVersionedFullName` in `StoredTypeMatch`; a stored entity without `CkTypeId` counts as matching; the guard's
+  own raw read applies the same match, so its visibility and ownership checks never judge a sibling-type record)
+  answers through the same
   `CreateEntityNotFoundException` hook as a hidden one, whatever the payload, so a validation error never tells a
   hidden record from a missing one. Entities the guard already read (`DataPermissionWriteGuard.CheckAsync`,
   `storedTargets`) are not read again; the others cost one `DocumentsAsync` read per type. Inserts and association

@@ -82,7 +82,7 @@ public class HiddenOrMissingAddressingTests : HiddenOrMissingWriteFixture
         StoredEntities[recordOfOtherType.RtId] = recordOfOtherType;
         var missingRtId = OctoObjectId.GenerateNewId();
 
-        foreach (var role in new[] { WriterOwnedRead, WriteOnly, Full })
+        foreach (var role in new[] { WriterOwnedRead, WriteOnly, Full, OwnedWriter })
         {
             var otherTypeAnswer = await AnswerOfAsync(() => ApplyAsync(repository, UserSession(role),
                 [Change("update", recordOfOtherType.RtId, validPayload)]), recordOfOtherType.RtId);

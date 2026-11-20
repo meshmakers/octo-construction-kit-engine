@@ -34,7 +34,7 @@ internal static class DataPermissionWriteGuard
     {
         var tenantId = runtimeRepository.TenantId;
         var accessByType = new Dictionary<RtCkId<CkTypeId>, DataPermissionRules.TypeAccess>();
-        var storedEntities = new StoredEntityCache(runtimeRepository, session);
+        var storedEntities = new StoredEntityCache(runtimeRepository, ckCacheService, session);
 
         DataPermissionRules.TypeAccess AccessOf(RtCkId<CkTypeId> ckTypeId)
         {
@@ -282,7 +282,8 @@ internal static class DataPermissionWriteGuard
     ///     Raw stored entities of one guard run, read at most once each on the caller's session (deliberately
     ///     not the query path: the caller's read filter hides the entities the checks need to see).
     /// </summary>
-    private sealed class StoredEntityCache(IRuntimeRepository runtimeRepository, IOctoSession session)
+    private sealed class StoredEntityCache(IRuntimeRepository runtimeRepository, ICkCacheService ckCacheService,
+        IOctoSession session)
     {
         private readonly Dictionary<RtEntityId, RtEntity?> _entities = new();
 
@@ -291,7 +292,10 @@ internal static class DataPermissionWriteGuard
             var key = new RtEntityId(ckTypeId, rtId);
             if (!_entities.TryGetValue(key, out var entity))
             {
-                entity = await runtimeRepository.GetRtEntityByRtIdAsync(session, key).ConfigureAwait(false);
+                var storedEntity = await runtimeRepository.GetRtEntityByRtIdAsync(session, key).ConfigureAwait(false);
+                var storedAsAddressedType = storedEntity != null && StoredTypeMatch.IsStoredAs(storedEntity,
+                    ckCacheService, runtimeRepository.TenantId, ckTypeId);
+                entity = storedAsAddressedType ? storedEntity : null;
                 _entities[key] = entity;
             }
 

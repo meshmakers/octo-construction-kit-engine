@@ -611,14 +611,24 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             }
         }
 
-        var missingTarget = await WriteTargetExistence.FindFirstMissingAsync(session, RepositoryDataSource,
-                cacheService, entityUpdateInfoList, associationUpdateInfoList, storedTargetsReadByGuard)
-            .ConfigureAwait(false);
-        if (missingTarget != null)
+        async Task ThrowIfATargetIsMissingAsync(bool onlyTypesSharingTheirCollection)
         {
-            throw CreateEntityNotFoundException(missingTarget.CkTypeId, missingTarget.RtId, missingTarget.Action,
-                options.DeleteStrategy);
+            var missingTarget = await WriteTargetExistence.FindFirstMissingAsync(session, RepositoryDataSource,
+                    cacheService, entityUpdateInfoList, associationUpdateInfoList, storedTargetsReadByGuard,
+                    onlyTypesSharingTheirCollection)
+                .ConfigureAwait(false);
+            if (missingTarget != null)
+            {
+                throw CreateEntityNotFoundException(missingTarget.CkTypeId, missingTarget.RtId, missingTarget.Action,
+                    options.DeleteStrategy);
+            }
         }
+
+        await ThrowIfATargetIsMissingAsync(onlyTypesSharingTheirCollection: true).ConfigureAwait(false);
+        var mutationOptions = options with
+        {
+            OnValidationFailedAsync = () => ThrowIfATargetIsMissingAsync(onlyTypesSharingTheirCollection: false)
+        };
 
         // After the data-permission guard: an archive the caller may not see stays a missing entity (AB#7126), the
         // refusal of the definition guard would tell its existence, status and name.
@@ -629,7 +639,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         }
 
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entityUpdateInfoList,
-                associationUpdateInfoList, options, operationResult ?? new OperationResult())
+                associationUpdateInfoList, mutationOptions, operationResult ?? new OperationResult())
             .ConfigureAwait(false);
     }
 

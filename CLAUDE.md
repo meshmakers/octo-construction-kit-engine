@@ -2064,6 +2064,18 @@ the classification):
   update, replace or delete existing records of that type; grant the matching Read policy (the shipped
   `FileManagement` role has it). Tests: `DataPermissionWriteGuardVisibilityTests`; the matrix test
   `Entity_AgreesWithWriteGuard` now covers every cell, `NotVisible` included.
+- **Existence and visibility before validation (AB#7212).** The order in `RuntimeRepositoryBase.ApplyChangesGuardedAsync`
+  is: type write restriction, data-permission guard (visibility first, then write/delete), **existence**
+  (`WriteTargetExistence`), archive-definition guard, then `BulkRtMutation` with the rule validation
+  (`EntityRuleEngine`, `GraphRuleEngine`). The existence step runs for every caller, system sessions and tenants
+  without policies included: a missing update, replace or delete target, or a missing association origin, answers
+  through the same `CreateEntityNotFoundException` hook as a hidden one, whatever the payload, so a validation error
+  never tells a hidden record from a missing one. Targets the guard already read (`DataPermissionWriteGuard.CheckAsync`,
+  `existingTargets`) are not read again; the others cost one count per type (`GetTotalCountAsync` by id), only a
+  short count reads the ids. Inserts and association origins inserted by the same change set have no stored target
+  and are not checked; a type the CK cache does not know is left to the rule validation. Visible records keep their
+  validation errors. Tests: `HiddenEqualsMissingWriteTests`, `MissingBeforeValidationWriteTests` (real funnel, real
+  `EntityRuleEngine`, in-memory collection).
 - Tests: `RtDataPermissionEvaluatorTests` (matrix, agreement with the guard) in `Runtime.Engine.Tests`; the
   differential test against the real repository is `DataPermissionEvaluatorDifferentialTests` in
   engine-mongodb.

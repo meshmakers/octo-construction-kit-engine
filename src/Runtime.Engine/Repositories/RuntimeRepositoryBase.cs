@@ -588,6 +588,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             RuntimeRepositoryException.ThrowIfOperationResultError(writeAccessResult);
         }
 
+        var storedTargetsReadByGuard = new HashSet<RtEntityId>();
         if (!securityContext.IsSystem && _dataPermissionResolver != null)
         {
             var policyTable = await _dataPermissionResolver.GetPolicyTableAsync(this).ConfigureAwait(false);
@@ -597,7 +598,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
                 var notVisible = new List<DataPermissionWriteGuard.NotVisibleChange>();
                 await DataPermissionWriteGuard.CheckAsync(this, cacheService, _auditEventSink, session,
                         securityContext, policyTable, entityUpdateInfoList, associationUpdateInfoList,
-                        guardResult, notVisible)
+                        guardResult, notVisible, storedTargetsReadByGuard)
                     .ConfigureAwait(false);
                 if (notVisible.Count > 0)
                 {
@@ -608,6 +609,15 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
                 RuntimeRepositoryException.ThrowIfOperationResultError(guardResult);
             }
+        }
+
+        var missingTarget = await WriteTargetExistence.FindFirstMissingAsync(session, RepositoryDataSource,
+                cacheService, entityUpdateInfoList, associationUpdateInfoList, storedTargetsReadByGuard)
+            .ConfigureAwait(false);
+        if (missingTarget != null)
+        {
+            throw CreateEntityNotFoundException(missingTarget.CkTypeId, missingTarget.RtId, missingTarget.Action,
+                options.DeleteStrategy);
         }
 
         // After the data-permission guard: an archive the caller may not see stays a missing entity (AB#7126), the

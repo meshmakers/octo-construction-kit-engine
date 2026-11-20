@@ -342,7 +342,7 @@ public class BasicTests(CacheServiceFixture fixture) : IClassFixture<CacheServic
     }
 
     [Fact]
-    public async Task DeleteOneRtEntityByRtIdAsync_AbstractTypeNonexistentRtId_IsNoOp()
+    public async Task DeleteOneRtEntityByRtIdAsync_AbstractTypeNonexistentRtId_AnswersNotFound()
     {
         var ckCacheService = await fixture.GetCacheServiceAsync();
         var rtSerializer = fixture.GetRtRepositorySerializer();
@@ -352,10 +352,12 @@ public class BasicTests(CacheServiceFixture fixture) : IClassFixture<CacheServic
             new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
-        // Should silently no-op (consistent with the idempotent collection.DeleteOne semantics
-        // for concrete types), not throw the abstract-type validation error.
-        await localDirectoryRepository.DeleteOneRtEntityByRtIdAsync<RtLocation>(new LocalSession(),
-            OctoObjectId.GenerateNewId(),
-            new DeleteOptions { Strategy = DeleteStrategies.Erase });
+        var missingRtId = OctoObjectId.GenerateNewId();
+
+        var exception = await Assert.ThrowsAsync<RuntimeRepositoryException>(() =>
+            localDirectoryRepository.DeleteOneRtEntityByRtIdAsync<RtLocation>(new LocalSession(), missingRtId,
+                new DeleteOptions { Strategy = DeleteStrategies.Erase }));
+
+        Assert.Contains(missingRtId.ToString(), exception.Message);
     }
 }

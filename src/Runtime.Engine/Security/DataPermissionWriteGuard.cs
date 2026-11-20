@@ -30,11 +30,11 @@ internal static class DataPermissionWriteGuard
         IAuditEventSink? auditEventSink, IOctoSession session, RtSecurityContext securityContext,
         RtDataPolicyTable policyTable, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, OperationResult operationResult,
-        List<NotVisibleChange>? notVisible = null)
+        List<NotVisibleChange>? notVisible = null, IDictionary<RtEntityId, RtEntity>? storedTargets = null)
     {
         var tenantId = runtimeRepository.TenantId;
         var accessByType = new Dictionary<RtCkId<CkTypeId>, DataPermissionRules.TypeAccess>();
-        var storedEntities = new StoredEntityCache(runtimeRepository, session);
+        var storedEntities = new StoredEntityCache(runtimeRepository, ckCacheService, session);
 
         DataPermissionRules.TypeAccess AccessOf(RtCkId<CkTypeId> ckTypeId)
         {
@@ -132,6 +132,8 @@ internal static class DataPermissionWriteGuard
             }
         }
 
+        storedEntities.CopyStoredEntitiesTo(storedTargets);
+
         // AuditOnly read policy that would hide an existing entity from this write: one audit event per
         // type, never a refusal — and none when the write audit of the same type already reported.
         if (!operationResult.HasErrors && !operationResult.HasFatalErrors)
@@ -165,8 +167,8 @@ internal static class DataPermissionWriteGuard
     ///     means the entity is invisible and the change is refused as not found; an id without a stored entity
     ///     is refused the same way as an invisible one when the caller's read access is restricted (the
     ///     evaluator's <c>EntityNotFound</c>), so existence is never revealed; with unrestricted read it is
-    ///     left to the normal write path, which answers not found. Inserts are not checked. The stored
-    ///     entity is read (raw, once per entity) only for an owned-only read grant, or for an AuditOnly read
+    ///     left to the existence step of the write funnel, which answers not found the same way. Inserts are not
+    ///     checked. The stored entity is read (raw, once per entity) only for an owned-only read grant, or for an AuditOnly read
     ///     policy that would hide the entity (<paramref name="auditTypes" /> collects those types; AuditOnly
     ///     never refuses). Returns true when at least one change is refused.
     /// </summary>
@@ -178,29 +180,7 @@ internal static class DataPermissionWriteGuard
         OperationResult operationResult, List<NotVisibleChange>? notVisible,
         HashSet<RtCkId<CkTypeId>> auditTypes)
     {
-        var targets = new List<NotVisibleChange>();
-        foreach (var item in entityUpdateInfoList)
-        {
-            if (item.ModOption != EntityModOptions.Insert && item.RtId != null)
-            {
-                targets.Add(new NotVisibleChange(item.CkTypeId,item.RtId.Value,
-                    item.ModOption == EntityModOptions.Delete ? RtDataAction.Delete : RtDataAction.Write));
-            }
-        }
-
-        // An association whose origin is inserted by the same change set (the parent link of a new file or
-        // folder) has no stored entity yet, so it can be neither visible nor hidden: the insert is the write
-        // that is decided by the write policy, the association is its part and needs no visibility question.
-        var insertedInThisChange = entityUpdateInfoList
-            .Where(i => i.ModOption == EntityModOptions.Insert)
-            // The CreateInsert(ckTypeId, entity) overload leaves RtId empty; the id is the entity's own.
-            .Select(i => (RtId: i.RtId ?? i.RtEntity?.RtId, i.CkTypeId))
-            .Where(i => i.RtId != null)
-            .Select(i => new RtEntityId(i.CkTypeId, i.RtId!.Value))
-            .ToHashSet();
-        targets.AddRange(associationUpdateInfoList
-            .Where(a => !insertedInThisChange.Contains(a.Origin))
-            .Select(a => new NotVisibleChange(a.Origin.CkTypeId, a.Origin.RtId, RtDataAction.Write)));
+        var targets = CollectStoredTargets(entityUpdateInfoList, associationUpdateInfoList);
 
         var refused = false;
         foreach (var typeGroup in targets.Distinct().GroupBy(t => t.CkTypeId))
@@ -265,10 +245,45 @@ internal static class DataPermissionWriteGuard
     }
 
     /// <summary>
+    ///     The changes whose target must already be stored: every update, replace and delete, and every association
+    ///     change at its origin. Inserts have no stored target. An association whose origin is
+    ///     inserted by the same change set (the parent link of a new file or folder) has no stored entity yet, so
+    ///     it can be neither visible, hidden nor missing: the insert is the write that is decided by the write
+    ///     policy, the association is its part.
+    /// </summary>
+    internal static List<NotVisibleChange> CollectStoredTargets(
+        IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
+        IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList)
+    {
+        var targets = new List<NotVisibleChange>();
+        foreach (var item in entityUpdateInfoList)
+        {
+            if (item.ModOption != EntityModOptions.Insert && item.RtId != null)
+            {
+                targets.Add(new NotVisibleChange(item.CkTypeId, item.RtId.Value,
+                    item.ModOption == EntityModOptions.Delete ? RtDataAction.Delete : RtDataAction.Write));
+            }
+        }
+
+        var insertedInThisChange = entityUpdateInfoList
+            .Where(i => i.ModOption == EntityModOptions.Insert)
+            // The CreateInsert(ckTypeId, entity) overload leaves RtId empty; the id is the entity's own.
+            .Select(i => (RtId: i.RtId ?? i.RtEntity?.RtId, i.CkTypeId))
+            .Where(i => i.RtId != null)
+            .Select(i => new RtEntityId(i.CkTypeId, i.RtId!.Value))
+            .ToHashSet();
+        targets.AddRange(associationUpdateInfoList
+            .Where(a => !insertedInThisChange.Contains(a.Origin))
+            .Select(a => new NotVisibleChange(a.Origin.CkTypeId, a.Origin.RtId, RtDataAction.Write)));
+        return targets;
+    }
+
+    /// <summary>
     ///     Raw stored entities of one guard run, read at most once each on the caller's session (deliberately
     ///     not the query path: the caller's read filter hides the entities the checks need to see).
     /// </summary>
-    private sealed class StoredEntityCache(IRuntimeRepository runtimeRepository, IOctoSession session)
+    private sealed class StoredEntityCache(IRuntimeRepository runtimeRepository, ICkCacheService ckCacheService,
+        IOctoSession session)
     {
         private readonly Dictionary<RtEntityId, RtEntity?> _entities = new();
 
@@ -277,11 +292,34 @@ internal static class DataPermissionWriteGuard
             var key = new RtEntityId(ckTypeId, rtId);
             if (!_entities.TryGetValue(key, out var entity))
             {
-                entity = await runtimeRepository.GetRtEntityByRtIdAsync(session, key).ConfigureAwait(false);
+                var storedEntity = await runtimeRepository.GetRtEntityByRtIdAsync(session, key).ConfigureAwait(false);
+                var storedAsAddressedType = storedEntity != null && StoredTypeMatch.IsStoredAs(storedEntity,
+                    ckCacheService, runtimeRepository.TenantId, ckTypeId);
+                entity = storedAsAddressedType ? storedEntity : null;
                 _entities[key] = entity;
             }
 
             return entity;
+        }
+
+        /// <summary>
+        ///     Hands the entities this run found stored to the write funnel, so its existence check does not
+        ///     read them again.
+        /// </summary>
+        public void CopyStoredEntitiesTo(IDictionary<RtEntityId, RtEntity>? storedTargets)
+        {
+            if (storedTargets == null)
+            {
+                return;
+            }
+
+            foreach (var (entityId, storedEntity) in _entities)
+            {
+                if (storedEntity != null)
+                {
+                    storedTargets[entityId] = storedEntity;
+                }
+            }
         }
     }
 

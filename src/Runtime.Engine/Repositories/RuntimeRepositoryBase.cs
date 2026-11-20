@@ -451,7 +451,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             await ResolveConcreteCkTypeIdForDeleteAsync(session, cacheService, ckTypeId, rtId).ConfigureAwait(false);
         if (resolvedCkTypeId == null)
         {
-            return;
+            throw CreateEntityNotFoundException(ckTypeId, rtId, RtDataAction.Delete, deleteOptions.Strategy);
         }
 
         var entitiesUpdate = new[] { EntityUpdateInfo<RtEntity>.CreateDelete(new RtEntityId(resolvedCkTypeId, rtId)) };
@@ -470,7 +470,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             await ResolveConcreteCkTypeIdForDeleteAsync(session, cacheService, ckTypeId, rtId).ConfigureAwait(false);
         if (resolvedCkTypeId == null)
         {
-            return;
+            throw CreateEntityNotFoundException(ckTypeId, rtId, RtDataAction.Delete, deleteOptions.Strategy);
         }
 
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateDelete(new RtEntityId(resolvedCkTypeId, rtId)) };
@@ -482,8 +482,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     // For delete-by-id with an abstract CK type, find the concrete CkTypeId of the entity at this
     // RtId. The validator rejects abstract types on insert/update/replace (correct: a concrete
     // subtype is required), but for delete the RtId is enough to identify the concrete entity.
-    // Returns null when the entity does not exist, so the caller can no-op (matches the idempotent
-    // semantics of the underlying collection.DeleteOneAsync).
+    // Returns null when the entity does not exist; the caller answers not found, as for a concrete
+    // type and as for a record the caller may not see.
     //
     // The probe order is backend-aware:
     //   1. Try the abstract base's collection first. In storage backends that share a single
@@ -588,7 +588,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             RuntimeRepositoryException.ThrowIfOperationResultError(writeAccessResult);
         }
 
-        var storedTargetsReadByGuard = new HashSet<RtEntityId>();
+        var storedTargetsReadByGuard = new Dictionary<RtEntityId, RtEntity>();
         if (!securityContext.IsSystem && _dataPermissionResolver != null)
         {
             var policyTable = await _dataPermissionResolver.GetPolicyTableAsync(this).ConfigureAwait(false);

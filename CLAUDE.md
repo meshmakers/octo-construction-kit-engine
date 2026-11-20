@@ -2068,14 +2068,18 @@ the classification):
   is: type write restriction, data-permission guard (visibility first, then write/delete), **existence**
   (`WriteTargetExistence`), archive-definition guard, then `BulkRtMutation` with the rule validation
   (`EntityRuleEngine`, `GraphRuleEngine`). The existence step runs for every caller, system sessions and tenants
-  without policies included: a missing update, replace or delete target, or a missing association origin, answers
-  through the same `CreateEntityNotFoundException` hook as a hidden one, whatever the payload, so a validation error
-  never tells a hidden record from a missing one. Targets the guard already read (`DataPermissionWriteGuard.CheckAsync`,
-  `existingTargets`) are not read again; the others cost one count per type (`GetTotalCountAsync` by id), only a
-  short count reads the ids. Inserts and association origins inserted by the same change set have no stored target
-  and are not checked; a type the CK cache does not know is left to the rule validation. Visible records keep their
-  validation errors. Tests: `HiddenEqualsMissingWriteTests`, `MissingBeforeValidationWriteTests` (real funnel, real
-  `EntityRuleEngine`, in-memory collection).
+  without policies included: an update, replace or delete target, or an association origin, that is not stored as the
+  addressed type or one of its derived types (stored `CkTypeId`, compared like the read filter by
+  `SemanticVersionedFullName`; a stored entity without `CkTypeId` counts as matching) answers through the same
+  `CreateEntityNotFoundException` hook as a hidden one, whatever the payload, so a validation error never tells a
+  hidden record from a missing one. Entities the guard already read (`DataPermissionWriteGuard.CheckAsync`,
+  `storedTargets`) are not read again; the others cost one `DocumentsAsync` read per type. Inserts and association
+  origins inserted by the same change set have no stored target and are not checked; a type the CK cache does not
+  know is left to the rule validation. Visible records keep their validation errors. `DeleteOneRtEntityByRtIdAsync`
+  with an abstract type answers a missing rtId through the same hook (it no longer returns silently), so a delete by
+  base type of a hidden and of a missing record answer alike. Tests: `HiddenEqualsMissingWriteTests`,
+  `MissingBeforeValidationWriteTests`, `HiddenOrMissingAddressingTests` (real funnel, real `EntityRuleEngine`,
+  in-memory collection).
 - Tests: `RtDataPermissionEvaluatorTests` (matrix, agreement with the guard) in `Runtime.Engine.Tests`; the
   differential test against the real repository is `DataPermissionEvaluatorDifferentialTests` in
   engine-mongodb.

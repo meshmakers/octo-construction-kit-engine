@@ -71,9 +71,6 @@ internal sealed class HiddenOrMissingTestRepository : RuntimeRepositoryBase
                 A<int?>._, A<int?>._))
             .ReturnsLazily((IOctoSession _, Expression<Func<RtEntity, bool>> filter, int? _, int? _) =>
                 (ICollection<RtEntity>)storedEntities.Values.Where(filter.Compile()).ToList());
-        A.CallTo(() => collection.GetTotalCountAsync(A<IOctoSession>._, A<Expression<Func<RtEntity, bool>>>._))
-            .ReturnsLazily((IOctoSession _, Expression<Func<RtEntity, bool>> filter) =>
-                (long)storedEntities.Values.Count(filter.Compile()));
         A.CallTo(() => collection.UpdateOneAsync(A<IOctoSession>._, A<IEnumerable<RtEntity>>._))
             .ReturnsLazily((IOctoSession _, IEnumerable<RtEntity> entities) =>
                 ThrowForFirstMissing(storedEntities, entities.Select(entity => entity.RtId)));

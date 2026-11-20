@@ -1,4 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
@@ -8,9 +9,10 @@ using Meshmakers.Octo.Runtime.Engine.Security;
 namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 
 /// <summary>
-///     Existence step of the write funnel, before rule validation: a missing update, replace or delete target or
-///     association origin answers "not found" exactly like a record the caller may not see. Targets the guard already
-///     read are not read again; the others cost one count per type. Unknown types are left to the rule validation.
+///     Existence step of the write funnel, before rule validation: an update, replace or delete target or association
+///     origin that is not stored as the addressed type (or one of its derived types) answers "not found" exactly like
+///     a record the caller may not see. Entities the guard already read are not read again; the others cost one read
+///     per type. Unknown types are left to the rule validation.
 /// </summary>
 internal static class WriteTargetExistence
 {
@@ -18,23 +20,22 @@ internal static class WriteTargetExistence
         IRepositoryDataSource repositoryDataSource, ICkCacheService ckCacheService,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
-        IReadOnlySet<RtEntityId> knownStoredTargets)
+        IReadOnlyDictionary<RtEntityId, RtEntity> storedEntitiesReadByGuard)
     {
-        var unresolvedTargets = DataPermissionWriteGuard
-            .CollectStoredTargets(entityUpdateInfoList, associationUpdateInfoList)
-            .Where(target => !knownStoredTargets.Contains(new RtEntityId(target.CkTypeId, target.RtId)))
-            .ToList();
-
-        foreach (var targetsOfType in unresolvedTargets.GroupBy(target => target.CkTypeId))
+        var targets = DataPermissionWriteGuard.CollectStoredTargets(entityUpdateInfoList, associationUpdateInfoList);
+        foreach (var targetsOfType in targets.GroupBy(target => target.CkTypeId))
         {
             if (!ckCacheService.TryGetRtCkType(repositoryDataSource.TenantId, targetsOfType.Key, out var ckTypeGraph))
             {
                 continue;
             }
 
-            var collection = repositoryDataSource.GetRtCollection<RtEntity>(ckTypeGraph);
-            var missingTarget = await FindFirstMissingOfTypeAsync(session, collection, targetsOfType.ToList())
-                .ConfigureAwait(false);
+            var storedById = await ReadStoredEntitiesAsync(session, repositoryDataSource, ckTypeGraph,
+                targetsOfType.Key, targetsOfType.ToList(), storedEntitiesReadByGuard).ConfigureAwait(false);
+            var acceptedTypeNames = AcceptedStoredTypeNames(ckTypeGraph);
+            var missingTarget = targetsOfType.FirstOrDefault(target =>
+                !storedById.TryGetValue(target.RtId, out var storedEntity) ||
+                !IsStoredAsAcceptedType(storedEntity, acceptedTypeNames));
             if (missingTarget != null)
             {
                 return missingTarget;
@@ -44,21 +45,44 @@ internal static class WriteTargetExistence
         return null;
     }
 
-    private static async Task<DataPermissionWriteGuard.NotVisibleChange?> FindFirstMissingOfTypeAsync(
-        IOctoSession session, IDataSourceCollection<OctoObjectId, RtEntity> collection,
-        IReadOnlyList<DataPermissionWriteGuard.NotVisibleChange> targetsOfType)
+    private static async Task<Dictionary<OctoObjectId, RtEntity>> ReadStoredEntitiesAsync(IOctoSession session,
+        IRepositoryDataSource repositoryDataSource, CkTypeGraph ckTypeGraph, RtCkId<CkTypeId> addressedTypeId,
+        IReadOnlyList<DataPermissionWriteGuard.NotVisibleChange> targetsOfType,
+        IReadOnlyDictionary<RtEntityId, RtEntity> storedEntitiesReadByGuard)
     {
-        var distinctRtIds = targetsOfType.Select(target => target.RtId).Distinct().ToList();
-        var storedCount = await collection
-            .GetTotalCountAsync(session, entity => distinctRtIds.Contains(entity.RtId))
-            .ConfigureAwait(false);
-        if (storedCount >= distinctRtIds.Count)
+        var storedById = new Dictionary<OctoObjectId, RtEntity>();
+        var unreadRtIds = new List<OctoObjectId>();
+        foreach (var rtId in targetsOfType.Select(target => target.RtId).Distinct())
         {
-            return null;
+            if (storedEntitiesReadByGuard.TryGetValue(new RtEntityId(addressedTypeId, rtId), out var storedEntity))
+            {
+                storedById[rtId] = storedEntity;
+            }
+            else
+            {
+                unreadRtIds.Add(rtId);
+            }
         }
 
-        var storedEntities = await collection.DocumentsAsync(session, distinctRtIds).ConfigureAwait(false);
-        var storedRtIds = storedEntities.Select(entity => entity.RtId).ToHashSet();
-        return targetsOfType.FirstOrDefault(target => !storedRtIds.Contains(target.RtId));
+        if (unreadRtIds.Count == 0)
+        {
+            return storedById;
+        }
+
+        var collection = repositoryDataSource.GetRtCollection<RtEntity>(ckTypeGraph);
+        var readEntities = await collection.DocumentsAsync(session, unreadRtIds).ConfigureAwait(false);
+        foreach (var readEntity in readEntities)
+        {
+            storedById.TryAdd(readEntity.RtId, readEntity);
+        }
+
+        return storedById;
     }
+
+    private static HashSet<string> AcceptedStoredTypeNames(CkTypeGraph ckTypeGraph) =>
+        new(ckTypeGraph.GetAllDerivedTypes(true).Select(typeId => typeId.ToRtCkId().SemanticVersionedFullName),
+            StringComparer.Ordinal);
+
+    private static bool IsStoredAsAcceptedType(RtEntity storedEntity, HashSet<string> acceptedTypeNames) =>
+        storedEntity.CkTypeId == null || acceptedTypeNames.Contains(storedEntity.CkTypeId.SemanticVersionedFullName);
 }

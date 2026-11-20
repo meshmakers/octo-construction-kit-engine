@@ -68,10 +68,12 @@ internal sealed class SecretTestModel
             Attr("Name", AttributeValueTypesDto.String),
             Attr("File", AttributeValueTypesDto.BinaryLinked));
 
+        Required = BuildType("Required", Attr("Title", AttributeValueTypesDto.String, isOptional: false));
+
         Cache = A.Fake<ICkCacheService>();
         A.CallTo(() => Cache.IsTenantLoaded(TenantId)).Returns(true);
         A.CallTo(() => Cache.GetCkTypes(TenantId)).Returns([Config, OptionalOnly, Plain, Named, Document]);
-        foreach (var type in new[] { Config, OptionalOnly, Plain, Named, Document })
+        foreach (var type in new[] { Config, OptionalOnly, Plain, Named, Document, Required })
         {
             RegisterType(type);
         }
@@ -93,6 +95,8 @@ internal sealed class SecretTestModel
     public CkTypeGraph Named { get; }
 
     public CkTypeGraph Document { get; }
+
+    public CkTypeGraph Required { get; }
 
     public CkRecordGraph Credential { get; }
 

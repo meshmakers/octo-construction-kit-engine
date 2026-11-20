@@ -24,13 +24,20 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 - **A missing record answers "not found" before its payload is validated (AB#7212).** An update, replace or delete
   through `IRuntimeRepository.ApplyChangesAsync` (and the by-id write methods built on it, e.g.
   `UpdateOneRtEntityByIdAsync`, `DeleteOneRtEntityByRtIdAsync`; filter writes and bulk imports are unchanged) of an rtId
-  that does not exist, and an association change whose origin does not exist, now answer with the repository's
-  "entity not found" exception even when the payload is invalid; before, an invalid payload answered with a
-  validation error (`RuntimeRepositoryException`, e.g. a missing mandatory attribute) and only a valid one with not
-  found. This holds for every caller, system sessions and tenants without data policies included, and makes a
-  missing record answer exactly like a record the caller may not see. Records that exist (and are visible) and
-  inserts keep their validation errors. Cost: one count per CK type of the change set for the targets the
-  data-permission guard has not already read.
+  that does not exist now answers with the repository's "entity not found" exception (MongoDB:
+  `EntityNotFoundException`) even when the payload is invalid; before, an invalid payload answered with a validation
+  error (`RuntimeRepositoryException`, e.g. a missing mandatory attribute) and only a valid one with not found. A
+  record that is stored under another type than the addressed one (or one of its derived types) counts as missing.
+  This holds for every caller, system sessions and tenants without data policies included, and makes a missing
+  record answer exactly like a record the caller may not see. Records that exist (and are visible) and inserts keep
+  their validation errors. Two answers change type for every payload:
+  - an association change whose origin does not exist answers the repository's "entity not found" exception instead
+    of a `RuntimeRepositoryException` with the rule engine's `EntityNotFound` message; callers that caught
+    `RuntimeRepositoryException` for this case must catch the not-found exception;
+  - `DeleteOneRtEntityByRtIdAsync` with an abstract CK type and an rtId that does not exist answers "entity not
+    found" instead of returning silently, like the same call with a concrete type.
+
+  Cost: one read per CK type of the change set for the targets the data-permission guard has not already read.
 - **A catalog server that never answers no longer hangs the CK build (AB#9388).** A GitHub Pages connection that was
   accepted but never sent response headers kept a CK compile at "Refreshing construction kit model library cache" for
   20 minutes and more: every catalog request waited 3 x 100 s (HttpClient's default timeout, two retries), the refresh

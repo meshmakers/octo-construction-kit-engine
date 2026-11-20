@@ -1,5 +1,4 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using System.Linq.Expressions;
 using FakeItEasy;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.DataPermissions;
@@ -109,7 +108,7 @@ public class MissingBeforeValidationWriteTests : HiddenOrMissingWriteFixture
         await ApplyAsync(Repository(RtDataPolicyTable.Empty), SystemSession(),
             storedRecords.Select(record => Change("update", record.RtId, true)).ToList());
 
-        A.CallTo(() => Collection.GetTotalCountAsync(A<IOctoSession>._, A<Expression<Func<RtEntity, bool>>>._))
+        A.CallTo(() => Collection.DocumentsAsync(A<IOctoSession>._, A<IEnumerable<OctoObjectId>>._))
             .MustHaveHappenedOnceExactly();
         A.CallTo(() => Collection.UpdateOneAsync(A<IOctoSession>._, A<IEnumerable<RtEntity>>._))
             .MustHaveHappenedOnceExactly();
@@ -124,8 +123,6 @@ public class MissingBeforeValidationWriteTests : HiddenOrMissingWriteFixture
             [Change("update", ownRecord.RtId, true)]);
 
         A.CallTo(() => Collection.DocumentAsync(A<IOctoSession>._, ownRecord.RtId)).MustHaveHappenedOnceExactly();
-        A.CallTo(() => Collection.GetTotalCountAsync(A<IOctoSession>._, A<Expression<Func<RtEntity, bool>>>._))
-            .MustNotHaveHappened();
         A.CallTo(() => Collection.DocumentsAsync(A<IOctoSession>._, A<IEnumerable<OctoObjectId>>._))
             .MustNotHaveHappened();
     }

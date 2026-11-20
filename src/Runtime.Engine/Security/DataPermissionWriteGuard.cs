@@ -30,7 +30,7 @@ internal static class DataPermissionWriteGuard
         IAuditEventSink? auditEventSink, IOctoSession session, RtSecurityContext securityContext,
         RtDataPolicyTable policyTable, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, OperationResult operationResult,
-        List<NotVisibleChange>? notVisible = null, ISet<RtEntityId>? existingTargets = null)
+        List<NotVisibleChange>? notVisible = null, IDictionary<RtEntityId, RtEntity>? storedTargets = null)
     {
         var tenantId = runtimeRepository.TenantId;
         var accessByType = new Dictionary<RtCkId<CkTypeId>, DataPermissionRules.TypeAccess>();
@@ -132,7 +132,7 @@ internal static class DataPermissionWriteGuard
             }
         }
 
-        storedEntities.CopyExistingIdsTo(existingTargets);
+        storedEntities.CopyStoredEntitiesTo(storedTargets);
 
         // AuditOnly read policy that would hide an existing entity from this write: one audit event per
         // type, never a refusal — and none when the write audit of the same type already reported.
@@ -299,19 +299,22 @@ internal static class DataPermissionWriteGuard
         }
 
         /// <summary>
-        ///     Hands the ids this run found stored to the write funnel, so its existence check does not
+        ///     Hands the entities this run found stored to the write funnel, so its existence check does not
         ///     read them again.
         /// </summary>
-        public void CopyExistingIdsTo(ISet<RtEntityId>? existingIds)
+        public void CopyStoredEntitiesTo(IDictionary<RtEntityId, RtEntity>? storedTargets)
         {
-            if (existingIds == null)
+            if (storedTargets == null)
             {
                 return;
             }
 
-            foreach (var storedEntity in _entities.Where(cached => cached.Value != null))
+            foreach (var (entityId, storedEntity) in _entities)
             {
-                existingIds.Add(storedEntity.Key);
+                if (storedEntity != null)
+                {
+                    storedTargets[entityId] = storedEntity;
+                }
             }
         }
     }

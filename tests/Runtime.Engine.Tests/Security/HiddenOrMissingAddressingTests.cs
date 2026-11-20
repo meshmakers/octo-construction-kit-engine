@@ -38,6 +38,50 @@ public class HiddenOrMissingAddressingTests : HiddenOrMissingWriteFixture
         return baseRtCkTypeId;
     }
 
+    private void RegisterRequiredAndPlainInOneSharedCollection()
+    {
+        var rootCkTypeId = new CkId<CkTypeId>($"{Model.Required.CkTypeId.ModelId}/SharedRoot");
+        var rootGraph = new CkTypeGraph(rootCkTypeId, isAbstract: true, isFinal: false, isCollectionRoot: true,
+            baseTypes: [], derivedFromCkTypeId: null, definingCollectionRootCkTypeId: rootCkTypeId,
+            derivedTypes:
+            [
+                new CkGraphTypeInheritance(Model.Required.CkTypeId, rootCkTypeId, 0),
+                new CkGraphTypeInheritance(Model.Plain.CkTypeId, rootCkTypeId, 0)
+            ],
+            definedAttributes: [], allAttributes: new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(),
+            indexes: [], associations: new CkGraphDirectedAssociations([]), description: "SharedRoot",
+            enableChangeStreamPreAndPostImages: false);
+        RegisterByCkId(rootGraph);
+        RegisterInSharedCollection(Model.Required, rootCkTypeId);
+        RegisterInSharedCollection(Model.Plain, rootCkTypeId);
+    }
+
+    private void RegisterInSharedCollection(CkTypeGraph storedTypeGraph, CkId<CkTypeId> rootCkTypeId)
+    {
+        var sharedGraph = new CkTypeGraph(storedTypeGraph.CkTypeId, isAbstract: false, isFinal: false,
+            isCollectionRoot: false, baseTypes: [], derivedFromCkTypeId: rootCkTypeId,
+            definingCollectionRootCkTypeId: rootCkTypeId, derivedTypes: [], definedAttributes: [],
+            allAttributes: storedTypeGraph.AllAttributes.ToDictionary(pair => pair.Key, pair => pair.Value),
+            indexes: [], associations: new CkGraphDirectedAssociations([]), description: storedTypeGraph.Description ?? "shared",
+            enableChangeStreamPreAndPostImages: false);
+        var rtCkTypeId = storedTypeGraph.CkTypeId.ToRtCkId();
+        var sharedGraphOut = (CkTypeGraph?)sharedGraph;
+        A.CallTo(() => Model.Cache.GetRtCkType(SecretTestModel.TenantId,
+            A<RtCkId<CkTypeId>>.That.Matches(id => id.FullName == rtCkTypeId.FullName))).Returns(sharedGraph);
+        A.CallTo(() => Model.Cache.TryGetRtCkType(SecretTestModel.TenantId,
+                A<RtCkId<CkTypeId>>.That.Matches(id => id.FullName == rtCkTypeId.FullName), out sharedGraphOut))
+            .Returns(true).AssignsOutAndRefParameters(sharedGraph);
+        RegisterByCkId(sharedGraph);
+    }
+
+    private void RegisterByCkId(CkTypeGraph typeGraph)
+    {
+        var typeGraphOut = (CkTypeGraph?)typeGraph;
+        A.CallTo(() => Model.Cache.TryGetCkType(SecretTestModel.TenantId,
+                A<CkId<CkTypeId>>.That.Matches(id => id.FullName == typeGraph.CkTypeId.FullName), out typeGraphOut))
+            .Returns(true).AssignsOutAndRefParameters(typeGraph);
+    }
+
     [Theory]
     [InlineData(WriterOwnedRead)]
     [InlineData(WriteOnly)]
@@ -74,6 +118,7 @@ public class HiddenOrMissingAddressingTests : HiddenOrMissingWriteFixture
     [InlineData(false)]
     public async Task RecordAddressedUnderATypeItIsNotStoredAs_AnswersExactlyLikeMissingRecord(bool validPayload)
     {
+        RegisterRequiredAndPlainInOneSharedCollection();
         var repository = Repository(PolicyTable());
         var recordOfOtherType = new RtEntity(Model.Plain.CkTypeId.ToRtCkId(), OctoObjectId.GenerateNewId())
         {

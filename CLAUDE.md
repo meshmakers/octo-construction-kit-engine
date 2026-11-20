@@ -2067,7 +2067,13 @@ the classification):
 - **Existence and visibility before validation (AB#7212).** The order in `RuntimeRepositoryBase.ApplyChangesGuardedAsync`
   is: type write restriction, data-permission guard (visibility first, then write/delete), **existence**
   (`WriteTargetExistence`), archive-definition guard, then `BulkRtMutation` with the rule validation
-  (`EntityRuleEngine`, `GraphRuleEngine`). The existence step runs for every caller, system sessions and tenants
+  (`EntityRuleEngine`, `GraphRuleEngine`). The existence step reads before validation only the targets of types that
+  share their collection with concrete types outside their own subtree (`StoredTypeMatch.SharesCollectionWithOtherTypes`,
+  an unresolvable collection root counts as shared); for all other types it runs only when the validation fails
+  (`BulkRtMutationOptions.OnValidationFailedAsync`, called by `BulkRtMutation` before it throws the validation errors), so
+  a valid change set keeps its MongoDB command count (`RecordArrayItemUpdateTests`). The answer is the same either
+  way: whatever the payload, the caller never sees a validation error for a missing target. The step runs for every
+  caller, system sessions and tenants
   without policies included: an update, replace or delete target, or an association origin, that is not stored as the
   addressed type or one of its derived types (stored `CkTypeId`, compared like the read filter by
   `SemanticVersionedFullName` in `StoredTypeMatch`; a stored entity without `CkTypeId` counts as matching; the guard's

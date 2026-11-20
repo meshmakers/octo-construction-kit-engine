@@ -9,9 +9,9 @@ namespace Meshmakers.Octo.Runtime.Engine.Tests.Security;
 
 /// <summary>
 ///     Without a visibility question (system session, tenant without policies) a missing target of an update,
-///     replace, delete or association change answers not found before rule validation; an existing record keeps its
-///     validation error. The existence check costs one read per type, not one per record, and reuses what the
-///     data-permission guard already read.
+///     replace, delete or association change never answers a validation error; an existing record keeps its
+///     validation error. The existence read runs only when the validation fails (or the type shares its collection),
+///     costs one read per type, not one per record, and reuses what the data-permission guard already read.
 /// </summary>
 public class MissingBeforeValidationWriteTests : HiddenOrMissingWriteFixture
 {
@@ -101,7 +101,7 @@ public class MissingBeforeValidationWriteTests : HiddenOrMissingWriteFixture
     }
 
     [Fact]
-    public async Task ValidUpdatesOfExistingRecords_AreWritten_WithOneExistenceReadForTheWholeType()
+    public async Task ValidUpdatesOfATypeWithItsOwnCollection_AreWritten_WithoutAnExistenceRead()
     {
         var storedRecords = Enumerable.Range(0, 5).Select(_ => Store(OtherUser)).ToList();
 
@@ -109,9 +109,24 @@ public class MissingBeforeValidationWriteTests : HiddenOrMissingWriteFixture
             storedRecords.Select(record => Change("update", record.RtId, true)).ToList());
 
         A.CallTo(() => Collection.DocumentsAsync(A<IOctoSession>._, A<IEnumerable<OctoObjectId>>._))
-            .MustHaveHappenedOnceExactly();
+            .MustNotHaveHappened();
         A.CallTo(() => Collection.UpdateOneAsync(A<IOctoSession>._, A<IEnumerable<RtEntity>>._))
             .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task InvalidUpdatesOfExistingRecords_ReadExistenceOncePerType_AndKeepTheValidationError()
+    {
+        var storedRecords = Enumerable.Range(0, 5).Select(_ => Store(OtherUser)).ToList();
+
+        var answer = await AnswerOfAsync(() => ApplyAsync(Repository(RtDataPolicyTable.Empty), SystemSession(),
+            storedRecords.Select(record => Change("update", record.RtId, false)).ToList()), storedRecords[0].RtId);
+
+        AssertValidationError(answer);
+        A.CallTo(() => Collection.DocumentsAsync(A<IOctoSession>._, A<IEnumerable<OctoObjectId>>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => Collection.UpdateOneAsync(A<IOctoSession>._, A<IEnumerable<RtEntity>>._))
+            .MustNotHaveHappened();
     }
 
     [Fact]

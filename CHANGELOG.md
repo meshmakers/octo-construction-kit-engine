@@ -37,7 +37,9 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   - `DeleteOneRtEntityByRtIdAsync` with an abstract CK type and an rtId that does not exist answers "entity not
     found" instead of returning silently, like the same call with a concrete type.
 
-  Cost: one read per CK type of the change set for the targets the data-permission guard has not already read.
+  Cost: a valid change set pays no extra read, unless the addressed CK type shares its MongoDB collection with types
+  outside its own subtree (then one read per such type before validation); a change set with validation errors pays
+  one read per CK type for the targets the data-permission guard has not already read.
 - **A catalog server that never answers no longer hangs the CK build (AB#9388).** A GitHub Pages connection that was
   accepted but never sent response headers kept a CK compile at "Refreshing construction kit model library cache" for
   20 minutes and more: every catalog request waited 3 x 100 s (HttpClient's default timeout, two retries), the refresh

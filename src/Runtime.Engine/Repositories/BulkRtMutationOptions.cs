@@ -29,6 +29,13 @@ public record BulkRtMutationOptions
     public DeleteStrategies DeleteStrategy { get; init; } = DeleteStrategies.Archive;
 
     /// <summary>
+    /// Runs when the rule validation found errors, before they are thrown. The write funnel answers a missing
+    /// target here as not found, so a validation error never tells a missing record from a hidden one, while a
+    /// valid change set pays no existence read.
+    /// </summary>
+    public Func<Task>? OnValidationFailedAsync { get; init; }
+
+    /// <summary>
     /// Gets delete options
     /// </summary>
     /// <returns></returns>

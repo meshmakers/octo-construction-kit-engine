@@ -9,9 +9,11 @@ using Meshmakers.Octo.Runtime.Engine.Security;
 namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 
 /// <summary>
-///     Existence step of the write funnel, before rule validation: an update, replace or delete target or association
-///     origin that is not stored as the addressed type (or one of its derived types) answers "not found" exactly like
-///     a record the caller may not see. Entities the guard already read are not read again; the others cost one read
+///     Existence step of the write funnel: an update, replace or delete target or association origin that is not
+///     stored as the addressed type (or one of its derived types) answers "not found" exactly like a record the caller
+///     may not see. It runs before rule validation only for types that share their collection with other types (a
+///     record of another type could be addressed under them), otherwise only when the validation fails, so a valid
+///     change set pays no extra read. Entities the guard already read are not read again; the others cost one read
 ///     per type. Unknown types are left to the rule validation.
 /// </summary>
 internal static class WriteTargetExistence
@@ -20,12 +22,18 @@ internal static class WriteTargetExistence
         IRepositoryDataSource repositoryDataSource, ICkCacheService ckCacheService,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
-        IReadOnlyDictionary<RtEntityId, RtEntity> storedEntitiesReadByGuard)
+        IReadOnlyDictionary<RtEntityId, RtEntity> storedEntitiesReadByGuard, bool onlyTypesSharingTheirCollection)
     {
         var targets = DataPermissionWriteGuard.CollectStoredTargets(entityUpdateInfoList, associationUpdateInfoList);
         foreach (var targetsOfType in targets.GroupBy(target => target.CkTypeId))
         {
             if (!ckCacheService.TryGetRtCkType(repositoryDataSource.TenantId, targetsOfType.Key, out var ckTypeGraph))
+            {
+                continue;
+            }
+
+            if (onlyTypesSharingTheirCollection && !StoredTypeMatch.SharesCollectionWithOtherTypes(ckTypeGraph,
+                    ckCacheService, repositoryDataSource.TenantId))
             {
                 continue;
             }

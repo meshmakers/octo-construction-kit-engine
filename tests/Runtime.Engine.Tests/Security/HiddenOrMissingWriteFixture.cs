@@ -19,6 +19,7 @@ public abstract class HiddenOrMissingWriteFixture
     protected const string WriterOwnedRead = "WriterOwnedRead";
     protected const string WriteOnly = "WriteOnly";
     protected const string Full = "Full";
+    protected const string OwnedWriter = "OwnedWriter";
 
     private const string RequiredType = "Test/Required";
     private static readonly RtCkId<CkAssociationRoleId> ValidRoleId = new("Test/Related");
@@ -43,7 +44,11 @@ public abstract class HiddenOrMissingWriteFixture
                 new HashSet<string> { WriterOwnedRead }),
             new RtDataPolicyRule("p3", new HashSet<string> { RequiredType },
                 [RtDataAction.Read, RtDataAction.Write, RtDataAction.Delete], false, false,
-                new HashSet<string> { Full })
+                new HashSet<string> { Full }),
+            new RtDataPolicyRule("p4", new HashSet<string> { RequiredType }, [RtDataAction.Read], false, false,
+                new HashSet<string> { OwnedWriter }),
+            new RtDataPolicyRule("p5", new HashSet<string> { RequiredType }, [RtDataAction.Write, RtDataAction.Delete],
+                true, false, new HashSet<string> { OwnedWriter })
         ]);
 
     private protected HiddenOrMissingTestRepository Repository(RtDataPolicyTable policyTable) =>

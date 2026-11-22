@@ -316,6 +316,12 @@ ApplyBlueprintAsync(tenantId, blueprintId, force)
 └── 4. Append history entry, return result
 ```
 
+The `BlueprintApplied` notification (and `BlueprintUpdated` after an update) carries `CkModelDependencies`: the distinct
+names of the CK models the blueprint and the blueprints resolved for it depend on (update: the target version), sorted
+ordinally. Services use it to enable the capability a blueprint needs, e.g. the Communication Controller for
+`System.Communication` and the AI service for `System.Ai` (AB#9578). A notification without it (`null`) comes from code
+built against an older engine.
+
 ```
 ApplyUpdateAsync(tenantId, targetVersion, updateMode, options)
 │

@@ -604,7 +604,14 @@ internal class BlueprintService : IBlueprintService
                     EntitiesUpdated: 0,
                     EntitiesDeleted: 0,
                     correlationId,
-                    DateTime.UtcNow),
+                    DateTime.UtcNow)
+                {
+                    // AB#9578: the CK models the blueprint and the blueprints resolved for it declare, kept
+                    // dependencies included, before the stream-data gate - the need of the blueprint, not what
+                    // this apply installed.
+                    CkModelDependencies = CkModelDependencyNames(resolution.InstallOrder
+                        .SelectMany(bp => bp.CkModelDependencies ?? []))
+                },
                 cancellationToken).ConfigureAwait(false);
 
             return BlueprintApplicationResult.Success(
@@ -633,6 +640,18 @@ internal class BlueprintService : IBlueprintService
             return BlueprintApplicationResult.Failed(operationResult);
         }
     }
+
+    /// <summary>
+    /// AB#9578: the distinct names of <paramref name="dependencies"/>, sorted ordinally, for the
+    /// <c>CkModelDependencies</c> of the applied and updated notifications.
+    /// </summary>
+    internal static IReadOnlyList<string> CkModelDependencyNames(IEnumerable<CkModelIdVersionRange> dependencies) =>
+        dependencies
+            .Select(d => d.Name)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToList();
 
     /// <summary>
     /// Finds dependencies (never the root) the tenant already runs in a version newer than the one
@@ -2526,7 +2545,11 @@ internal class BlueprintService : IBlueprintService
                         result.EntitiesUpdated,
                         result.EntitiesDeleted,
                         correlationId,
-                        appliedAt),
+                        appliedAt)
+                    {
+                        // AB#9578: the CK models the target version declares (before the stream-data gate).
+                        CkModelDependencies = CkModelDependencyNames(targetBlueprint.CkModelDependencies ?? [])
+                    },
                     cancellationToken).ConfigureAwait(false);
             }
             else

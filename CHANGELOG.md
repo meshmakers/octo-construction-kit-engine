@@ -7,6 +7,18 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ## Unreleased
 
+### Added
+
+- **The applied and updated blueprint notifications carry the CK model dependencies (AB#9578).**
+  `BlueprintAppliedNotification` and `BlueprintUpdatedNotification` get the init-only property `CkModelDependencies`
+  (distinct names, sorted ordinally). Apply: the CK model dependencies of the root blueprint and of every blueprint the
+  resolution installs for it, dependencies the tenant already runs in a newer version included, before the stream-data
+  gate (the need of the blueprint, not what the apply installed). Update: the CK model dependencies of the target version.
+  Hosts that republish the notifications (octo-asset-repo-services) forward it, so services can switch on what a blueprint
+  needs (System.Communication, System.Ai) without reading catalogs. **Compatibility:** binary and source compatible - a
+  property, not a positional parameter, so the record constructors and `Deconstruct` are unchanged; a notification created
+  by code compiled against an older engine has `null`, which consumers must read as "unknown".
+
 ### Changed
 
 - **A catalog server that never answers no longer hangs the CK build (AB#9388).** A GitHub Pages connection that was

@@ -28,10 +28,10 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="JsonSchema.Net" Version="9.4.0" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+        <PackageReference Include="JsonSchema.Net" Version="9.6.0" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.15" />
         <PackageReference Include="Newtonsoft.Json" Version="13.0.4" PrivateAssets="All" />
-        <PackageReference Include="System.Text.Json" Version="10.0.11" />
+        <PackageReference Include="System.Text.Json" Version="10.0.15" />
         <PackageReference Include="YamlDotNet" Version="18.1.0" />
     </ItemGroup>
 

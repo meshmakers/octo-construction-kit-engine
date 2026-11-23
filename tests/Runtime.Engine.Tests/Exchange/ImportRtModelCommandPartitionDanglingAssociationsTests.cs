@@ -139,4 +139,39 @@ public class ImportRtModelCommandPartitionDanglingAssociationsTests
         Assert.Equal(25, skippedCount);
         Assert.Equal(3, samples.Count);
     }
+
+    [Fact]
+    public void ToSkippedAssociations_ReturnsTheDroppedEdges_InImportOrder_WithTheAttributeFlag()
+    {
+        var role = OctoObjectId.GenerateNewId();
+        var permission = OctoObjectId.GenerateNewId();
+        var missing1 = OctoObjectId.GenerateNewId();
+        var missing2 = OctoObjectId.GenerateNewId();
+        var kept = Edge(role, RoleType, permission, PermissionType);
+        var dropped1 = Edge(role, RoleType, missing1, PermissionType);
+        var dropped2 = new RtAssociation(GrantsRole, OctoObjectId.GenerateNewId(),
+            new Dictionary<string, object?> { ["Weight"] = 1 })
+        {
+            OriginRtId = role,
+            OriginCkTypeId = RoleType,
+            TargetRtId = missing2,
+            TargetCkTypeId = PermissionType
+        };
+        var all = new List<RtAssociation> { dropped1, kept, dropped2 };
+
+        var (keptEdges, _, _) = ImportRtModelCommand.PartitionDanglingAssociations(
+            new HashSet<OctoObjectId> { role, permission }, all);
+        var skipped = ImportRtModelCommand.ToSkippedAssociations(all, keptEdges).ToList();
+
+        Assert.Equal([missing1, missing2], skipped.Select(s => s.TargetRtId).ToList());
+        Assert.All(skipped, s =>
+        {
+            Assert.Equal(GrantsRole, s.RoleId);
+            Assert.Equal(role, s.OriginRtId);
+            Assert.Equal(RoleType, s.OriginCkTypeId);
+            Assert.Equal(PermissionType, s.TargetCkTypeId);
+        });
+        Assert.False(skipped[0].HasAttributes);
+        Assert.True(skipped[1].HasAttributes);
+    }
 }

@@ -23,6 +23,13 @@ public interface IImportRtModelCommand
     IReadOnlyList<RtImportComputedFormulaChange> ArchiveFormulaChanges => [];
 
     /// <summary>
+    ///     The association edges the last import did not write because an endpoint exists neither in the import nor in
+    ///     the tenant (AB#5005), in import order. Empty when every edge was written. Blueprint seeds keep them and write
+    ///     them once both ends exist (AB#9651).
+    /// </summary>
+    IReadOnlyList<RtImportSkippedAssociation> SkippedAssociations => [];
+
+    /// <summary>
     ///     Imports as text
     /// </summary>
     /// <param name="runtimeRepository">The runtime repository</param>

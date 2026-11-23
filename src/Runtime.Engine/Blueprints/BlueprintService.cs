@@ -2724,7 +2724,9 @@ internal class BlueprintService : IBlueprintService
                 result.ArchiveColumnsAdded.AddRange(_importRtModelCommand.ArchiveColumnAdditions);
 
                 // AB#9651: seed edges to entities the tenant does not hold yet are kept and written once both ends exist.
+                // An update result has no info list: message 74 (edges written) reaches only the log here.
                 await ProcessDeferredSeedAssociationsAsync(tenantId, repository, targetVersion,
+                        entitiesToImport.Select(e => e.RtId).ToList(),
                         (level, _, text) =>
                         {
                             if (level == MessageLevel.Warning)
@@ -4032,12 +4034,14 @@ internal class BlueprintService : IBlueprintService
     /// and reports both. Never fails the apply: an error is logged and reported as a warning.
     /// </summary>
     private async Task ProcessDeferredSeedAssociationsAsync(string tenantId, IRuntimeRepository repository,
-        BlueprintId blueprintId, Action<MessageLevel, int, string> report, CancellationToken cancellationToken)
+        BlueprintId blueprintId, IReadOnlyCollection<OctoObjectId> importedEntityIds,
+        Action<MessageLevel, int, string> report, CancellationToken cancellationToken)
     {
         try
         {
             var store = new DeferredSeedAssociations(repository, _ckCacheService, _logger);
             var outcome = await store.ProcessAsync(blueprintId, _importRtModelCommand.SkippedAssociations,
+                    importedEntityIds,
                     async name => await _installations.GetByBlueprintNameAsync(tenantId, name, cancellationToken)
                         .ConfigureAwait(false) != null,
                     cancellationToken)
@@ -4072,7 +4076,7 @@ internal class BlueprintService : IBlueprintService
             if (outcome.Dropped > 0)
             {
                 report(MessageLevel.Warning, 75,
-                    $"{outcome.Dropped} deferred association edge(s) were given up: {string.Join("; ", outcome.DroppedSamples)}");
+                    $"{outcome.Dropped} deferred association edge(s) or store entries were given up: {string.Join("; ", outcome.DroppedSamples)}");
                 _logger.LogWarning(
                     "Gave up {Count} deferred seed association edge(s) in tenant {TenantId}: {Samples}",
                     outcome.Dropped, tenantId, string.Join("; ", outcome.DroppedSamples));
@@ -4106,7 +4110,7 @@ internal class BlueprintService : IBlueprintService
             }
 
             var removed = await new DeferredSeedAssociations(repository, _ckCacheService, _logger)
-                .RemoveBlueprintAsync(blueprintName).ConfigureAwait(false);
+                .RemoveBlueprintAsync(blueprintName, cancellationToken).ConfigureAwait(false);
             if (removed > 0)
             {
                 _logger.LogInformation(
@@ -4231,6 +4235,7 @@ internal class BlueprintService : IBlueprintService
 
             // AB#9651: seed edges to entities the tenant does not hold yet are kept and written once both ends exist.
             await ProcessDeferredSeedAssociationsAsync(tenantId, repository, blueprint.BlueprintId,
+                    seedRoot.Entities.Select(e => e.RtId).ToList(),
                     (level, code, text) => operationResult.AddMessage(
                         new OperationMessage(level, SeedDataDescription(blueprint), code, text)),
                     cancellationToken)

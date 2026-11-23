@@ -15,8 +15,10 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   after the install (AB#9578). `BlueprintService` now keeps such edges in the tenant (`System/TenantConfiguration`
   `Octo.Blueprints.DeferredSeedAssociations`), reports them as a warning in the install or update result (message 73) and
   writes them with any later blueprint seed import of the tenant once both ends exist (message 74) - for example the
-  service-managed `System.Communication` seed that brings the Mesh Adapter. Never over another target of a to-one role,
-  never for identity roles or edges with attributes, forgotten on uninstall; details in `docs/blueprints.md`.
+  service-managed `System.Communication` seed that brings the Mesh Adapter. Never over another target of a to-one role
+  (fail closed when the multiplicity is unknown), never for identity roles or edges with attributes, forgotten when a
+  later version of the blueprint no longer declares them and on uninstall; the store is updated in a transaction with
+  retry on a write conflict; details in `docs/blueprints.md`.
   `IImportRtModelCommand` gets the default member `SkippedAssociations` (record `RtImportSkippedAssociation`).
   **Compatibility:** binary and source compatible - a default interface member and a new record; implementations written
   before it report no skipped edges, and nothing is kept then. Services that apply blueprints (asset repository) and those

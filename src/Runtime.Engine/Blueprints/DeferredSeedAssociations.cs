@@ -96,6 +96,9 @@ internal sealed class DeferredSeedAssociations
     /// </summary>
     internal static readonly TimeSpan UninstalledGracePeriod = TimeSpan.FromMinutes(15);
 
+    /// <summary>How often a pass runs before its failure is reported (write conflicts with a concurrent pass).</summary>
+    internal const int MaxAttempts = 3;
+
     private const int SampleCap = 10;
     private const string ConfigurationValueAttribute = "ConfigurationValue";
 
@@ -118,73 +121,147 @@ internal sealed class DeferredSeedAssociations
     }
 
     /// <summary>
-    /// Records the edges <paramref name="skipped" /> the seed of <paramref name="blueprint" /> dropped, then writes every
-    /// deferred edge of the tenant whose ends exist now and saves what is left.
+    /// Records the edges <paramref name="skipped" /> the seed of <paramref name="blueprint" /> dropped, forgets the kept
+    /// edges of that blueprint that its current seed no longer declares, then writes every deferred edge of the tenant
+    /// whose ends exist now and saves what is left. The read, the writes and the save run in one transaction of the
+    /// tenant database; a write conflict with a concurrent pass (another service applying a seed at the same time) aborts
+    /// it and the pass is run again on the fresh state (<see cref="MaxAttempts" /> attempts).
     /// </summary>
     /// <param name="blueprint">The blueprint whose seed was just imported.</param>
     /// <param name="skipped">The edges that import dropped (<see cref="IImportRtModelCommand.SkippedAssociations" />).</param>
+    /// <param name="importedEntityIds">
+    /// The entities that import wrote. A kept edge of <paramref name="blueprint" /> (same name, any version) whose origin
+    /// is among them and that the import did not drop again is no longer pending: the seed wrote it or no longer declares it.
+    /// </param>
     /// <param name="isInstalledAsync">Tells whether a blueprint (by name) is installed in the tenant.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<DeferredSeedAssociationOutcome> ProcessAsync(BlueprintId blueprint,
-        IReadOnlyList<RtImportSkippedAssociation>? skipped, Func<string, Task<bool>> isInstalledAsync,
-        CancellationToken cancellationToken)
+        IReadOnlyList<RtImportSkippedAssociation>? skipped, IReadOnlyCollection<OctoObjectId>? importedEntityIds,
+        Func<string, Task<bool>> isInstalledAsync, CancellationToken cancellationToken)
     {
-        var outcome = new DeferredSeedAssociationOutcome();
-        var session = await _repository.GetSessionAsync().ConfigureAwait(false);
-        var (configuration, stored) = await LoadAsync(session).ConfigureAwait(false);
-        var entries = new List<DeferredSeedAssociation>(stored);
-        var changed = Merge(entries, blueprint, skipped ?? [], _utcNow(), outcome);
-
-        if (entries.Count == 0)
+        return await InTransactionAsync(async session =>
         {
-            if (configuration != null)
+            var outcome = new DeferredSeedAssociationOutcome();
+            var (configurations, stored, invalid) = await LoadAsync(session).ConfigureAwait(false);
+            var entries = new List<DeferredSeedAssociation>(stored);
+            ReportInvalid(invalid, outcome);
+            var changed = invalid.Count > 0 || configurations.Count > 1;
+            changed |= DropRedeclared(entries, blueprint, skipped ?? [], importedEntityIds ?? []) > 0;
+            changed |= Merge(entries, blueprint, skipped ?? [], _utcNow(), outcome);
+
+            if (entries.Count > 0)
             {
-                await SaveAsync(session, configuration, entries).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                changed |= await DropUninstalledAsync(entries, blueprint, isInstalledAsync, outcome).ConfigureAwait(false);
+                changed |= await ApplyAsync(session, entries, outcome).ConfigureAwait(false);
+            }
+
+            var current = blueprint.FullName;
+            foreach (var entry in entries.Where(e => e.Blueprint == current))
+            {
+                outcome.DeferredForCurrent++;
+                if (outcome.DeferredSamples.Count < SampleCap)
+                {
+                    outcome.DeferredSamples.Add(entry.Describe());
+                }
+            }
+
+            if (changed)
+            {
+                await SaveAsync(session, configurations, entries).ConfigureAwait(false);
             }
 
             return outcome;
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        changed |= await DropUninstalledAsync(entries, blueprint, isInstalledAsync, outcome).ConfigureAwait(false);
-        changed |= await ApplyAsync(session, entries, outcome).ConfigureAwait(false);
-
-        var current = blueprint.FullName;
-        foreach (var entry in entries.Where(e => e.Blueprint == current))
-        {
-            outcome.DeferredForCurrent++;
-            if (outcome.DeferredSamples.Count < SampleCap)
-            {
-                outcome.DeferredSamples.Add(entry.Describe());
-            }
-        }
-
-        if (changed)
-        {
-            await SaveAsync(session, configuration, entries).ConfigureAwait(false);
-        }
-
-        return outcome;
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Removes the deferred edges of a blueprint (uninstall). Returns how many were removed.</summary>
-    public async Task<int> RemoveBlueprintAsync(string blueprintName)
+    public async Task<int> RemoveBlueprintAsync(string blueprintName, CancellationToken cancellationToken = default)
     {
-        var session = await _repository.GetSessionAsync().ConfigureAwait(false);
-        var (configuration, stored) = await LoadAsync(session).ConfigureAwait(false);
-        if (configuration == null)
+        return await InTransactionAsync(async session =>
+        {
+            var (configurations, stored, invalid) = await LoadAsync(session).ConfigureAwait(false);
+            if (configurations.Count == 0)
+            {
+                return 0;
+            }
+
+            var kept = stored.Where(e => !string.Equals(e.BlueprintName, blueprintName, StringComparison.Ordinal))
+                .ToList();
+            var removed = stored.Count - kept.Count;
+            if (removed > 0 || invalid.Count > 0 || configurations.Count > 1)
+            {
+                await SaveAsync(session, configurations, kept).ConfigureAwait(false);
+            }
+
+            return removed;
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="pass" /> in a transaction of the tenant database and commits it; any failure aborts it and
+    /// the pass runs again with a new session, up to <see cref="MaxAttempts" /> times (the last failure is thrown).
+    /// </summary>
+    private async Task<T> InTransactionAsync<T>(Func<IOctoSession, Task<T>> pass, CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            using var session = await _repository.GetSessionAsync().ConfigureAwait(false);
+            session.StartTransaction();
+            try
+            {
+                var result = await pass(session).ConfigureAwait(false);
+                await session.CommitTransactionAsync().ConfigureAwait(false);
+                return result;
+            }
+            catch (Exception e) when (attempt < MaxAttempts && !cancellationToken.IsCancellationRequested)
+            {
+                await TryAbortAsync(session).ConfigureAwait(false);
+                _logger.LogInformation(e,
+                    "Deferred seed association pass in tenant '{TenantId}' failed (attempt {Attempt} of {MaxAttempts}), probably a concurrent pass; running it again",
+                    _repository.TenantId, attempt, MaxAttempts);
+            }
+            catch
+            {
+                await TryAbortAsync(session).ConfigureAwait(false);
+                throw;
+            }
+        }
+    }
+
+    private static async Task TryAbortAsync(IOctoSession session)
+    {
+        try
+        {
+            await session.AbortTransactionAsync().ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // The transaction may already be aborted by the server (write conflict); nothing else to undo.
+        }
+    }
+
+    /// <summary>
+    /// Removes the kept edges of <paramref name="blueprint" /> (by name, any version) whose origin is among
+    /// <paramref name="importedEntityIds" /> and which <paramref name="skipped" /> does not hold again: the seed just
+    /// imported that origin and either wrote the edge or no longer declares it. Pure; returns how many were removed.
+    /// </summary>
+    internal static int DropRedeclared(List<DeferredSeedAssociation> entries, BlueprintId blueprint,
+        IReadOnlyList<RtImportSkippedAssociation> skipped, IReadOnlyCollection<OctoObjectId> importedEntityIds)
+    {
+        if (importedEntityIds.Count == 0)
         {
             return 0;
         }
 
-        var kept = stored.Where(e => !string.Equals(e.BlueprintName, blueprintName, StringComparison.Ordinal)).ToList();
-        var removed = stored.Count - kept.Count;
-        if (removed > 0)
-        {
-            await SaveAsync(session, configuration, kept).ConfigureAwait(false);
-        }
-
-        return removed;
+        var imported = importedEntityIds.Select(id => id.ToString()).ToHashSet(StringComparer.Ordinal);
+        var stillSkipped = skipped
+            .Select(e => (e.RoleId.SemanticVersionedFullName, e.OriginRtId.ToString(), e.TargetRtId.ToString()))
+            .ToHashSet();
+        return entries.RemoveAll(e =>
+            string.Equals(e.BlueprintName, blueprint.Name, StringComparison.Ordinal) &&
+            imported.Contains(e.OriginRtId) &&
+            !stillSkipped.Contains(e.Key));
     }
 
     /// <summary>
@@ -413,12 +490,15 @@ internal sealed class DeferredSeedAssociations
         }
     }
 
-    /// <summary>The current target of every origin among <paramref name="edges" /> on a to-one role, if it has one.</summary>
+    /// <summary>
+    /// The current target of every origin among <paramref name="edges" /> on a role that is to-one, or whose multiplicity
+    /// cannot be resolved from the CK cache (fail closed: such an edge is never written next to another target).
+    /// </summary>
     private async Task<Dictionary<(OctoObjectId Origin, RtCkId<CkAssociationRoleId> Role), OctoObjectId>>
         FindTakenToOneAsync(IOctoSession session, IReadOnlyList<RtAssociation> edges)
     {
         var taken = new Dictionary<(OctoObjectId, RtCkId<CkAssociationRoleId>), OctoObjectId>();
-        foreach (var roleGroup in edges.Where(IsToOne).GroupBy(e => e.AssociationRoleId!))
+        foreach (var roleGroup in edges.Where(e => IsToOne(e) != false).GroupBy(e => e.AssociationRoleId!))
         {
             var origins = roleGroup.Select(e => new RtEntityId(e.OriginCkTypeId, e.OriginRtId)).Distinct().ToList();
             var resultSet = await _repository.GetRtAssociationsAsync(session, origins,
@@ -433,18 +513,37 @@ internal sealed class DeferredSeedAssociations
         return taken;
     }
 
-    private bool IsToOne(RtAssociation edge)
+    /// <summary>
+    /// True for a to-one outbound role of the origin type, false for a to-many one, <c>null</c> when the origin type or
+    /// the role cannot be resolved (CK cache not loaded, model upgraded since the edge was recorded). Roles are compared
+    /// version-less.
+    /// </summary>
+    private bool? IsToOne(RtAssociation edge)
     {
         if (edge.AssociationRoleId == null ||
             !_ckCacheService.TryGetRtCkType(_repository.TenantId, edge.OriginCkTypeId, out var ckTypeGraph) ||
             ckTypeGraph == null)
         {
-            return false;
+            return null;
         }
 
+        var role = VersionLess(edge.AssociationRoleId);
         var association = ckTypeGraph.Associations.Out.All
-            .FirstOrDefault(a => a.CkRoleId.ToRtCkId() == edge.AssociationRoleId);
-        return association is { Multiplicity: MultiplicitiesDto.One or MultiplicitiesDto.ZeroOrOne };
+            .FirstOrDefault(a => VersionLess(a.CkRoleId.ToRtCkId()) == role);
+        if (association == null)
+        {
+            return null;
+        }
+
+        return association.Multiplicity is MultiplicitiesDto.One or MultiplicitiesDto.ZeroOrOne;
+    }
+
+    /// <summary>Model name and role id of an association role, without the model version and the role version.</summary>
+    internal static (string Model, string Element) VersionLess(RtCkId<CkAssociationRoleId> id)
+    {
+        var model = id.ModelId.ToString() ?? string.Empty;
+        var cut = model.IndexOfAny(['-', '@']);
+        return (cut < 0 ? model : model[..cut], id.ElementId.RoleId);
     }
 
     internal static bool TryParse(DeferredSeedAssociation entry, out RtAssociation edge)
@@ -481,50 +580,111 @@ internal sealed class DeferredSeedAssociations
         }
     }
 
-    private async Task<(RtEntity? Configuration, List<DeferredSeedAssociation> Entries)> LoadAsync(IOctoSession session)
+    private async Task<(List<RtEntity> Configurations, List<DeferredSeedAssociation> Entries,
+        List<string> Invalid)> LoadAsync(IOctoSession session)
     {
         var options = RtEntityQueryOptions.Create();
         options.Field(nameof(RtEntity.RtWellKnownName), FieldFilterOperator.Equals, ConfigurationKey);
         var resultSet = await _repository
-            .GetRtEntitiesByTypeAsync(session, TenantConfigurationCkTypeId, options, skip: 0, take: 1)
+            .GetRtEntitiesByTypeAsync(session, TenantConfigurationCkTypeId, options)
             .ConfigureAwait(false);
-        var configuration = resultSet?.Items?.FirstOrDefault(e =>
-            string.Equals(e.RtWellKnownName, ConfigurationKey, StringComparison.Ordinal));
-        if (configuration == null)
+        // Two passes that both found no store insert one each; every entity with the name is read and merged.
+        var configurations = (resultSet?.Items ?? [])
+            .Where(e => string.Equals(e.RtWellKnownName, ConfigurationKey, StringComparison.Ordinal))
+            .ToList();
+        var entries = new List<DeferredSeedAssociation>();
+        var invalid = new List<string>();
+        var keys = new HashSet<(string, string, string)>();
+        foreach (var configuration in configurations)
         {
-            return (null, []);
+            var json = configuration.GetAttributeStringValueOrDefault(ConfigurationValueAttribute);
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                continue;
+            }
+
+            List<DeferredSeedAssociation?>? loaded;
+            try
+            {
+                loaded = JsonSerializer.Deserialize<List<DeferredSeedAssociation?>>(json, JsonOptions);
+            }
+            catch (JsonException e)
+            {
+                _logger.LogWarning(e,
+                    "The deferred seed association edges of tenant '{TenantId}' could not be read and are discarded",
+                    _repository.TenantId);
+                invalid.Add("unreadable store");
+                continue;
+            }
+
+            foreach (var entry in loaded ?? [])
+            {
+                if (!IsValid(entry))
+                {
+                    invalid.Add(entry == null ? "empty entry" : $"{entry.Describe()} (invalid entry)");
+                    continue;
+                }
+
+                if (keys.Add(entry!.Key))
+                {
+                    entries.Add(entry);
+                }
+            }
         }
 
-        var json = configuration.GetAttributeStringValueOrDefault(ConfigurationValueAttribute);
-        if (string.IsNullOrWhiteSpace(json))
+        return (configurations, entries, invalid);
+    }
+
+    /// <summary>
+    /// True when every field of <paramref name="entry" /> is set, the blueprint id parses and the recording time is
+    /// known. Invalid entries (a manual write, a future format) are dropped instead of failing every later pass.
+    /// </summary>
+    internal static bool IsValid(DeferredSeedAssociation? entry)
+    {
+        if (entry == null || string.IsNullOrWhiteSpace(entry.Blueprint) || string.IsNullOrWhiteSpace(entry.Role) ||
+            string.IsNullOrWhiteSpace(entry.OriginCkTypeId) || string.IsNullOrWhiteSpace(entry.OriginRtId) ||
+            string.IsNullOrWhiteSpace(entry.TargetCkTypeId) || string.IsNullOrWhiteSpace(entry.TargetRtId) ||
+            entry.RecordedAt == default)
         {
-            return (configuration, []);
+            return false;
         }
 
         try
         {
-            return (configuration, JsonSerializer.Deserialize<List<DeferredSeedAssociation>>(json, JsonOptions) ?? []);
+            var id = new BlueprintId(entry.Blueprint);
+            return !id.IsEmpty && !string.IsNullOrEmpty(id.Name);
         }
-        catch (JsonException e)
+        catch (Exception)
         {
-            _logger.LogWarning(e,
-                "The deferred seed association edges of tenant '{TenantId}' could not be read and are discarded",
-                _repository.TenantId);
-            return (configuration, []);
+            return false;
         }
     }
 
-    private async Task SaveAsync(IOctoSession session, RtEntity? configuration,
+    private static void ReportInvalid(IReadOnlyList<string> invalid, DeferredSeedAssociationOutcome outcome)
+    {
+        foreach (var text in invalid)
+        {
+            outcome.Dropped++;
+            if (outcome.DroppedSamples.Count < SampleCap)
+            {
+                outcome.DroppedSamples.Add(text);
+            }
+        }
+    }
+
+    /// <summary>Writes <paramref name="entries" /> into the first store entity and erases every other one.</summary>
+    private async Task SaveAsync(IOctoSession session, IReadOnlyList<RtEntity> configurations,
         IReadOnlyList<DeferredSeedAssociation> entries)
     {
+        var keep = entries.Count > 0 ? configurations.FirstOrDefault() : null;
+        foreach (var other in configurations.Where(c => !ReferenceEquals(c, keep)))
+        {
+            await _repository.DeleteOneRtEntityByRtIdAsync(session, TenantConfigurationCkTypeId, other.RtId,
+                DeleteOptions.Erase).ConfigureAwait(false);
+        }
+
         if (entries.Count == 0)
         {
-            if (configuration != null)
-            {
-                await _repository.DeleteOneRtEntityByRtIdAsync(session, TenantConfigurationCkTypeId,
-                    configuration.RtId, DeleteOptions.Erase).ConfigureAwait(false);
-            }
-
             return;
         }
 
@@ -533,10 +693,10 @@ internal sealed class DeferredSeedAssociations
         entity.RtWellKnownName = ConfigurationKey;
         entity.SetAttributeValue(ConfigurationValueAttribute, AttributeValueTypesDto.String,
             JsonSerializer.Serialize(entries, JsonOptions));
-        if (configuration != null)
+        if (keep != null)
         {
-            await _repository.ReplaceOneRtEntityByIdAsync(session, TenantConfigurationCkTypeId, configuration.RtId,
-                entity).ConfigureAwait(false);
+            await _repository.ReplaceOneRtEntityByIdAsync(session, TenantConfigurationCkTypeId, keep.RtId, entity)
+                .ConfigureAwait(false);
         }
         else
         {

@@ -531,14 +531,26 @@ keeps them and writes them later instead of losing them:
   whose seed brings the Mesh Adapter, and that apply writes the `Executes` edges of the pipelines. The same happens when
   Communication is enabled by hand later, and after a restart (the store is in the tenant database).
 - **Never over the tenant's choice.** An edge of a to-one role is not written when its origin is linked to another
-  target meanwhile; it is given up and reported (message 75). An edge whose blueprint is no longer installed is given up
-  as well (after 15 minutes, because the installation row is written after the seed), and an uninstall forgets the
-  edges of its blueprint at once.
+  target meanwhile; it is given up and reported (message 75). When the multiplicity of the role cannot be resolved (the
+  CK cache does not know the origin type or the role, e.g. after a model upgrade; roles are compared without versions)
+  the edge is treated like a to-one role (fail closed). An edge whose blueprint is no longer installed is given up as
+  well (after 15 minutes, because the installation row is written after the seed), and an uninstall forgets the edges
+  of its blueprint at once.
+- **Only what the current seed declares.** When a later apply or update of the same blueprint (any version) imports the
+  origin of a kept edge again and does not drop that edge again, the edge is forgotten: the seed wrote it or no longer
+  declares it. So an edge a previous version declared is never written after an update removed it.
 - **Not kept**, still reported as a warning: edges that carry attribute values, and edges of an identity association role
   (`IdentityOwnedWrites`; only the identity service writes them). A deferred edge is written only when both ends exist with
   the recorded CK types; an entry naming an identity role is never written.
 - At most 1000 edges are kept per tenant; further ones are reported and dropped. A failure to keep or write them is a
-  warning and never fails the blueprint operation.
+  warning and never fails the blueprint operation. An entry of the store that cannot be read (missing field, blueprint
+  id that does not parse) is dropped and reported (message 75) instead of blocking every later pass.
+- **Concurrent passes.** Reading the store, writing the edges and saving the store run in one transaction of the tenant
+  database. When two services apply a seed in the same tenant at once, the write conflict aborts one pass, which runs
+  again on the fresh state (three attempts). Two passes that both found no store each insert one; the next pass reads
+  every entity with the well-known name, merges them and keeps one.
+- **Update results.** An update reports kept edges as a warning; it has no list for information messages, so the edges
+  an update writes (message 74) appear only in the log ("Wrote <n> deferred seed association edge(s) ...").
 
 Residual risk: the store is as trustworthy as every other `System/TenantConfiguration` entity (the capability flags of
 the services live there too). A caller who can write that type could add edges that a later seed import writes on the

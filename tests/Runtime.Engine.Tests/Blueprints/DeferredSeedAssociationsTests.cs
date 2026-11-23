@@ -32,6 +32,10 @@ public class DeferredSeedAssociationsTests
     private static readonly DateTime Now = new(2026, 11, 23, 8, 0, 0, DateTimeKind.Utc);
 
     private readonly IRuntimeRepository _repository = A.Fake<IRuntimeRepository>();
+    private readonly ICkCacheService _ckCache = A.Fake<ICkCacheService>();
+    private readonly List<RtAssociation> _existingEdges = [];
+    private readonly List<RtEntity> _extraStores = [];
+    private int _replaceFailures;
     private readonly HashSet<(RtCkId<CkTypeId>, OctoObjectId)> _existing = [];
     private readonly List<RtAssociation> _written = [];
     private RtEntity? _stored;
@@ -42,7 +46,8 @@ public class DeferredSeedAssociationsTests
         A.CallTo(() => _repository.TenantId).Returns(TenantId);
         A.CallTo(() => _repository.GetRtEntitiesByTypeAsync(A<IOctoSession>._, A<RtCkId<CkTypeId>>._,
                 A<RtEntityQueryOptions>._, A<int?>._, A<int?>._))
-            .ReturnsLazily(() => Task.FromResult(ResultSet(_stored == null ? [] : [_stored])));
+            .ReturnsLazily(() => Task.FromResult(ResultSet(
+                (_stored == null ? new List<RtEntity>() : [_stored]).Concat(_extraStores).ToList())));
         A.CallTo(() => _repository.GetRtEntitiesByIdAsync(A<IOctoSession>._, A<RtCkId<CkTypeId>>._,
                 A<IReadOnlyList<OctoObjectId>>._, A<RtEntityQueryOptions>._, A<int?>._, A<int?>._))
             .ReturnsLazily((IOctoSession _, RtCkId<CkTypeId> type, IReadOnlyList<OctoObjectId> ids,
@@ -55,10 +60,39 @@ public class DeferredSeedAssociationsTests
             .Invokes((IOctoSession _, RtCkId<CkTypeId> _, RtEntity entity) => _stored = entity);
         A.CallTo(() => _repository.ReplaceOneRtEntityByIdAsync(A<IOctoSession>._, A<RtCkId<CkTypeId>>._,
                 A<OctoObjectId>._, A<RtEntity>._))
-            .Invokes((IOctoSession _, RtCkId<CkTypeId> _, OctoObjectId _, RtEntity entity) => _stored = entity);
+            .ReturnsLazily((IOctoSession _, RtCkId<CkTypeId> _, OctoObjectId _, RtEntity entity) =>
+            {
+                if (_replaceFailures > 0)
+                {
+                    _replaceFailures--;
+                    throw new InvalidOperationException("WriteConflict");
+                }
+
+                _stored = entity;
+                return Task.CompletedTask;
+            });
         A.CallTo(() => _repository.DeleteOneRtEntityByRtIdAsync(A<IOctoSession>._, A<RtCkId<CkTypeId>>._,
                 A<OctoObjectId>._, A<DeleteOptions>._))
-            .Invokes(() => _stored = null);
+            .Invokes((IOctoSession _, RtCkId<CkTypeId> _, OctoObjectId id, DeleteOptions _) =>
+            {
+                if (_stored?.RtId == id)
+                {
+                    _stored = null;
+                }
+
+                _extraStores.RemoveAll(e => e.RtId == id);
+            });
+        A.CallTo(() => _repository.GetRtAssociationsAsync(A<IOctoSession>._, A<IEnumerable<RtEntityId>>._,
+                A<RtAssociationExtendedQueryOptions>._))
+            .ReturnsLazily((IOctoSession _, IEnumerable<RtEntityId> origins, RtAssociationExtendedQueryOptions _) =>
+            {
+                var ids = origins.Select(o => o.RtId).ToHashSet();
+                var inner = A.Fake<IResultSet<RtAssociation>>();
+                A.CallTo(() => inner.Items).Returns(_existingEdges.Where(e => ids.Contains(e.OriginRtId)).ToList());
+                var set = A.Fake<IMultipleOriginResultSet<RtAssociation>>();
+                A.CallTo(() => set.Values).Returns(new List<IResultSet<RtAssociation>> { inner });
+                return Task.FromResult(set);
+            });
         A.CallTo(() => _repository.BulkRtAssociationsAsync(A<IOctoSession>._, A<IEnumerable<RtAssociation>>._,
                 A<BulkOperationOptions>._))
             .Invokes((IOctoSession _, IEnumerable<RtAssociation> edges, BulkOperationOptions _) =>
@@ -73,7 +107,7 @@ public class DeferredSeedAssociationsTests
     }
 
     private DeferredSeedAssociations Store() =>
-        new(_repository, A.Fake<ICkCacheService>(), NullLogger.Instance, () => _now);
+        new(_repository, _ckCache, NullLogger.Instance, () => _now);
 
     private static RtImportSkippedAssociation Edge(OctoObjectId origin, OctoObjectId target,
         RtCkId<CkAssociationRoleId>? role = null, bool hasAttributes = false) =>
@@ -87,7 +121,7 @@ public class DeferredSeedAssociationsTests
     {
         _existing.Add((PipelineType, Pipeline1));
 
-        var outcome = await Store().ProcessAsync(Samples, [Edge(Pipeline1, MeshAdapter)],
+        var outcome = await Store().ProcessAsync(Samples, [Edge(Pipeline1, MeshAdapter)], null,
             Installed(), CancellationToken.None);
 
         Assert.Equal(1, outcome.DeferredForCurrent);
@@ -103,12 +137,12 @@ public class DeferredSeedAssociationsTests
     {
         _existing.Add((PipelineType, Pipeline1));
         _existing.Add((PipelineType, Pipeline2));
-        await Store().ProcessAsync(Samples, [Edge(Pipeline1, MeshAdapter), Edge(Pipeline2, MeshAdapter)],
+        await Store().ProcessAsync(Samples, [Edge(Pipeline1, MeshAdapter), Edge(Pipeline2, MeshAdapter)], null,
             Installed(), CancellationToken.None);
 
         // The service-managed System.Communication seed brings the Mesh Adapter (Communication enabled).
         _existing.Add((AdapterType, MeshAdapter));
-        var outcome = await Store().ProcessAsync(Communication, [], Installed(Samples.Name), CancellationToken.None);
+        var outcome = await Store().ProcessAsync(Communication, [], null, Installed(Samples.Name), CancellationToken.None);
 
         Assert.Equal(2, outcome.Applied);
         Assert.Equal(2, outcome.AppliedByBlueprint[Samples.FullName]);
@@ -128,9 +162,9 @@ public class DeferredSeedAssociationsTests
     public async Task EdgeWithAnEndStillMissing_StaysKept()
     {
         _existing.Add((PipelineType, Pipeline1));
-        await Store().ProcessAsync(Samples, [Edge(Pipeline1, MeshAdapter)], Installed(), CancellationToken.None);
+        await Store().ProcessAsync(Samples, [Edge(Pipeline1, MeshAdapter)], null, Installed(), CancellationToken.None);
 
-        var outcome = await Store().ProcessAsync(Communication, [], Installed(Samples.Name), CancellationToken.None);
+        var outcome = await Store().ProcessAsync(Communication, [], null, Installed(Samples.Name), CancellationToken.None);
 
         Assert.Equal(0, outcome.Applied);
         Assert.Empty(_written);
@@ -141,16 +175,16 @@ public class DeferredSeedAssociationsTests
     public async Task EdgeOfAnUninstalledBlueprint_IsDropped_AfterTheGracePeriod_NotBefore()
     {
         _existing.Add((PipelineType, Pipeline1));
-        await Store().ProcessAsync(Samples, [Edge(Pipeline1, MeshAdapter)], Installed(), CancellationToken.None);
+        await Store().ProcessAsync(Samples, [Edge(Pipeline1, MeshAdapter)], null, Installed(), CancellationToken.None);
 
         _now = Now + DeferredSeedAssociations.UninstalledGracePeriod - TimeSpan.FromMinutes(1);
-        var early = await Store().ProcessAsync(Communication, [], Installed(), CancellationToken.None);
+        var early = await Store().ProcessAsync(Communication, [], null, Installed(), CancellationToken.None);
         Assert.Equal(0, early.Dropped);
         Assert.NotNull(_stored);
 
         _now = Now + DeferredSeedAssociations.UninstalledGracePeriod + TimeSpan.FromMinutes(1);
         _existing.Add((AdapterType, MeshAdapter));
-        var late = await Store().ProcessAsync(Communication, [], Installed(), CancellationToken.None);
+        var late = await Store().ProcessAsync(Communication, [], null, Installed(), CancellationToken.None);
 
         Assert.Equal(1, late.Dropped);
         Assert.Contains("is not installed", late.DroppedSamples.Single());
@@ -162,15 +196,15 @@ public class DeferredSeedAssociationsTests
     public async Task RemoveBlueprint_ForgetsOnlyItsEdges()
     {
         _existing.Add((PipelineType, Pipeline1));
-        await Store().ProcessAsync(Samples, [Edge(Pipeline1, MeshAdapter)], Installed(), CancellationToken.None);
-        await Store().ProcessAsync(new BlueprintId("Other-1.0.0"), [Edge(Pipeline2, MeshAdapter)], Installed(),
+        await Store().ProcessAsync(Samples, [Edge(Pipeline1, MeshAdapter)], null, Installed(), CancellationToken.None);
+        await Store().ProcessAsync(new BlueprintId("Other-1.0.0"), [Edge(Pipeline2, MeshAdapter)], null, Installed(),
             CancellationToken.None);
 
-        Assert.Equal(1, await Store().RemoveBlueprintAsync(Samples.Name));
+        Assert.Equal(1, await Store().RemoveBlueprintAsync(Samples.Name, TestContext.Current.CancellationToken));
 
         _existing.Add((PipelineType, Pipeline2));
         _existing.Add((AdapterType, MeshAdapter));
-        var outcome = await Store().ProcessAsync(Communication, [], Installed("Other"), CancellationToken.None);
+        var outcome = await Store().ProcessAsync(Communication, [], null, Installed("Other"), CancellationToken.None);
         Assert.Equal(Pipeline2, _written.Single().OriginRtId);
         Assert.Equal(1, outcome.Applied);
     }
@@ -185,7 +219,7 @@ public class DeferredSeedAssociationsTests
         _stored.SetAttributeValue("ConfigurationValue",
             ConstructionKit.Contracts.DataTransferObjects.AttributeValueTypesDto.String, "{not json");
 
-        var outcome = await Store().ProcessAsync(Samples, [], Installed(), CancellationToken.None);
+        var outcome = await Store().ProcessAsync(Samples, [], null, Installed(), CancellationToken.None);
 
         Assert.Equal(0, outcome.Applied);
         Assert.Null(_stored);
@@ -283,5 +317,140 @@ public class DeferredSeedAssociationsTests
         (toWrite, blocked) = DeferredSeedAssociations.DecideWrites(ready, taken);
         Assert.Equal(Pipeline2, toWrite.Single().Edge.OriginRtId);
         Assert.Empty(blocked);
+    }
+
+    [Fact]
+    public async Task NextVersionNoLongerDeclaringAKeptEdge_ForgetsIt_WhileStillDeclaredEdgesStay()
+    {
+        _existing.Add((PipelineType, Pipeline1));
+        _existing.Add((PipelineType, Pipeline2));
+        await Store().ProcessAsync(Samples, [Edge(Pipeline1, MeshAdapter), Edge(Pipeline2, MeshAdapter)],
+            [Pipeline1, Pipeline2], Installed(), CancellationToken.None);
+
+        // v2 re-imports Pipeline1 without the edge and Pipeline2 with it (still dangling).
+        var v2 = new BlueprintId("Samples.PipelineBasics-2.1.0");
+        var outcome = await Store().ProcessAsync(v2, [Edge(Pipeline2, MeshAdapter)], [Pipeline1, Pipeline2],
+            Installed(Samples.Name), CancellationToken.None);
+
+        Assert.Equal(1, outcome.DeferredForCurrent);
+        Assert.Contains(Pipeline2.ToString(), outcome.DeferredSamples.Single());
+
+        _existing.Add((AdapterType, MeshAdapter));
+        await Store().ProcessAsync(Communication, [], null, Installed(Samples.Name), CancellationToken.None);
+        Assert.Equal(Pipeline2, _written.Single().OriginRtId);
+    }
+
+    [Fact]
+    public void DropRedeclared_OnlyTouchesTheSameBlueprint_AndOriginsOfThisImport()
+    {
+        var entries = new List<DeferredSeedAssociation>();
+        var outcome = new DeferredSeedAssociationOutcome();
+        DeferredSeedAssociations.Merge(entries, Samples, [Edge(Pipeline1, MeshAdapter)], Now, outcome);
+        DeferredSeedAssociations.Merge(entries, new BlueprintId("Other-1.0.0"), [Edge(Pipeline2, MeshAdapter)], Now,
+            outcome);
+
+        Assert.Equal(0, DeferredSeedAssociations.DropRedeclared(entries, Samples, [], [Pipeline2]));
+        Assert.Equal(0, DeferredSeedAssociations.DropRedeclared(entries, Samples, [Edge(Pipeline1, MeshAdapter)],
+            [Pipeline1]));
+        Assert.Equal(0, DeferredSeedAssociations.DropRedeclared(entries, Samples, [], []));
+        Assert.Equal(1, DeferredSeedAssociations.DropRedeclared(entries, new BlueprintId("Samples.PipelineBasics-3.0.0"),
+            [], [Pipeline1, Pipeline2]));
+        Assert.Equal("Other-1.0.0", entries.Single().Blueprint);
+    }
+
+    [Fact]
+    public async Task UnresolvableRole_FailsClosed_NeverWritesNextToAnotherTarget()
+    {
+        // The fake CK cache resolves no type: the multiplicity is unknown and the edge is treated like a to-one role.
+        _existing.Add((PipelineType, Pipeline1));
+        await Store().ProcessAsync(Samples, [Edge(Pipeline1, MeshAdapter)], null, Installed(), CancellationToken.None);
+        _existing.Add((AdapterType, MeshAdapter));
+        _existingEdges.Add(new RtAssociation
+        {
+            AssociationRoleId = Executes, OriginRtId = Pipeline1, OriginCkTypeId = PipelineType,
+            TargetRtId = OtherAdapter, TargetCkTypeId = AdapterType
+        });
+
+        var outcome = await Store().ProcessAsync(Communication, [], null, Installed(Samples.Name),
+            CancellationToken.None);
+
+        Assert.Empty(_written);
+        Assert.Equal(1, outcome.Dropped);
+        Assert.Contains(OtherAdapter.ToString(), outcome.DroppedSamples.Single());
+        Assert.Null(_stored);
+    }
+
+    [Fact]
+    public async Task WriteConflict_IsRetried_AndNothingIsLost()
+    {
+        _existing.Add((PipelineType, Pipeline1));
+        _existing.Add((PipelineType, Pipeline2));
+        await Store().ProcessAsync(Samples, [Edge(Pipeline1, MeshAdapter)], null, Installed(), CancellationToken.None);
+
+        _replaceFailures = 1; // a concurrent pass changed the store: the first save fails
+        var outcome = await Store().ProcessAsync(new BlueprintId("Other-1.0.0"), [Edge(Pipeline2, MeshAdapter)], null,
+            Installed(), CancellationToken.None);
+
+        Assert.Equal(1, outcome.DeferredForCurrent);
+        _existing.Add((AdapterType, MeshAdapter));
+        var applied = await Store().ProcessAsync(Communication, [], null, Installed(Samples.Name, "Other"),
+            CancellationToken.None);
+        Assert.Equal(2, applied.Applied);
+    }
+
+    [Fact]
+    public async Task TwoStoreEntities_AreMerged_AndTheSecondIsErased()
+    {
+        _existing.Add((PipelineType, Pipeline1));
+        _existing.Add((PipelineType, Pipeline2));
+        await Store().ProcessAsync(Samples, [Edge(Pipeline1, MeshAdapter)], null, Installed(), CancellationToken.None);
+        var first = _stored!;
+        _stored = null;
+        await Store().ProcessAsync(new BlueprintId("Other-1.0.0"), [Edge(Pipeline2, MeshAdapter)], null, Installed(),
+            CancellationToken.None);
+        _extraStores.Add(first); // both passes found no store and inserted one each
+
+        _existing.Add((AdapterType, MeshAdapter));
+        var outcome = await Store().ProcessAsync(Communication, [], null, Installed(Samples.Name, "Other"),
+            CancellationToken.None);
+
+        Assert.Equal(2, outcome.Applied);
+        Assert.Null(_stored);
+        Assert.Empty(_extraStores);
+    }
+
+    [Fact]
+    public async Task InvalidEntry_IsDroppedAndReported_TheOtherEdgesStillWork()
+    {
+        _existing.Add((PipelineType, Pipeline1));
+        await Store().ProcessAsync(Samples, [Edge(Pipeline1, MeshAdapter)], null, Installed(), CancellationToken.None);
+        var json = _stored!.GetAttributeStringValueOrDefault("ConfigurationValue")!;
+        _stored.SetAttributeValue("ConfigurationValue",
+            ConstructionKit.Contracts.DataTransferObjects.AttributeValueTypesDto.String,
+            json.TrimEnd(']') + ",{\"blueprint\":null,\"role\":\"x\"}]");
+        _now = Now + DeferredSeedAssociations.UninstalledGracePeriod + TimeSpan.FromMinutes(1);
+        _existing.Add((AdapterType, MeshAdapter));
+
+        var outcome = await Store().ProcessAsync(Communication, [], null, Installed(Samples.Name),
+            CancellationToken.None);
+
+        Assert.Equal(1, outcome.Applied);
+        Assert.Equal(1, outcome.Dropped);
+        Assert.Null(_stored);
+    }
+
+    [Fact]
+    public void IsValid_RefusesMissingFields_AndUnparseableBlueprints()
+    {
+        var valid = new DeferredSeedAssociation(Samples.FullName, Executes.SemanticVersionedFullName,
+            PipelineType.SemanticVersionedFullName, Pipeline1.ToString(), AdapterType.SemanticVersionedFullName,
+            MeshAdapter.ToString(), Now);
+
+        Assert.True(DeferredSeedAssociations.IsValid(valid));
+        Assert.False(DeferredSeedAssociations.IsValid(null));
+        Assert.False(DeferredSeedAssociations.IsValid(valid with { Blueprint = null! }));
+        Assert.False(DeferredSeedAssociations.IsValid(valid with { Blueprint = "" }));
+        Assert.False(DeferredSeedAssociations.IsValid(valid with { TargetRtId = " " }));
+        Assert.False(DeferredSeedAssociations.IsValid(valid with { RecordedAt = default }));
     }
 }

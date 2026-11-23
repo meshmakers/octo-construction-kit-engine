@@ -62,7 +62,7 @@ its form only (placeholder / empty / value).
 
 ## 1. meshmakers-app (Meshmakers.Accounting, Meshmakers.Accounting.Tesla)
 
-Repo: `/Users/gerald/RiderProjects/meshmakers/main/meshmakers-app` (branch `main`, ea98fac).
+Repo: `meshmakers-app` (branch `main`, ea98fac).
 The Meshmakers.Accounting model (3.1.0) has **no** credential attribute. The credentials the app
 manages live in System.Communication types (`AiConfiguration.ApiKey`,
 `MicrosoftGraphConfiguration.ClientSecret`, `EMailReceiverConfiguration.Password`,
@@ -155,7 +155,7 @@ semantics: an empty `serviceAccount.clientSecret` writes `ClientSecret: ""`, whi
 
 ## 2. energy-community (EnergyCommunity.Registration)
 
-Repo: `/Users/gerald/RiderProjects/meshmakers/main/energy-community` (branch `main`, c33caef).
+Repo: `energy-community` (branch `main`, c33caef).
 
 ### 2.1 Model — phase 3
 
@@ -235,7 +235,7 @@ Registration API" DataFlow after installing Billing 2.5.0.
 
 ## 3. octo-adapter-loxone (Loxone CK + edge adapter)
 
-Repo: `/Users/gerald/RiderProjects/meshmakers/main/octo-adapter-loxone` (branch `main`, d840ef9).
+Repo: `octo-adapter-loxone` (branch `main`, d840ef9).
 
 The Loxone CK attribute `Password` (`src/AdapterEdgeLoxone.CkModel/ConstructionKit/attributes/connection.yaml`)
 is defined but **assigned to no type** (`Miniserver` uses only `Host`/`Port`). The real credential is
@@ -253,7 +253,7 @@ No seed or pipeline in the repo contains a Loxone password.
 
 ## 4. octo-report-services (System.Reporting)
 
-Repo: `/Users/gerald/RiderProjects/meshmakers/main/octo-report-services` (branch `main`, 5eb13cb).
+Repo: `octo-report-services` (branch `main`, 5eb13cb).
 The service hosts the runtime engine (`AddRuntimeEngine`), the key ring is delivered by the
 octo-helm-pro reporting chart (ef37529).
 
@@ -272,7 +272,7 @@ value type does not close; the designer should get connection names only.
 
 ## 5. one-time-ticket (Demo.Tickets)
 
-Repo: `/Users/gerald/RiderProjects/meshmakers/main/one-time-ticket` (branch `main`, e3e698b).
+Repo: `one-time-ticket` (branch `main`, e3e698b).
 The HTTP routes are called anonymously (the BFF `app/server/server.js` forwards without credentials).
 
 ### 5.1 Model — phase 3
@@ -323,7 +323,7 @@ pipeline need no change.
 
 ## 6. wwc26-landing-page (Wwc26.Challenge)
 
-Repo: `/Users/gerald/RiderProjects/meshmakers/main/wwc26-landing-page` (branch `main`, 9aeea2d).
+Repo: `wwc26-landing-page` (branch `main`, 9aeea2d).
 
 `Submission.SecretKey` (`ck/ConstructionKit/attributes/submission.yaml`) is the treasure-hunt answer a
 participant submits; the jury reads it: `src/we-are-developers-landing-page/src/app/graphQL/getSubmissions.graphql`
@@ -379,4 +379,4 @@ Branch `feat/gerald/secret-attribute-type`, commit `ab93f44`:
 
 ## Version rule after the System 2.5 repins (decided 2026-10-06, G1-a)
 
-Wave 1 repins every model that pinned System 2.4 to `System-[2.5,3.0)` with a **minor** bump (CI `ValidateVersion` rule). Every phase-3 SECRET model change in this document therefore takes the **next minor after the repin version**, e.g. System.Reporting 2.3.0 (repin) → 2.4.0 (Secret `ConnectionString`), Meshmakers.Accounting.Tesla 1.3.0 (repin) → 1.4.0, Demo.Tickets / EnergyCommunity.Registration / Wwc26.Challenge likewise. The repin versions per model are listed in `wave1-push-pr-plan-backend.md` §4.5.
+Wave 1 repins every model that pinned System 2.4 to `System-[2.5,3.0)` with a **minor** bump (CI `ValidateVersion` rule). Every phase-3 SECRET model change in this document therefore takes the **next minor after the repin version**, e.g. System.Reporting 2.3.0 (repin) → 2.4.0 (Secret `ConnectionString`), Meshmakers.Accounting.Tesla 1.3.0 (repin) → 1.4.0, Demo.Tickets / EnergyCommunity.Registration / Wwc26.Challenge likewise.

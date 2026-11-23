@@ -42,7 +42,7 @@ concept records that as the answer and adds the one missing guardrail.
 | Path | Mechanism | Status |
 |---|---|---|
 | **Automatic** (the common case) | On every write, `RetroactiveWriteDetector` flags a write whose `timestamp < consumedWatermark` and records a `CkArchiveDirtyWindow`. The `RecomputeOrchestrator` periodic tick propagates that window onto dependents and recomputes **only the affected `[from, to)` range** via the optimistic per-window **generation-swap** — leaving `LastAggregatedBucketEnd` untouched. | ✅ Implemented |
-| **Manual** (escape hatch) | `rewindRollupWatermark(rtId, toBucketEnd)` moves the threshold backwards; the forward orchestrator re-aggregates from there. Reconciled with the genmap via `ClearRecomputeGenerationsAsync`. Plus `recomputeArchive(rtId, from, to, rtId?)` for a reader-safe range recompute. | ✅ Implemented (/ rollup MVP) |
+| **Manual** (escape hatch) | `rewindRollupWatermark(rtId, toBucketEnd)` moves the threshold backwards; the forward orchestrator re-aggregates from there. Reconciled with the genmap via `ClearRecomputeGenerationsAsync`. Plus `recomputeArchive(rtId, from, to, rtId?)` for a reader-safe range recompute. | ✅ Implemented (rollup MVP) |
 | **Guardrail** ("bounded retro reach") | Cap how far back a single very-late write may drag an automatic recompute. | ❌ **Not yet implemented — the scope of this item's code work (b).** |
 
 ### Why automatic does not walk the threshold back

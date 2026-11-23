@@ -6,7 +6,7 @@ applies_to: src/Runtime.*/Secrets/**
 # SECRET attribute value type — concept
 
 > Status: Approved for implementation · 2026-10-05, amended 2026-10-06 (§2.1) · Owner: Gerald Lochner
-> Work item: tracked in the backlog (Bug, Epic 4969). Work item: tracked in the backlog (entity forms) (installation-level adapter credential for impersonation). tracked in the backlog closed as duplicate closed as a false alarm.
+> Work item: tracked in the backlog (Bug). Related: entity forms, installation-level adapter credential for impersonation. Two related items were closed, one as a duplicate and one as a false alarm.
 > Sources: two planning passes (engine/storage/API and existing secrets/migration), verified against the code on 2026-10-05.
 
 ---

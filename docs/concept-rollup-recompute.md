@@ -51,7 +51,7 @@ This concept adds **stable, optimistic recompute**: recomputation that can be tr
 ### Non-Goals
 
 - **Automatic event-driven trigger policy** — whether a detected raw change *automatically*
-  walks the threshold back is tracked in the backlog. This concept produces the dirty signal that 4196
+  walks the threshold back is tracked in the backlog. This concept produces the dirty signal that the threshold-reset policy
   consumes; it does not decide the auto-reset policy.
 - **New rollup aggregation types** — out of scope (owns multi-aggregate).
 - **Cross-archive consistency** — each archive is recomputed independently; a chain propagates
@@ -234,7 +234,7 @@ storage and a larger table to scan for as long as the grace period lasts.
 > flip a single-row write in the same store (atomicity without cross-store coordination) and avoids a
 > CK-model version bump. The full mechanism lives in `octo-construction-kit-engine-mongodb`'s
 > `Runtime.Engine.CrateDb` layer (`GenerationMapSqlBuilder`, `CrateDbArchiveRecomputeExecutor`,
-> `CrateQueryCompiler`); see that repo's CLAUDE.md "Optimistic Recompute — Per-Window Generation
+> `CrateQueryCompiler`); see that repo's documentation "Optimistic Recompute — Per-Window Generation
 > Pointer". **Status: implemented** (unit-tested + end-to-end validated against a CrateDB
 > Testcontainer by `RollupRecomputeGenerationPointerTests` in `octo-asset-repo-services`).
 >
@@ -404,7 +404,7 @@ data source for it.
   windowed query methods) injects `generation = CASE WHEN <range> THEN <gen> … ELSE 0 END` for
   rollup archives, so a query during recompute returns a single consistent generation per window.
 - No hard error, no `500`, no abort while a recompute runs (acceptance criterion). The mesh-adapter
-  `GetQueryById` node and the VOEST App inherit this behavior for free.
+  `GetQueryById` node and the customer app inherit this behavior for free.
 - **Optional soft hint**: the existing `was_updated` flag plus the new
   `RecomputeInProgress` / `LastRecomputeSuccessAt` fields let a dashboard show "recompute in
   progress" without being required to.
@@ -441,7 +441,7 @@ that was merely interrupted by a shutdown ("Interrupted …").
 
 `IArchiveAuditTrail` is extended with `RecordRecomputeRunAsync(...)` and
 `RecordRecomputeFailureAsync(..., reason)`, routed through `IAuditEventSink` into the platform
-event log (see `octo-construction-kit-engine/CLAUDE.md` — Audit-Trail Architecture; never
+event log (see `docs/audit-trail.md`; never
 ctor-capture `IEventRepository`).
 
 ### Metrics (Prometheus / OTLP)
@@ -458,13 +458,13 @@ One structured log at each phase boundary — **Compute → Validate → Swap �
 
 | Element | Change |
 |---|---|
-| `CkArchive` / `CkRollupArchive` attributes | `DirtyWindows` (RecordArray — Information A), `PendingRecomputeRanges` (RecordArray — Information B), and the §7 observability fields. All marked `isRuntimeState: true` (see CLAUDE.md — runtime-state preservation, so a blueprint re-apply never tramples them). |
+| `CkArchive` / `CkRollupArchive` attributes | `DirtyWindows` (RecordArray — Information A), `PendingRecomputeRanges` (RecordArray — Information B), and the §7 observability fields. All marked `isRuntimeState: true` (see `docs/runtime-state-preservation.md` — runtime-state preservation, so a blueprint re-apply never tramples them). |
 | New record `CkArchiveDirtyWindow` | `WindowStart`, `WindowEnd`, `ChangeKind`, `Source`, `DetectedAt`. |
 | Record `CkArchiveRecomputeRange` | `DependentArchiveRtId`, `RangeStart`, `RangeEnd`, `RtIdScope`, `EnqueuedAt`, plus the retry bookkeeping `Attempts` (default 0), `NextAttemptAt` and `LastError` (System.StreamData 1.9.0 — see *Failure mode*). Ranges stored before 1.9.0 read back as attempt zero and are due immediately. |
 | New record `CkArchiveRecomputeJob` | the §7 job-history fields, plus the heartbeat `LastProgressAt` (1.9.0). Jobs stored before 1.9.0 carry none and are judged by `StartedAt`. |
 | New enums | `CkRecomputeChangeKind { Append, RetroactiveModify }`, `CkRecomputeChangeSource { Manual, Pipeline, Import }`, `CkRecomputeJobState { Pending, Running, Swapping, Completed, Failed, Coalesced }`. |
 
-The bump is additive; existing archives migrate via the no-migrations bridge (CLAUDE.md).
+The bump is additive; existing archives migrate via the no-migrations bridge (`docs/ck-model-migrations.md`).
 
 ## §9 Service / API surface
 

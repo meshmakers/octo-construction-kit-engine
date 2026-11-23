@@ -29,7 +29,7 @@ licensed.
 | `src/Runtime.*/Blueprints/**`, `src/Runtime.*/Exchange/**` | `docs/blueprint-engine.md` |
 | `src/Runtime.*/Blueprints/**`, `src/BlueprintManager/**`, `src/ConstructionKit.Engine/BlueprintCatalogs/**` | `docs/blueprints.md` |
 | `Directory.Build.*`, `src/ConstructionKit.Templates/**`, `src/ConstructionKit.MsBuildTasks/**` | `docs/build-and-packaging.md` |
-| `src/ConstructionKit.Contracts/**`, `src/ConstructionKit.Engine/Serialization/**`, `src/ConstructionKit.Engine/Resolvers/**` | `docs/ck-field-touch-points.md` |
+| `src/ConstructionKit.Contracts/**`, `src/ConstructionKit.SourceGeneration/**`, `src/ConstructionKit.Engine/Resolvers/**`, `src/ConstructionKit.Engine/Seri*/**` | `docs/ck-field-touch-points.md` |
 | `src/Runtime.Engine/CkModelMigrations/**`, `src/Runtime.Contracts/CkModelMigrations/**` | `docs/ck-model-migrations.md` |
 | `azure-pipelines.yml`, `src/ConstructionKit.Engine/ModelCatalogs/**`, `src/ConstructionKit.Engine/ModelRepositories/**` | `docs/ck-publishing.md` |
 | `src/ConstructionKit.SchemaProvider/**`, `src/*/Serialization/**`, `src/ConstructionKit.Contracts/RtCkIdJsonShim.cs` | `docs/ck-schema-and-json-serialization.md` |

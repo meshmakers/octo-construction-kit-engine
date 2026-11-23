@@ -250,7 +250,7 @@ Answers Q2 and Q3 and part of Q4. Sources are official vendor docs; all were acc
 Bucket and account names come from a read-only look at the local infra repos (`meshmakers-infrastructure`
 at `b6a17b9`; `infrastructure-helm-charts`, `maintenance-deployment` and `octo-mesh-deployment` define no
 object storage). No live system was queried, so live names still need one `aws s3 ls` / `az storage account
-show` check during tracked in the backlog–5565.
+show` check during the artifact storage work.
 
 ### Summary
 

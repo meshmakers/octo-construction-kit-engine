@@ -5,12 +5,12 @@ background: true
 
 # Concept: Downsampling for Simple (non-aggregating) Stream-Data Queries
 
-**Work item: tracked in the backlog (Stream data v2 / tracked in the backlog) — covers both backend and frontend.
-**Work item: tracked in the backlog (persistent SD queries + query types) (MeshBoard widgets consuming SD queries), [`concept-time-range-archives.md`](concept-time-range-archives.md) §7 (windowed-storage containment).
+**Work item:** tracked in the backlog (Stream data v2) — covers both backend and frontend.
+**Related:** persistent SD queries + query types, MeshBoard widgets consuming SD queries, [`concept-time-range-archives.md`](concept-time-range-archives.md) §7 (windowed-storage containment).
 
 ## 1. Goal
 
-Charts must not pull every raw row into the browser. A line chart that is ~1000 px wide cannot show more than ~1000–2000 distinct points, yet today a `SimpleSdQuery` over a year of 15-minute meter readings returns the full set (e.g. 33 224 rows / 16 612 timestamps for the voest board). The browser must be able to ask the backend for a **representative N-point reduction sized to the chart's pixel width**, where N is driven by the rendered width.
+Charts must not pull every raw row into the browser. A line chart that is ~1000 px wide cannot show more than ~1000–2000 distinct points, yet today a `SimpleSdQuery` over a year of 15-minute meter readings returns the full set (e.g. 33 224 rows / 16 612 timestamps for a customer board). The browser must be able to ask the backend for a **representative N-point reduction sized to the chart's pixel width**, where N is driven by the rendered width.
 
 This requires:
 - **Backend:** make `queryMode: DOWNSAMPLING` reduce a `SimpleSdQuery` (raw, non-aggregating) to exactly `limit` buckets — today the CrateDB compiler only downsamples when the query carries aggregations.
@@ -146,7 +146,7 @@ flowchart TB
 ## 7. Phasing (all) — DELIVERED
 
 All phases shipped and live-verified against the windowed `energy-measurements` archive on
-voest (33 224 raw rows → `limit` bins per series, AVG line + MIN/MAX envelope).
+a customer board (33 224 raw rows → `limit` bins per series, AVG line + MIN/MAX envelope).
 
 - ✅ **Engine primitive** — `WithDownsamplingGroupBy` on the query builder + compiler per-series GROUP BY/ORDER BY (engine-mongodb `1150376`); `GroupByColumnPaths` option (engine `0f93da9`) wired through `ExecuteDownsamplingQueryAsync` (engine-mongodb `9fae4b2`). Unit tests cover the per-series shape + envelope.
 - ✅ **Runtime fixes surfaced by the first live run** (all engine/asset-repo): timestamp mapping built directly to avoid the windowed-archive `Resolve("timestamp")` NRE (asset-repo `e9e7aeb`); rtId scope on the downsampling path via an IN field-filter instead of `AddWhereIn` (engine `9e84006`); downsampling rows stamped with the query's Ck type so the non-null GraphQL `ckTypeId` resolves (engine `72a59ca`). These were latent bugs in the pre-existing downsampling path that no caller had hit.

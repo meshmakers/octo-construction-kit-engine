@@ -15,7 +15,7 @@ query returns the recombined duty cycle. Open: CrateDB integration tests in CI, 
 TWA in downsampling bins, linear interpolation. Fourth increment: `Integral` (energy over the
 query window, value × hours, step/LOCF) over raw archives — §6.5. Fifth increment: `Integral`
 over rollups that materialise a TimeWeightedAvg — §6.5 "Rollups", read from the stored integral.
-**Work item: tracked in the backlog (Stream data: time-weighted state-duration aggregation for event-based archives).
+**Work item:** tracked in the backlog (Stream data: time-weighted state-duration aggregation for event-based archives).
 **Related:**
 - [`concept-rollup-archives.md`](concept-rollup-archives.md) — the rollup orchestrator + SQL-per-bucket model this concept extends; the AVG `_sum`/`_count` two-column materialisation is the precedent for the new integral/duration pair.
 - [`concept-rollup-recompute.md`](concept-rollup-recompute.md) (implemented) — staging + per-window generation pointer; the new function must be reproducible under recompute.

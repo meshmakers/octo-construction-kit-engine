@@ -6,7 +6,7 @@ background: true
 # Concept: Timezone-Aware Rollup Queries (Civil-Time Ranges Across Mixed-Timezone Metering Points)
 
 **Status:** Draft / analysis. Design decisions resolved (§9); write-path primitives already shipped, read-path unimplemented (§3).
-**Work item: tracked in the backlog
+**Work item:** tracked in the backlog
 **Motivating use case:** An operator asks a MeshBoard "what were the values *yesterday* / *this week* / *last month*?" and gets the answer for the **local civil day/week/month** of a chosen time zone — not for a UTC day shifted against it. Becomes critical the moment one chart compares metering points across time zones (a Linz site in `Europe/Vienna` next to a Portugal site in `Europe/Lisbon`): a single UTC bucket boundary cannot mean "yesterday" for both.
 **Related:**
 - [`concept-resolution-aware-series-queries.md`](concept-resolution-aware-series-queries.md) — the resolution ladder + selector this concept extends. **Decision O6 already reserved a reference time zone on the archive/rollup; this concept turns that reservation into an end-to-end read path.**
@@ -42,7 +42,7 @@ This concept specifies the **computation** concern and reaffirms the **display**
 - Calendar quirks beyond time zones (fiscal years, custom shift calendars).
 - Per-user timezone preferences in the UI — a separate concern.
 - Backfilling timezone metadata onto historical rows.
-- New aggregation functions or new downsampling SQL — tracked in the backlog already produces exactly `limit` bins.
+- New aggregation functions or new downsampling SQL — the simple-downsampling concept ([concept-simple-downsampling.md](concept-simple-downsampling.md)) already produces exactly `limit` bins.
 
 ---
 
@@ -76,7 +76,7 @@ Two independent inputs, both needed:
 1. **Archive/rollup `ReferenceTimeZone`** *(exists, O6)* — a property of the series' **physical location**, provisioned with the archive, defaulting to the tenant zone. It is what makes the **stored** calendar buckets DST-correct, and it is the natural **per-series** zone for mixed-timezone comparison (§5).
 2. **Query time zone** *(new)* — an IANA name supplied **on the query**, used to (a) resolve relative ranges to a UTC window and (b) pick/align the calendar rung for a **query-wide** comparison.
 
-**Decision (T1): combination — query zone drives resolution; archive zone is the per-series default.** The caller always supplies a query zone (explicit input, never inferred from the server clock). Per-row inference from the metering point / operating facility is realised **through the archive's `ReferenceTimeZone`** (already provisioned per physical location) and selected by the comparison policy in §5 — no new per-row lookup path. voest M1 is single-zone (`Europe/Vienna`) but the query zone is an explicit input from day one, so cross-site (Portugal) works without a redesign.
+**Decision (T1): combination — query zone drives resolution; archive zone is the per-series default.** The caller always supplies a query zone (explicit input, never inferred from the server clock). Per-row inference from the metering point / operating facility is realised **through the archive's `ReferenceTimeZone`** (already provisioned per physical location) and selected by the comparison policy in §5 — no new per-row lookup path. the first customer use case is single-zone (`Europe/Vienna`) but the query zone is an explicit input from day one, so cross-site (Portugal) works without a redesign.
 
 ## §5 Design decision #2 — comparison across time zones (policy)
 
@@ -123,9 +123,9 @@ How is a civil-day query assembled from pre-bucketed rollups **without re-readin
 
 ## §8 Composition with related work (unchanged)
 
-- tracked in the backlog (recompute):** recompute already enumerates buckets via `BucketBoundary` with the archive zone (`CrateDbArchiveRecomputeExecutor.cs:106`). Timezone semantics are a read-path concern and do **not** touch the recompute model.
-- tracked in the backlog (multi-aggregations):** the zone aligns buckets; it is orthogonal to *how many* aggregations a bucket carries. No interaction.
-- tracked in the backlog (computed columns):** a timestamp-derived computed column evaluates per row over UTC storage; civil-time bucketing happens above it. Compatible.
+- **Recompute:** recompute already enumerates buckets via `BucketBoundary` with the archive zone (`CrateDbArchiveRecomputeExecutor.cs:106`). Timezone semantics are a read-path concern and do **not** touch the recompute model.
+- **Multi-aggregations:** the zone aligns buckets; it is orthogonal to *how many* aggregations a bucket carries. No interaction.
+- **Computed columns:** a timestamp-derived computed column evaluates per row over UTC storage; civil-time bucketing happens above it. Compatible.
 
 ---
 

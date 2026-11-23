@@ -33,7 +33,7 @@ This concept specifies layer B and formalises how it composes with layer A.
 
 - Defining new aggregation functions (the canonical five from `concept-rollup-archives.md` are sufficient).
 - Cross-archive N:M merging into one virtual series (a metering point's registers stay separate series).
-- Changing the downsampling SQL itself — tracked in the backlog already produces exactly `limit` bins via `generate_series` + `DATE_BIN`.
+- Changing the downsampling SQL itself — the downsampling concept ([concept-simple-downsampling.md](concept-simple-downsampling.md)) already produces exactly `limit` bins via `generate_series` + `DATE_BIN`.
 - Building rollups automatically. Which rungs exist is a provisioning/blueprint decision; this concept only *selects among existing rungs* and degrades gracefully when a rung is absent.
 
 ---
@@ -62,7 +62,7 @@ Scoping mechanism (already shipped):
 
 ### §3.2 The point-count primitive exists
 
-`query_stream_data_downsampling` / `QueryMode = DOWNSAMPLING` takes `from`, `to`, `limit`; the server computes `bucketSize = (to - from) / limit` and returns exactly `limit` bins (empty bins → `NULL`). The bin machine (`Runtime.Engine.CrateDb/QueryBuilder/CrateQueryCompiler.cs`, `CompileDownsamplingQuery`) uses `generate_series` + `DATE_BIN` and groups by `bins.ts` (per tracked in the backlog D4: additionally by source `rtId`). **So "~600 points" is already solvable on any single archive** — the open question is only *which* archive.
+`query_stream_data_downsampling` / `QueryMode = DOWNSAMPLING` takes `from`, `to`, `limit`; the server computes `bucketSize = (to - from) / limit` and returns exactly `limit` bins (empty bins → `NULL`). The bin machine (`Runtime.Engine.CrateDb/QueryBuilder/CrateQueryCompiler.cs`, `CompileDownsamplingQuery`) uses `generate_series` + `DATE_BIN` and groups by `bins.ts` (per the downsampling concept D4: additionally by source `rtId`). **So "~600 points" is already solvable on any single archive** — the open question is only *which* archive.
 
 ### §3.3 What is missing
 

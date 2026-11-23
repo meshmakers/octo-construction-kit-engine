@@ -5,7 +5,7 @@ background: true
 
 # Concept: Multi-Source Rollup Archives, Validity Spans and Archive Coverage
 
-**Work item: tracked in the backlog · **CK model:** `System.StreamData` 1.8.0 (non-breaking, no migration)
+**Work item:** tracked in the backlog · **CK model:** `System.StreamData` 1.8.0 (non-breaking, no migration)
 
 A rollup archive used to aggregate from exactly **one** source archive. Since
 `System.StreamData` 1.8.0 it declares a **list of time-disjoint sources**, each with an optional

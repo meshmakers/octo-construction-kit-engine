@@ -196,7 +196,7 @@ of another computed column. mXparser binds each referenced name as an `Argument`
 > column backfilled NULL for every historical row and an on-change source that sends one of two
 > attributes produced NULL rows. NaN propagates (an unhandled NULL in arithmetic → `NULL`);
 > `coalesce(x, default)` and `isnull(x)` handle it explicitly. Standard columns (`timestamp`, `rtid`, …) are **not** bound today — a
-> timestamp-derived computed column (#4190) would add `timestamp` to the argument set later.
+> timestamp-derived computed column would add `timestamp` to the argument set later.
 >
 > **Logical names at create time — implemented.** A formula may be written in the archive's
 > logical column vocabulary — the CK attribute paths the Studio lists, e.g. `Amount.Value` — and is
@@ -678,7 +678,7 @@ changed / removed a computed column, with the formula text.
 | tracked in the backlog (first) | Provides backfill orchestration, atomic swap, recompute triggers, observability. The active-archive ACs block on it. The CK-model + ingest-time evaluation + validation + the shared evaluator refactor (§3–§7, §9) can be implemented in parallel / ahead. |
 | tracked in the backlog | Multi-aggregate composes trivially — a computed source column is just another aggregatable column. |
 | tracked in the backlog | Timestamp-derived columns: `now` / `startOfDay` already cover the time-function need; compatibility noted. |
-| tracked in the backlog | VOEST App must tolerate active-archive backfills without hard errors — same optimistic contract. |
+| tracked in the backlog | The customer app must tolerate active-archive backfills without hard errors — same optimistic contract. |
 
 ## §18 Open items to confirm during implementation
 

@@ -1,6 +1,6 @@
 ---
 description: Everything a new CK field has to touch across the contracts, engine, serialization and persistence.
-applies_to: src/ConstructionKit.Contracts/**, src/ConstructionKit.Engine/Serialization/**, src/ConstructionKit.Engine/Resolvers/**
+applies_to: src/ConstructionKit.Contracts/**, src/ConstructionKit.SourceGeneration/**, src/ConstructionKit.Engine/Resolvers/**, src/ConstructionKit.Engine/Seri*/**
 ---
 
 # Touch-point checklist for every new CK field

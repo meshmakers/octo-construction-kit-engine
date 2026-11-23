@@ -1,5 +1,6 @@
 using FakeItEasy;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.DataPermissions;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
@@ -50,6 +51,26 @@ public abstract class HiddenOrMissingWriteFixture
             new RtDataPolicyRule("p5", new HashSet<string> { RequiredType }, [RtDataAction.Write, RtDataAction.Delete],
                 true, false, new HashSet<string> { OwnedWriter })
         ]);
+
+    protected void RegisterByCkId(CkTypeGraph typeGraph)
+    {
+        var typeGraphOut = (CkTypeGraph?)typeGraph;
+        A.CallTo(() => Model.Cache.TryGetCkType(SecretTestModel.TenantId,
+                A<CkId<CkTypeId>>.That.Matches(id => id.FullName == typeGraph.CkTypeId.FullName), out typeGraphOut))
+            .Returns(true).AssignsOutAndRefParameters(typeGraph);
+    }
+
+    protected void RegisterGraph(CkTypeGraph typeGraph)
+    {
+        var rtCkTypeId = typeGraph.CkTypeId.ToRtCkId();
+        var typeGraphOut = (CkTypeGraph?)typeGraph;
+        A.CallTo(() => Model.Cache.GetRtCkType(SecretTestModel.TenantId,
+            A<RtCkId<CkTypeId>>.That.Matches(id => id.FullName == rtCkTypeId.FullName))).Returns(typeGraph);
+        A.CallTo(() => Model.Cache.TryGetRtCkType(SecretTestModel.TenantId,
+                A<RtCkId<CkTypeId>>.That.Matches(id => id.FullName == rtCkTypeId.FullName), out typeGraphOut))
+            .Returns(true).AssignsOutAndRefParameters(typeGraph);
+        RegisterByCkId(typeGraph);
+    }
 
     private protected HiddenOrMissingTestRepository Repository(RtDataPolicyTable policyTable) =>
         HiddenOrMissingTestRepository.Create(Model, Collection, policyTable);

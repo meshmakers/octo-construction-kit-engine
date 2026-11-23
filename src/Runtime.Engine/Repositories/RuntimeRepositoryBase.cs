@@ -482,8 +482,10 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     // For delete-by-id with an abstract CK type, find the concrete CkTypeId of the entity at this
     // RtId. The validator rejects abstract types on insert/update/replace (correct: a concrete
     // subtype is required), but for delete the RtId is enough to identify the concrete entity.
-    // Returns null when the entity does not exist; the caller answers not found, as for a concrete
-    // type and as for a record the caller may not see.
+    // Returns null when the entity does not exist or is stored as a type outside the addressed subtree;
+    // the caller answers not found, as for a concrete type and as for a record the caller may not see.
+    // The type write restriction is judged on the addressed type and its subtree before any read, so a
+    // refused caller gets the same answer for an existing and a missing rtId.
     //
     // The probe order is backend-aware:
     //   1. Try the abstract base's collection first. In storage backends that share a single
@@ -501,11 +503,18 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             return ckTypeId;
         }
 
+        await ThrowIfTypeWriteRestrictedAsync(session,
+                [new TypeWriteTarget(ckTypeId, rtId, TypeWriteAccessGuard.OperationDelete, ExactType: false)])
+            .ConfigureAwait(false);
+
+        var acceptedStoredTypeNames = StoredTypeMatch.AcceptedStoredTypeNames(ckTypeGraph);
         var abstractCollection = RepositoryDataSource.GetRtCollection<RtEntity>(ckTypeGraph);
         var existing = await abstractCollection.DocumentAsync(session, rtId).ConfigureAwait(false);
         if (existing?.CkTypeId != null)
         {
-            return existing.CkTypeId;
+            var isInAddressedSubtree =
+                acceptedStoredTypeNames.Contains(existing.CkTypeId.SemanticVersionedFullName);
+            return isInAddressedSubtree ? existing.CkTypeId : null;
         }
 
         foreach (var derivedTypeId in ckTypeGraph.GetAllDerivedTypes(false))
@@ -521,7 +530,10 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             var match = await derivedCollection.DocumentAsync(session, rtId).ConfigureAwait(false);
             if (match != null)
             {
-                return match.CkTypeId ?? derivedRtCkId;
+                var storedCkTypeId = match.CkTypeId ?? derivedRtCkId;
+                var isInAddressedSubtree =
+                    acceptedStoredTypeNames.Contains(storedCkTypeId.SemanticVersionedFullName);
+                return isInAddressedSubtree ? storedCkTypeId : null;
             }
         }
 

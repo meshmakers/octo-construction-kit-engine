@@ -36,11 +36,15 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
     `RuntimeRepositoryException` for this case must catch the not-found exception;
   - `DeleteOneRtEntityByRtIdAsync` with an abstract CK type and an rtId that does not exist answers "entity not
     found" instead of returning silently, like the same call with a concrete type; a record the caller may not see
-    answers the same way, under the addressed abstract type and never under the concrete type it is stored as.
+    answers the same way, under the addressed abstract type and never under the concrete type it is stored as. A record
+    stored as a type outside the addressed subtree answers not found and is not deleted, and a caller the type write
+    restriction refuses for the addressed type or one of its derived types is refused before any read, for an existing
+    and a missing rtId alike.
 
   Cost: a valid change set pays no extra read, unless the addressed CK type shares its MongoDB collection with types
   outside its own subtree (then one read per such type before validation); a change set with validation errors pays
-  one read per CK type for the targets the data-permission guard has not already read.
+  one read per CK type for the targets the data-permission guard has not already read, and the targets of such a
+  shared-collection type are read a second time then.
 - **A catalog server that never answers no longer hangs the CK build (AB#9388).** A GitHub Pages connection that was
   accepted but never sent response headers kept a CK compile at "Refreshing construction kit model library cache" for
   20 minutes and more: every catalog request waited 3 x 100 s (HttpClient's default timeout, two retries), the refresh

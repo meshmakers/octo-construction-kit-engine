@@ -266,15 +266,16 @@ internal static class DataPermissionWriteGuard
         }
 
         var insertedInThisChange = entityUpdateInfoList
-            .Where(i => i.ModOption == EntityModOptions.Insert)
+            .Where(updateInfo => updateInfo.ModOption == EntityModOptions.Insert)
             // The CreateInsert(ckTypeId, entity) overload leaves RtId empty; the id is the entity's own.
-            .Select(i => (RtId: i.RtId ?? i.RtEntity?.RtId, i.CkTypeId))
-            .Where(i => i.RtId != null)
-            .Select(i => new RtEntityId(i.CkTypeId, i.RtId!.Value))
+            .Select(updateInfo => (RtId: updateInfo.RtId ?? updateInfo.RtEntity?.RtId, updateInfo.CkTypeId))
+            .Where(insertedEntity => insertedEntity.RtId != null)
+            .Select(insertedEntity => new RtEntityId(insertedEntity.CkTypeId, insertedEntity.RtId!.Value))
             .ToHashSet();
         targets.AddRange(associationUpdateInfoList
-            .Where(a => !insertedInThisChange.Contains(a.Origin))
-            .Select(a => new NotVisibleChange(a.Origin.CkTypeId, a.Origin.RtId, RtDataAction.Write)));
+            .Where(association => !insertedInThisChange.Contains(association.Origin))
+            .Select(association =>
+                new NotVisibleChange(association.Origin.CkTypeId, association.Origin.RtId, RtDataAction.Write)));
         return targets;
     }
 

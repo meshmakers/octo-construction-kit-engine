@@ -362,6 +362,32 @@ public class BasicTests(CacheServiceFixture fixture) : IClassFixture<CacheServic
     }
 
     [Fact]
+    public async Task DeleteOneRtEntityByRtIdAsync_AbstractTypeOfASiblingRecord_AnswersNotFoundAndKeepsTheRecord()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtSerializer = fixture.GetRtRepositorySerializer();
+        var bulkRtMutation = fixture.GetBulkRtMutation();
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath,
+            ckCacheService,
+            new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
+            bulkRtMutation);
+
+        var rtOcean = await localDirectoryRepository.CreateTransientRtEntityAsync<RtOcean>();
+        rtOcean.Designation = "Ocean_NotDeletableAsLocationWithSensor";
+        await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), rtOcean);
+
+        var exception = await Assert.ThrowsAsync<RuntimeRepositoryException>(() =>
+            localDirectoryRepository.DeleteOneRtEntityByRtIdAsync(new LocalSession(),
+                (RtCkId<CkTypeId>)"Test/LocationWithSensor", rtOcean.RtId,
+                new DeleteOptions { Strategy = DeleteStrategies.Erase }));
+
+        Assert.Contains(rtOcean.RtId.ToString(), exception.Message);
+        var retrieved =
+            await localDirectoryRepository.GetRtEntityByRtIdAsync<RtOcean>(new LocalSession(), rtOcean.RtId);
+        Assert.NotNull(retrieved);
+    }
+
+    [Fact]
     public async Task DeleteOneRtEntityByRtIdAsync_ConcreteTypeNonexistentRtId_AnswersNotFound()
     {
         var ckCacheService = await fixture.GetCacheServiceAsync();

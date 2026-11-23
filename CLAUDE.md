@@ -2088,8 +2088,10 @@ the classification):
   know is left to the rule validation. Visible records keep their validation errors. `DeleteOneRtEntityByRtIdAsync`
   with an abstract type answers a missing rtId through the same hook (it no longer returns silently), so a delete by
   base type of a hidden and of a missing record answer alike; both are refused under the addressed (abstract) type,
-  never under the concrete type of the stored record. Tests: `HiddenEqualsMissingWriteTests`,
-  `MissingBeforeValidationWriteTests`, `HiddenOrMissingAddressingTests` (real funnel, real `EntityRuleEngine`,
+  never under the concrete type of the stored record. A record stored outside the addressed subtree counts as missing
+  (`StoredTypeMatch.AcceptedStoredTypeNames`), and the type write restriction is judged on the addressed type and its
+  derived types before the record is read. Tests: `HiddenEqualsMissingWriteTests`,
+  `MissingBeforeValidationWriteTests`, `HiddenOrMissingAddressingTests`, `HiddenOrMissingAbstractDeleteTests` (real funnel, real `EntityRuleEngine`,
   in-memory collection).
 - Tests: `RtDataPermissionEvaluatorTests` (matrix, agreement with the guard) in `Runtime.Engine.Tests`; the
   differential test against the real repository is `DataPermissionEvaluatorDifferentialTests` in

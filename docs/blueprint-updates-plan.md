@@ -1,3 +1,8 @@
+---
+description: Superseded first plan of the blueprint update feature (German); kept as history, see blueprints-concept-v2 and blueprints.
+background: true
+---
+
 # Blueprint Update Feature - Implementation Plan
 
 > **Status (2026-05-14): abgelöst durch `blueprints-concept-v2.md`.**

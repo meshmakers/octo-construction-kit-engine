@@ -1,3 +1,8 @@
+---
+description: Concept draft: timezone-aware rollup queries across mixed-timezone metering points (reference, design record).
+background: true
+---
+
 # Concept: Timezone-Aware Rollup Queries (Civil-Time Ranges Across Mixed-Timezone Metering Points)
 
 **Status:** Draft / analysis. Design decisions resolved (§9); write-path primitives already shipped, read-path unimplemented (§3).

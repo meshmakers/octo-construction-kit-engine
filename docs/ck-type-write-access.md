@@ -1,3 +1,8 @@
+---
+description: Type write restriction (writeAccess): who may write entities of a CK type and where the engine enforces it.
+applies_to: src/ConstructionKit.Contracts/DataTransferObjects/CkTypeWriteAccessDto.cs, src/Runtime.Engine/Security/**
+---
+
 # Type write restriction (`writeAccess`, AB#8574)
 
 A CK type can restrict **who may write** its runtime entities: create, update, replace, delete, and change

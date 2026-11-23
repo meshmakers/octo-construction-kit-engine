@@ -1,3 +1,8 @@
+---
+description: CK model migrations: YAML format, actions, ordering and the difference to blueprint migrations.
+applies_to: src/Runtime.Engine/CkModelMigrations/**, src/Runtime.Contracts/CkModelMigrations/**
+---
+
 # CK Model Migrations
 
 CK Model Migrations enable automatic updates to runtime entities when the Construction Kit model changes. Unlike Blueprint migrations (which migrate tenant data), CK Model Migrations adapt the structure of entities themselves.

@@ -1,3 +1,8 @@
+---
+description: Write-up and evidence of the proof that two additive System releases need no dependent bumps; how to rerun it.
+background: true
+---
+
 # Proof: two additive System releases need zero dependent bumps (AB#6676, Epic AB#5584 F2.4)
 
 Claim of Feature AB#5686 / Phase 2 exit: after two consecutive additive System releases the installed dependents are **not** `ResolveFailed`,

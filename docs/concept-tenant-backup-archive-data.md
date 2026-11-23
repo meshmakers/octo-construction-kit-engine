@@ -1,3 +1,8 @@
+---
+description: Concept of tenant backup and restore with optional archive data (reference, design record).
+background: true
+---
+
 # Concept: Tenant Backup/Restore — optional archive data
 
 > Work item: **AB#4231** (parent epic **AB#3364** "Stream data version 2").

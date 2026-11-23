@@ -1,3 +1,8 @@
+---
+description: Frontend handover of the SECRET attribute value type: admin API field names (reference).
+background: true
+---
+
 # SECRET attribute value type — frontend handover (AB#5542, AB#5544)
 
 > From: PO AB#5528 (SECRET value type) · To: Studio / frontend-libraries PO via Chief Product Owner

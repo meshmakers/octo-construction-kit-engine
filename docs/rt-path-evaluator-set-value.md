@@ -1,3 +1,8 @@
+---
+description: RtPathEvaluator.SetValue: what a null value, a missing record and a required enum do.
+applies_to: src/Runtime.Contracts/RtPathEvaluator.cs, src/Runtime.Contracts/RtPathNullHandling.cs
+---
+
 # `RtPathEvaluator.SetValue`: values, explicit null and missing
 
 `RtPathEvaluator.SetValue` writes a value into an entity or record along an attribute path

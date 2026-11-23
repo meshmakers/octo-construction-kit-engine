@@ -1,3 +1,8 @@
+---
+description: Concept of resolution-aware series queries and archive auto-selection (reference, design record).
+background: true
+---
+
 # Concept: Resolution-Aware Series Queries (Archive Auto-Selection)
 
 **Status:** Implemented — `SeriesResolutionService` + GraphQL `streamData.resolveSeriesQuery` + MCP `resolve_series_query` (AB#4290), cascade function matching (AB#4336); the §6 decisions are in effect.

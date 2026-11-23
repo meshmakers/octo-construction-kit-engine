@@ -1,3 +1,8 @@
+---
+description: Concept of multi-source rollup archives, validity spans and archive coverage (reference, design record).
+background: true
+---
+
 # Concept: Multi-Source Rollup Archives, Validity Spans and Archive Coverage
 
 **Work item:** AB#5157 · **CK model:** `System.StreamData` 1.8.0 (non-breaking, no migration)

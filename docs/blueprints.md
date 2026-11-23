@@ -1,3 +1,8 @@
+---
+description: Blueprint user documentation: properties, seed data, variables, dependencies, updates, archives and rollups, tenant-owned data.
+applies_to: src/Runtime.Engine/Blueprints/**, src/Runtime.Contracts/Blueprints/**, src/BlueprintManager/**, src/ConstructionKit.Engine/BlueprintCatalogs/**
+---
+
 # Blueprints
 
 Blueprints are versioned, declarative bundles of Construction Kit models and runtime seed data that bootstrap a tenant — and continue to manage it. They are not a one-shot bootstrap mechanism: a blueprint can be updated, rolled back, uninstalled, depend on other blueprints, and ship migration scripts that transform tenant data when its own version moves forward.

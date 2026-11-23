@@ -1,3 +1,8 @@
+---
+description: What happens to an archive when a CK model change makes a column reach a Hidden attribute, and how an operator recovers it.
+applies_to: src/Runtime.Contracts/StreamData/**, src/StreamDataCkModel/**
+---
+
 # Archives and Hidden attributes (AB#6247)
 
 CK v2 attributes with `access: Hidden` are never readable outside a method. Stream-data storage (CrateDB) does not

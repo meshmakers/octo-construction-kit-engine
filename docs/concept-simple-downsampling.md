@@ -1,3 +1,8 @@
+---
+description: Concept of downsampling for simple, non-aggregating stream-data queries (reference, design record).
+background: true
+---
+
 # Concept: Downsampling for Simple (non-aggregating) Stream-Data Queries
 
 **Work item:** AB#4233 (Stream data v2 / epic AB#3364) — covers both backend and frontend.

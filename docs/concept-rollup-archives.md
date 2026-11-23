@@ -1,3 +1,8 @@
+---
+description: Concept of rollup archives: derived archives with time-bucketed aggregations (reference, design record).
+background: true
+---
+
 # Concept: Rollup Archives (Folgearchive)
 
 ## §1 Overview

@@ -1,3 +1,8 @@
+---
+description: Implementation progress log of the SECRET value type rollout (history, reference).
+background: true
+---
+
 # SECRET attribute value type — implementation progress
 
 > Epic AB#5528 · concept: [concept-secret-attribute-type.md](concept-secret-attribute-type.md) · frontend handover: [secret-frontend-handover.md](secret-frontend-handover.md) · app/adapter model changes: [secret-app-model-changes.md](secret-app-model-changes.md)

@@ -1,3 +1,8 @@
+---
+description: Concept of Pascal case validation in the Construction Kit compiler (reference, design record).
+background: true
+---
+
 # Concept: Pascal Case Validation for Construction Kit Compiler
 
 ## Overview

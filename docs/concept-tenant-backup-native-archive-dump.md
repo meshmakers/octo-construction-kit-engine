@@ -1,3 +1,8 @@
+---
+description: Concept of tenant backup of archive data through COPY TO and COPY FROM (reference, design record).
+background: true
+---
+
 # Concept: Tenant Backup/Restore — archive data through COPY TO and COPY FROM
 
 > Work item: **AB#5490** (Feature **AB#5967**, Epic **AB#3364**).

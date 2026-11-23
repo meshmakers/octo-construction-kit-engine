@@ -1,3 +1,8 @@
+---
+description: CK engine version contract: minEngineVersion of a compiled model and compiler message 126.
+applies_to: src/ConstructionKit.Engine/Versioning/**
+---
+
 # CK engine version contract (`minEngineVersion`, message 126)
 
 AB#6390 (Feature AB#5686, Epic AB#5584). Source: `src/ConstructionKit.Engine/Versioning/CkEngineVersion.cs`.

@@ -1,3 +1,8 @@
+---
+description: Analyzer OM1005: why run-time code must not use generated versioned CK ids, and the version-less alternative.
+applies_to: src/ConstructionKit.Analyzers/**
+---
+
 # Versioned generated CK ids at run time: analyzer OM1005 (AB#6673)
 
 Run-time code must not look up CK elements by a generated **versioned** id (`SystemCkIds.CkEntityTypeId`,

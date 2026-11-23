@@ -1,3 +1,8 @@
+---
+description: Concept of time-range-based stream-data archives, with the phase list of what shipped (reference, design record).
+background: true
+---
+
 # Concept: Time-Range-Based Stream Data Archives
 
 Status: **Implemented** — phases 1-10 of §12 have shipped and are in productive use;

@@ -1,3 +1,8 @@
+---
+description: Push and PR plan of wave 1 of the SECRET rollout across repositories (history, reference).
+background: true
+---
+
 # Wave 1 — push and PR plan (backend)
 
 > Epic AB#5528 (SECRET attribute value type) + key ring (AB#5536) + artifact storage (AB#5559–AB#5565).

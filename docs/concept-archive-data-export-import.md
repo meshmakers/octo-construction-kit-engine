@@ -1,3 +1,8 @@
+---
+description: Concept of archive data export and import in the Studio UI (reference, design record).
+background: true
+---
+
 # Concept: Archive Data Export / Import in Studio UI
 
 > Work item: **AB#4230** (parent epic **AB#3364** "Stream data version 2").

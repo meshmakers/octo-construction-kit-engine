@@ -1,3 +1,8 @@
+---
+description: Concept of durable storage for the dump taken before a secret sweep (reference, design record).
+background: true
+---
+
 # Durable storage for pre-sweep dumps (AB#5539)
 
 Status: concept, 2026-10-06. Scope: where `octo-bot-services` keeps the tenant dump it takes before every

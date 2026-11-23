@@ -1,3 +1,8 @@
+---
+description: Display name rules: how a CK type computes rtDisplayName and rtDisplayDescription on save.
+applies_to: src/ConstructionKit.Contracts/DisplayRules/**, src/Runtime.Contracts/DisplayRules/**
+---
+
 # Display Name Rules (rtDisplayName / rtDisplayDescription)
 
 Epic AB#4808. CK types can declare how a runtime entity's display name and display

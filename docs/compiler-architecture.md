@@ -1,3 +1,8 @@
+---
+description: Architecture of the Construction Kit compiler: pipeline, validation, dependency resolution and output.
+applies_to: src/ConstructionKit.Compiler/**, src/ConstructionKit.Engine/Services/**
+---
+
 # Construction Kit Compiler Architecture
 
 ## Overview

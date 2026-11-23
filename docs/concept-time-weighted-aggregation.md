@@ -1,3 +1,8 @@
+---
+description: Concept of time-weighted aggregation for event-based archives (reference, design record).
+background: true
+---
+
 # Concept: Time-Weighted Aggregation for Event-Based Archives
 
 **Status:** Implemented (see §11). Third increment (AB#4336): `StateDuration(comparisonValue)`

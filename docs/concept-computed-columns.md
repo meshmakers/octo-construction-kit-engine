@@ -1,3 +1,8 @@
+---
+description: Concept draft: computed columns via formula for raw and time-range archives (reference, design record).
+background: true
+---
+
 # Concept: Computed Columns via Formula (Raw & Time-Range Archives)
 
 Status: **Draft** — concept agreed in chat on 2026-06-28, implementation pending.

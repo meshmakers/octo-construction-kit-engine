@@ -1,3 +1,8 @@
+---
+description: Changes that apps and adapter models need for the SECRET value type (handover note, reference).
+background: true
+---
+
 # SECRET value type: required changes in app and adapter models (WP11, AB#5541)
 
 > From: PO AB#5528 (SECRET value type). To: the owners of meshmakers-app, energy-community,

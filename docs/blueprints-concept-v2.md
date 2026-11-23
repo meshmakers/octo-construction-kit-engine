@@ -1,3 +1,8 @@
+---
+description: Blueprint concept v2 (German): decisions of 2026-05-14 on tracking, history, multi-blueprint and conflict detection.
+background: true
+---
+
 # Blueprints — Konzept v2
 
 Dieses Dokument konsolidiert und aktualisiert den ursprünglichen Plan

@@ -1,3 +1,8 @@
+---
+description: Decision record on the rollup threshold-reset policy, manual versus automatic (reference).
+background: true
+---
+
 # Concept: Rollup Threshold-Reset Policy (manual vs. automatic)
 
 Status: **Decision recorded** — 2026-07-14. Work item: **AB#4196**

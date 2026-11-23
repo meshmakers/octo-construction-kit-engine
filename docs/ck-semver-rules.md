@@ -1,3 +1,8 @@
+---
+description: SemVer rules of a CK model version and the octo-ckc ValidateVersion gate: change classification, baselines, cascade, acknowledgements.
+applies_to: src/ConstructionKit.Engine/SemVer/**
+---
+
 # Construction Kit SemVer Rules and Version Validation
 
 The version of a Construction Kit model lives in the `modelId` suffix of `ckModel.yaml`

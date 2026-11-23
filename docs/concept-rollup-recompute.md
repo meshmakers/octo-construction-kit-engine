@@ -1,3 +1,8 @@
+---
+description: Concept draft: recompute of rollup archives, stable and optimistic (reference, design record).
+background: true
+---
+
 # Concept: Recompute Rollup Archives (stable, optimistic)
 
 Status: **Draft** — concept agreed in chat on 2026-06-28, implementation pending.

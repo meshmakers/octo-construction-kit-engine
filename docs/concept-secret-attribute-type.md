@@ -1,3 +1,8 @@
+---
+description: Concept of the SECRET attribute value type: storage, key ring, API and sweep decisions (reference, design record).
+background: true
+---
+
 # SECRET attribute value type — concept
 
 > Status: Approved for implementation · 2026-10-05, amended 2026-10-06 (§2.1) · Owner: Gerald Lochner

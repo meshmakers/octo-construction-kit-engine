@@ -8,7 +8,7 @@ background: true
 > Work item: tracked in the backlog
 > Predecessors: tracked in the backlog (archive data export/import), tracked in the backlog (tenant backup with archive
 > data, `concept-tenant-backup-archive-data.md`), tracked in the backlog (export reads time slices).
-> Status: **Concept complete; local implementation under way** (tracked in the backlog, step 1 of §12; the
+> Status: **Concept complete** (tracked in the backlog, step 1 of §12; the
 > engine contract of slice tracked in the backlog is in §11). Decisions are in §3 and §12; §12 also lists what is
 > still to be checked.
 
@@ -102,7 +102,7 @@ one); letting the bot fetch files from the CrateDB pods (needs exec rights on th
 (read from `information_schema.columns` at dump time), the slices with their time range, the row
 count counted before the copy and the count `COPY TO` reported; at the top level the CrateDB
 version of the source cluster and the platform version. The schema block of format 1
-(`ArchiveSchemaDto`) stays, so the schema match §6 works unchanged.
+(`ArchiveSchemaDto`) stays, so the schema match (§6 of [concept-tenant-backup-archive-data.md](concept-tenant-backup-archive-data.md)) works unchanged.
 
 Entries under `archives/` are stored without compression (they are gzip files). Building the
 container is a byte copy from the staging area, and a restore hands each entry to the staging area

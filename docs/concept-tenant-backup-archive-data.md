@@ -6,7 +6,7 @@ background: true
 # Concept: Tenant Backup/Restore — optional archive data
 
 > Work item: tracked in the backlog
-> Predecessor: tracked in the backlog (archive data export/import) — this feature **reuses** its mechanism
+> Predecessor: [concept-archive-data-export-import.md](concept-archive-data-export-import.md) (archive data export/import) — this feature **reuses** its mechanism
 > (`IStreamDataRepository.ExportRowsAsync` / `ImportRowsAsync`, the NDJSON format, the §6 schema
 > match). Read `concept-archive-data-export-import.md` first.
 > Status: **Refinement / design**. Decisions in §2 were taken at refinement on 2026-06-25.

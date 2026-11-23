@@ -114,8 +114,6 @@ Tests: `SystemInterfacesTests` (Compiler.Tests: members, per-type table, no inde
 
 ## System.StreamData on ckLanguage 2
 
-## System.StreamData on ckLanguage 2
-
 `src/StreamDataCkModel` is **System.StreamData-1.30.0** (archive lifecycle methods 1.24.0, rollup control 1.25.0, late-delivery sets 1.26.0, Hidden-column failures 1.27.0, column methods 1.28.0, confirmed redaction 1.29.0, asynchronous recompute and backfill 1.30.0, below); 1.23.0 was the first ckLanguage 2 release of the model and a **Minor** against
 the ckLanguage 1 release 1.22.0 (`ValidateVersion`: only "ckLanguage changed '1' → '2'"). The rules of the System migration above apply:
 

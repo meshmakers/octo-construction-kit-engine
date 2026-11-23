@@ -77,7 +77,7 @@ version).
    *lower* major: `4.0.0` is still diffed against the newest `3.x`, so the migration check (`OCTO-CK104`) and the
    changelog keep working. A major allows any change; when the changes only need a minor or patch bump, the report
    notes a "valid major bump without structural need". Only a model without any version is a first publication.
-3. **Never the model under test (symptom 2).** Entries of the `LocalFileSystemCatalog` at or above the
+3. **Never the model under test.** Entries of the `LocalFileSystemCatalog` at or above the
    declared version are never the baseline: they come from
    earlier local builds, not from a publish. They are listed as ignored in the report. A local entry *below* the
    declared version can be the baseline (marked "local build, not a publish"). A published (remote) entry equal to the
@@ -97,7 +97,7 @@ version).
    discovers the other spellings of the name in each catalog (`GetSpellingsAsync`, one listing per catalog) and queries
    every spelling; the highest hit wins and keeps the spelling it was published under (`System.Bot-3.1.0`). This is the one
    place that does it, so `ValidateVersion`, the compile gate and the publish gate behave alike. A case-only variant is never
-   treated as a first publication. (`ValidateCatalog`, reports such pairs.)
+   treated as a first publication. (`ValidateCatalog` reports such pairs.)
 
 When a catalog source is unreachable and no same-major baseline was found, the resolver does not fall back to a
 lower major: the result is `OCTO-CK102`, as before.

@@ -35,7 +35,7 @@ What already exists and is reused: `InstanceSecretCrypto` (octo-sdk, AES-256-GCM
 | 8 | Scope | Identity-provider `ClientSecret`s are **in scope**; identity Data Protection keys are a **separate work item** |
 | 9 | Blueprint seeds | Seeds contain **no secret values**; secrets are set after installation (Studio, CLI, rotate endpoints). A lint enforces it. Amended 2026-10-06 (§2.1 item 1): only empty or omitted values — placeholders are values and fail the lint |
 | 10 | Deadlines | Strict mode per environment **14 days** after the sweep reports zero plaintext; pre-sweep plaintext backups kept **7 days**, treated as secrets, then deleted |
-| 11 | ~~tracked in the backlog public repository~~ | ~~Rotate and replace, no history rewrite~~ — void: tracked in the backlog was a false alarm and is closed (2026-10-06) |
+| 11 | ~~Report about a public repository~~ | ~~Rotate and replace, no history rewrite~~ — void: the report was a false alarm and is closed (2026-10-06) |
 | 12 | Older clients | **Minimum version plus gate**: models using SECRET require `System >= 2.5`, so old engines fail with a clear dependency error |
 
 ### 2.1 Decisions 2026-10-06 (product owner, round 2)

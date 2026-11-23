@@ -37,8 +37,8 @@ the previous state intact.
 | # | Decision | Consequence |
 |---|----------|-------------|
 | D1 | **Stored, evaluated in .NET via mXparser at ingest.** Reuse the existing `Runtime.Engine.MongoDb.Formulas` engine. | One formula semantics across the whole platform (adapter `DataPointMapping` and archive computed columns share the identical mXparser dialect). The computed value is a real, typed CrateDB column → natively aggregatable by rollups and visible to direct SQL consumers (Grafana datasource). Cost: backfill of past rows is a read→compute→write batch in .NET, not a single SQL `UPDATE`. |
-| D2 | **Rollup-internal computed columns are in scope** for tracked in the backlog. | A `RollupArchive` may carry its own computed columns over its aggregated output columns. One mechanism, applied at orchestrator write time. |
-| D3 | is sequenced first.** reuses its backfill orchestration + atomic-swap + observability. | does **not** re-invent the atomic swap. The CK-model + ingest-time evaluation + validation (§3–§7) can land independently; the *active-archive backfill* acceptance criteria block on tracked in the backlog. |
+| D2 | **Rollup-internal computed columns are in scope** for this concept. | A `RollupArchive` may carry its own computed columns over its aggregated output columns. One mechanism, applied at orchestrator write time. |
+| D3 | **The rollup recompute is sequenced first.** Computed columns reuse its backfill orchestration + atomic-swap + observability. | Computed columns do **not** re-invent the atomic swap. The CK-model + ingest-time evaluation + validation (§3–§7) can land independently; the *active-archive backfill* acceptance criteria block on the rollup recompute work. |
 
 ### Goals
 
@@ -293,7 +293,7 @@ GraphQL layer) can evaluate / validate formulas without a direct mXparser depend
   (duplication removed). `AddFormulaEngine()` is invoked from `AddMongoDbRuntimeRepository()`, so every
   host that wires the runtime engine gets `IFormulaEngine` registered.
 
-## §8 Active-archive lifecycle & backfill (Phase 7 — reuses tracked in the backlog orchestration, **not** its row-generation pointer)
+## §8 Active-archive lifecycle & backfill (Phase 7 — reuses the rollup-recompute orchestration, **not** its row-generation pointer)
 
 > **Status: implemented (Phase 7, 2026-06-29).** Add / remove / formula-change land across engine
 > (`ArchiveLifecycleService` orchestration + `IArchiveRuntimeStore` / `IStreamDataRepository`
@@ -394,7 +394,7 @@ logical→physical name pointer atomically on completion.
 ### §8.3a Backfill as a background job
 
 > **Status: implemented 2026-11-01.** Until then the add and the formula change ran the backfill
-> **inside** the GraphQL / REST request. On test-2 (energyiq, archives with ~750k–950k rows) the
+> **inside** the GraphQL / REST request. On test-2 (a customer tenant, archives with ~750k–950k rows) the
 > backfill outlived the client timeout and the CrateDB driver's 30 s default command timeout; CrateDB
 > killed the statements (`XX000: Job killed. Cancellation request by: octo-system`), the columns ended
 > `Failed`, and four parallel backfills starved the shared asset-repo until its probes failed.
@@ -447,7 +447,7 @@ logical→physical name pointer atomically on completion.
 
 ### §8.3b Bounded memory, no silent NULL, repair
 
-> **Status: implemented 2026-11-06.** On prod-1 energyiq (release 3.5.62) the backfills of
+> **Status: implemented 2026-11-06.** On prod-1 a customer tenant (release 3.5.62) the backfills of
 > `ImportPower`/`ExportPower` (GridConnectionArchive, ~1.79 M rows) and `ChargePower`/`DischargePower`
 > (BatteryStorageArchive, ~2.31 M rows) ran into a `System.OutOfMemoryException` in
 > `ApplyComputedColumns` 40 s after they started; the catch-all stored `NULL` for the row (3 rows of
@@ -675,10 +675,10 @@ changed / removed a computed column, with the formula text.
 
 | Dependency | Relationship |
 |---|---|
-| tracked in the backlog (first) | Provides backfill orchestration, atomic swap, recompute triggers, observability. The active-archive ACs block on it. The CK-model + ingest-time evaluation + validation + the shared evaluator refactor (§3–§7, §9) can be implemented in parallel / ahead. |
-| tracked in the backlog | Multi-aggregate composes trivially — a computed source column is just another aggregatable column. |
-| tracked in the backlog | Timestamp-derived columns: `now` / `startOfDay` already cover the time-function need; compatibility noted. |
-| tracked in the backlog | The customer app must tolerate active-archive backfills without hard errors — same optimistic contract. |
+| Rollup recompute (first) | Provides backfill orchestration, atomic swap, recompute triggers, observability. The active-archive ACs block on it. The CK-model + ingest-time evaluation + validation + the shared evaluator refactor (§3–§7, §9) can be implemented in parallel / ahead. |
+| Multiple aggregations | Multi-aggregate composes trivially — a computed source column is just another aggregatable column. |
+| Timestamp-derived columns | Timestamp-derived columns: `now` / `startOfDay` already cover the time-function need; compatibility noted. |
+| Customer app | The customer app must tolerate active-archive backfills without hard errors — same optimistic contract. |
 
 ## §18 Open items to confirm during implementation
 

@@ -242,7 +242,6 @@ restating `ownership: SeedOwned` markers. They change the compiled file; since t
 gate treats such a restatement under an already published version as a no-op with a WARNING instead of `OCTO-CK205` (System.StreamData was bumped
 to 1.17.1 before that rule existed). Rule: a change of the compiled output that is a real content change (also a flipped ownership other than the
 default restated, `TenantOwned`/`Secret`) needs a version bump before it reaches main; a pure restatement of a default no longer does. The F4
-the F4
 retention attributes (`Archive.RawRetentionMs`, `Archive.MaxRetroactiveReachMs`) carry the
 comment "under review". `SystemCkModel` is not armed yet.
 

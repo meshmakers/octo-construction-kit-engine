@@ -8,7 +8,9 @@ applies_to: src/ConstructionKit.Compiler/**, src/ConstructionKit.Engine/Messages
 ## CK v2: interfaces, attribute access, method definitions, visibility/derivable
 
 Gated by **`ckLanguage: 2`** in `ckModel.yaml` (`CkModelPropertiesDto.CkLanguage`, `null` = 1). A model
-without the key compiles byte-identical to the engine before CK v2 — compiled YAML **and** CK cache JSON
+without the key compiles byte-identical to the engine before CK v2 with range retention off (classic exact pins,
+`CkCompilerOptions.RangeRetention = false`, the configuration of the golden comparison; the default output with range
+retention is described in `docs/ck-versioning.md`) — compiled YAML **and** CK cache JSON
 (`CkV1CompileOutputUnchangedTests` against the frozen golden in
 `tests/ConstructionKit.Compiler.Tests/sampleData/v1Golden`, produced by octo-ckc built from `main` — 6189ef1d,
 re-verified byte-identical against `origin/main` 01fb187 on 2026-10-08; the comparison covers the compiled YAML, the

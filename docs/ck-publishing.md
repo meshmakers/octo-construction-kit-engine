@@ -34,7 +34,7 @@ removed from `construction-kit-libraries-build` and `meshmakers.github.io` on 20
 test-only CK model project must set the same property.
 
 Since `tpl-v1.0.0` of `meshmakers/octo-pipeline-templates` (pinned by the `ref:` of the
-`pipelineTemplates` resource in `azure-pipelines.yml`, `tpl-v1.3.1`) no MSBuild step
+`pipelineTemplates` resource in `azure-pipelines.yml`, `tpl-v1.11.0`) no MSBuild step
 publishes to a shared catalog. `update-build-number.yml` no longer exports `OctoPublishCatalog` /
 `effectivePublishCatalog`. The shared catalogs are published only by
 `templates/steps/validate-and-publish-ck-versions.yml`, which runs **after build and tests**, validates

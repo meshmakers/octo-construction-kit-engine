@@ -360,4 +360,24 @@ public class BasicTests(CacheServiceFixture fixture) : IClassFixture<CacheServic
 
         Assert.Contains(missingRtId.ToString(), exception.Message);
     }
+
+    [Fact]
+    public async Task DeleteOneRtEntityByRtIdAsync_ConcreteTypeNonexistentRtId_AnswersNotFound()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtSerializer = fixture.GetRtRepositorySerializer();
+        var bulkRtMutation = fixture.GetBulkRtMutation();
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath,
+            ckCacheService,
+            new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
+            bulkRtMutation);
+
+        var missingRtId = OctoObjectId.GenerateNewId();
+
+        var exception = await Assert.ThrowsAsync<RuntimeRepositoryException>(() =>
+            localDirectoryRepository.DeleteOneRtEntityByRtIdAsync<RtOcean>(new LocalSession(), missingRtId,
+                new DeleteOptions { Strategy = DeleteStrategies.Erase }));
+
+        Assert.Contains(missingRtId.ToString(), exception.Message);
+    }
 }

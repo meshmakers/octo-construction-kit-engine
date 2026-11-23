@@ -76,7 +76,7 @@ public class HiddenEqualsMissingWriteTests : HiddenOrMissingWriteFixture
         var answer = await AnswerOfAsync(() => ApplyAsync(Repository(PolicyTable()), UserSession(WriterOwnedRead),
             [Change(operation, ownRecord.RtId, false)]), ownRecord.RtId);
 
-        AssertValidationError(answer);
+        AssertValidationError(answer, MandatoryTitleMessageNumberOf(operation));
     }
 
     [Theory]
@@ -94,7 +94,7 @@ public class HiddenEqualsMissingWriteTests : HiddenOrMissingWriteFixture
         var missingAnswer = await AnswerOfAsync(() => ApplyAsync(repository, UserSession(Full),
             [Change(operation, missingRtId, false)]), missingRtId);
 
-        AssertValidationError(existingAnswer);
+        AssertValidationError(existingAnswer, MandatoryTitleMessageNumberOf(operation));
         AssertNotFound(missingAnswer);
     }
 
@@ -109,6 +109,6 @@ public class HiddenEqualsMissingWriteTests : HiddenOrMissingWriteFixture
         var answer = await AnswerOfAsync(() => ApplyAsync(Repository(PolicyTable()), UserSession(role),
             [EntityUpdateInfo<RtEntity>.CreateInsert(Payload(newRtId, false))]), newRtId);
 
-        AssertValidationError(answer);
+        AssertValidationError(answer, MandatoryAttributeMissingMessageNumber);
     }
 }

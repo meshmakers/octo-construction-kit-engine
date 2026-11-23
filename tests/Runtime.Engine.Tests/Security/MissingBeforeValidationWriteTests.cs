@@ -56,7 +56,7 @@ public class MissingBeforeValidationWriteTests : HiddenOrMissingWriteFixture
         var answer = await AnswerOfAsync(() => ApplyAsync(UnguardedRepository(systemSession),
             UnguardedSession(systemSession), [Change(operation, storedRecord.RtId, false)]), storedRecord.RtId);
 
-        AssertValidationError(answer);
+        AssertValidationError(answer, MandatoryTitleMessageNumberOf(operation));
     }
 
     [Theory]
@@ -97,7 +97,7 @@ public class MissingBeforeValidationWriteTests : HiddenOrMissingWriteFixture
             [EntityUpdateInfo<RtEntity>.CreateInsert(Payload(newRtId, true))], [AssociationFrom(newRtId, false)]),
             newRtId);
 
-        AssertValidationError(answer);
+        AssertValidationError(answer, InvalidRoleMessageNumber);
     }
 
     [Fact]
@@ -122,7 +122,7 @@ public class MissingBeforeValidationWriteTests : HiddenOrMissingWriteFixture
         var answer = await AnswerOfAsync(() => ApplyAsync(Repository(RtDataPolicyTable.Empty), SystemSession(),
             storedRecords.Select(record => Change("update", record.RtId, false)).ToList()), storedRecords[0].RtId);
 
-        AssertValidationError(answer);
+        AssertValidationError(answer, MandatoryAttributeMissingAtUpdateMessageNumber);
         A.CallTo(() => Collection.DocumentsAsync(A<IOctoSession>._, A<IEnumerable<OctoObjectId>>._))
             .MustHaveHappenedOnceExactly();
         A.CallTo(() => Collection.UpdateOneAsync(A<IOctoSession>._, A<IEnumerable<RtEntity>>._))

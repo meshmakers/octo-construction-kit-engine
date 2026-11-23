@@ -456,7 +456,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
         var entitiesUpdate = new[] { EntityUpdateInfo<RtEntity>.CreateDelete(new RtEntityId(resolvedCkTypeId, rtId)) };
         await ApplyChangesGuardedAsync(session, cacheService, entitiesUpdate,
-                [], BulkRtMutationOptions.FromDeleteOptions(deleteOptions))
+                [], BulkRtMutationOptions.FromDeleteOptions(deleteOptions), addressedCkTypeIdOfDelete: ckTypeId)
             .ConfigureAwait(false);
     }
 
@@ -475,7 +475,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateDelete(new RtEntityId(resolvedCkTypeId, rtId)) };
         await ApplyChangesGuardedAsync(session, cacheService, entitiesUpdate,
-                [], BulkRtMutationOptions.FromDeleteOptions(deleteOptions))
+                [], BulkRtMutationOptions.FromDeleteOptions(deleteOptions), addressedCkTypeIdOfDelete: ckTypeId)
             .ConfigureAwait(false);
     }
 
@@ -571,11 +571,14 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     ///     (<c>writeAccess</c>, AB#8574): system sessions and
     ///     tenants without policies pass through untouched (dormant guarantee); denied changes reject
     ///     the whole set atomically with a <see cref="RuntimeRepositoryException" />.
+    ///     <paramref name="addressedCkTypeIdOfDelete" /> is the type a delete by id was addressed with; a record the
+    ///     caller may not see is then refused under that type, as a missing record of it is.
     /// </summary>
     private async Task ApplyChangesGuardedAsync(IOctoSession session, ICkCacheService cacheService,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
-        BulkRtMutationOptions options, OperationResult? operationResult = null, bool checkArchiveDefinitions = false)
+        BulkRtMutationOptions options, OperationResult? operationResult = null, bool checkArchiveDefinitions = false,
+        RtCkId<CkTypeId>? addressedCkTypeIdOfDelete = null)
     {
         var securityContext = session.GetSecurityContext();
         if (!securityContext.IsSystem)
@@ -603,8 +606,10 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
                 if (notVisible.Count > 0)
                 {
                     // AB#7126: a change of an entity the caller may not see is answered like a missing entity.
-                    throw CreateEntityNotFoundException(notVisible[0].CkTypeId, notVisible[0].RtId,
-                        notVisible[0].Action, options.DeleteStrategy);
+                    var firstNotVisible = notVisible[0];
+                    var refusedCkTypeId = addressedCkTypeIdOfDelete ?? firstNotVisible.CkTypeId;
+                    throw CreateEntityNotFoundException(refusedCkTypeId, firstNotVisible.RtId,
+                        firstNotVisible.Action, options.DeleteStrategy);
                 }
 
                 RuntimeRepositoryException.ThrowIfOperationResultError(guardResult);

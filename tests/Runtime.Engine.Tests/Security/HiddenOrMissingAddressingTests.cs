@@ -101,6 +101,30 @@ public class HiddenOrMissingAddressingTests : HiddenOrMissingWriteFixture
         Assert.Equal(hiddenAnswer, missingAnswer);
     }
 
+    [Theory]
+    [InlineData(WriterOwnedRead)]
+    [InlineData(WriteOnly)]
+    public async Task DeleteByAbstractType_HiddenRecord_BaseNotFoundMessage_NamesTheAddressedTypeLikeMissingRecord(
+        string role)
+    {
+        var abstractTypeId = RegisterAbstractBaseOfRequired();
+        var repository = RepositoryWithTheBaseNotFoundMessage(PolicyTable());
+        var hiddenRecord = Store(OtherUser);
+        var missingRtId = OctoObjectId.GenerateNewId();
+
+        var hiddenAnswer = await AnswerOfAsync(() => repository.DeleteOneRtEntityByRtIdAsync(UserSession(role),
+            abstractTypeId, hiddenRecord.RtId, new DeleteOptions()), hiddenRecord.RtId);
+        var missingAnswer = await AnswerOfAsync(() => repository.DeleteOneRtEntityByRtIdAsync(UserSession(role),
+            abstractTypeId, missingRtId, new DeleteOptions()), missingRtId);
+
+        var quotedAbstractTypeName = $"'{abstractTypeId.SemanticVersionedFullName}'";
+        var quotedConcreteTypeName = $"'{Model.Required.CkTypeId.ToRtCkId().SemanticVersionedFullName}'";
+        Assert.Equal(nameof(RuntimeRepositoryException), hiddenAnswer.ExceptionType);
+        Assert.Contains(quotedAbstractTypeName, hiddenAnswer.Message);
+        Assert.DoesNotContain(quotedConcreteTypeName, hiddenAnswer.Message);
+        Assert.Equal(missingAnswer, hiddenAnswer);
+    }
+
     [Fact]
     public async Task DeleteByAbstractType_MissingRecord_SystemSession_AnswersNotFound()
     {

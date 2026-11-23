@@ -2067,7 +2067,9 @@ the classification):
 - **Existence and visibility before validation (AB#7212).** The order in `RuntimeRepositoryBase.ApplyChangesGuardedAsync`
   is: type write restriction, data-permission guard (visibility first, then write/delete), **existence**
   (`WriteTargetExistence`), archive-definition guard, then `BulkRtMutation` with the rule validation
-  (`EntityRuleEngine`, `GraphRuleEngine`). The existence step reads before validation only the targets of types that
+  (`EntityRuleEngine`, `GraphRuleEngine`); the existence step therefore runs in one of two places: eagerly before the
+  archive-definition guard for types that share their collection, otherwise only after a failed validation, inside
+  `BulkRtMutation`. The existence step reads before validation only the targets of types that
   share their collection with concrete types outside their own subtree (`StoredTypeMatch.SharesCollectionWithOtherTypes`,
   an unresolvable collection root counts as shared); for all other types it runs only when the validation fails
   (`BulkRtMutationOptions.OnValidationFailedAsync`, called by `BulkRtMutation` before it throws the validation errors), so
@@ -2085,7 +2087,8 @@ the classification):
   origins inserted by the same change set have no stored target and are not checked; a type the CK cache does not
   know is left to the rule validation. Visible records keep their validation errors. `DeleteOneRtEntityByRtIdAsync`
   with an abstract type answers a missing rtId through the same hook (it no longer returns silently), so a delete by
-  base type of a hidden and of a missing record answer alike. Tests: `HiddenEqualsMissingWriteTests`,
+  base type of a hidden and of a missing record answer alike; both are refused under the addressed (abstract) type,
+  never under the concrete type of the stored record. Tests: `HiddenEqualsMissingWriteTests`,
   `MissingBeforeValidationWriteTests`, `HiddenOrMissingAddressingTests` (real funnel, real `EntityRuleEngine`,
   in-memory collection).
 - Tests: `RtDataPermissionEvaluatorTests` (matrix, agreement with the guard) in `Runtime.Engine.Tests`; the

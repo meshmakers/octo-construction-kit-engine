@@ -35,7 +35,8 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
     of a `RuntimeRepositoryException` with the rule engine's `EntityNotFound` message; callers that caught
     `RuntimeRepositoryException` for this case must catch the not-found exception;
   - `DeleteOneRtEntityByRtIdAsync` with an abstract CK type and an rtId that does not exist answers "entity not
-    found" instead of returning silently, like the same call with a concrete type.
+    found" instead of returning silently, like the same call with a concrete type; a record the caller may not see
+    answers the same way, under the addressed abstract type and never under the concrete type it is stored as.
 
   Cost: a valid change set pays no extra read, unless the addressed CK type shares its MongoDB collection with types
   outside its own subtree (then one read per such type before validation); a change set with validation errors pays

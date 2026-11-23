@@ -54,6 +54,10 @@ public abstract class HiddenOrMissingWriteFixture
     private protected HiddenOrMissingTestRepository Repository(RtDataPolicyTable policyTable) =>
         HiddenOrMissingTestRepository.Create(Model, Collection, policyTable);
 
+    private protected HiddenOrMissingTestRepository RepositoryWithTheBaseNotFoundMessage(
+        RtDataPolicyTable policyTable) =>
+        HiddenOrMissingTestRepository.Create(Model, Collection, policyTable, answersWithTheBaseNotFoundMessage: true);
+
     protected static IOctoSession UserSession(string role)
     {
         var session = A.Fake<IOctoSecureSession>();
@@ -106,6 +110,13 @@ public abstract class HiddenOrMissingWriteFixture
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> changes, IReadOnlyList<AssociationUpdateInfo>? associations = null) =>
         repository.ApplyChangesAsync(session, changes, associations ?? [], new DeleteOptions(), new OperationResult());
 
+    protected const int MandatoryAttributeMissingMessageNumber = 2;
+    protected const int MandatoryAttributeMissingAtUpdateMessageNumber = 5;
+    protected const int InvalidRoleMessageNumber = HiddenOrMissingTestRepository.InvalidRoleMessageNumber;
+
+    protected static int MandatoryTitleMessageNumberOf(string operation) =>
+        operation == "update" ? MandatoryAttributeMissingAtUpdateMessageNumber : MandatoryAttributeMissingMessageNumber;
+
     protected sealed record Answer(string ExceptionType, string Message, string MessageNumbers);
 
     protected static async Task<Answer> AnswerOfAsync(Func<Task> write, OctoObjectId rtId)
@@ -122,7 +133,11 @@ public abstract class HiddenOrMissingWriteFixture
     protected static void AssertNotFound(Answer answer) =>
         Assert.True(answer.ExceptionType == nameof(TestEntityNotFoundException), $"Expected not found, got {answer}");
 
-    protected static void AssertValidationError(Answer answer) =>
+    protected static void AssertValidationError(Answer answer, int expectedMessageNumber)
+    {
         Assert.True(answer.ExceptionType == nameof(RuntimeRepositoryException),
             $"Expected a validation error, got {answer}");
+        var messageNumbers = answer.MessageNumbers.Split(',', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Contains(expectedMessageNumber.ToString(), messageNumbers);
+    }
 }

@@ -38,24 +38,29 @@ internal sealed class HiddenOrMissingTestRepository : RuntimeRepositoryBase
     internal static readonly RtCkId<CkAssociationRoleId> InvalidRoleId = new("Test/InvalidRole");
     internal const int InvalidRoleMessageNumber = 9999;
 
+    private readonly bool _answersWithTheBaseNotFoundMessage;
+
     private HiddenOrMissingTestRepository(SecretTestModel model, IRepositoryDataSource dataSource,
-        IDataPermissionResolver dataPermissionResolver)
+        IDataPermissionResolver dataPermissionResolver, bool answersWithTheBaseNotFoundMessage)
         : base(SecretTestModel.TenantId, model.Cache, dataSource,
             new BulkRtMutation(new EntityRuleEngine(model.Cache), new InvalidRoleGraphRuleEngine(), [],
                 new SecretWriteNormalizer(SecretTestModel.CreateProtector())),
             dataPermissionResolver)
     {
+        _answersWithTheBaseNotFoundMessage = answersWithTheBaseNotFoundMessage;
     }
 
     internal static HiddenOrMissingTestRepository Create(SecretTestModel model,
-        IDataSourceCollection<OctoObjectId, RtEntity> collection, RtDataPolicyTable policyTable)
+        IDataSourceCollection<OctoObjectId, RtEntity> collection, RtDataPolicyTable policyTable,
+        bool answersWithTheBaseNotFoundMessage = false)
     {
         var dataSource = A.Fake<IRepositoryDataSource>();
         A.CallTo(() => dataSource.TenantId).Returns(SecretTestModel.TenantId);
         A.CallTo(() => dataSource.GetRtCollection<RtEntity>(A<CkTypeGraph>._)).Returns(collection);
         var dataPermissionResolver = A.Fake<IDataPermissionResolver>();
         A.CallTo(() => dataPermissionResolver.GetPolicyTableAsync(A<IRuntimeRepository>._)).Returns(policyTable);
-        return new HiddenOrMissingTestRepository(model, dataSource, dataPermissionResolver);
+        return new HiddenOrMissingTestRepository(model, dataSource, dataPermissionResolver,
+            answersWithTheBaseNotFoundMessage);
     }
 
     internal static IDataSourceCollection<OctoObjectId, RtEntity> CreateCollection(
@@ -94,7 +99,10 @@ internal sealed class HiddenOrMissingTestRepository : RuntimeRepositoryBase
     }
 
     protected override Exception CreateEntityNotFoundException(RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId,
-        RtDataAction action, DeleteStrategies deleteStrategy) => new TestEntityNotFoundException(rtId);
+        RtDataAction action, DeleteStrategies deleteStrategy) =>
+        _answersWithTheBaseNotFoundMessage
+            ? base.CreateEntityNotFoundException(ckTypeId, rtId, action, deleteStrategy)
+            : new TestEntityNotFoundException(rtId);
 
     protected override Task RefreshCkCacheServiceAsync(ICkCacheService ckCacheService) => Task.CompletedTask;
 

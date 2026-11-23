@@ -46,7 +46,7 @@ pass-through exists. There is no env value for the storage paths; the setting wo
 three bot deployments.
 
 **Existing DR backups we can use as a template** (`meshmakers-infrastructure`,
-`docs/MONGODB-BACKUP-RESTORE.md`, `docs/CONCEPT-CRATEDB-DISASTER-RECOVERY.md`, group_vars, terraform):
+the MongoDB backup and restore runbook, the CrateDB disaster recovery concept, group_vars, terraform):
 
 | Cluster | MongoDB DR (daily 03:00, keep last 5) | CrateDB DR snapshots | Object storage available | Credentials (Vault) |
 | --- | --- | --- | --- | --- |
@@ -404,10 +404,10 @@ show` check during AB#5562–5565.
 
 | Cluster | Provider | Existing DR target (source of truth) | Doc mismatch | Proposed artifact target |
 | --- | --- | --- | --- | --- |
-| test-2 | Hetzner Object Storage | Bucket and endpoint live **only in Vault** (`secret/meshmakers/test-2/hetzner-s3`, keys `bucket`, `endpoint`). `docs/CLUSTER-SERVICES-OVERVIEW.md` names bucket `meshmakers` (prefix `cratedb/`); `test_2_infrastructure.yml` has no bucket name. The location is not in the repo | none, but unconfirmed | `test-2-octo-artifacts` (same project unless Q7 decides otherwise) |
-| staging-1 | Azure Blob | Account **`mmstaging1backups`** (terraform `variables.tf` default and `staging_1_infrastructure.yml`), westeurope, Standard LRS; containers `mongodb-backups`, `cratedb-backups` (private) | `docs/CONCEPT-CRATEDB-DISASTER-RECOVERY.md` says `meshmakersstaging1backups`, which is **stale** | container `octo-artifacts` in `mmstaging1backups` (or a dedicated account, Q4) |
+| test-2 | Hetzner Object Storage | Bucket and endpoint live **only in Vault** (`secret/meshmakers/test-2/hetzner-s3`, keys `bucket`, `endpoint`). the cluster services overview names bucket `meshmakers` (prefix `cratedb/`); `test_2_infrastructure.yml` has no bucket name. The location is not in the repo | none, but unconfirmed | `test-2-octo-artifacts` (same project unless Q7 decides otherwise) |
+| staging-1 | Azure Blob | Account **`mmstaging1backups`** (terraform `variables.tf` default and `staging_1_infrastructure.yml`), westeurope, Standard LRS; containers `mongodb-backups`, `cratedb-backups` (private) | the CrateDB disaster recovery concept says `meshmakersstaging1backups`, which is **stale** | container `octo-artifacts` in `mmstaging1backups` (or a dedicated account, Q4) |
 | prod-2 | Azure Blob | Account **`meshmakersprod2backups`** (terraform and `prod_2_infrastructure.yml`), westeurope, Standard LRS; the same two containers | none | container `octo-artifacts` in `meshmakersprod2backups` (or a dedicated account) |
-| prod-1 | Exoscale SOS | Bucket **`prod-1-backups`** (`aws_s3_bucket "${var.cluster_name}-backups"`, `cluster_name = "prod-1"`; `exoscale_sos.bucket` in `prod_1_infrastructure.yml`), endpoint `https://sos-at-vie-1.exo.io`, zone `at-vie-1`; prefixes `mongodb/`, `cratedb/`, `signal-bridge/`. IAM role/key `prod-1-sos-backup` is limited to that bucket | `docs/MONGODB-BACKUP-RESTORE.md` says `meshmakers-prod-1-backups`, which is **stale** | bucket `prod-1-octo-artifacts`, its own IAM role/key `prod-1-octo-artifacts` (bucket count < 20 to be checked) |
+| prod-1 | Exoscale SOS | Bucket **`prod-1-backups`** (`aws_s3_bucket "${var.cluster_name}-backups"`, `cluster_name = "prod-1"`; `exoscale_sos.bucket` in `prod_1_infrastructure.yml`), endpoint `https://sos-at-vie-1.exo.io`, zone `at-vie-1`; prefixes `mongodb/`, `cratedb/`, `signal-bridge/`. IAM role/key `prod-1-sos-backup` is limited to that bucket | the MongoDB backup and restore runbook says `meshmakers-prod-1-backups`, which is **stale** | bucket `prod-1-octo-artifacts`, its own IAM role/key `prod-1-octo-artifacts` (bucket count < 20 to be checked) |
 
 Vault paths (names only): `secret/meshmakers/test-2/hetzner-s3`, `secret/meshmakers/staging-1/azure-storage`,
 `secret/meshmakers/prod-2/azure-storage`, `secret/meshmakers/prod-1/sos`.

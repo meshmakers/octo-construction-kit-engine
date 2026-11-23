@@ -185,4 +185,4 @@ contract until an operator opts in, while the global ceiling still bounds a path
 6. **Tests** *(done)*: `RetroactiveWriteDetector` cap unit tests, orchestrator propagation-clamp tests,
    and Studio rollups-panel tip spec tests.
 7. **Docs** *(done)*: `octo-documentation` archives.md / rollupRecompute.md / glossary / studio archives,
-   plus the engine + mongodb `CLAUDE.md` recompute sections.
+   plus the engine (`docs/concept-rollup-recompute.md`) and mongodb recompute sections.

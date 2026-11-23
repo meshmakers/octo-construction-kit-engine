@@ -5,7 +5,7 @@ applies_to: src/StreamDataCkModel/**, src/Runtime.Contracts/StreamData/**
 
 # System.StreamData on ckLanguage 2
 
-## System.StreamData on ckLanguage 2 (AB#8597, Epic AB#5584 F4.3)
+## System.StreamData on ckLanguage 2
 
 `src/StreamDataCkModel` is **System.StreamData-1.30.0** (archive lifecycle methods 1.24.0, rollup control 1.25.0, late-delivery sets 1.26.0, Hidden-column failures 1.27.0, column methods 1.28.0, confirmed redaction 1.29.0, asynchronous recompute and backfill 1.30.0, below); 1.23.0 was the first ckLanguage 2 release of the model and a **Minor** against
 the ckLanguage 1 release 1.22.0 (`ValidateVersion`: only "ckLanguage changed '1' → '2'"). The rules of the System migration above apply:
@@ -32,7 +32,7 @@ the ckLanguage 1 release 1.22.0 (`ValidateVersion`: only "ckLanguage changed '1'
   `derivable: Any` = `OCTO-CK200`, a dependent model derives from `Archive` and `CkArchiveColumn` without message 113). The Mongo round-trip gate
   (`CkMetaModelReflectionGateTests` in engine-mongodb) covers the model through the package.
 
-### Late-delivery recompute (System.StreamData 1.26.0, AB#9016)
+### Late-delivery recompute (System.StreamData 1.26.0)
 
 1.26.0 adds the optional `StringArray` attributes `CkArchiveDirtyWindow.RtIds`, `CkArchiveRecomputeRange.RtIdSet` and
 `RecomputeJob.RtIdSet`. This is a Minor against 1.25.0 with no acknowledgement. They carry the series of a late delivery
@@ -53,7 +53,7 @@ Contract rules for a mixed package set:
 Pinned by `RtIdSetAndContractCompatibilityTests`; behaviour by `RecomputeLateDeliveryTests`. Concept:
 `docs/concept-rollup-recompute.md` §4a.
 
-### Hidden columns of an archive (System.StreamData 1.27.0, AB#6247)
+### Hidden columns of an archive (System.StreamData 1.27.0)
 
 1.27.0 adds `Archive.StatusReason` and `Archive.HiddenColumns` (runtime state) and the destructive method
 `Archive.RedactHiddenColumns-1` (parameter `confirmDataLoss`, role `StreamDataAdmin`, result `ArchiveRedactionResult`). A Minor
@@ -86,7 +86,7 @@ name, not an overload, so the `cref`s to `RedactHiddenColumnsAsync` in consumers
 optional parameter on `-1`: an added error code is a Major (row M8). Tests: `ArchiveHiddenColumnGuardTests` (`RedactConfirmed_*`),
 `StreamDataCkLanguage2Tests` (`RedactHiddenColumns2_*`, `StreamData_1_29_0_*`).
 
-### Archive lifecycle, rollup and column methods (System.StreamData 1.24.0, AB#8598; 1.25.0, AB#8599; 1.28.0, AB#8600; 1.30.0, AB#9056)
+### Archive lifecycle, rollup and column methods (System.StreamData 1.24.0, 1.25.0, 1.28.0, 1.30.0)
 
 1.24.0 adds the archive lifecycle as CK methods (Minor against 1.23.0, no acknowledgement, `minEngineVersion` unchanged 3.5.1). They
 replace the hand-written `streamData` GraphQL mutations of octo-asset-repo-services, which stay and are deprecated there:
@@ -120,17 +120,17 @@ replace the hand-written `streamData` GraphQL mutations of octo-asset-repo-servi
   `isRuntimeState: true`) take the ckLanguage 2 default `derivable: Model`. Their shapes equal the mutation input/result types.
 - No `replacesGenericCreate`: blueprints seed `TimeRangeArchive` / `RollupArchive` through `ImportRt` (SmartMeterInsights.Base,
   EnergyCommunity.Base, voest-app), which the flag would refuse (message 136).
-- **The create-method handlers bind the generated `{Type}{Method}Parameters`** (AB#8707): the method JSON of octo-common-services
+- **The create-method handlers bind the generated `{Type}{Method}Parameters`**: the method JSON of octo-common-services
   (`CkMethodJson`) binds the record arrays (`IAttributeValueList<T>`) of the generated `Rt{Record}Record`; the plain look-alike
-  classes of AB#8598 are gone.
-- The column methods (1.28.0, AB#8600) complete the set: every `streamData` mutation of the asset repository now has a method. They
+  classes are gone.
+- The column methods (1.28.0) complete the set: every `streamData` mutation of the asset repository now has a method. They
   sit on `Archive` like the lifecycle methods; a rollup refuses them in the engine as the mutations do. The backfills and repairs
-  stay background jobs (AB#8002), the methods answer once the job is queued. `RecomputeJobInfo` gained the optional member
-  `ComputedColumnName` (row R1, Minor). A path that reaches a Hidden attribute is refused by the engine (AB#6247), so `AddColumn-1`
+  stay background jobs, the methods answer once the job is queued. `RecomputeJobInfo` gained the optional member
+  `ComputedColumnName` (row R1, Minor). A path that reaches a Hidden attribute is refused by the engine, so `AddColumn-1`
   answers `STREAMDATA_ERROR` like the mutation.
-- `Recompute-1` and `BackfillFromSource-1` (1.25.0, AB#8599) are synchronous like the mutations: they answer the job
+- `Recompute-1` and `BackfillFromSource-1` (1.25.0) are synchronous like the mutations: they answer the job
   (`RecomputeJobInfo`, state Pending/Running/... or Failed for a refused precondition). Deprecated since 1.30.0 (description only).
-- **1.30.0 (AB#9056): `RollupArchive.Recompute-2` and `BackfillFromSource-2`** with `execution.mode: async` (the asynchronous
+- **1.30.0: `RollupArchive.Recompute-2` and `BackfillFromSource-2`** with `execution.mode: async` (the asynchronous
   versions; a mode change is a Major of the method version, row M19, so they are new versions). Same parameters, role, data access
   and result as `-1`, `timeoutSeconds: 30` (the accept step), plus the error `STREAMDATA_RECOMPUTE_FAILED` (`jobRtId`, `reason`)
   for a job that ended Failed. The mutations `recomputeArchive` / `backfillRollupFromSource` of the asset repository are deprecated

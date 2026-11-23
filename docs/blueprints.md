@@ -1,6 +1,6 @@
 ---
 description: Blueprint user documentation: properties, seed data, variables, dependencies, updates, archives and rollups, tenant-owned data.
-applies_to: src/Runtime.Engine/Blueprints/**, src/Runtime.Contracts/Blueprints/**, src/BlueprintManager/**, src/ConstructionKit.Engine/BlueprintCatalogs/**
+applies_to: src/Runtime.*/Blueprints/**, src/BlueprintManager/**, src/ConstructionKit.Engine/BlueprintCatalogs/**
 ---
 
 # Blueprints
@@ -79,7 +79,7 @@ requires:
   octo.environment: [staging, production]
   octo.isSystemTenant: "false"
 
-# Optional: archives of the seed that stay Created on install/update (AB#7991)
+# Optional: archives of the seed that stay Created on install/update
 archiveActivation:
   exclude:
     - MyRollupWellKnownName
@@ -104,7 +104,7 @@ migrations:
 | `seedDataPaths`         | string[] | Optional list of seed-data files, merged into one model before import      |
 | `requires`              | object   | Optional preconditions evaluated against the tenant variable context       |
 | `migrations`            | array    | Optional list of migration scripts keyed by source version                 |
-| `archiveActivation`     | object   | Optional; `exclude` lists archives (rtId or well-known name) of the seed that are not activated (AB#7991) |
+| `archiveActivation`     | object   | Optional; `exclude` lists archives (rtId or well-known name) of the seed that are not activated |
 
 > Composition (`composedBlueprints`) was removed in favour of dependency-only resolution. The field is no longer accepted; the schema rejects manifests that still carry it.
 
@@ -165,7 +165,7 @@ entities:
         value: "${octo.version}"   # ← rolled forward by helm with every release
 ```
 
-#### Keeping a runtime placeholder: `$${name}` (AB#8995)
+#### Keeping a runtime placeholder: `$${name}`
 
 Some seed values carry placeholders that are resolved later at run time, not at install:
 notification templates (`${count}`, `${name}`, resolved by the mesh-adapter
@@ -192,7 +192,7 @@ Rules (`BlueprintVariableInterpolator`):
   ("Unknown blueprint variable"). A placeholder that is not a variable name (`${a->b}`) is left
   unchanged without a warning, as before.
 - **Engine version:** an engine before this change stores `$${name}` verbatim. Use the escape in
-  a blueprint only once every cluster that installs it runs an engine with AB#8995 (the first
+  a blueprint only once every cluster that installs it runs an engine with that change (the first
   libs release after r3.5.75).
 
 #### Empty-string sentinel for chart versions
@@ -206,7 +206,7 @@ a single blueprint family ship two variants — one with `ChartVersion:
 "${octo.version}"` for staging/production (matches the release-channel chart 1:1)
 and one with `ChartVersion: ""` for dev/test (tracks the rolling dev-channel
 chart, gets overwritten by the CD pipeline on every main-CI run). See
-`octo-communication-controller-services/CLAUDE.md` "Service-Managed Blueprints"
+octo-communication-controller-services, section "Service-Managed Blueprints"
 and "Empty ChartVersion" for the full contract.
 
 ### `requires:` preconditions
@@ -274,7 +274,7 @@ declared range is kept untouched (no seed re-import, no installation-row change,
 the apply instead of downgrading it.
 
 The same rule holds for a `ckModelDependencies` range, **for classic (exact-pinned) and range-retaining
-CK models alike** (AB#6672; it is about the declared range, not about how a model was compiled). The floor
+CK models alike** (it is about the declared range, not about how a model was compiled). The floor
 of the range is a minimum, never a target:
 
 | The tenant runs the model in … | The apply … |
@@ -324,7 +324,7 @@ ApplyBlueprintAsync(tenantId, blueprintId, force)
 The `BlueprintApplied` notification (and `BlueprintUpdated` after an update) carries `CkModelDependencies`: the distinct
 names of the CK models the blueprint and the blueprints resolved for it depend on (update: the target version), sorted
 ordinally. Services use it to enable the capability a blueprint needs, e.g. the Communication Controller for
-`System.Communication` and the AI service for `System.Ai` (AB#9578). A notification without it (`null`) comes from code
+`System.Communication` and the AI service for `System.Ai`. A notification without it (`null`) comes from code
 built against an older engine.
 
 ```
@@ -357,28 +357,28 @@ Every seed entity is stamped with three system attributes when applied:
 
 A blueprint that ships an entity but wants to leave it user-editable from day one can set `rtBlueprintLocked: false` in its seed data. Such an entity is **tenant-owned**, see the next section.
 
-## Product-owned and tenant-owned seed entities (AB#6383)
+## Product-owned and tenant-owned seed entities
 
 The `rtBlueprintLocked` flag **in the seed** says who owns an entity once it exists on the tenant:
 
 | Seed says                        | Owner    | First install            | Update, tenant holds it                               | Update, tenant lacks it                                      |
 |----------------------------------|----------|--------------------------|-------------------------------------------------------|--------------------------------------------------------------|
 | flag absent or `true` (default)  | product  | created                  | renewed from the seed (Merge/Full)                    | created again (a deleted entity comes back)                  |
-| `rtBlueprintLocked: false`       | tenant   | created with seed values | **unedited**: receives the new seed content (AB#8778); **edited**: not touched, no conflict (only the stamp is moved) | created only if it is new; **stays deleted** if the previous version's seed already had its key |
+| `rtBlueprintLocked: false`       | tenant   | created with seed values | **unedited**: receives the new seed content; **edited**: not touched, no conflict (only the stamp is moved) | created only if it is new; **stays deleted** if the previous version's seed already had its key |
 
 Rules for a tenant-owned seed entity (`UpdateBlueprint` in `Merge` and `Full` mode, and `Safe` for the creation part):
 
 - **Created once.** On the first install, and when a later version of the seed brings a key the previously installed version did not have, it is created with the seed values.
-- **Updated only while the tenant has not edited it (AB#8778).** If the tenant holds it, the update compares three contents: the target seed, the seed of the previously installed version (read from the catalog, the same seed the deleted-check uses) and the tenant entity. The comparison is the one the update preview uses for product-owned entities (CK defaults for omitted attributes, values in import shape, the `rtBlueprint*` stamp, `Secret` attributes and attributes the upsert preserves - `RuntimeState`, `TenantOwned` - are not content).
+- **Updated only while the tenant has not edited it.** If the tenant holds it, the update compares three contents: the target seed, the seed of the previously installed version (read from the catalog, the same seed the deleted-check uses) and the tenant entity. The comparison is the one the update preview uses for product-owned entities (CK defaults for omitted attributes, values in import shape, the `rtBlueprint*` stamp, `Secret` attributes and attributes the upsert preserves - `RuntimeState`, `TenantOwned` - are not content).
   - The tenant entity already equals the target seed, or the target seed equals the previous seed: nothing to write.
   - **Unedited** - the tenant entity equals what the previous seed wrote, and its `rtBlueprintSource` names this blueprint: the update writes the target seed (the entity stays tenant-owned, `rtBlueprintLocked: false`; `rtBlueprintSource` and `rtBlueprintAppliedAt` move to the target version). Listed in `TenantOwnedRefreshed`, counted in `EntitiesUpdated`, and shown with its attribute changes in the preview's `Changes`. Not in `Safe` mode (which only adds).
   - **Edited** - any other case, including a previous seed that cannot be read, a key the previous seed did not have, an entity of another blueprint, or a CK type that is not cached: none of its attribute values is written. Listed in `TenantOwnedSkipped` and, when the target seed differs from the tenant content, also in `TenantOwnedUpdateAvailable`. The update only moves the blueprint stamp: `rtBlueprintLocked` is set to `false`, `rtBlueprintSource` and `rtBlueprintAppliedAt` are refreshed (not in `Safe` mode, and not for an entity another blueprint or the user owns by `rtBlueprintSource`). No `UserModified` conflict is raised, so the entity does not block the update.
   - **Limits of the comparison.** "Unedited" is the result of the comparison, not the edit history: changed `TenantOwned`, `RuntimeState` or `Secret` attributes, or an edit reverted to the installed seed, still count as unedited (the preserved attributes keep their values). A tenant entity found only by its well-known name under another `rtId` is never refreshed (the import upserts by `rtId` and would create a second entity). A tenant entity with the seed's `rtId` but another well-known name (renamed by the tenant) counts as edited. Associations are not compared: an entity whose target seed declares associations is never refreshed automatically (the import would write the seed's associations over the tenant's), it is listed in `TenantOwnedUpdateAvailable` instead when its attributes changed; a change of the seed's associations alone is neither applied nor reported. The previous seed is rendered with the tenant's *current* blueprint variables; if a variable changed since the install, the stored content no longer equals that baseline and the entity counts as edited (kept). A CK default that changed while both seeds omit the attribute is no seed change (nothing is written).
   - **Blanking.** A refresh runs through the blanking guard like a locked entity: an attribute the new seed would blank is listed in `BlankedAttributes`, kept unless confirmed (`AllowBlanking` / `ConfirmedBlankings`) in the same update, and its values appear only as summaries in `Changes`. After the update the previous and the target seed are the same, so a blank that was not confirmed is not offered again.
   - **A report of the run.** `TenantOwnedUpdateAvailable` is not stored: applying the same version again lists nothing, although the edit is still there.
-  - **No marker on the entity.** The baseline of "unedited" (the *seed content hash* of the rule decided on AB#8450) is the previous seed itself, not a value stored on the entity, so no System CK attribute is needed and entities seeded before AB#8778 follow the same rule: they are unedited exactly when their content equals the previous seed, and after one refresh they equal the new seed. Re-applying the same version is a no-op (target and previous seed are the same).
+  - **No marker on the entity.** The baseline of "unedited" (the *seed content hash* of the rule) is the previous seed itself, not a value stored on the entity, so no System CK attribute is needed and entities seeded before the rule change follow the same rule: they are unedited exactly when their content equals the previous seed, and after one refresh they equal the new seed. Re-applying the same version is a no-op (target and previous seed are the same).
   - **Versioned content** (for example knowledge pages): ship each content version as its own seed entity with a new key and let the page refer to its current version through an attribute that belongs to the page content. An unedited page then points to the new version; an edited page keeps its reference while the new version entity is created (new key) and is not referenced - a later check can report it from there.
-- **Removed by an uninstall while the tenant has not edited it (AB#8966).** `UninstallBlueprint` compares the tenant entity with the seed of the installed version, with the comparison of the update rule above plus the `TenantOwned` attributes (no stored hash): an unedited entity is erased, an edited one is kept and listed in `TenantOwnedKept` with the reason `Edited`; an unedited one that an entity staying in the tenant references is kept with the reason `Referenced`. Details in [Uninstall](#uninstall).
+- **Removed by an uninstall while the tenant has not edited it.** `UninstallBlueprint` compares the tenant entity with the seed of the installed version, with the comparison of the update rule above plus the `TenantOwned` attributes (no stored hash): an unedited entity is erased, an edited one is kept and listed in `TenantOwnedKept` with the reason `Edited`; an unedited one that an entity staying in the tenant references is kept with the reason `Referenced`. Details in [Uninstall](#uninstall).
 - **Never re-created after a delete.** If the tenant lacks it and the seed of the previously installed version (read from the catalog) contains the same key (`rtWellKnownName`, else `rtId`) with the same CK type, the tenant deleted it and it stays deleted. If that previous seed cannot be read from the catalog, the update does **not** create the absent tenant-owned entities and returns a warning, because it cannot tell a deleted entity from a new one.
 - **The seed decides, not the tenant's stamp.** A tenant that still carries the stamp `rtBlueprintLocked: true` from an earlier version is handled as tenant-owned from the first update whose seed declares the entity unlocked; its edits are kept. The key counts as "contained in the previous seed" whatever flag the previous seed gave it, so an entity that was product-owned and is handed over to the tenant stays deleted if the tenant had deleted it.
 - **Reported.** `PreviewUpdateAsync` lists them in `TenantOwnedSkipped`, `TenantOwnedUpdateAvailable` (a subset of `TenantOwnedSkipped`), `TenantOwnedRefreshed` and `TenantOwnedStaysDeleted`; the apply result carries the same four lists (skipped and stays-deleted counted in `EntitiesSkipped`, refreshed in `EntitiesUpdated`). A forced re-apply or an install over another version applies the same rule and reports the groups as messages of the `OperationResult`.
@@ -387,9 +387,9 @@ Rules for a tenant-owned seed entity (`UpdateBlueprint` in `Merge` and `Full` mo
 - Associations declared on a tenant-owned seed entity that is skipped are not applied either; an association from another seed entity to a tenant-owned entity the tenant deleted is dropped as dangling.
 - The reverse flip (seed locks an entity that the tenant copy carries as unlocked) is unchanged: the unlocked tenant copy raises a `UserModified` conflict.
 
-Effect on existing unlocked seed entities: before AB#6383 an update that found such an entity on the tenant raised a `UserModified` conflict, and `ApplyUpdateAsync` refused the whole update unless `ContinueOnError` or a per-entity resolution was given. Such an entity is now **skipped** and does not block the update. Example: the unlocked FamilyOs entities (AB#6317 F10) went from "blocks the update" to "skipped".
+Effect on existing unlocked seed entities: earlier an update that found such an entity on the tenant raised a `UserModified` conflict, and `ApplyUpdateAsync` refused the whole update unless `ContinueOnError` or a per-entity resolution was given. Such an entity is now **skipped** and does not block the update. Example: the unlocked FamilyOs entities went from "blocks the update" to "skipped".
 
-### Read-only for users: `ProtectBlueprintLocked` (AB#6384)
+### Read-only for users: `ProtectBlueprintLocked`
 
 By default `rtBlueprintLocked` only steers blueprint updates; users can still edit or delete a locked entity. A
 `System.Identity/DataPolicy` can opt a CK type in to enforcement at the engine write guard
@@ -413,8 +413,8 @@ By default `rtBlueprintLocked` only steers blueprint updates; users can still ed
 - Callers running as system are exempt: blueprint install, `UpdateBlueprint` (Safe/Merge/Full, forced re-apply),
   blueprint migrations and the CK model migration/upgrade services all open their session with
   `GetSessionAsync()` (system context). `ImportRt` is covered separately, see
-  [ImportRt on opted-in types](#importrt-on-opted-in-types-ab6392).
-- **ServiceAccount pipelines (AB#6392 finding).** A mesh-adapter node with `Identity: ServiceAccount` does *not* run as
+  [ImportRt on opted-in types](#importrt-on-opted-in-types).
+- **ServiceAccount pipelines (finding).** A mesh-adapter node with `Identity: ServiceAccount` does *not* run as
   the system context: `PipelineIdentityResolver.ResolveServiceAccountAsync` opens the session as
   `RtSecurityContext.ForUser(<service account subject>, <its roles>)`. Only `IsSystem` sessions bypass the guard, so a
   configured service account is **guarded like a user** and cannot change a locked entity of an opted-in type (no
@@ -425,7 +425,7 @@ By default `rtBlueprintLocked` only steers blueprint updates; users can still ed
 - Put the opted-in policies in a policy group of their own, one per opted-in type; do not set the flag on shared
   master-data policies.
 
-### ImportRt on opted-in types (AB#6392)
+### ImportRt on opted-in types
 
 `POST Models/ImportRt` hands the uploaded file to a bus command, so the caller identity does not reach the
 engine's write guard, and the import itself runs on a system session (replace semantics, `RtCreatedBy` round trip, the
@@ -527,7 +527,7 @@ fetched anyway.
 | `Full`      | Like Merge, plus delete entities that exist in the tenant but no longer in the seed. Unlocked → conflict.    |
 | `Migration` | Execute the migration script from the installed version to the target. Required for any non-additive change. Fails the update when the target ships no script for the installed version (see below). |
 
-## Seed values never blank tenant values (AB#6313)
+## Seed values never blank tenant values
 
 Every `Upsert` import (blueprint apply and update, `ImportRt -r`, CK-migration entity writes) is a
 full replace of the entity. The engine therefore guards the attributes the blueprint owns
@@ -543,9 +543,9 @@ For a `SeedOwned` attribute the decision is made per attribute by `SeedValueGuar
 | non-empty | different non-empty value | **seed wins** (blueprint-owned change, as before) |
 | non-empty | empty value (`null`, `""`, empty array, record with only empty members) | **existing kept**, reported (`SeedEmpty`) |
 | non-empty | attribute omitted, attribute has no CK default | **existing kept**, reported (`SeedOmitted`) |
-| non-empty, equals the CK default | attribute omitted, attribute has a CK default | seed (the default lands again), **no finding** (AB#6395) |
-| non-empty, differs from the CK default | attribute omitted, attribute has a CK default | **existing kept**, reported as `ResetToDefault` (AB#6395) |
-| non-empty JSON text | non-empty JSON text with an empty string where the existing has a non-empty one | **existing kept as a whole**, reported as `SeedEmptiesJsonField` with the path of the first emptied field (an "empty skeleton" such as the EDA adapter configuration of AB#6310; own reason since AB#8263) |
+| non-empty, equals the CK default | attribute omitted, attribute has a CK default | seed (the default lands again), **no finding** |
+| non-empty, differs from the CK default | attribute omitted, attribute has a CK default | **existing kept**, reported as `ResetToDefault` |
+| non-empty JSON text | non-empty JSON text with an empty string where the existing has a non-empty one | **existing kept as a whole**, reported as `SeedEmptiesJsonField` with the path of the first emptied field (an "empty skeleton" such as the EDA adapter configuration; own reason) |
 
 "Empty" is narrow on purpose: numbers, booleans, enums, dates and time spans are never empty, so an
 explicit `0`, `false` or the first enum member in a seed is a value the author chose and replaces
@@ -561,9 +561,9 @@ A seed that declares the attribute as `null` or empty is still `SeedEmpty`, beca
 is written as null and the default does not apply.
 
 `SeedEmpty` means exactly that the seed value is empty. A non-empty seed value is never `SeedEmpty`
-(AB#8263): when it is a JSON text that empties one string field the tenant filled, the reason is
+: when it is a JSON text that empties one string field the tenant filled, the reason is
 `SeedEmptiesJsonField`. The tenant value still wins by default, because that field may be a credential
-(AB#6310), but the report says which field is emptied, e.g. `string (184 chars), empties
+, but the report says which field is emptied, e.g. `string (184 chars), empties
 $.valueAttribute`. When the new seed clears that field on purpose (a dashboard widget switched from a
 query value to a formula, for instance), confirm the attribute (`--confirm-blanking <rtId>:<attribute>`)
 and the whole seed value lands.
@@ -581,7 +581,7 @@ let the operator confirm the blanking explicitly. Blueprint-owned changes to a n
 working unchanged. Merge, Safe and Full update modes only decide which entities are imported; the
 guard applies to all of them.
 
-### Preview and explicit confirmation (AB#6315)
+### Preview and explicit confirmation
 
 The same detection (`SeedBlankingDetector`, built on `SeedValueGuard`) feeds the update preview, so
 what the preview announces is exactly what the apply keeps.
@@ -629,7 +629,7 @@ public async Task UpdateTenantAsync(string tenantId)
 }
 ```
 
-### Preview and install of a blueprint that is not installed - adoption (AB#8256)
+### Preview and install of a blueprint that is not installed - adoption
 
 A tenant can hold the content of a blueprint without an installation of it: the entities came from a manual `ImportRt`, an
 older install without an installation record, or another blueprint with the same rtIds. `PreviewUpdateAsync` for such a
@@ -653,17 +653,17 @@ the blueprint's source and lock, leaves every other tenant entity alone and reco
 unchanged). `UpdateBlueprint` (`ApplyUpdateAsync`) without an installation uses the same diff. Tests:
 `BlueprintServiceAdoptionPreviewTests` (engine), `BlueprintServiceIntegrationTests.PreviewWithoutInstallation_*` (engine-mongodb).
 
-### CK upgrade guard (AB#6871)
+### CK upgrade guard
 
 `PreviewUpdateAsync` also reports which installed CK models the blueprint's `ckModelDependencies` would break (`CkUpdateSet`, `CkUpgradeBlockers`,
 `IsCkUpgradeBlocked`) when the host registers an `IBlueprintCkUpgradeGuard`. `ApplyUpdateAsync` / `ApplyBlueprintAsync` refuse a blocked set before
 the first change when `CkUpgradeGuard = BlueprintCkUpgradeGuardMode.Enforce` (result flag `IsCkUpgradeBlocked`, tenant unchanged); `ForceBreakingUpdate`
-proceeds and returns the forced blockers; `Off` (the default) never asks the guard on apply. See the engine `CLAUDE.md` and the user documentation
+proceeds and returns the forced blockers; `Off` (the default) never asks the guard on apply. See `docs/blueprint-engine.md` and the user documentation
 (`constructionKits/blueprints.md#ck-upgrade-guard`).
 
 Updates do not create a tenant backup — take an external snapshot (e.g. the platform's tenant dump/backup jobs) beforehand if you need a safety net.
 
-### Archive columns a seed adds (AB#7997)
+### Archive columns a seed adds
 
 `Archive.Columns` is seed-owned, but an activated archive has a table. When a seed (install, `--force` re-apply, update, or
 `ImportRt`) adds a column to an archive that is `Activated`, the import does not write it with the definition: it adds it after the
@@ -671,11 +671,11 @@ commit through the archive lifecycle - an ingested column with `ALTER TABLE … 
 through the computed-column add (Pending, storage, background backfill job, Active). The update result lists every addition in
 `ArchiveColumnsAdded` (archive, column, computed or not, backfill job, error); an install reports them as info messages. A failed
 addition fails the apply after the entities are committed, the column stays out of the definition, and applying again retries it.
-Removing or retyping a column of an activated archive is still refused (AB#7872), and a column added to a disabled archive that was
-activated before is refused until it is enabled again. Seed computed columns declare `Path: ""` and `Required: false` (AB#8034).
-Rules: engine-mongodb `docs/streamdata-archive-concept.md` §10.
+Removing or retyping a column of an activated archive is still refused, and a column added to a disabled archive that was
+activated before is refused until it is enabled again. Seed computed columns declare `Path: ""` and `Required: false`.
+Rules: the stream-data archive concept of octo-construction-kit-engine-mongodb, §10.
 
-### Runtime state and formula changes of existing archive columns (AB#8255)
+### Runtime state and formula changes of existing archive columns
 
 A column carries runtime state the seed never holds: the version pointer of a computed column (`ComputedVersion`; its values live
 in the physical column `{name}__v{N}` after a formula change), its `ComputedState` and a formula change in progress
@@ -694,7 +694,7 @@ it. A seed formula equal to the change in progress (compared normalised) is no n
 before is refused until it is enabled again. On an archive without a table (never activated, or `Failed`) the seed formula is
 written as before and the runtime members are kept.
 
-### Order of archive columns (AB#8332)
+### Order of archive columns
 
 The order of `Columns` carries no meaning: a column is identified by its key (the physical name of an ingested path, the name of a
 computed column) in the table and in every check above. The archive lifecycle appends a column a seed adds, so after an install or
@@ -709,7 +709,7 @@ behind the ingested ones). Two rules keep that from turning into a change:
   has in the stored order, then every other column in seed order. A re-apply writes the list the tenant holds; a seed cannot reorder
   the columns of an existing archive (there is nothing to reorder for).
 
-## Archives and rollups in a blueprint (AB#7991)
+## Archives and rollups in a blueprint
 
 A blueprint ships stream-data archives (raw, time-range, rollup) as seed entities. On **install, forced re-apply and update** the
 engine activates every archive **the seed import created** and queues the backfill of every new rollup, so a fresh tenant gets
@@ -731,7 +731,7 @@ Rules:
 
 - **Archives that existed before are never touched**, whatever their status: a re-apply (also `--force`) is idempotent, and an archive an
   operator left `Created` or `Disabled` on purpose stays so. A blueprint update that adds an archive activates exactly that one. (Changing
-  the definition of an existing rollup is AB#7992 / AB#7993.)
+  the definition of an existing rollup is tracked separately.)
 - **Opt-out** per archive: `archiveActivation.exclude` in `blueprint.yaml` lists rtIds or well-known names (case-insensitive) that stay
   `Created`. An entry that matches no archive of the seed is a warning. A rollup whose new source is excluded fails (its source is not active).
 - **Stream data off** (the tenant's stream data is switched off): the apply **succeeds** and leaves the stream-data part out, because the CK
@@ -747,9 +747,9 @@ Rules:
   `Created` and one warning says so.
 - **A failed activation never fails the apply** (the seed is committed): the archive ends `Failed` (retry with `RetryArchiveActivation` once
   the cause is fixed) and is reported with the reason; the other archives go on. A rollup on a failed source is not attempted and is `Failed` too.
-- **AB#7984 guard**: a new rollup with `TimeWeightedAvg` or `StateDuration` over a raw (non-windowed) source is activated, but its backfill is
-  **not** queued (the LOCF statement trips the CrateDB memory breaker over a long history); the result and a warning name AB#7984. The rollup
-  aggregates new buckets. Removing the guard is part of AB#7984.
+- guard**: a new rollup with `TimeWeightedAvg` or `StateDuration` over a raw (non-windowed) source is activated, but its backfill is
+  **not** queued (the LOCF statement trips the CrateDB memory breaker over a long history); the result and a warning name the guard. The rollup
+  aggregates new buckets. Removing the guard is part.
 - An archive without an rtId in the seed cannot be identified before the import and is not activated (warning). Give seed archives an rtId.
 - Seed archives carry `Status: 0` (Created) or omit it; `Archive.Status` is runtime state.
 - The host wiring is `IStreamDataTenantServicesProvider` (`Runtime.Contracts/StreamData`), an optional constructor dependency of
@@ -875,7 +875,7 @@ raises a blocking `MissingMigrationScript` conflict (entity id `migration:<bluep
 `ApplyUpdateAsync` returns `Success = false` with the installed version and the available
 `fromVersion` values in the error. Earlier versions degraded to `Merge` with only a warning and
 still reported success, so the deletes and renames the script was meant to perform silently did
-not happen (AB#4832). The old behaviour is still reachable for programmatic callers via
+not happen. The old behaviour is still reachable for programmatic callers via
 `BlueprintUpdateOptions.ContinueOnError`, which downgrades the failure to a warning and applies
 the seed data in `Merge` mode; the REST/GraphQL/CLI paths do not expose that flag, so there
 `-m Migration` either runs the script or fails.
@@ -922,19 +922,19 @@ if (!result.Success && result.BlockingDependents.Any())
 |------------------------|-----------------------------------------------------------------------------------------------|
 | **Refcount check**     | If any other installed blueprint depends on this one, uninstall is blocked.                   |
 | **Owned entity erase** | The seed entities of the blueprint whose tenant copy carries `rtBlueprintSource == <this blueprint full id>` and `rtBlueprintLocked = true` are erased permanently. The match is version-exact and uses the version named by the installation row, i.e. the version currently in effect. |
-| **Tenant-owned seed entities** | Seed entities with `rtBlueprintLocked: false` (AB#8966): erased when the tenant never edited them, kept with a reason otherwise — see below. |
+| **Tenant-owned seed entities** | Seed entities with `rtBlueprintLocked: false`: erased when the tenant never edited them, kept with a reason otherwise — see below. |
 | **Other unlocked entities** | A product-owned seed entity whose tenant copy the user unlocked (`rtBlueprintLocked = false`) is kept as user data, with a warning. |
 | **Cascade**            | `cascade: true` uninstalls dependents first and orphan-cleans dependencies of the target.     |
 | **Associations**       | Erasing an entity removes its associations, so no association is left pointing to an erased entity. |
 
-### Tenant-owned seed entities on uninstall (AB#8966)
+### Tenant-owned seed entities on uninstall
 
 An uninstall gives the tenant back without the content the blueprint seeded and the tenant never touched. For every
 tenant-owned seed entity (the seed sets `rtBlueprintLocked: false`) that the tenant holds with this blueprint's
 `rtBlueprintSource` and unlocked:
 
 - **Unedited → erased.** The tenant entity equals the seed of the installed version, read from the catalog — the comparison
-  of the update rule (AB#8778, see [product-owned and tenant-owned seed entities](#product-owned-and-tenant-owned-seed-entities-ab6383)),
+  of the update rule (see [product-owned and tenant-owned seed entities](#product-owned-and-tenant-owned-seed-entities)),
   with no stored hash, **plus the `TenantOwned` attributes**, because they hold the content a tenant edits (a page's summary,
   sections, status) — and it has the seed's `rtId` and the seed's well-known name (a name the tenant added to an entity the
   seed leaves unnamed is an edit). Counted in `EntitiesDeleted`, listed in `DeletedEntities` (`TenantOwned = true`).
@@ -981,7 +981,7 @@ Limits of the uninstall rules:
 - "Seeded child" is generic: any to-one association the seed declares from an entity to a kept entity of the same
   blueprint. A seed that points its entities at a shared tenant-owned parent through a to-one role, such as a folder that
   stays, keeps all of them. System.Ai pages have no such role; `VersionOf` is their only to-one link.
-- An update (AB#8778) keeps `TenantOwned` values. After an update whose seed changed a `TenantOwned` attribute, the entity
+- An update keeps `TenantOwned` values. After an update whose seed changed a `TenantOwned` attribute, the entity
   differs from the installed seed and counts as edited on uninstall. It is kept, never erased by mistake.
 - Only associations are references. An entity that names another one in an **attribute** (for example a page that
 holds the rtId of its current version, the pattern the update rule recommends for versioned content) does not keep it: an
@@ -1044,7 +1044,7 @@ On the API surface both `blueprints.updateInfo` / `blueprints.current` (GraphQL)
 
 ## Backup and Rollback
 
-The blueprint-level backup/rollback feature was removed (AB#4317): updates never create tenant snapshots, and there is no `RollbackAsync`. Tenant-level safety nets are the infrastructure layer's job — use the platform's tenant dump/restore jobs (bot services) or database-level snapshots instead.
+The blueprint-level backup/rollback feature was removed: updates never create tenant snapshots, and there is no `RollbackAsync`. Tenant-level safety nets are the infrastructure layer's job — use the platform's tenant dump/restore jobs (bot services) or database-level snapshots instead.
 
 ## Blueprint History
 
@@ -1108,7 +1108,7 @@ services.Configure<PrivateGitHubBlueprintCatalogOptions>(o =>
 });
 ```
 
-Both GitHub blueprint catalogs have an `IsEnabled` switch (default `true`, AB#6112). A disabled
+Both GitHub blueprint catalogs have an `IsEnabled` switch (default `true`). A disabled
 catalog is neither read nor written: it does not appear in `ListBlueprints`, is ignored by dependency
 resolution and installs, and `RefreshBlueprintCatalogs` reports it as skipped. Production installations
 disable the private (main-lane) catalog so that only released blueprints are offered; in the services
@@ -1179,7 +1179,7 @@ blueprints/v1/
 
 The three `catalog.json` levels are generated by the `Publish` flow on the engine side — application code talks to `IBlueprintCatalogManager`, not to the catalog files directly.
 
-**`octo-bpm publish` and existing versions (AB#6397).** `octo-bpm -c publish -p <dir> -c <catalog> [-f]` checks whether the version already exists in the **target catalog only** (`IBlueprintCatalogManager.IsExistingAsync(catalogName, blueprintId)`). A version that exists only in another catalog (for example Private) does not block the publish to the requested catalog, so the Private and Public legs of a release publish are independent. An existing version in the target catalog is refused with `Blueprint '<id>' already exists in catalog '<catalog>'. Use --force to replace` (the pipeline templates match the text `already exists in catalog`) and `-f` still replaces it; exit codes are unchanged. The catalog-wide `IsExistingAsync(blueprintId)` keeps its "any readable catalog" meaning for resolution and reads.
+**`octo-bpm publish` and existing versions.** `octo-bpm -c publish -p <dir> -c <catalog> [-f]` checks whether the version already exists in the **target catalog only** (`IBlueprintCatalogManager.IsExistingAsync(catalogName, blueprintId)`). A version that exists only in another catalog (for example Private) does not block the publish to the requested catalog, so the Private and Public legs of a release publish are independent. An existing version in the target catalog is refused with `Blueprint '<id>' already exists in catalog '<catalog>'. Use --force to replace` (the pipeline templates match the text `already exists in catalog`) and `-f` still replaces it; exit codes are unchanged. The catalog-wide `IsExistingAsync(blueprintId)` keeps its "any readable catalog" meaning for resolution and reads.
 
 `GitHubBlueprintCatalog.GetAsync` caches the parsed `blueprint.yaml` per `BlueprintId` in memory (published versions are immutable), so repeated lookups — e.g. resolving dependencies for a listing — cost one HTTP GET per blueprint and process. Failures are never cached; the entries are dropped on `Publish` / `Unpublish` / `UnpublishAllVersions` of that catalog. Callers receive a copy, not the cached instance.
 
@@ -1197,7 +1197,7 @@ Runtime blueprint operations against a tenant service are handled by `octo-cli`.
 | `UpdateBlueprint`             | Apply an update. `-m <mode>`, `-dr` (dry-run), `-nb` (no backup).      |
 | `UninstallBlueprint`          | Uninstall a blueprint. `-c` to cascade-uninstall dependents.           |
 
-See `octo-cli/CLAUDE.md` § "Blueprints" for the exact argument forms.
+See `octo-cli/docs/cli-usage-examples.md`, "Blueprints", for the exact argument forms.
 
 ## Best Practices
 

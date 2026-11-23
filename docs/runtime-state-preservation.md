@@ -1,6 +1,6 @@
 ---
 description: How blueprint and CK re-imports preserve runtime state and the attribute ownership markers (Secret, RuntimeState, TenantOwned, SeedOwned).
-applies_to: src/Runtime.Engine/Blueprints/**, src/Runtime.Engine/Exchange/**, src/Runtime.Contracts/Exchange/**, src/ConstructionKit.MsBuildTasks/**
+applies_to: src/Runtime.*/Blueprints/**, src/Runtime.*/Exchange/**, src/ConstructionKit.MsBuildTasks/**
 ---
 
 # Runtime-state preservation on re-import and attribute ownership
@@ -14,16 +14,16 @@ the import model's value, even attributes the author never meant to manage
 `Archive.Status`, …). Two observable failure modes: a "Deployed" adapter
 flips back to "Undeployed" on the next controller restart that picks up a
 blueprint version bump (the seed encodes `DeploymentState: 0` as the
-fresh-tenant default, AB#4582's sibling), and an **activated stream-data
+fresh-tenant default, a sibling case), and an **activated stream-data
 archive silently reverts to Disabled** on a blueprint re-apply or a plain
-`ImportRt -r` (AB#4582 / AB#4589), breaking SD queries with
+`ImportRt -r`, breaking SD queries with
 `STREAMDATA_ARCHIVE_NOT_ACTIVATED`.
 
 The fix is per-attribute, opt-in on the CK side, and lives at the **single
 import choke point** so every Upsert caller gets it automatically:
 
 - **CK schema**: `CkAttribute.ownership: SeedOwned | TenantOwned |
-  RuntimeState | Secret` (AB#5187), with `isRuntimeState: bool` kept as a
+  RuntimeState | Secret`, with `isRuntimeState: bool` kept as a
   deprecated alias. See `Serialization/Schema/construction-kit-elements-attribute.schema.json`,
   `AttributeOwnershipDto`, `CkAttributeDto`, and the propagation through
   `CkAttributeGraph` / `CkTypeAttributeGraph`. Existing CK models that set
@@ -43,7 +43,7 @@ import choke point** so every Upsert caller gets it automatically:
   warning and falls through to imported values rather than blocking the
   import. `Insert` is untouched (it errors on an existing id, so there is
   nothing to preserve).
-- **Per-import state (AB#6652)**: `ImportRtModelCommand` is transient, but
+- **Per-import state**: `ImportRtModelCommand` is transient, but
   scoped callers (`DefaultConfigurationCreatorService`, the seed re-import over
   all tenants) reuse one instance for many imports. `ResetImportState()` runs at
   the start of `ImportModelAsync`, `ImportTextAsync` and `ImportFileAsync` and
@@ -55,11 +55,10 @@ import choke point** so every Upsert caller gets it automatically:
   entries, Insert is rejected by the database with a duplicate key). Tests:
   `ImportRtModelCommandStateResetTests`. Imports on one instance must stay
   sequential.
-- **Mandatory-attribute validation (AB#4772, AB#7450)**: the bulk path bypasses the
+- **Mandatory-attribute validation**: the bulk path bypasses the
   entity rule engine, so `ImportRtModelCommand.FindMissingMandatoryMembers` applies
   the rule engine's insert predicate (not optional, no value, no default values, no
-  auto-increment reference; empty Secret = not set) to every imported entity. Since
-  AB#7450 it also recurses into every `Record` value and every item of a `RecordArray`
+  auto-increment reference; empty Secret = not set) to every imported entity. Since then it also recurses into every `Record` value and every item of a `RecordArray`
   value, nested records included (same recursion as `EntityRuleEngine.SetDefaultValuesOnInsert`);
   an absent or null record-valued attribute is not inspected, unresolvable records are
   skipped. A top-level violation is reported as the CK attribute id, a record member as
@@ -76,7 +75,7 @@ import choke point** so every Upsert caller gets it automatically:
     and the locked/merge import path) — the explicit pre-import preserve call
     that used to live in `BlueprintService` was removed; it is now automatic.
   - the plain `ImportRt -r` CLI path (`octo-bot-services` `ImportModelJob` →
-    `ImportAsync`) — the AB#4589 target (voest-app archive re-import).
+    `ImportAsync`) — the target (archive re-import).
   - CK-model migration entity writes (`BlueprintMigrationExecutor`, Upsert).
     Note: an additive migration that introduces a new runtime-state attribute
     on a pre-existing entity still lands its value (existing entity has no
@@ -92,7 +91,7 @@ import choke point** so every Upsert caller gets it automatically:
   in-memory, so the actual import stays a `ReplaceOne`. Fresh tenants /
   brand-new entities (no existing entity) are silent no-ops.
 
-- **Omitted preserved attributes are injected, not cleared (AB#5232)**: because
+- **Omitted preserved attributes are injected, not cleared**: because
   the upsert is a full `ReplaceOne`, a preserved attribute the import model
   *omits* would be cleared — and omission is the NORMAL seed shape for
   engine-owned bookkeeping that is null on a fresh tenant. The concrete
@@ -109,7 +108,7 @@ import choke point** so every Upsert caller gets it automatically:
   `RollupArchive.LastAggregatedBucketEnd` and `RollupArchive.FrozenUntil` as
   runtime-state to close the incident.
 
-- **Record-typed values need converting, not copying (AB#4784)**: the value
+- **Record-typed values need converting, not copying**: the value
   read from the repository is in *repository* shape, the import model holds
   *transport* shape. They coincide for every scalar type, which is why a raw
   assignment worked for the overwhelming majority of runtime-state attributes —
@@ -137,7 +136,7 @@ cover: flagged+both-sides → preserved; unflagged → imported value wins; mixe
 model-only (additive CK bump) → imported value lands; existing-only (model
 omits the attr) → no-op; multi-attribute independence; the stream-data
 `Archive.Status` activated-survives-re-import / fresh-import-keeps-Disabled cases;
-and (AB#4784) that the preserved value is handed to the converter rather than
+and that the preserved value is handed to the converter rather than
 copied raw — including the `RecordArray` case the suite was missing, which is why
 the bug shipped. The conversion itself is covered by
 `ImportRtModelCommandToTransportValueTests` against the real CK cache fixture
@@ -145,7 +144,7 @@ the bug shipped. The conversion itself is covered by
 missing record attribute stays omitted rather than nulled, scalar and string
 pass-through).
 
-#### Attribute Ownership (AB#5187)
+#### Attribute Ownership
 
 `isRuntimeState` answered two independent questions with one bit — *who owns
 the value on Upsert?* (preservation, `ImportRtModelCommand`) and *is the value
@@ -231,7 +230,7 @@ The `CkLintRuntimeStateMarkers` MSBuild task (opt-in per project via
 that declares neither (`OCTO-CK001`), both (`OCTO-CK003`), or an unknown
 ownership value (`OCTO-CK004`).
 
-Armed models (AB#6326 and earlier): System.Communication, System.Identity, System.Ai,
+Armed models (and earlier): System.Communication, System.Identity, System.Ai,
 System.Notification, Meshmakers.Accounting(.Tesla) via the package targets, and
 **System.StreamData in this repository**. This repository cannot consume its own
 MsBuildTasks package, so `Directory.Build.targets` registers the same task from
@@ -239,13 +238,13 @@ MsBuildTasks package, so `Directory.Build.targets` registers the same task from
 a reused node); a model project that sets `OctoEnforceRuntimeStateMarkers=true` adds a
 `ProjectReference` to `ConstructionKit.MsBuildTasks` with `ReferenceOutputAssembly="false"`
 for the build order (see `StreamDataCkModel.csproj`). System.StreamData got 56
-restating `ownership: SeedOwned` markers. They change the compiled file; since AB#6386 (equivalent-content rule, `CkPublishEquivalence`) the publish
+restating `ownership: SeedOwned` markers. They change the compiled file; (equivalent-content rule, `CkPublishEquivalence`) the publish
 gate treats such a restatement under an already published version as a no-op with a WARNING instead of `OCTO-CK205` (System.StreamData was bumped
 to 1.17.1 before that rule existed). Rule: a change of the compiled output that is a real content change (also a flipped ownership other than the
 default restated, `TenantOwned`/`Secret`) needs a version bump before it reaches main; a pure restatement of a default no longer does. The F4
 the F4
 retention attributes (`Archive.RawRetentionMs`, `Archive.MaxRetroactiveReachMs`) carry the
-comment "under review in AB#6328". `SystemCkModel` is not armed yet.
+comment "under review". `SystemCkModel` is not armed yet.
 
 **Review question for every new attribute:** could an operator or user type this value in
 the product? Yes → `TenantOwned` (or `Secret` for a credential); a service writes it →

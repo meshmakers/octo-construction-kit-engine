@@ -3,9 +3,9 @@ description: Write-up and evidence of the proof that two additive System release
 background: true
 ---
 
-# Proof: two additive System releases need zero dependent bumps (AB#6676, Epic AB#5584 F2.4)
+# Proof: two additive System releases need zero dependent bumps
 
-Claim of Feature AB#5686 / Phase 2 exit: after two consecutive additive System releases the installed dependents are **not** `ResolveFailed`,
+Claim of the Phase 2 exit: after two consecutive additive System releases the installed dependents are **not** `ResolveFailed`,
 need **no rebuild and no version bump**, the tenant keeps working, `LibraryStatus` shows them `Available`, and a breaking System change is caught
 before it reaches a tenant. This page describes the repeatable script, how to rerun it, and the evidence of the run of 2026-10-18 (local DebugL stack,
 engine `main` at `f914578d`, range retention as compiler default, engine PR #279).
@@ -22,7 +22,7 @@ tenants (`octo-cli -c LogIn -i --context local_OctoSystem`; machine client crede
 for admin calls, see `octoa`).
 
 The "mesh adapter is Online" wait (phases `tenant-pipeline`, `tenant-final`) parses the JSON of `GetAdapters -j` (`proof_lib.py adapter-online`), so compact and
-pretty-printed output both work (AB#6973; before, a grep for the spaced form never matched and a green run ended with a false FINDING after about 5 minutes).
+pretty-printed output both work (before, a grep for the spaced form never matched and a green run ended with a false FINDING after about 5 minutes).
 `scripts/prove-additive-system-releases.sh --selftest` checks that helper against both spacings, Offline and empty output without a stack.
 
 ```bash
@@ -60,13 +60,13 @@ before the adapter starts, hence the restart after `tenant-prep`:
 | System n+2 = 2.7.0 | **additive**: another optional attribute `RtProofNote2` on `Entity` and a new enum `ProofKind2` | same |
 | System n+3 = 2.8.0 | **breaking, declared as MINOR on purpose**: removes the attribute `DisplayName` (used by System.Identity, listed in its `usedSurface`) | same |
 | Basic 2.6.0 | **breaking, declared as MINOR**: removes the attribute `Iban` (used by Basic.Accounting) | `proof_lib.py make-dependent-break` |
-| System.Communication 4.10.0 | **additive**: a new enum (AB#4696 case) | `make-release --model System.Communication --kind additive-enum` |
+| System.Communication 4.10.0 | **additive**: a new enum | `make-release --model System.Communication --kind additive-enum` |
 | Per release | `ValidateVersion`, `ValidateCascade` (forced bumps = `NeedsRepin`), publish into the private catalog, **recompile of every dependent without editing its `ckModel.yaml`** and compare with its build before the release | offline phase |
 | Tenant | throw-away tenant with the 12 dependents and the service models installed; after each release: `LibraryStatus`, login, a pipeline run on the local mesh adapter (upsert of a `Basic/Tree` through the dependent type, no redeploy), a runtime query, a bot job (`RunFixupScripts -w`; the `ImportCk` job itself is one too), and a scan of the service logs for `not found in CkCache`, `has missing dependencies`, `marked as ResolveFailed`, `too old for the tenant` | tenant phases |
 
 "Build output changed" compares the compiled yaml of the dependent before and after the System release. With range retention the only difference is the
 resolved `dependencies:` closure line (`System-2.5.0 -> System-2.7.0`); the retained `dependencyRanges` (`System-[2.5,3.0)`, floor 2.5.0, `usedSurface`) and
-every `System@2/...` reference are byte-identical. That closure line is level `None` for SemVer (row D8, AB#5435): no bump, nothing to publish again.
+every `System@2/...` reference are byte-identical. That closure line is level `None` for SemVer (row D8): no bump, nothing to publish again.
 
 ## Evidence of the run (2026-10-18)
 
@@ -78,7 +78,7 @@ every `System@2/...` reference are byte-identical. That closure line is level `N
 | -------- | --------- | ----------------- | ---------- | ------ | ----------------------------- | ----------------------------------------------------- |
 | range retention (current) | System-2.6.0 (n+1) | VALID | 21 | 0 | **0** | **0 / 21** (resolved closure line only: 21) |
 | range retention (current) | System-2.7.0 (n+2) | VALID | 21 | 0 | **0** | **0 / 21** (closure line only: 21) |
-| classic exact pins (v1 baseline, engine `a9e5532d`) | System-2.6.0 | VALID | 0 | 0 | **21** | **21 / 21**, 14 of them do not even compile (`error 66`-class conflict, AB#5432) |
+| classic exact pins (v1 baseline, engine `a9e5532d`) | System-2.6.0 | VALID | 0 | 0 | **21** | **21 / 21**, 14 of them do not even compile (`error 66`-class conflict) |
 | classic exact pins | System-2.7.0 | VALID | 0 | 0 | **21** | **21 / 21**, 14 do not compile |
 
 Version bumps needed: 0 (range retention) against 21 (classic). `git status` of all 21 dependent source directories: clean.
@@ -97,7 +97,7 @@ System.Notification 2.6.0, System.StreamData 1.18.0.
 | baseline, System 2.5.0 | 20 Available, 0 ResolveFailed | ok | - | - | - | - |
 | import System-2.6.0 | 20 Available, 0 ResolveFailed | ok | Status 1 (success) | `Basic/Tree`: 1 instance | completed | 0 |
 | import System-2.7.0 | 20 Available, 0 ResolveFailed | ok | Status 1 | 1 instance | completed | 0 |
-| import System.Communication-4.10.0 (AB#4696 case) | 20 Available, 0 ResolveFailed | ok | Status 1 | 1 instance | completed | 0 |
+| import System.Communication-4.10.0 | 20 Available, 0 ResolveFailed | ok | Status 1 | 1 instance | completed | 0 |
 | **restart of all services** (embedded System 2.5.0 vs installed 2.7.0) | 20 Available, 0 ResolveFailed | ok | Status 1 | 1 instance | completed | 0 |
 
 Log line of the restart (the downgrade guard keeps the newer installed System; 110 occurrences, one per resolve):
@@ -144,8 +144,8 @@ No new bypass found; limitations 1 and 2 are the ones the platform owner accepte
 (run 1 of the day): the import job completed, `LibraryStatus` still listed every model `Available` (also in the database: `modelState` 1), and from then on every
 request of the tenant failed with `Failed loading tenant 'tmp-ab6676'. CkAttributeId 'System-2.8.0/DisplayName-1' of CkTypeId 'System.Identity-2.26.0/IdentityProvider-1' does not exist`;
 `Delete` of the tenant fails with the same message (no API path back; the tenant had to be dropped in MongoDB). The file import has no usedSurface check
-(the F2.5 guard of AB#6867/6870 covers `ImportFromCatalog`, batch import and `FixAll`), and the import's re-validation does not mark the dependents
-`ResolveFailed` for a removed attribute (known limitation D-M1 of `SoftResolveAsync`, CLAUDE.md). Expected by AC 4: refused, or the dependents leave `Available` with a reason.
+(the F2.5 guard covers `ImportFromCatalog`, batch import and `FixAll`), and the import's re-validation does not mark the dependents
+`ResolveFailed` for a removed attribute (known limitation D-M1 of `SoftResolveAsync`, documented in octo-construction-kit-engine-mongodb). Expected by AC 4: refused, or the dependents leave `Available` with a reason.
 
 **F2 (medium) - `CheckUpgrade` / `ImportFromCatalog` do not judge a System release.** System is service-managed: `ImportFromCatalog -m System-2.8.0` answers
 `No models need to be imported.` and `CheckUpgrade -m System-2.8.0` prints `Breaking Changes: False` although the release removes an attribute that System.Identity,
@@ -155,12 +155,12 @@ System the only protection against a breaking change is the pre-release gates (`
 **F3 (info, F2.6 scope) - published exact-pinned models turn incompatible.** After System 2.6.0/2.7.0 the `LibraryStatus` catalog column marks 15 catalog models
 `Incompatible` (before: 2): Test, CkHealthMonitoring, EnergyIQ, Loxone, Meshmakers.Accounting, Meshmakers.Accounting.Tesla, Monitoring, SmartMeterInsights,
 EnergyCommunity.Registration, Smoke.CkV2, Demo.Tickets, EnergyLanding.Community, FamilyOs, FdaSeen, Wwc26.Challenge (remote catalog models, none installed in the tenant).
-This is the AB#4696 population (published with exact pins before the flip); the proof does not cover them: they need the one-time re-pin (F2.6, AB#5688 / AB#6708).
+This is the population (published with exact pins before the flip); the proof does not cover them: they need the one-time re-pin (F2.6).
 The local cascade of the unfiltered catalogs shows the same 24 `NeedsRepin` dependents.
 
 **F4 (info) - the catalog entry `Test` is flagged `Incompatible`** in `LibraryStatus` although `CheckDependencies -m Test-1.1.0` (the local, range-retaining test model, `System-[2.0,3.0)`) says `[INSTALL]` against the service-managed System 2.7.0. The flag probably comes from an older exact-pinned `Test` entry of a remote catalog cache; not investigated here.
 
-## AB#4696 acceptance criterion 2 (Loxone-style pipeline case)
+## Acceptance criterion 2 (Loxone-style pipeline case)
 
 A pipeline whose node resolves a type of a dependent (`Basic/Tree`, created and queried through `GetOrCreateRtEntitiesByType`, `CreateUpdateInfo`, `ApplyChanges@2`,
 `GetRtEntitiesByType`) keeps running **without redeploy** after: System 2.6.0, System 2.7.0, an additive System.Communication 4.10.0 (the Loxone case: a communication
@@ -173,3 +173,28 @@ dependent on a bumped communication base) and a restart of all services; no `not
   (`octo-construction-kit` build); the offline part reads only sources.
 - Timings of the run (run 4/5 of the day, M-series Mac): offline ~75 s, tenant preparation ~35 s, stack restart ~110 s, import of one System release with all checks ~100 s.
 - The tenant evidence combines run 4 (fresh tenant: preparation, restart, System-2.6.0/2.7.0, restart, guard test) and run 5 (the same steps on that tenant after the script fixes: wait for the adapter, retry of the first pipeline run). Run 5 could not recreate the tenant because the stored user login of `local_OctoSystem` had been replaced by a client-credentials token (fixed in the script: `octoa`); the System.Communication-4.10.0 step ran on the same tenant right afterwards. A clean end-to-end rerun with a fresh user login is the first thing Ariadne does.
+
+## Proof: additive System releases need zero dependent bumps
+
+`scripts/prove-additive-system-releases.sh` (helpers in `scripts/ab6676/`, write-up and evidence in `docs/ck-additive-system-proof.md`) is the
+repeatable scenario behind the Phase 2 exit criterion "two consecutive additive System releases require zero dependent bumps, a breaking
+change is caught". It is **parameterised** (`--system-base`, compiler paths, tenant, context), **rerunnable** (work directory and tenant are recreated)
+and **restores the baseline** (throw-away tenant deleted; the stack's local catalog is only touched with `--guard-test` and is restored byte for byte).
+
+- **Offline phase** (no stack, no network): `octo-ckc` runs with a throw-away `HOME` whose `settings.json` switches both GitHub catalogs off, and every call
+  gets `-lcr <private catalog>`. It compiles System plus the dependents (the models of `octo-construction-kit` and the service models) from the
+  monorepo sources into a private catalog, derives System n+1 / n+2 (additive: a new optional attribute on `Entity`, later also a new enum) and a breaking
+  n+3 (removes `DisplayName`, declared MINOR on purpose) with `scripts/ab6676/proof_lib.py make-release`, and prints per release: `ValidateVersion`,
+  the `ValidateCascade` verdicts (forced bumps = `NeedsRepin`) and the number of dependents whose build output changes when they are recompiled
+  **without editing their `ckModel.yaml`** (the resolved `dependencies:` closure line is reported separately, SemVer row D8). With
+  `--classic-ckc <compiler built before engine commit 8f69cca1>` the same models are compiled with exact pins: that is the "before" row (v1 baseline).
+  Also: breaking System n+3 and Basic n+1 (`ValidateVersion` OCTO-CK100, cascade names the dependents) and five adversarial cases.
+- **Tenant phases** (need the local stack: `Start-Octo -nonInteractive $true ... -meshAdapterTenantId <tenant> -meshAdapterId 670000000000000000000002`,
+  `octo-cli`, a user context that may create/delete tenants): create a tenant, install the dependents (`ImportFromCatalog`), import System n+1 / n+2
+  with `ImportCk -f`, and after each: `LibraryStatus` (Available / ResolveFailed counts), login, a pipeline run on the local mesh adapter without redeploy
+  (upserts a `Basic/Tree`), a runtime query, a bot job and a scan of the service logs for `not found in CkCache` / `missing dependencies` /
+  `marked as ResolveFailed`. `--restart-cmd` restarts the stack after the tenant exists (the mesh adapter must register for it) and after n+2 (service
+  restart = embedded import with the downgrade guard: "downgrade prevented" in the log). `--guard-test` publishes the proof releases temporarily into the
+  stack's local catalog and runs `CheckUpgrade` / `ImportFromCatalog` (the tenant upgrade guard of F2.5).
+- Never use it against a shared environment. The forced `ImportCk -f` of the breaking System release (`--forced-file-import`) leaves the tenant
+  unloadable (finding F1 in the doc): throw-away tenant only, and it needs a manual database cleanup afterwards.

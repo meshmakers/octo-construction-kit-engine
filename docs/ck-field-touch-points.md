@@ -10,9 +10,9 @@ applies_to: src/ConstructionKit.Contracts/**, src/ConstructionKit.Engine/Seriali
 **Mandatory persistence gate:** every new meta-model field must pass the generic reflection round-trip gate in
 `octo-construction-kit-engine-mongodb` — `CkModelReflectionComparer` (F1.3-S3, H-M2 `c3a4911`) compares every
 public property of the compiled model after import → Mongo → read-back, so a field that is not written or not read
-back (the isRuntimeState class of bug, AB#4589) fails there. Row 10 below is not done until that gate is green.
+back (the isRuntimeState class of bug) fails there. Row 10 below is not done until that gate is green.
 
-**Mandatory classification gate (AB#6272):** every new meta-model field also needs a diff **and** a classifier rule.
+**Mandatory classification gate:** every new meta-model field also needs a diff **and** a classifier rule.
 `tests/ConstructionKit.Engine.Tests/SemVer/CkSemVerClassificationGuardTests.cs` fails, naming the item, when a public
 element-DTO property is neither in `CkModelDiffService.ComparedProperties` nor in `ExcludedProperties` (with a written
 reason), when a compared property has no probe in the guard's `PropertyProbes` or its probe yields no diff change,
@@ -21,7 +21,7 @@ of `CkSemVerClassifier` ("no classification rule …"), when a `CkModelElementKi
 rule rows of `docs/ck-semver-rules.md` (N*, I*, M*, T*, E*, R*, A*, B*, D*) and the tests named after them
 (`N1_…`) drift apart. To satisfy it: diff the field, list its shape, add a probe, add the classifier rule, add the
 docs row and its row test (`docs/ck-semver-rules.md`, "Classification guard"). Open items live only in the guard's
-`KnownGaps` list (each with its story); it must be empty when F2.1 closes (AB#6273). Row 7 below is not done until
+`KnownGaps` list (each with its story); it must be empty when F2.1 closes. Row 7 below is not done until
 that gate is green.
 
 | # | Touch point | `ckLanguage` | `interfaces` | `implements` | `access` | `methods` | `visibility` / `derivable` | interface completion (S5) |
@@ -37,16 +37,16 @@ that gate is green.
 | 9 | Docs generator | — | yes | yes | — | yes | yes (non-default only) | yes |
 | 10 | Mongo entity + write + read-back (gate: `CkModelReflectionComparer`, mandatory) | engine-mongodb (Persistence agent) | | | | | engine-mongodb (Persistence agent) | engine-mongodb (Persistence agent) |
 | 11 | GraphQL CK meta | asset-repo F1.5-S3 (CK meta introspection) | asset-repo F1.5-S2/S3 | asset-repo F1.5-S2 | asset-repo `CkTypeAttributeDtoType.access` | asset-repo F1.5-S3 | asset-repo F1.5-S3 | asset-repo F1.5-S2/S3 |
-| 12 | Studio CK browser query (refinery-studio `src/app/graphQL/`, AB#5924) — v2 fields go into the CK v2 follow-up documents run by `CkLanguage2Service`, **never** into the v1 queries (`getCkTypeDetails` etc. must keep working against asset repos without the CK v2 meta API; studio `CLAUDE.md` "CK language 2 in the CK browser") | `getCkModelsLanguage2` | `getCkInterfaces`, `getCkInterfaceDetails`, `getCkTypeLanguage2` | `getCkTypeLanguage2` | `getCkTypeAttributesAccess` | `getCkTypeLanguage2` | `getCkTypeLanguage2`, `getCkElementLanguage2` | `getCkInterfaceDetails` |
+| 12 | Studio CK browser query (refinery-studio `src/app/graphQL/`) — v2 fields go into the CK v2 follow-up documents run by `CkLanguage2Service`, **never** into the v1 queries (`getCkTypeDetails` etc. must keep working against asset repos without the CK v2 meta API; octo-frontend-refinery-studio, section "CK language 2 in the CK browser") | `getCkModelsLanguage2` | `getCkInterfaces`, `getCkInterfaceDetails`, `getCkTypeLanguage2` | `getCkTypeLanguage2` | `getCkTypeAttributesAccess` | `getCkTypeLanguage2` | `getCkTypeLanguage2`, `getCkElementLanguage2` | `getCkInterfaceDetails` |
 
-**`usedSurface` (AB#4472) touch points**, same numbering: (2) compiled schema `dependencyRanges[].usedSurface` /
+**`usedSurface` touch points**, same numbering: (2) compiled schema `dependencyRanges[].usedSurface` /
 `usedSurfaceHash`; (3) `CkModelDependencyDto.UsedSurface` / `UsedSurfaceHash`; (4) computed by `CkUsedSurfaceCollector`
 in `CatalogModelResolver.ApplyRangeRetentionAsync` (range retention only, so v1 output is unchanged); (7) documented
 exclusion in `CkModelDiffService.ExcludedProperties` (row D7); (10) engine-mongodb `CkModelDependency.UsedSurface` /
-`UsedSurfaceHash` (reflection gate via the C# kitchen sink); consumer: F2.5 (AB#5687). Rules and limits:
+`UsedSurfaceHash` (reflection gate via the C# kitchen sink); consumer: F2.5. Rules and limits:
 `docs/ck-semver-rules.md`, "usedSurface".
 
-**`compatibility.acknowledge` (AB#6295) touch points**, same numbering: (1) meta schema `compatibility.acknowledge[]`
+**`compatibility.acknowledge` touch points**, same numbering: (1) meta schema `compatibility.acknowledge[]`
 (`change` without wildcards, `reason` non-blank); (2) compiled schema, same shape; (3) `CkMetaRootDto.Compatibility`,
 `CkModelCompileCandidate.Compatibility`, `CkCompiledModelRoot.Compatibility` (`CkCompatibilityDto`, `CkAcknowledgeDto`);
 (4) `CompilerService` -> `CkCompatibilityValidator` -> candidate -> `CatalogModelResolver.CompileAsync` (omitted when
@@ -57,25 +57,25 @@ matched against the diff by `CkAcknowledgementResult`, they are not model struct
 (`CkCompiledModelRoot.Compatibility`: build and publish-time metadata, read from the catalog JSON by the publish gate, not
 needed in tenants); (11), (12) not needed. Rules: `docs/ck-semver-rules.md`, "Acknowledge".
 
-**`execution.handler` (AB#6877, F3.1) touch points**, same numbering (the field lives in `CkMethodExecutionDto`, next to
+**`execution.handler` (F3.1) touch points**, same numbering (the field lives in `CkMethodExecutionDto`, next to
 `timeoutSeconds` / `idempotent`; values `service` (default) and `pipeline`, the string constants of `CkMethodHandlers`;
 `null` = omitted = `service`, so existing models serialize byte-identically): (1) method schema
 `CkMethodExecution.handler` (plain string, no `enum`: an unknown value is message 131 with the method id, not a schema
 error); (2) compiled schema via the shared `$ref`; (3) `CkMethodExecutionDto.Handler` (`string?`, `OmitNull`);
 (4) copied by reference with `Methods`; (5) `CkMethodGraph.Handler` (`[JsonIgnore]`, derived from the definition that
 the graph already serializes); (6) message 131 (unknown value, `pipeline` without explicit `timeoutSeconds`, `pipeline`
-on an interface method) and message 132 (AB#7004: `pipeline` with a `sensitive` parameter); (7) diff property `handler` (effective value, so adding `handler: service` is no change),
+on an interface method) and message 132 (`pipeline` with a `sensitive` parameter); (7) diff property `handler` (effective value, so adding `handler: service` is no change),
 classifier row **M15** (service ↔ pipeline = Major), guard probe, `signature` summary shows `, handler pipeline` only for
 the non-default; (8) — (parameter/result records and id constants are generated as before); (9) `Types.md` marks a
-non-default method `(handler: pipeline)`; (10) **follow-up AB#6878** (engine-mongodb `CkMethodExecution` map +
-`CkModelReflectionComparer` gate — until then a tenant document drops the value on import); (11) **follow-up AB#6878**
-(asset-repo CK meta); (12) optional, Studio. Runtime routing of `pipeline` methods: AB#6879. Tests:
+non-default method `(handler: pipeline)`; (10) **follow-up** (engine-mongodb `CkMethodExecution` map +
+`CkModelReflectionComparer` gate — until then a tenant document drops the value on import); (11) **follow-up**
+(asset-repo CK meta); (12) optional, Studio. Runtime routing of `pipeline` methods. Tests:
 `CkV2MethodResolverTests` (`Code131_*`, `Code132_*`), `CkV2CompileTests.MethodHandler_*`, `CkV2GraphJsonRoundTripTests`,
 `MethodRowTests.M15_*`.
 
-**`replacesGenericCreate` (AB#7024, F3.7) touch points**, same numbering (the field lives on `CkMethodDto` itself, next to
+**`replacesGenericCreate` (F3.7) touch points**, same numbering (the field lives on `CkMethodDto` itself, next to
 `kind` / `visibility`; `bool`, omitted = `false`; a static method that is the only way to create entities of its type, the
-refusal of the generic create is enforced by the asset repository, AB#7025): (1) method schema `CkMethod.replacesGenericCreate`
+refusal of the generic create is enforced by the asset repository): (1) method schema `CkMethod.replacesGenericCreate`
 (boolean; the model-language key needs a **schema release** at schemas.meshmakers.cloud, a catalog model must not use it
 before that); (2) compiled schema via the shared `$ref`; (3) `CkMethodDto.ReplacesGenericCreate` (`OmitDefaults` in YAML,
 `JsonIgnore(WhenWritingDefault)` in JSON, so models that do not use the key serialize byte-identically); (4) copied by
@@ -85,7 +85,7 @@ concrete type incl. inherited ones) and message 90 in a v1 model (`ElementResolv
 `replacesGenericCreate`, classifier row **M16** (`false` → `true` Major, `true` → `false` Minor, a new flagged method on a type of the previous version is Major too — the diff emits the `false` → `true` change for it —, on a new type Minor),
 guard probe, `signature` summary shows `, replaces generic create` only when set; (8) — (no generated code depends on it);
 (9) `Types.md` marks the method `(replaces generic create)`; (10) engine-mongodb `CkMethod.ReplacesGenericCreate`
-(reflection gate); (11) asset-repo CK meta + refusal: AB#7025; (12) optional, Studio. **minEngineVersion:**
+(reflection gate); (11) asset-repo CK meta + refusal; (12) optional, Studio. **minEngineVersion:**
 `CkEngineVersion.GetRequiredMinEngineVersion` raises the value to `ReplacesGenericCreateMinEngineVersion` for a model with
 a flagged method (models without it keep `CkV2MinEngineVersion`; dependents inherit it through their dependencies), so an
 engine that predates the field refuses the model with message 126 instead of silently dropping the flag and serving the
@@ -93,10 +93,10 @@ generic create. The constant must equal the number of the release that first shi
 `CkV2MethodResolverTests` (`Code133_*`, `Code90_*`), `CkV2CompileTests.ReplacesGenericCreate_*`,
 `CkV2GraphJsonRoundTripTests.ReplacesGenericCreate_*`, `CkEngineVersionTests`, `MethodRowTests.M16_*`.
 
-**Method result `sensitive` (AB#7006, F3.4) touch points**, same numbering (the field lives on `CkMethodResultDto`, next to
+**Method result `sensitive` (F3.4) touch points**, same numbering (the field lives on `CkMethodResultDto`, next to
 `valueType`; `bool`, omitted = `false`; it marks the **whole** result value — scalar, enum or record — as never to be logged,
 audited or traced; per-attribute marking inside a record result is out of scope; a `Secret` value type is **not** sensitive
-implicitly, the marker is explicit; the redaction itself is enforced at runtime, AB#7007, the GraphQL exposure is AB#7008):
+implicitly, the marker is explicit; the redaction itself is enforced at runtime, the GraphQL exposure is tracked separately):
 (1) method schema `CkMethodResult.sensitive` (boolean; the model-language key needs a **schema release** at
 schemas.meshmakers.cloud, a catalog model must not use it before that; an older compiler refuses the key loudly because the
 definition has `additionalProperties: false`); (2) compiled schema via the shared `$ref`; (3) `CkMethodResultDto.Sensitive`
@@ -111,7 +111,7 @@ or removed is one `result` change, row M6), classifier row **M17** (`false` → 
 a contract property), guard probe `CkMethodResultDto.Sensitive`, the method `signature` summary appends ` sensitive` to the
 result; (8) source generator: the generated `{Type}{Method}Result` gets a `ToString()` override printing `Value = ***` for a
 sensitive result (unchanged record rendering otherwise); (9) `Types.md` marks the result column `(sensitive)`; (10) engine-mongodb
-`CkMethodResult.Sensitive` (reflection gate, legacy document); (11) asset-repo CK meta: AB#7008; (12) optional, Studio.
+`CkMethodResult.Sensitive` (reflection gate, legacy document); (11) asset-repo CK meta; (12) optional, Studio.
 **minEngineVersion:** `CkEngineVersion.GetRequiredMinEngineVersion` raises the value to `SensitiveResultMinEngineVersion` for a
 model in which any type **or interface** method has a sensitive result (the maximum with the other markers; models without it
 keep their minimum), so an engine that predates the field refuses the model with message 126 instead of silently dropping the
@@ -120,7 +120,7 @@ marker (fail-open: nothing would be redacted). The constant must equal the numbe
 `CkV2CompileTests.SensitiveResult_*`, `CkV2GraphJsonRoundTripTests.SensitiveResult_*`, `CkV2GeneratedContractsTests`,
 `CkEngineVersionTests`, `MethodRowTests.M17_*`, `CkV2SchemaTests`.
 
-**`execution.mode` (AB#6925, F3.6) touch points**, same numbering (the field lives in `CkMethodExecutionDto`, next to
+**`execution.mode` (F3.6) touch points**, same numbering (the field lives in `CkMethodExecutionDto`, next to
 `timeoutSeconds` / `idempotent` / `handler`; values `sync` (default) and `async`, the string constants of `CkMethodModes`;
 `null` = omitted = `sync`, so existing models serialize byte-identically; `async` means a call returns an operation handle once
 the handler has accepted the work, and `timeoutSeconds` bounds that accept step, not the operation — decision OD-5,
@@ -133,25 +133,25 @@ that redeclares an interface method keeps its mode; (7) diff property `mode` (ef
 change), classifier row **M19** (sync ↔ async = Major; on an interface method also I12, `mode` is in
 `CkMethodContract.MethodProperties`), guard probe `CkMethodExecutionDto.Mode`, the method `signature` summary shows `, mode async`
 only for the non-default; (8) — (no generated code depends on it); (9) `Types.md` and `Interfaces.md` mark a non-default method
-`(mode: async)`; (10) engine-mongodb, AB#6926: the value is persisted inside the embedded
+`(mode: async)`; (10) engine-mongodb: the value is persisted inside the embedded
 `CkMethodDto.Execution` (class map `CkMethodExecutionDto`, `SetIgnoreIfNull`, covered by the reflection gate); an undeclared
 mode is left out of the document and a document written before the field reads back as `null`, i.e. the effective mode `sync`
-(`CkMethodModes.Effective`); (11) asset-repo CK meta `CkMethodExecution.mode: String!` (effective value), AB#6926; (12) optional,
+(`CkMethodModes.Effective`); (11) asset-repo CK meta `CkMethodExecution.mode: String!` (effective value); (12) optional,
 Studio. **Schema:** the method schema reaches model authors only through the schema publish path (see "JSON schema publish
-path" under "Working with Construction Kit Models"), AB#8522.
+path" in `docs/ck-schema-and-json-serialization.md`).
 **minEngineVersion:** `CkEngineVersion.GetRequiredMinEngineVersion` raises the value to `ExecutionModeMinEngineVersion` for a
 model in which any type **or interface** method sets `execution.mode` (also `sync`; the maximum with the other markers; models
 without the key keep their minimum and compile byte-identically), so an older CK v2 engine refuses the model with message 126
-instead of dropping the key and running an `async` method as sync (decision Odin, AB#6925). The constant must equal the number of
+instead of dropping the key and running an `async` method as sync (decision Odin). The constant must equal the number of
 the release that first ships the field (the next patch after the last `r3.5.x` tag at merge time; `3.5.67` when `r3.5.66` was the
-last tag). The runtime that produces operation handles is F3.6 (AB#8443 ff.). Tests: `CkV2MethodResolverTests` (`Code142_*`,
+last tag). The runtime that produces operation handles is F3.6. Tests: `CkV2MethodResolverTests` (`Code142_*`,
 `Code122_*Mode*`), `CkV2CompileTests.MethodMode_*`, `CkV2GraphJsonRoundTripTests.AsyncMode_*`, `CkV2SchemaTests`,
 `MethodRowTests.M19_*`, `InterfaceRowTests.I12_*` (case `mode changed`), `CkEngineVersionTests` (`*ExecutionMode*`).
 
-**Method `authorization.dataAccess` (AB#7036, F3.4b) touch points**, same numbering (the field lives on `CkMethodAuthorizationDto`,
+**Method `authorization.dataAccess` (F3.4b) touch points**, same numbering (the field lives on `CkMethodAuthorizationDto`,
 next to `roles` / `allowSelf` / `scopes`; enum `CkMethodDataAccessDto` `Read` | `Write`, PascalCase like `visibility`; nullable, omitted =
 `Write`; it declares the data permission a caller needs on the target record of the method call — `Read` = the method only reads its
-target, a read grant suffices; the gateway check that consumes it is AB#7037, nothing in the engine enforces it): (1) method schema
+target, a read grant suffices; the gateway check that consumes it is tracked separately, nothing in the engine enforces it): (1) method schema
 `CkMethodAuthorization.dataAccess` (string enum `Read`/`Write`; the model-language key needs a **schema release** at
 schemas.meshmakers.cloud, a catalog model must not use it before that; an older compiler refuses the key loudly because the definition has
 `additionalProperties: false`); (2) compiled schema via the shared `$ref`; (3) `CkMethodAuthorizationDto.DataAccess`
@@ -165,7 +165,7 @@ method access widened", change key `TypeMethod:<Type>/<Method>#Modified:dataAcce
 `CkMethodAuthorizationDto.DataAccess`, the method `signature` summary appends `, dataAccess Read` only for `Read`; (8) source generator: the
 generated `{Type}{Method}Parameters` record gets `public const CkMethodDataAccessDto CkDataAccess` (effective value); (9) `Types.md` marks a
 `Read` method `(data access: Read)`, nothing for the default; (10) engine-mongodb `CkMethodAuthorization.DataAccess` (reflection gate);
-(11) asset-repo CK meta and (12) Studio: not part of AB#7036, cut when Studio needs to show the field. **minEngineVersion:**
+(11) asset-repo CK meta and (12) Studio: not part, cut when Studio needs to show the field. **minEngineVersion:**
 `CkEngineVersion.GetRequiredMinEngineVersion` raises the value to `DataAccessMinEngineVersion` for a model in which any type **or interface**
 method declares `dataAccess` (also `Write`; the maximum with the other markers; models without it keep their minimum), so an engine that
 predates the field refuses the model with message 126 instead of dropping the key and treating a `Read` method as `Write`. The constant must
@@ -173,9 +173,9 @@ equal the number of the release that first ships the field (the next patch after
 the last tag). Tests: `CkV2MethodResolverTests` (`Code135_*`), `CkV2CompileTests.DataAccess_*`, `CkV2GraphJsonRoundTripTests.DataAccess_*`,
 `CkV2GeneratedContractsTests`, `CkEngineVersionTests`, `MethodRowTests.M18_*`, `CkV2SchemaTests`.
 
-**Type `writeAccess` (AB#8574) touch points**, same numbering (the block lives on `CkTypeDto.WriteAccess`,
+**Type `writeAccess` touch points**, same numbering (the block lives on `CkTypeDto.WriteAccess`,
 `CkTypeWriteAccessDto { Principals, Channels }`, constants `CkWritePrincipals`; `null` = omitted = unrestricted, so
-existing models serialize byte-identically; full description `docs/ck-type-write-access.md`): (1) type schema
+existing models serialize byte-identically; full description `docs/data-permissions.md`): (1) type schema
 `CkType.writeAccess` / `CkCompiledType.writeAccess` -> shared definition `CkTypeWriteAccess` (`additionalProperties:
 false`, values as plain strings: an unknown value is message 143, an unknown key message 27; needs a **schema release**);
 (2) compiled schema, same definition; (3) `CkTypeDto.WriteAccess` (`OmitNull`, `JsonIgnore(WhenWritingNull)`);
@@ -194,7 +194,7 @@ the bulk import paths for non-system sessions, and the caller path of `ImportRtM
 (default `Unknown`, refused by restricted types) and `RtSecurityContext.WriteChannel` (set only by service code,
 `WithWriteChannel`) carry the caller; `RtImportCallerContext` has the same two properties. Tests: see the doc.
 
-**`securitySensitive` (AB#6269) touch points**, same numbering: (1) attribute schema `CkAttribute.securitySensitive`;
+**`securitySensitive` touch points**, same numbering: (1) attribute schema `CkAttribute.securitySensitive`;
 (2) compiled schema via the shared `$ref`; (3) `CkAttributeDto.SecuritySensitive` (`bool?`, omitted when null); (4) copied
 by reference; (5) `CkAttributeGraph.SecuritySensitive`, omitted from the cache JSON while false (`OmitCkV2Defaults`);
 (6) message 90 in a v1 model; (7) diff property `securitySensitive`, rows A3 and T7, guard probe; (8) —;

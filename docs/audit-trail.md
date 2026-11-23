@@ -18,8 +18,8 @@ Runtime.Contracts/AuditTrails/
 
 Runtime.Engine/AuditTrails/
   LoggingAuditEventSink   — default; writes structured logs via ILogger
-  AggregatingAuditEventSink — decorator for repeated facts (AuditEvent.AggregationKey), AB#7279
-  DataPermissionAudit     — builds + counts the data-permission violation events, AB#7279
+  AggregatingAuditEventSink — decorator for repeated facts (AuditEvent.AggregationKey)
+  DataPermissionAudit     — builds + counts the data-permission violation events
   NoOpAuditEventSink      — opt-in silence (tests, hosts that explicitly want events dropped)
 
 Runtime.Engine/{CkModelMigrations,StreamData}/
@@ -37,7 +37,7 @@ Runtime.Engine/{CkModelMigrations,StreamData}/
 A host that wants events in the platform event log replaces step 1 only — see
 `EventRepositoryAuditEventSink` in `octo-common-services`.
 
-**Why this shape (history matters):** WI #3324 originally landed a per-interface bridge
+**Why this shape (history matters):** originally landed a per-interface bridge
 (`EventRepositoryCkModelImportAuditTrail`) in `octo-common-services` that ctor-captured
 `IEventRepository`. That closed a DI bootstrap cycle:
 `SystemContext.ctor → IDatabaseCkModelRepository → ICkModelImportAuditTrail (bridge)
@@ -59,9 +59,9 @@ interfaces are added later.
 3. Register the forwarder in `AddRuntimeEngine` next to the existing ones.
 
 **Never** add a host-side bridge class that ctor-captures `IEventRepository` or
-`ISystemContext` — that re-introduces the WI #3324 cycle. Use the sink.
+`ISystemContext` — that re-introduces the earlier bridge cycle. Use the sink.
 
-### Aggregation of repeated audit events (AB#7279)
+### Aggregation of repeated audit events
 
 AuditOnly data-permission violations are published per repository call (prod-1: ~1 million
 `[Audit:DataPermissions.ReadViolation]` lines a day from 54 (tenant, subject, type) keys). They are

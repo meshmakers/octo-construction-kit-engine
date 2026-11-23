@@ -1,6 +1,6 @@
 ---
 description: BlueprintService internals: tenant CK upgrade guard, replacesGenericCreate preflight, ImportRt and export access rules, identity-owned fields, bulk import.
-applies_to: src/Runtime.Engine/Blueprints/**, src/Runtime.Contracts/Blueprints/**, src/Runtime.Engine/Exchange/**, src/Runtime.Contracts/Exchange/**
+applies_to: src/Runtime.*/Blueprints/**, src/Runtime.*/Exchange/**
 ---
 
 # Blueprint engine: upgrade guard, generic-create guard, import and export rules
@@ -14,14 +14,14 @@ Blueprints initialize tenants with pre-configured CK models and runtime data. Se
 
 Key services:
 - `IBlueprintService` - Applies blueprints to tenants
-- `IBlueprintCkUpgradeGuard` (host-registered, optional) - tenant upgrade guard for the CK models a blueprint installs or raises (CK v2 F2.5, AB#6871), see below
-- `IStreamDataTenantServicesProvider` (host-registered, optional, `Runtime.Contracts/StreamData`; engine-mongodb `TenantStreamDataServicesProvider`) - after the seed import `BlueprintService` activates the archives the seed created (raw first, rollups in source order; pre-existing archives never touched; `archiveActivation.exclude` opt-out; AB#7984 guard: no backfill for TimeWeightedAvg/StateDuration rollups over a raw source) and queues the backfill of new rollups through `BlueprintArchiveActivator`; results in `ArchiveActivations` (AB#7991). Without a provider new archives stay Created. Rules: `docs/blueprints.md`, "Archives and rollups in a blueprint"; tests `BlueprintArchiveActivatorTests`, `BlueprintServiceArchiveActivationTests`
+- `IBlueprintCkUpgradeGuard` (host-registered, optional) - tenant upgrade guard for the CK models a blueprint installs or raises (CK v2 F2.5), see below
+- `IStreamDataTenantServicesProvider` (host-registered, optional, `Runtime.Contracts/StreamData`; engine-mongodb `TenantStreamDataServicesProvider`) - after the seed import `BlueprintService` activates the archives the seed created (raw first, rollups in source order; pre-existing archives never touched; `archiveActivation.exclude` opt-out guard: no backfill for TimeWeightedAvg/StateDuration rollups over a raw source) and queues the backfill of new rollups through `BlueprintArchiveActivator`; results in `ArchiveActivations`. Without a provider new archives stay Created. Rules: `docs/blueprints.md`, "Archives and rollups in a blueprint"; tests `BlueprintArchiveActivatorTests`, `BlueprintServiceArchiveActivationTests`
 
-#### Tenant upgrade guard in `BlueprintService` (CK v2 F2.5, AB#6871)
+#### Tenant upgrade guard in `BlueprintService` (CK v2 F2.5)
 
 A blueprint installs the floor of each `ckModelDependencies` range as an exact model version, so an apply or update can replace an installed model
 exactly like `ImportFromCatalog`. `BlueprintService` therefore asks an optional host service, `IBlueprintCkUpgradeGuard`
-(`Runtime.Contracts/Blueprints/IBlueprintCkUpgradeGuard.cs`; the guard of AB#6867 lives in engine-mongodb and needs the catalogs, so the host -
+(`Runtime.Contracts/Blueprints/IBlueprintCkUpgradeGuard.cs`; the guard lives in engine-mongodb and needs the catalogs, so the host -
 asset-repo - implements the interface), to judge the **CK update set as one set** before anything is installed:
 
 - **Update set** (`EvaluateCkUpgradeGuardAsync`): every dependency whose floor is above the installed version or that is not installed
@@ -41,7 +41,7 @@ asset-repo - implements the interface), to judge the **CK update set as one set*
   true, `IsCkUpgradeBlocked` + blockers are reported, nothing is written.
 - Tests: `tests/Runtime.Engine.Tests/Blueprints/BlueprintServiceCkUpgradeGuardTests.cs`.
 
-#### Blueprint apply and `replacesGenericCreate` (AB#7121, F3.7)
+#### Blueprint apply and `replacesGenericCreate` (F3.7)
 
 A blueprint never runs a CK method, so a seed would skip what the method of a `replacesGenericCreate` type guarantees
 (certificate, provisioning). `BlueprintGenericCreateGuard.FindRefusalsAsync` (Runtime.Engine/Blueprints) is the preflight;
@@ -57,7 +57,7 @@ An entity whose rtId exists is upserted as before. It runs before the import at 
   `ContinueOnError` does not soften it; the errors are `OCTO-CK136: <text>` strings in `BlueprintUpdateResult.Errors`;
 - `BlueprintMigrationExecutor.ExecuteAddAsync` (migration `Add` step): the step fails with the same `OCTO-CK136` text
   (not for `DryRun`, which writes nothing).
-Out of scope on purpose: `CkModelMigrationService` (a model migration, not a blueprint), `ApplyChanges` (AB#7120), an opt-out
+Out of scope on purpose: `CkModelMigrationService` (a model migration, not a blueprint), `ApplyChanges`, an opt-out
 flag (`ImportRt` has its own check, next section). The lookup itself is public: `GenericCreateReplacement.FindReplacingMethod(CkTypeGraph)`
 / `TryGetReplacingMethod(ICkCacheService, tenantId, RtCkId<CkTypeId>, out CkMethodGraph)` and the shared reason token
 `GenericCreateReplacement.ReasonToken` live in `ConstructionKit.Contracts` (`DependencyGraph`); asset-repo's
@@ -65,7 +65,7 @@ flag (`ImportRt` has its own check, next section). The lookup itself is public: 
 table of `ConstructionKit.Engine` is `internal`; the assembly makes it visible to `Meshmakers.Octo.Runtime.Engine` for this
 message. Tests: `BlueprintGenericCreateRefusalTests` (type graphs are built in the test, no System version involved).
 
-#### `System.Identity/User` is created only through `User.CreateUser-1` (AB#7777, AB#8053)
+#### `System.Identity/User` is created only through `User.CreateUser-1`
 
 System.Identity 3.0.0 sets `replacesGenericCreate: true` on the static `User.CreateUser-1` in the model (row M16, part of the
 major), so `GenericCreateReplacement.FindReplacingMethod` answers it from the flag like for every other type. A user is created
@@ -76,12 +76,12 @@ query-row create, MCP create, the mesh-adapter insert pre-check (`GenericCreateG
 blueprint seed data, update diff and migration `Add` (136). An existing user (rtId stored) is updated as before. Not affected: the
 identity service's repository writes, the system import path of `ImportRt` without a caller (no blueprint guard there), a tenant
 restore. **History:** System.Identity 2.29.0 - 2.30.0 could not carry the flag (a Major) and the engine stood in for it with a
-runtime rule in `GenericCreateReplacement` (AB#7777); that rule was removed with AB#8053. A tenant still on System.Identity 2.x
+runtime rule in `GenericCreateReplacement`; that rule was removed. A tenant still on System.Identity 2.x
 (until the identity service has imported 3.0.0 into it) keeps the generic create of a user. Tests:
 `GenericCreateReplacementIdentityUserTests`, `ImportRtModelCommandGenericCreateTests` (`*IdentityUser*`),
 `BlueprintGenericCreateRefusalTests` (`*IdentityUser*`).
 
-#### `ImportRt` and `replacesGenericCreate` (AB#7107, F3.7)
+#### `ImportRt` and `replacesGenericCreate` (F3.7)
 
 A user-initiated `ImportRt` (`ImportAsCallerAsync`, the `caller != null` path that bot-services uses) cannot create a **new**
 entity of a type whose static method declares `replacesGenericCreate` (own or inherited), exactly as the GraphQL generic create
@@ -101,12 +101,12 @@ method cost no read, one batched read per flagged type).
   tenant that does not hold them is therefore not possible with `ImportRt`; use a restore or the method.
 - Tests: `ImportRtModelCommandGenericCreateTests`.
 
-#### RT export and import honour `access` (AB#7767, F4.2; findings H2/H3)
+#### RT export and import honour `access` (F4.2, findings H2/H3)
 
 `access: Hidden` / `MethodOnly` used to restrict only asset-repo GraphQL. The RT exchange paths now keep the promise too.
 The rule lives in one place on the CK graph: `AttributeAccess.IsReadableOutsideMethod` (not `Hidden`) and
 `AttributeAccess.IsWritableOutsideMethod` (`ReadWrite`/`ReadOnly`), exposed as `CkTypeAttributeGraph.IsReadableOutsideMethod` /
-`IsWritableOutsideMethod`. Asset-repo `AccessQueryGuard`, the mesh adapter (AB#7768) and the MCP service can call these instead of
+`IsWritableOutsideMethod`. Asset-repo `AccessQueryGuard`, the mesh adapter and the MCP service can call these instead of
 testing the enum inline.
 - **Export** (`RtEntityToTcDtoConverter`, the only export converter): a `Hidden` attribute is never emitted - type attributes and
   record members one by one (the loop is re-entered for records, same granularity as ownership). `MethodOnly` and `ReadOnly`
@@ -125,36 +125,35 @@ testing the enum inline.
   through `ApplyAttributeUpdate`) refuse a `Hidden`/`MethodOnly` target or source attribute for the whole step before the first
   entity is replaced (`EnsureWritableOutsideMethod`; `rtId` is `000...` in that message, a step has no single entity).
 - **Round trip**: an export that contains `MethodOnly` values cannot be imported again (139). A tenant restore works on MongoDB
-  directly and is unaffected. No published model uses `Hidden`/`MethodOnly` yet (first: System.Identity, AB#7772).
+  directly and is unaffected. No published model uses `Hidden`/`MethodOnly` yet (first: System.Identity).
 - Tests: `RtAttributeAccessCheckTests`, `RtEntityToTcDtoConverterAccessTests`, `ImportRtModelCommandAttributeAccessTests`,
   `BlueprintAttributeAccessRefusalTests` (synthetic graph `Access/AccessTestModel.cs`).
 
-#### Identity-owned User fields and identity associations (AB#8042, AB#8053, F4.2)
+#### Identity-owned User fields and identity associations (F4.2)
 
 **Attributes: the model says it (System.Identity 3.0.0).** The identity-owned attributes of `System.Identity/User` -
 `NormalizedUserName`, `NormalizedEmail`, `EmailConfirmed`, `PhoneNumberConfirmed`, `TwoFactorEnabled`, `LockoutEnabled`,
 `LockoutEnd`, `AccessFailedCount`, `ResetPasswordOnLogin`, `Claims`, `UserLogins`, `PreferredChannelBindingId` (with `UserName` and
 `Email` from 2.28.0 twelve in all) - are `access: MethodOnly` in `ck-user.yaml`. There is no attribute list in the engine any more
-(AB#8053 removed `UserAttributeNames` / `IsIdentityOwnedAttribute` / `IsUserType`): the generic access rules enforce it for every
+(removed `UserAttributeNames` / `IsIdentityOwnedAttribute` / `IsUserType`): the generic access rules enforce it for every
 model - asset-repo GraphQL and query rows (`ATTRIBUTE_NOT_WRITABLE`), `ImportRt` and blueprint seeds (rule 139, every path), the
 mesh-adapter write nodes (`RtAttributeAccessGuard`). `ReadOnly` would not do (it is importable), which is why `LockoutEnd` and
-`AccessFailedCount` went from `ReadOnly` to `MethodOnly`. Differences to the AB#8042 list: the system path (blueprint seed,
+`AccessFailedCount` went from `ReadOnly` to `MethodOnly`. Differences to the list above: the system path (blueprint seed,
 `ImportModelAsync`) refuses a value for these attributes too (139; no blueprint seeds a User), and a GraphQL refusal no longer
 carries `reason = identity-owned` but the generic access detail. The identity service writes through its own repository and the
 tenant restore works on MongoDB: neither is guarded.
-- **Omission (AB#8059, now general):** a caller `Upsert` is a full replace, and the blanking guard alone would let an omitted value
+- **Omission (now general):** a caller `Upsert` is a full replace, and the blanking guard alone would let an omitted value
   go under `RtImportBlankingPolicy.Allow` or a confirmation (a lockout reset by leaving `LockoutEnd` out). On the caller path
   `PreserveRuntimeStateAttributesAsync` therefore treats **every attribute that is not writable outside a method** (`access`
   `MethodOnly` or `Hidden`, `!IsWritableOutsideMethod`) like runtime state: the existing value is carried over, whatever the policy
   (flag `_callerImport`, set by `ImportFileAsync` only). The system path keeps the blanking semantics. Tests:
   `ImportRtModelCommandIdentityOwnedTests` (`CallerUpsert_*`, `SystemUpsert_*`).
-- **Omission inside records (AB#8141): merge.** The attribute rule alone left a hole: a record attribute `R` whose record has a member `M`
+- **Omission inside records: merge.** The attribute rule alone left a hole: a record attribute `R` whose record has a member `M`
   with `access: MethodOnly` or `Hidden` is replaced as a whole by an upsert, so a file that writes `R` without `M` dropped the stored
-  `R.M`. On the caller path `PreserveSecretRecordMembers` (the AB#5532 Secret carry-over, now with the optional `convertProtected`
+  `R.M`. On the caller path `PreserveSecretRecordMembers` (the Secret carry-over, now with the optional `convertProtected`
   converter that only the caller path passes) therefore also carries the stored value of every `!IsWritableOutsideMethod` member into the
   written record: single record by position, record array by the **record key** (same matching as Secrets; a new element has nothing to
-  keep; a removed element or an omitted record attribute removes its members, as for Secrets and as the asset-repo GraphQL update does,
-  AB#8055), nested records the same. Chosen over refusing for symmetry with the attribute rule and with GraphQL
+  keep; a removed element or an omitted record attribute removes its members, as for Secrets and as the asset-repo GraphQL update does), nested records the same. Chosen over refusing for symmetry with the attribute rule and with GraphQL
   (`RecordMemberPreservation`). Where merging is unsafe - a record array whose record has **no record key**, or whose key member is itself
   not writable outside a method, so the elements cannot be matched - the write is **refused** before anything is written with **message
   141** `RtRecordMemberNotPreservable` (`ExchangeException.RecordMemberNotPreservable`; parameters `rtId`, `ckTypeId`, `path` such as
@@ -162,7 +161,7 @@ tenant restore works on MongoDB: neither is guarded.
   of the stored element included); nothing stored means nothing to lose. An explicit value for the member is still refused by 139. The
   secret-record selection (`secretRecordAttributes`) takes record attributes with such members on the caller path
   (`RecordHasSecretMembers(..., includeMethodOnlyMembers)`); a record attribute that is itself MethodOnly/Hidden is carried whole by the
-  attribute rule. **Derived records (AB#8141 reopen):** a record value may hold a record derived from the declared one, and a protected
+  attribute rule. **Derived records (reopen):** a record value may hold a record derived from the declared one, and a protected
   member may exist only on the derived record. The selection therefore also looks at every record that derives from the declared record
   (and from each nested record), taken from the `BaseRecords` chains of the tenant's records (`DerivedRecordsFunc`;
   `CkRecordGraph.DerivedRecords` is never filled by the CK resolver and must not be relied on). The walk itself uses the record type of
@@ -187,10 +186,10 @@ in the list. Remove the list when the CK language can express association write 
   attributes through rule 139 on caller and system path, the system path imports the edges as before, tenant without System.Identity
   reads the file once, version-less matching, omission preserved).
 
-#### JSON import writes its bulks inside the awaited call (AB#8325)
+#### JSON import writes its bulks inside the awaited call
 
 `ImportAsync` / `ImportAsCallerAsync` with a JSON file read the entities through `IRtDeserializeStream` in bulks of 5000.
-Until AB#8325 each bulk was written by an `async void` handler of the `BulkDeserialized` event: the call returned and
+Earlier, each bulk was written by an `async void` handler of the `BulkDeserialized` event: the call returned and
 committed the transaction before the entities were written (against MongoDB the entity appeared ~3 s later), and a
 write error - message 141, the seed or archive guard, strict mandatory validation, a duplicate key - never reached the
 caller (bot-services reported the job as done). The handler also set `IsHandled` only after its first await, so the
@@ -208,7 +207,7 @@ stream handed every pending entity out again with each further entity of a file 
 - `BulkDeserialized` / `ReadAsync` stay for synchronous handlers only (built on `ReadBulksAsync`); never subscribe an
   `async` handler. `RtDeserializeEventArgs.IsHandled` is no longer read.
 - The cancellation token of the import now also cancels the read of the JSON file (rollback, nothing committed).
-- **Record values in a JSON file** (found while fixing AB#8325): the stream reads an attribute value of type `object` with
+- **Record values in a JSON file**: the stream reads an attribute value of type `object` with
   Newtonsoft, so a record arrived as a `JObject` (a record array as a `JArray`). The import expects `RtRecordTcDto` (the YAML
   reader's shape): a single record was silently dropped, a record array failed with an `InvalidCastException` - both
   unseen while the write ran in the `async void` handler. `RtJsonRecordValueNormalizer` (called by the stream for every

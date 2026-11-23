@@ -1,14 +1,14 @@
 ---
 description: What happens to an archive when a CK model change makes a column reach a Hidden attribute, and how an operator recovers it.
-applies_to: src/Runtime.Contracts/StreamData/**, src/StreamDataCkModel/**
+background: true
 ---
 
-# Archives and Hidden attributes (AB#6247)
+# Archives and Hidden attributes
 
 CK v2 attributes with `access: Hidden` are never readable outside a method. Stream-data storage (CrateDB) does not
 enforce attribute access, so **no archive column may reach a Hidden attribute**. This page describes what happens when a
 CK model change makes a column of an existing archive reach Hidden, and how an operator gets the archive back.
-It covers the Phase 4 prerequisite N2/N3 of Epic AB#5584 (review G3 re-review, 2026-10-09).
+It covers the Phase 4 prerequisite N2/N3 (review G3 re-review, 2026-10-09).
 
 ## The rule
 
@@ -66,7 +66,7 @@ If a later model change makes the columns visible again, the archive stays `Fail
 the queries) until `RetryActivation` or the redaction resumes it.
 
 Both attributes are runtime state of System.StreamData 1.27.0 and are visible wherever the archive entity is read
-(runtime GraphQL query of the `Archive` types; Refinery Studio, AB#9120).
+(runtime GraphQL query of the `Archive` types, Refinery Studio).
 
 ## Resume: `RedactHiddenColumns` (destructive)
 
@@ -127,7 +127,7 @@ copy the data elsewhere before the redaction. A retry after a failure between th
 (`DROP COLUMN IF EXISTS`). If the resume itself fails (provisioning), the archive is `Failed` with the provisioning reason
 and no Hidden columns; `RetryActivation` applies.
 
-## Backups (AB#9141)
+## Backups
 
 A tenant backup leaves out the values of every column known to reach a Hidden attribute, in either format, from the staging
 copy and from the final artefact. Known means: found in the archive's CK type, or recorded on the archive. When the type
@@ -170,7 +170,7 @@ Then:
   `Failed`). Change the rollup or the model.
 - **A rollup whose source was restored this way**: skipped with the reason before its table is touched; it cannot be
   activated while its source is not Activated.
-- **A native backup written before AB#9141** that still holds a value column of such an archive: skipped with the reason
+- **A native backup written before the fix** that still holds a value column of such an archive: skipped with the reason
   (the column is named) before the table is touched; the load would refuse a column the table does not have. A row-path
   (format 1) backup of that age is restored and the values of these columns are ignored.
 - The check itself fails (e.g. the archive's type is unknown): the restore goes on as before.

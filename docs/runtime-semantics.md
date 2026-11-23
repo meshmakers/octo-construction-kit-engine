@@ -1,20 +1,20 @@
 ---
 description: Run-time semantics: SetValue null, load by rtId, formula errors, enum import, delete as archive, record-array item update, rtVersion, unacknowledged writes.
-applies_to: src/Runtime.Contracts/RtPathEvaluator.cs, src/Runtime.Contracts/RtPathNullHandling.cs, src/Runtime.Contracts/RtVersionConflictException.cs, src/Runtime.Contracts/UnacknowledgedWriteClassifier.cs, src/Runtime.Engine.Formulas/**
+applies_to: src/Runtime.Contracts/RtPath*.cs, src/Runtime.Contracts/RtVersion*.cs, src/Runtime.Contracts/Unacknowledged*.cs, src/Runtime.Engine.Formulas/**
 ---
 
 # Runtime write and read semantics
 
-## `RtPathEvaluator.SetValue` and explicit null (AB#8625)
+## `RtPathEvaluator.SetValue` and explicit null
 
 A `null` on an **optional** enum attribute sets it to null; on a **required** enum (`isOptional: false`) it is refused
 with an `InvalidPathException` that names the path, before anything is changed. A `null` on a sub-path of a record that
-does not exist yet (`Amount.Value` without `Amount`) is dropped by default (AB#1988: query-row cells must not create empty
+does not exist yet (`Amount.Value` without `Amount`) is dropped by default (query-row cells must not create empty
 records); the overloads with `RtPathNullHandling.CreateMissingRecords` create the record with that member explicitly null
-(used by the mesh adapter's `CreateUpdateInfo@1`, so an explicit null reaches an archive as null, AB#8622). Rules and
-table: `docs/rt-path-evaluator-set-value.md`. Tests: `RtPathEvaluatorTests`, region `SetValue explicit null (AB#8625)`.
+(used by the mesh adapter's `CreateUpdateInfo@1`, so an explicit null reaches an archive as null). Rules and
+table: `docs/runtime-semantics.md`. Tests: `RtPathEvaluatorTests`, region `SetValue explicit null`.
 
-## Load by rtId to use it: archived counts as not found (AB#8355)
+## Load by rtId to use it: archived counts as not found
 
 The default delete archives an entity (`rtState = Archived`, the document stays). List queries filter archived entities,
 but `IRuntimeRepository.GetRtEntityByRtIdAsync` returns the document whatever its state, and some callers rely on that
@@ -25,20 +25,20 @@ entity; an entity without `rtState` (written before it existed) counts as active
 member, so engine-mongodb and other implementers need no change. Users: asset-repo `PersistedQueryLookup`, mesh-adapter
 `GetQueryById@1`, the MCP persisted-query tools. Tests: `RuntimeRepositoryExtensionsTests`.
 
-## Formula engine: parse once, never NULL for an exception (AB#8331)
+## Formula engine: parse once, never NULL for an exception
 
 `FormulaEngine` (Runtime.Engine.Formulas) caches a parsed mXparser expression per thread and formula (`FormulaShape`, one
 `PreparedFormula` per set of identifiers the values supply) and only sets argument values per call; a fresh expression per row
 cost ~200 KiB and ran a 2 M-row backfill on prod-1 out of memory. Rules: bind only names that occur in the formula (own
 identifier scan, not mXparser's missing-argument list); an exception thrown inside `calculate()` becomes
-`FormulaEvaluationException` (never NaN/NULL). **mXparser stays pinned to 4.4.2** (AB#8364): the last Simplified-BSD version;
+`FormulaEvaluationException` (never NaN/NULL). **mXparser stays pinned to 4.4.2**: the last Simplified-BSD version;
 4.4.3+/5.x/6.x are dual-licensed and Meshmakers holds no commercial licence — never upgrade it, never call a `License.iConfirm*`
 method (`MxParser_IsTheLastBsdLicensedVersion` fails on an upgrade). 4.4.2 needs no periodic re-parse (6.1.1 leaked ~400 B per
 `if` evaluation) and writes no licence warning. Repair of an
 active computed column: `IArchiveLifecycleService.RepairComputedColumnAsync` (job marker `computed-column:repair:<name>`, run by
 the backfill drain). Details: `docs/concept-computed-columns.md` §8.3b. Tests: `FormulaEngineReuseTests`, `ComputedColumnRepairJobTests`.
 
-## Extensible Enum Import (WI #3324)
+## Extensible Enum Import
 
 Enums marked `isExtensible: true` allow runtime additions via the customize-API. When a new
 CK model version is imported, custom extension values are preserved into the new model
@@ -48,7 +48,7 @@ so it appears in the platform event log. The preservation/override logic itself 
 MongoDB layer (`DatabaseCkModelRepository.PreserveExtensibleEnumValues`); the engine layer
 owns the audit-trail contract and a logging default.
 
-## Delete is Archive by default; importing an archived entity again (AB#7018)
+## Delete is Archive by default; importing an archived entity again
 
 `DeleteStrategies.Archive` is the default of `DeleteOptions`, `BulkOperationOptions` and the GraphQL delete: the
 runtime entity and its associations only get `RtState = Archived`, the document keeps its `_id` (= rtId). Only
@@ -62,7 +62,7 @@ runtime entity and its associations only get `RtState = Archived`, the document 
   (details and tests there, section "Re-importing an archived entity"). `LocalDataSourceCollection` (dev-only local
   directory repository) still treats every existing id as taken.
 
-## Atomic update of one RecordArray item (AB#7445)
+## Atomic update of one RecordArray item
 
 Problem: pipelines that read an entity, change one item of a `RecordArray` in memory and write the whole array back lose
 updates under parallel execution (two writers read the same baseline, the later write overwrites the other item).
@@ -76,8 +76,7 @@ The info serialises the list only when set (Newtonsoft and System.Text.Json), so
 
 Semantics:
 - **One atomic statement, no read, no version check, no retry.** The persistence layer writes the item members with one update
-  (MongoDB: `$set attributes.<arr>.$[iN].attributes.<member>` with `arrayFilters` on the match member, see engine-mongodb
-  `CLAUDE.md`). Updates of different items never interfere; updates of the same item keep the last write.
+  (MongoDB: `$set attributes.<arr>.$[iN].attributes.<member>` with `arrayFilters` on the match member, see octo-construction-kit-engine-mongodb). Updates of different items never interfere; updates of the same item keep the last write.
 - **Use it** when several writers change different items of the same RecordArray of one entity in parallel (e.g. one
   `DataPoint` per state in `Loxone/Control.States`). **Do not use it** to replace or reorder the array, to add or remove items
   (use a whole-value update), or when a single writer owns the entity.
@@ -102,7 +101,7 @@ Semantics:
 - Tests: `RecordArrayItemUpdateRuleEngineTests`, `BulkRtMutationRecordArrayItemTests` (this repo); the real-MongoDB concurrency test
   lives in engine-mongodb.
 
-## Expected rtVersion - optimistic concurrency for update and replace (AB#7769)
+## Expected rtVersion - optimistic concurrency for update and replace
 
 Problem: a service that reads an entity, changes it in memory and writes it back (identity's user store: `AccessFailedCount`,
 finding L9) loses updates when two writers run in parallel - both read version n, the later write overwrites the other.
@@ -129,16 +128,15 @@ Semantics:
   transaction) and repeat. Two writers need at most one retry.
 - One mechanism per write: an expected version cannot be combined with `AttributeNewerThanGuard` or atomic RecordArray item
   updates (rule engine throws `RuntimeRepositoryException`), nor with a linked binary in the same update (the conflict would skip the
-  entity write after the bytes were stored, same reason as AB#6248). A replace checks the stored version once before it touches
+  entity write after the bytes were stored, same reason as above). A replace checks the stored version once before it touches
   linked binaries, so a replace that is bound to conflict does not delete them; the write itself repeats the check atomically.
 - A replace **without** an expected version is unchanged: it writes the entity as given (including its own `RtVersion`) and does not
   increment. A writer that wants to be detected by guarded writers must therefore also use the expected version.
-- `LocalDataSourceCollection` (dev-only) checks and applies in-process; the atomic MongoDB statement is in engine-mongodb
-  `CLAUDE.md`, "Expected rtVersion".
+- `LocalDataSourceCollection` (dev-only) checks and applies in-process; the atomic MongoDB statement is in octo-construction-kit-engine-mongodb, "Expected rtVersion".
 - Tests: `BulkRtMutationExpectedRtVersionTests` (this repo); the real-MongoDB tests (50 repeated parallel increments) live in
   engine-mongodb.
 
-## Unacknowledged writes: one classification (AB#8037, rule R3)
+## Unacknowledged writes: one classification (rule R3)
 
 `UnacknowledgedWriteClassifier.IsOutcomeUnknown(Exception?)` (`Runtime.Contracts`, public, static) answers whether an exception
 says that a write may have taken effect without being acknowledged: a MongoDB write-concern error (`MongoWriteConcernException` -
@@ -156,3 +154,55 @@ types are recognised by full name (`MongoDB.Driver*` namespaces) and the public 
 Tests: `tests/Runtime.Engine.Tests/Persistence/UnacknowledgedWriteClassifierTests` build the real driver exceptions
 (`MongoWriteFaults`; `MongoDB.Driver` is a **test-only** package reference of `Runtime.Engine.Tests`), so a rename in a driver
 update turns them red.
+
+## `RtPathEvaluator.SetValue`: values, explicit null and missing
+
+`RtPathEvaluator.SetValue` writes a value into an entity or record along an attribute path
+(`Designation`, `Amount.Value`, `RecordArrayTests[0].Designation`, `nav->Attr`). This page describes what
+a `null` value does.
+
+## Three cases
+
+| Input | Result |
+| ----- | ------ |
+| a value | the attribute is set; records missing along the path are created |
+| `null` | an explicit null, see below |
+| nothing (the caller does not call `SetValue`) | the attribute stays missing |
+
+A missing attribute and an attribute that holds `null` are different: an archive write keeps the
+stored value of a missing column and clears a column that holds an explicit null.
+
+## Explicit null on an enum attribute
+
+- **Optional enum** (`isOptional: true` on the type or record assignment): `null` sets the attribute to null.
+- **Required enum** (`isOptional: false`, the default): `null` is refused with an `InvalidPathException`
+  `Path '<path>' cannot be set to null: the enum attribute '<name>' (CkEnumId '<id>') is not optional.`
+  It is thrown before anything is changed, also before a missing record would be created.
+
+Earlier every `null` on an enum failed with `Invalid enum value type ... 'null'`.
+Other value types are unchanged: a `null` on them is written whatever `isOptional` says; the entity rule
+engine checks required attributes when the entity is saved.
+
+## Explicit null on a sub-path of a record that does not exist yet
+
+`Amount.Value = null` while `Amount` is not set depends on the `RtPathNullHandling` argument:
+
+| `RtPathNullHandling` | Result |
+| -------------------- | ------ |
+| `KeepMissingRecords` (default; the overloads without the argument) | nothing happens: `Amount` stays missing, so the null arrives as *missing* |
+| `CreateMissingRecords` | `Amount` is created (as a value would create it) with `Value` explicitly null; its other members stay missing |
+
+Why the default keeps the record missing: query-row creates and updates of the asset repository
+(`QueryMapper`) send a cell for every column, and an empty cell must not create an empty record. A
+record with only null members would also fail the required-member check of the rule engine on create.
+
+Why `CreateMissingRecords` exists: a pipeline (`CreateUpdateInfo@1`) that sends an explicit null for
+`Amount.Value` must reach the archive as null, not as missing. The caller opts in.
+
+Not changed in either mode: a null on an existing record sets the member to null and keeps the other members;
+a null whose missing parent is not a record that `SetValue` creates (a navigation without a target, a missing
+record array, `RecordArrayTests[0].Member` or `RecordArrayTests.Member`) is dropped, and so is not refused on a
+required enum either; a null on the record
+attribute itself (`Amount = null`) sets the record to null.
+
+Tests: `tests/Runtime.Engine.Tests/RtPathEvaluatorTests.cs`, region `SetValue explicit null`.

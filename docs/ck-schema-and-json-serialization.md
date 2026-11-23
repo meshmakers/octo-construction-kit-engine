@@ -1,6 +1,6 @@
 ---
 description: How a CK meta-schema change reaches model authors, and the Newtonsoft parity rules of the Rt JSON serializers and RtCkIdJsonShim.
-applies_to: src/ConstructionKit.SchemaProvider/**, src/ConstructionKit.Contracts/Serialization/Schema/**, src/Runtime.Contracts/Serialization/**, src/ConstructionKit.Contracts/RtCkIdJsonShim.cs
+applies_to: src/ConstructionKit.SchemaProvider/**, src/*/Serialization/**, src/ConstructionKit.Contracts/RtCkIdJsonShim.cs
 ---
 
 # JSON schema publish path and Rt JSON serialization parity
@@ -13,7 +13,7 @@ When modifying CK models:
 3. After changes, recompile the model using the compiler
 4. Generated code will be created based on the model definitions
 
-### JSON schema publish path (AB#8522)
+### JSON schema publish path
 
 The JSON schemas a model's `$schema` points to (`https://schemas.meshmakers.cloud/<file>`) are served from the files in
 `src/ConstructionKit.Contracts/Serialization/Schema/`, `src/ConstructionKit.Contracts/BlueprintCatalogs/Serialization/Schema/`
@@ -30,7 +30,7 @@ and `src/Runtime.Contracts/Serialization/Schema/`. A schema change reaches model
 
 So a new schema key (a new meta-model field) is usable in catalog models only after a libs release **and** the next helm-core train
 with an approved CD run. Until then the served schema rejects the key (`additionalProperties: false`). Before 2026-11-09 the CD trigger
-filtered `refs/tags/r*`, which no train run matches, so schemas.meshmakers.cloud stayed on the 2026-06-28 deployment (AB#8522).
+filtered `refs/tags/r*`, which no train run matches, so schemas.meshmakers.cloud stayed on the 2026-06-28 deployment.
 
 ## JSON Serialization & Newtonsoft Parity
 

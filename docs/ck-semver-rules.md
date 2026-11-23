@@ -31,7 +31,7 @@ ckc ValidateVersion -p <ck-folder> [-p <ck-folder2> ...]
 | `-rf, --refresh` | Forces a catalog cache refresh before the baseline is determined. Always use this in CI. |
 | `-cl, --changelog` | Writes/updates the `CHANGELOG.md` section of the declared version next to `ckModel.yaml`. Only runs after successful validation; older sections are never rewritten. |
 | `-rmm, --requireMigrationForMajor` | Escalates a missing migration for a required major bump from a warning to an error. |
-| `-ap, --apply` | AB#4467: writes the **minimum valid version** into `ckModel.yaml` for every package that fails with `OCTO-CK100`, see "Applying the minimum version" below. |
+| `-ap, --apply` | writes the **minimum valid version** into `ckModel.yaml` for every package that fails with `OCTO-CK100`, see "Applying the minimum version" below. |
 | `-lce, -lcr` | Enable/point the local file system catalog for this invocation (same semantics as `Compile`). |
 
 > **`-cn` pins the baseline, not the compile-stage dependency resolution.** Determining the
@@ -58,15 +58,15 @@ ckc ValidateVersion -p <ck-folder> [-p <ck-folder2> ...]
 > **per-run working copy** of the local file system catalog (or to the `-lcr` directory when one is
 > given, as in CI) so the compile stage of later packages resolves it. Without `-lcr` the command
 > copies the local catalog into a temporary directory, registers the siblings there and deletes the copy
-> at the end of the run: without `-lcr`, validation does not write into `~/.octo/local-catalog` (AB#5434). The report
+> at the end of the run: without `-lcr`, validation does not write into `~/.octo/local-catalog`. The report
 > names the write (`Registered X for sibling resolution in …; replaced nothing.`) or states that no
 > catalog was written (`-lce false`). This is why the `-p` paths must be in dependency order — a consumer
 > validated *before* its same-run dependency still fails with `OCTO-CK103`, honestly.
 
-### Baseline (AB#5450)
+### Baseline
 
 One shared, read-only resolver (`ICkBaselineResolver` in `ConstructionKit.Engine/SemVer/`) decides which version a
-model is compared against. `ValidateVersion`, the compile gate (AB#6294) and the publish gate (AB#6386, "Publish gate"
+model is compared against. `ValidateVersion`, the compile gate and the publish gate ("Publish gate"
 below) use the same resolver, so every gate agrees. It queries each catalog separately (never the merged highest
 version).
 
@@ -77,33 +77,33 @@ version).
    *lower* major: `4.0.0` is still diffed against the newest `3.x`, so the migration check (`OCTO-CK104`) and the
    changelog keep working. A major allows any change; when the changes only need a minor or patch bump, the report
    notes a "valid major bump without structural need". Only a model without any version is a first publication.
-3. **Never the model under test (AB#5434, symptom 2).** Entries of the `LocalFileSystemCatalog` at or above the
+3. **Never the model under test (symptom 2).** Entries of the `LocalFileSystemCatalog` at or above the
    declared version are never the baseline: they come from
    earlier local builds, not from a publish. They are listed as ignored in the report. A local entry *below* the
    declared version can be the baseline (marked "local build, not a publish"). A published (remote) entry equal to the
    declared version stays the baseline, so an unchanged version with structural changes still fails with
    `OCTO-CK100`. On a version tie the published entry wins over a local copy. Running `ValidateVersion -rf` twice gives
    the same baseline and verdict. When the build has **no** structural change against that published entry, it is a
-   rebuild of the published release and its acknowledgements are not judged again (AB#7894, "Lifetime of an
+   rebuild of the published release and its acknowledgements are not judged again ("Lifetime of an
    acknowledgement" below); the publish gate treats the same model as a no-op.
 4. **Read-only.** The resolver never publishes, refreshes or restores. `ValidateVersion` does not write into the
-   catalog other builds read either (AB#5434): without `-lcr`, its sibling registration goes to a per-run working copy that
+   catalog other builds read either: without `-lcr`, its sibling registration goes to a per-run working copy that
    is removed at the end of the run, so the user's local catalog stays byte-identical (the 2026-09-30 displacement/shadowing
    case). With `-lcr` the registration goes to the directory you named - point it at an empty or throw-away directory (CI does).
 5. **Visible.** The report names the baseline version and catalog (e.g. `Published: 3.3.0 (PrivateGitHubCatalog)`),
    marks a local baseline, says when the baseline comes from the previous major line, and lists ignored local entries.
-6. **Model names compare case-insensitively (AB#6386).** The catalogs match names case-sensitively, so a model published
+6. **Model names compare case-insensitively.** The catalogs match names case-sensitively, so a model published
    as `System.Bot` used to be invisible to a lookup of `system.bot` and looked like a first publication. The resolver
    discovers the other spellings of the name in each catalog (`GetSpellingsAsync`, one listing per catalog) and queries
    every spelling; the highest hit wins and keeps the spelling it was published under (`System.Bot-3.1.0`). This is the one
    place that does it, so `ValidateVersion`, the compile gate and the publish gate behave alike. A case-only variant is never
-   treated as a first publication. (`ValidateCatalog`, AB#4469, reports such pairs.)
+   treated as a first publication. (`ValidateCatalog`, reports such pairs.)
 
 When a catalog source is unreachable and no same-major baseline was found, the resolver does not fall back to a
 lower major: the result is `OCTO-CK102`, as before.
 
 Blueprints (`octo-bpm validateVersion`) keep their own baseline lookup; they have no structural diff and are immutable
-per version (checked for AB#5450, not changed).
+per version (checked, not changed).
 
 ### Validation rule
 
@@ -136,7 +136,7 @@ process code `-6` (`ModelValidationException`); because process exit codes are u
 surfaces as `250` in PowerShell's `$LASTEXITCODE` and `250` in a POSIX shell's `$?`. **CI must gate
 on `-ne 0`, never on `-eq 1`** — the command never exits with `1`.
 
-## Compile gate (AB#6294)
+## Compile gate
 
 Gate 1 of the CK v2 compatibility concept (§4.3.3). `CkCompile` (the MSBuild task behind `dotnet build`, local
 and CI) checks a freshly compiled model against its baseline **after compiling and before any publish** and fails
@@ -187,18 +187,18 @@ the verdict line.
 `OCTO-CK203` / `OCTO-CK204` belong to the acknowledge mechanism (next section).
 
 `OCTO-CK300` is a deprecation *warning*, not a gate verdict: a build still sets `OctoCkRangeRetention` / passes `-rr`.
-Range retention is the compiler default (AB#6675) and the value is ignored. Because of it, the first compile of every
+Range retention is the compiler default and the value is ignored. Because of it, the first compile of every
 existing model with dependencies is classified D6 (Minor, the one-time re-pin): the declared version must be raised by a
 MINOR before the compile gate and the publish gate accept it (`ValidateVersion -ap` applies the minimum).
 
 ### Accepted limitations of the compile gate
 
-Accepted by the platform owner on 2026-10-10; the guarantee is the catalog gate at publish time (F2.3, AB#6386), not the local build.
+Accepted by the platform owner on 2026-10-10; the guarantee is the catalog gate at publish time (F2.3), not the local build.
 
 1. **Deleting the local baseline** leaves a `Local` gate without a baseline (a model without a baseline is a first publication).
 2. **A downgrade below a local copy** is not detected in `Local` mode: local-catalog entries at or above the declared version
-   are never the baseline (AB#5434). `OCTO-CK201` needs a published baseline.
-3. ~~A model name that differs only in case from a published one has no remote baseline.~~ Closed by AB#6386: the baseline
+   are never the baseline. `OCTO-CK201` needs a published baseline.
+3. ~~A model name that differs only in case from a published one has no remote baseline.~~ Closed: the baseline
    lookup is case-insensitive (rule 6 of "Baseline").
 4. **CI detection** uses `TF_BUILD` and `ContinuousIntegrationBuild` only; other CI systems pass
    `-p:OctoCkCompatibilityBaseline=Remote`. A project file that sets the property to `Local` switches the Remote gate off, so
@@ -218,7 +218,7 @@ Compatibility: model 'GateModel', declared 2.5.0, baseline GateModel-2.4.0 (Loca
 
 A first publication logs `first publication (no baseline in the Remote baseline source)`.
 
-## Publish gate (AB#6386)
+## Publish gate
 
 Gate 2 of the CK v2 compatibility concept (§4.3.3). Whoever publishes a model to a **writable catalog other than the
 `LocalFileSystemCatalog`** — the private, the public and the dev-lane GitHub catalog — gets the compile gate's verdict,
@@ -227,26 +227,26 @@ so `octo-ckc -c Publish`, the MSBuild publish of `CkCompile` and every other cal
 no pipeline step can forget it and there is no bypass switch (`-r/--replace` only decides whether an existing file may be
 overwritten, never whether the gate runs). A refusal throws a `CkPublishRefusedException` (a `ModelValidationException`:
 exit code `-6`, the code of every other verdict, MSBuild error) with one message per reason and **writes nothing**. All
-reasons of one publish are reported together, see "One refusal" below (AB#6389).
+reasons of one publish are reported together, see "One refusal" below.
 
 | Aspect | Rule |
 | ------ | ---- |
 | Verdict | `ICkCompatibilityVerdictService` and `ICkSemVerClassifier`, the same as `ValidateVersion` and the compile gate; codes `OCTO-CK200` to `OCTO-CK202`. ckLanguage 1 and 2 alike (platform owner, 2026-10-10): for a v1 model the gate repeats the verdict CI already enforces with `validate-ck-versions`. |
-| Baseline | `ICkBaselineResolver.ResolvePublishBaselineAsync`: **the target catalog only** (the local catalog and a run-isolated catalog are never a baseline), read from the catalog's **source of truth** (AB#6580, see "Fail closed" below), not from the cache. The newest published version of the declared major **other than the declared version**; none in that major: the newest version of the highest lower major. Both catalog roots count: a first ckLanguage 2 release `3.0.0` is diffed against the newest `2.x` under `ck-models/v2/`, `3.1.0` against `3.0.0` under `ck-models/v3/`. A maintenance release `3.4.1` with `3.4.0` and `4.0.0` published is judged against `3.4.0`. |
+| Baseline | `ICkBaselineResolver.ResolvePublishBaselineAsync`: **the target catalog only** (the local catalog and a run-isolated catalog are never a baseline), read from the catalog's **source of truth** (see "Fail closed" below), not from the cache. The newest published version of the declared major **other than the declared version**; none in that major: the newest version of the highest lower major. Both catalog roots count: a first ckLanguage 2 release `3.0.0` is diffed against the newest `2.x` under `ck-models/v2/`, `3.1.0` against `3.0.0` under `ck-models/v3/`. A maintenance release `3.4.1` with `3.4.0` and `4.0.0` published is judged against `3.4.0`. |
 | Unreachable target | `OCTO-CK202` (also when the catalog is not readable); never treated as a first publication. What counts as unreachable, and what as a genuinely new catalog or model: "Fail closed" below. |
-| Same version | The declared version is already published: identical content (compared by the serialized model) is a **no-op** (nothing is written). *Equivalent* content is a no-op too, with a warning naming the difference class and the published file left as it is (AB#6386, `CkPublishEquivalence`): both models are read back and brought into one canonical form, and only what survives is a content change. The allow-list of normalised classes is closed: (1) **restated default ownership** — `ownership: SeedOwned` or `RuntimeState` on an attribute definition (or on an assignment whose definition is in the same model) that equals what the `isRuntimeState` alias resolves to; `TenantOwned` and `Secret` are never normalised, a legacy reader sees them as runtime state; (2) **element order** of the top-level lists; (3) **compiler-stamped metadata** (`minEngineVersion`); (4) **the resolved dependency closure of a range-retaining model** (`dependencies`; AB#5435) — compiler-set metadata like (3): normalised only when both models are range-retaining, their declared ranges and floors are identical, the closure has the same names and every difference is a move **up inside the same major** that satisfies the effective range (shared predicate `CkClosureMove`, the same one the classifier uses for row D8); a closure name added or removed, a major change, a range or floor change, or any other element changed next to it stays `OCTO-CK205`; exact-pinned (v1) models never take this path. A rebuild of an unchanged range-retaining dependent after a dependency minor is therefore a no-op, not `OCTO-CK205`, and the published file (and so the published closure) stays as it is; (5) **acknowledgements** (`compatibility.acknowledge`, AB#7894) — the audit trail of the published release, not model structure: a rebuild that keeps, drops or rewords them is a no-op and the published entries stay (see "Lifetime of an acknowledgement"). Different content is refused with `OCTO-CK205` on the private and the public catalog, also with `--replace` (published versions are immutable). The dev-lane catalog (GitHub repository `octo-catalog-dev`, `IReplaceablePublishCatalog`) keeps its replace behaviour, but the verdict always uses the newest version **strictly below** the declared one, so a replace is never compared with itself; after a refused or replaced publish the next publish gets the same baseline. |
-| Race | The verdict and the write are one unit (AB#6584). **(1) Conditional write.** The gate hands the state of the indexes it read (`CatalogStateToken`: hash of every per-major `catalog.json` it saw) to the catalog; `GitHubCatalog` (`IGuardedPublishCatalog`) makes the version visible by writing the per-major index only if that index still is exactly what the verdict saw - checked once before anything is written and again inside the index update, against the content the write replaces (compare-and-swap on the index blob, repeated after every SHA conflict of the Contents API). A publish that landed in between changes the index, so the later one aborts (its model file is removed, nothing is visible, no number is burned), the catalog is read again and the model is judged against the earlier one: the publish that lands second is judged against the first, in every process and on every machine. At most 3 attempts, then `OCTO-CK202` ("kept changing"). Before the write the catalog is also read once more (forced refresh, at most 3 reads) as before. **(2) Check after the write.** Publishing then reads the catalog once more and judges the version against its predecessor as the catalog holds it now (`CkPublishGate.VerifyAfterWriteAsync`); only when that predecessor differs from the baseline of the verdict. A concurrent publish the conditional write cannot see - another spelling of the model name (own directory and index), another major - that makes the version violate the rules ends with the violation (`OCTO-CK200`/`201`/`203`/`204`) plus `OCTO-CK208`: the version is withdrawn again (`Unpublish`, the number is burned); when the catalog cannot be read for this check the publish ends with `OCTO-CK202` ("is published ... not verified", the version stays; check with `ValidateCatalog` or `Unpublish`). A forced replace (dev lane) that loses the conditional write gets the previous file content back. Residual: a lower version published under another spelling *after* a higher one is not re-checked (only the higher version is). The local file-system catalog is not gated; its publish holds the cross-process index lock from the existence check to the last index update, so parallel publishes (also of two `octo-ckc` processes) are serialised and a second publish of the same version sees the first (`ModelAlreadyExists`). GitHub catalogs are read through the Contents API (AB#6580), consistent with the repository. Cost: one extra read round (about 5 Contents API reads) per publish. |
+| Same version | The declared version is already published: identical content (compared by the serialized model) is a **no-op** (nothing is written). *Equivalent* content is a no-op too, with a warning naming the difference class and the published file left as it is (`CkPublishEquivalence`): both models are read back and brought into one canonical form, and only what survives is a content change. The allow-list of normalised classes is closed: (1) **restated default ownership** — `ownership: SeedOwned` or `RuntimeState` on an attribute definition (or on an assignment whose definition is in the same model) that equals what the `isRuntimeState` alias resolves to; `TenantOwned` and `Secret` are never normalised, a legacy reader sees them as runtime state; (2) **element order** of the top-level lists; (3) **compiler-stamped metadata** (`minEngineVersion`); (4) **the resolved dependency closure of a range-retaining model** (`dependencies`) — compiler-set metadata like (3): normalised only when both models are range-retaining, their declared ranges and floors are identical, the closure has the same names and every difference is a move **up inside the same major** that satisfies the effective range (shared predicate `CkClosureMove`, the same one the classifier uses for row D8); a closure name added or removed, a major change, a range or floor change, or any other element changed next to it stays `OCTO-CK205`; exact-pinned (v1) models never take this path. A rebuild of an unchanged range-retaining dependent after a dependency minor is therefore a no-op, not `OCTO-CK205`, and the published file (and so the published closure) stays as it is; (5) **acknowledgements** (`compatibility.acknowledge`) — the audit trail of the published release, not model structure: a rebuild that keeps, drops or rewords them is a no-op and the published entries stay (see "Lifetime of an acknowledgement"). Different content is refused with `OCTO-CK205` on the private and the public catalog, also with `--replace` (published versions are immutable). The dev-lane catalog (GitHub repository `octo-catalog-dev`, `IReplaceablePublishCatalog`) keeps its replace behaviour, but the verdict always uses the newest version **strictly below** the declared one, so a replace is never compared with itself; after a refused or replaced publish the next publish gets the same baseline. |
+| Race | The verdict and the write are one unit. **(1) Conditional write.** The gate hands the state of the indexes it read (`CatalogStateToken`: hash of every per-major `catalog.json` it saw) to the catalog; `GitHubCatalog` (`IGuardedPublishCatalog`) makes the version visible by writing the per-major index only if that index still is exactly what the verdict saw - checked once before anything is written and again inside the index update, against the content the write replaces (compare-and-swap on the index blob, repeated after every SHA conflict of the Contents API). A publish that landed in between changes the index, so the later one aborts (its model file is removed, nothing is visible, no number is burned), the catalog is read again and the model is judged against the earlier one: the publish that lands second is judged against the first, in every process and on every machine. At most 3 attempts, then `OCTO-CK202` ("kept changing"). Before the write the catalog is also read once more (forced refresh, at most 3 reads) as before. **(2) Check after the write.** Publishing then reads the catalog once more and judges the version against its predecessor as the catalog holds it now (`CkPublishGate.VerifyAfterWriteAsync`); only when that predecessor differs from the baseline of the verdict. A concurrent publish the conditional write cannot see - another spelling of the model name (own directory and index), another major - that makes the version violate the rules ends with the violation (`OCTO-CK200`/`201`/`203`/`204`) plus `OCTO-CK208`: the version is withdrawn again (`Unpublish`, the number is burned); when the catalog cannot be read for this check the publish ends with `OCTO-CK202` ("is published ... not verified", the version stays; check with `ValidateCatalog` or `Unpublish`). A forced replace (dev lane) that loses the conditional write gets the previous file content back. Residual: a lower version published under another spelling *after* a higher one is not re-checked (only the higher version is). The local file-system catalog is not gated; its publish holds the cross-process index lock from the existence check to the last index update, so parallel publishes (also of two `octo-ckc` processes) are serialised and a second publish of the same version sees the first (`ModelAlreadyExists`). GitHub catalogs are read through the Contents API, consistent with the repository. Cost: one extra read round (about 5 Contents API reads) per publish. |
 | Not trusted | The verdict is computed from the model content and the target catalog only. A hand-edited compiled file (lowered version, removed members) gets the verdict of its content; nothing in the file lowers the required level. |
-| Acknowledgements | Enforced from the **compiled model alone** (AB#6387, next section "Acknowledgements at publish"): `OCTO-CK203`, `OCTO-CK204` and `OCTO-CK206`. |
+| Acknowledgements | Enforced from the **compiled model alone** (next section "Acknowledgements at publish"): `OCTO-CK203`, `OCTO-CK204` and `OCTO-CK206`. |
 
 | Code | Meaning | Remediation |
 | ---- | ------- | ----------- |
 | `OCTO-CK205` | The declared version is already published to the catalog with different content | Raise the version in `ckModel.yaml` and publish again; published versions are never replaced (only the dev-lane catalog allows it) |
 | `OCTO-CK206` | An entry of `compatibility.acknowledge` in the compiled model violates the entry rules (empty or wildcard or duplicate `change`, empty `reason`, not single-line plain text) | Recompile the model from a valid `ckModel.yaml`; never edit the compiled file by hand |
-| `OCTO-CK208` | The version was written, but a concurrent publish of the same model landed at the same time and made it violate the rules (AB#6584); the version was withdrawn again and its number is burned | Publish again with the next version above the other publish |
-| `OCTO-CK207` | The version number was unpublished earlier (`Unpublish`, AB#5433) and is burned; reported by the gate (AB#6389) instead of the catalog throwing at write time (the write still checks it) | Publish the next free version number |
+| `OCTO-CK208` | The version was written, but a concurrent publish of the same model landed at the same time and made it violate the rules; the version was withdrawn again and its number is burned | Publish again with the next version above the other publish |
+| `OCTO-CK207` | The version number was unpublished earlier (`Unpublish`) and is burned; reported by the gate instead of the catalog throwing at write time (the write still checks it) | Publish the next free version number |
 
-### Readers use the repository too (AB#6588)
+### Readers use the repository too
 
 The gate was not the only reader of the lagging mirror. With a token configured **and API reads enabled** (`IAuthoritativeVersionCatalog.IsAuthoritativeReadAvailable`;
 CI by default, see "The API budget of the catalog reads" below; anonymous readers and local builds keep the mirror) these reads now ask the repository as well, and fail with `OCTO-CK202` when it cannot be read:
@@ -258,15 +258,15 @@ CI by default, see "The API budget of the catalog reads" below; anonymous reader
 | Cascade check (`ValidateCascade`, `CkCascadeService`) | always (listing of the catalog) | A dependent published seconds ago must be checked. |
 
 
-### The API budget of the catalog reads (AB#6719)
+### The API budget of the catalog reads
 
-AB#6580/6581/6588 moved the reads of a CI run from the free Pages mirror to the GitHub Contents API (5000 requests/hour per user,
+The change moved the reads of a CI run from the free Pages mirror to the GitHub Contents API (5000 requests/hour per user,
 shared by every pipeline). A libs cascade plus a 12-model CK publish exhausted it. The rules now:
 
 | Read | Source | Cost |
 | ---- | ------ | ---- |
 | Publish-gate decision (`ResolvePublishBaselineAsync`, the check after the write) | **always the repository** (indexes, authoritative), any read mode | the indexes of the one model, once per process (memo), compare-and-swap state kept |
-| Dependency resolution, `ValidateVersion` baseline (Remote), cascade | the repository **only when API reads are enabled** (CI by default), else the mirror and the cache | index files memoised per path for the life of the process, dropped when this process publishes or loses a race (AB#6584) |
+| Dependency resolution, `ValidateVersion` baseline (Remote), cascade | the repository **only when API reads are enabled** (CI by default), else the mirror and the cache | index files memoised per path for the life of the process, dropped when this process publishes or loses a race |
 | The whole catalog (`ReadVersionsAsync(null)`, the cascade check) | one request: the recursive file tree of the branch; the version is the file name | 1 request instead of two root indexes plus two per model, once per model of the repository. A truncated tree walks the indexes. |
 | `OctoCkCompatibilityBaseline=Local` | never the repository | 0 requests (the baseline is the local catalog plus the cached mirror) |
 
@@ -276,7 +276,7 @@ shared by every pipeline). A libs cascade plus a 12-model CK publish exhausted i
 cached mirror and needs no token; without a token no request goes to api.github.com in any mode. A publish needs the token and decides authoritatively
 whatever the mode says.
 
-**Why the stale-mirror verdict of AB#6588 cannot come back.** The decision read of a publish and the cascade/dependency reads on CI are
+**Why the stale-mirror verdict cannot come back.** The decision read of a publish and the cascade/dependency reads on CI are
 still taken from the repository (the tree and the indexes at the time of the call); the memo only spares a process asking twice, and it is dropped
 when this process writes or the compare-and-swap loses a race. Regression tests: `CkDependencyMirrorLagTests`, `CkPublishGateMirrorLagTests`,
 `CatalogApiBudgetTests.A_publish_that_lost_the_race_reads_the_repository_again_not_its_memo`.
@@ -288,7 +288,7 @@ log it as the build error, the gate reports it as the reason of `OCTO-CK202`. A 
 Measured (`CatalogApiBudgetTests`, 12 candidates in a catalog of 72 models: `ValidateVersion` of 12 models in one process, the cascade read of 12 models
 in one process each, the publish of 12 models in one process each): before 2882 requests (62 + 2484 + 336), after 340 (40 + 24 + 276).
 
-### Fail closed (AB#6580, AB#6581)
+### Fail closed
 
 The publish gate never takes a read that failed for an answer. The GitHub catalogs have two read paths: a cheap one through
 the **GitHub Pages mirror** (cache, listing, anonymous readers) and the **Contents API**, authenticated with the token the
@@ -309,11 +309,11 @@ for the matching model(s) the library index and the index of every major - rough
 A model file that is missing from the mirror is read through the Contents API when the reader holds a token (and always
 first in the lane catalog, whose versions can be replaced); an anonymous reader has the mirror only. Whatever the gate
 reads that fails - also outside the baseline read, e.g. a baseline file the index lists but the repository lacks - ends
-as `OCTO-CK202` (exit `-6`), not as an unhandled exception (AB#6582: `octo-ckc -c Publish` offline or against a repository that does not exist ends with `-6` and the reason, formerly `-99`/exit 157; the record of burned numbers is no exception). A transport failure in the middle of the write (after the gate passed) is a `ModelCatalogException` "Publishing model ... failed: <reason>" - nothing half-written is reported as success. Tests: `PublishCommandOfflineTests` (real parser, `Runner` and `GitHubCatalog`), `CkPublishGateOfflineTests`, then `CkPublishGateFailClosedTests`,
+as `OCTO-CK202` (exit `-6`), not as an unhandled exception (`octo-ckc -c Publish` offline or against a repository that does not exist ends with `-6` and the reason, formerly `-99`/exit 157; the record of burned numbers is no exception). A transport failure in the middle of the write (after the gate passed) is a `ModelCatalogException` "Publishing model ... failed: <reason>" - nothing half-written is reported as success. Tests: `PublishCommandOfflineTests` (real parser, `Runner` and `GitHubCatalog`), `CkPublishGateOfflineTests`, then `CkPublishGateFailClosedTests`,
 `GitHubCatalogMirrorFlagTests`, `GitHubClientWrapperRepositoryStateTests` (the real wrapper against a local HTTP stub of the
 GitHub API).
 
-### One refusal (AB#6389)
+### One refusal
 
 A publisher who fixes one reason and then meets the next one publishes five times. The gate therefore collects **every**
 reason and reports them in one refusal:
@@ -343,13 +343,13 @@ Two independent gates stand in front of a publish. They never waive each other.
 
 | Gate | Where it lives | Question | Output |
 | ---- | -------------- | -------- | ------ |
-| **O1 guard** (operating rule O1, AB#6277) | Pipeline only: `templates/steps/ck-o1-guard.yml` of `octo-pipeline-templates`, a PowerShell step; the engine does not know it | May a ckLanguage-2 or range-retaining model (or a blueprint on one) go to this target catalog at all? Decided by the model kind and the target catalog; switch `OctoCkO1Lifted`; only `octo-catalog-dev` is the dev exception; an empty or unknown target counts as shared | `##vso[task.logissue type=error]O1: ...` |
+| **O1 guard** (operating rule O1) | Pipeline only: `templates/steps/ck-o1-guard.yml` of `octo-pipeline-templates`, a PowerShell step; the engine does not know it | May a ckLanguage-2 or range-retaining model (or a blueprint on one) go to this target catalog at all? Decided by the model kind and the target catalog; switch `OctoCkO1Lifted`; only `octo-catalog-dev` is the dev exception; an empty or unknown target counts as shared | `##vso[task.logissue type=error]O1: ...` |
 | **Compat gate** (this section) | Engine: `CkPublishGate` in `CatalogService.PublishAsync` | Is this version compatible with what the target catalog holds, and are the acknowledgements, the version number and the baseline in order? | `[compat gate] OCTO-CK2xx ...` lines, exit `-6` |
 
 Order in every lane: **O1 guard, ValidateVersion, cascade check (`ValidateCascade`), publish (compat gate inside)**. A
 model the O1 guard refuses never reaches the compat gate (no compatibility verdict in that log); a model it lets through
 (switch on, or dev-lane target) always passes the other gates. The engine decides from the model and the target catalog
-only; the O1 state is not an input, so lifting O1 (AB#6279) or the dev-catalog exception never switches the compat gate off.
+only; the O1 state is not an input, so lifting O1 or the dev-catalog exception never switches the compat gate off.
 
 | Target catalog | Model | O1 switch | O1 guard | Compat gate |
 | -------------- | ----- | --------- | -------- | ----------- |
@@ -371,7 +371,7 @@ and `PublishCommandGateTests`; the O1 rows by the Pester fixtures of `octo-pipel
 releases that changed a dependency pin or added elements, e.g. `Basic-2.0.2`, `Industry.Basic-2.1.1`); they predate the
 rules the classifier enforces today. The latest release of each of the 12 `octo-construction-kit` models replays clean.
 
-## Intermediate versions across catalogs (AB#7974)
+## Intermediate versions across catalogs
 
 An acknowledgement belongs to the version that introduces the change (see "Acknowledge" below): `System.Identity`
 2.28.0 acknowledges the seven access tightenings of its first ckLanguage 2 release, 2.29.0 does not repeat them. In the
@@ -414,12 +414,12 @@ Manual equivalent for one version:
 `octo-ckc -c Publish -f ck-system.identity-2.28.0.json -c <PublicGitHubCatalog | LocalFileSystemCatalog> -lcr <empty dir | <lane>/.octo/local-catalog>`,
 with the file taken byte for byte from the private catalog.
 
-## Acknowledge (AB#6295)
+## Acknowledge
 
 Some changes are accepted only when the publisher says so explicitly. The classifier marks them `requiresAcknowledge`
 (F2.1): tightening `access` on a **security-sensitive** attribute (Minor instead of Major, platform-owner decision
-2026-10-09; only when the attribute was sensitive in every published version of the major, AB#6585), **widening who may invoke a method**
-(a role such as `Everyone`, row M12, AB#6585, Minor) and a **unique index on a stable base** (row B4, Major). The author acknowledges such a change in
+2026-10-09; only when the attribute was sensitive in every published version of the major), **widening who may invoke a method**
+(a role such as `Everyone`, row M12, Minor) and a **unique index on a stable base** (row B4, Major). The author acknowledges such a change in
 `ckModel.yaml` (ckLanguage 2 only; in a ckLanguage 1 model the section is message 90):
 
 ```yaml
@@ -432,9 +432,9 @@ compatibility:
 | Code | Meaning | Remediation |
 | ---- | ------- | ----------- |
 | `OCTO-CK203` | A change that needs an acknowledgement has no matching entry. The message prints the **change key** and an example entry | Copy the entry into `compatibility.acknowledge` and give a reason |
-| `OCTO-CK204` | An entry matches no change in this release that needs an acknowledgement (stale, or it names an ordinary change) | Remove the entry; an acknowledgement is valid for one release only. **Exception (AB#7894):** when the declared version is already published, the message says so and the next step is to **raise the version** first; removing the entry without a raise changes a published version |
+| `OCTO-CK204` | An entry matches no change in this release that needs an acknowledgement (stale, or it names an ordinary change) | Remove the entry; an acknowledgement is valid for one release only. **Exception:** when the declared version is already published, the message says so and the next step is to **raise the version** first; removing the entry without a raise changes a published version |
 
-AB#6585 adds no message code: an access tightening on an attribute that became `securitySensitive` within the major line
+This adds no message code: an access tightening on an attribute that became `securitySensitive` within the major line
 fails with `OCTO-CK200` (a Major is required; an acknowledgement entry for it is stale, `OCTO-CK204`), a method authorization
 widening without an entry with `OCTO-CK203`. `ValidateVersion`, the compile gate, the publish gate and the cascade dry run share
 one classifier and one verdict service, so they agree; the history of the major is read from the baseline's catalog.
@@ -450,7 +450,7 @@ Rules:
   change, `…#Modified:indexType:<old> -> <new>`; two indexes of a type never share a key.
 - **`reason` is mandatory** and, like `change`, a single line of plain text (no line breaks, no `##vso[`). An empty reason or a wildcard key is rejected by the schema (and by the compiler, message 130).
 - **An acknowledgement never lowers a level.** A unique index on a stable base still needs a major bump
-  (`OCTO-CK200` for a lower version); an access tightening of an attribute that became `securitySensitive` within the major line is such a breaking change (AB#6585, row T7; the first ckLanguage 2 release of a classic model is the one exception, row T7a, AB#7771); an ordinary breaking change still fails with `OCTO-CK200` even if it is "acknowledged"
+  (`OCTO-CK200` for a lower version); an access tightening of an attribute that became `securitySensitive` within the major line is such a breaking change (row T7, the first ckLanguage 2 release of a classic model is the one exception, row T7a); an ordinary breaking change still fails with `OCTO-CK200` even if it is "acknowledged"
   (and the entry is then stale, `OCTO-CK204`).
 - **One release only.** Entries are matched against the diff of exactly this build; on a first publication (no baseline) every
   entry is stale. Nothing carries over to the next release. A rebuild of the release that carries them stays valid (next
@@ -458,11 +458,11 @@ Rules:
 - **Visible.** Acknowledged changes appear as "Acknowledged changes" (change, level, reason) in the `ValidateVersion` report, the
   build log of `CkCompile` and the `CHANGELOG.md` section, next to "Behavioural changes". Both gates report the same codes, because
   both use `ICkCompatibilityVerdictService`.
-- **Carried for the publish gate.** The compiled model contains `compatibility` (omitted when empty), so the publish gate (AB#6387, "Acknowledgements at publish")
+- **Carried for the publish gate.** The compiled model contains `compatibility` (omitted when empty), so the publish gate ("Acknowledgements at publish")
   enforces the same rule without the source. ckLanguage 1 models cannot declare entries; for them "requires acknowledge" stays
   advisory (no `OCTO-CK203`).
 
-### Lifetime of an acknowledgement (AB#7894)
+### Lifetime of an acknowledgement
 
 An entry lives exactly as long as the release it belongs to: it is written into the version that introduces the change, it
 is judged when that version is built and published, and it is spent once that version is published. A published version is
@@ -473,10 +473,10 @@ a closed release, and every gate treats it alike:
 | The release with its entries, not published yet | Judged against the previous version: matching entries pass, stale ones `OCTO-CK204`, missing ones `OCTO-CK203` | Same verdict; written |
 | **Rebuild** of the published release (same version, no structural change against it), entries unchanged — the CI rebuild of the released commit | Info "a rebuild of the published release"; entries not judged again; no error | Identical content: no-op |
 | Rebuild with the entries removed, added or reworded | Same info plus a **warning** that the entries differ from the published release; no error | Equivalent content (difference class "acknowledgements"): no-op with a warning; the published file keeps its entries |
-| Structural change under the published version (no version raise) | `OCTO-CK200`/`201` for the change; a stale entry is `OCTO-CK204` with the text "already published … raise the version in ckModel.yaml first", never "remove the entry" | `OCTO-CK205` first, then the other reasons (AB#6389) |
+| Structural change under the published version (no version raise) | `OCTO-CK200`/`201` for the change; a stale entry is `OCTO-CK204` with the text "already published … raise the version in ckModel.yaml first", never "remove the entry" | `OCTO-CK205` first, then the other reasons |
 | The next version, entries still present | Judged against the published release: `OCTO-CK204`, remove the entry | Same |
 
-Why: before AB#7894 the compile gate and `ValidateVersion` took the published version as their own baseline, so every rebuild
+Why: earlier the compile gate and `ValidateVersion` took the published version as their own baseline, so every rebuild
 of a released commit found all entries stale (`OCTO-CK204`, "remove the entry"), and following that advice made the publish
 gate refuse the rebuild (`OCTO-CK205`, the entries were part of the content, plus `OCTO-CK203` against the previous version).
 System.Identity 2.28.0 (2026-10-30) and 3.1.0 (2026-11-06, release r3.5.63) were blocked that way; only a further version without
@@ -489,7 +489,7 @@ requires no bump); `CkPublishEquivalence` normalises `compatibility.acknowledge`
 `CkAcknowledgeRebuildRoundTripTests`, `ValidateVersionCommandTests.ValidateVersion_ARebuildOfThePublishedAcknowledgedMinorIsValid`,
 `CkPublishEquivalenceTests.Changed_acknowledgements_*`.
 
-### Acknowledgements at publish (AB#6387)
+### Acknowledgements at publish
 
 The publish gate (previous section) enforces the acknowledge rule too, from the **compiled model JSON alone**: the publisher
 needs no `ckModel.yaml`, the entries travel in `compatibility.acknowledge`. It uses the same code as the compile gate
@@ -510,7 +510,7 @@ The compiled JSON is untrusted input: the verdict (levels, required major bump) 
 catalog only; nothing in `compatibility` can lower a level. The same-version no-op (identical or equivalent content already
 published) does not evaluate entries; nothing is written.
 
-### Applying the minimum version (`--apply`, AB#4467)
+### Applying the minimum version (`--apply`)
 
 When the compile gate (`OCTO-CK200`) or `ValidateVersion` (`OCTO-CK100`) says the declared version is too low, the author does
 not have to work out the number: `octo-ckc -c ValidateVersion -p <model folder> --apply` computes the minimum with the same
@@ -536,7 +536,7 @@ the new version. The `OCTO-CK200` message of the compile gate names this command
 - No git is involved, and `--apply` writes to no catalog beyond what `ValidateVersion` already does (the validated package is
   registered in the per-run catalog copy for sibling resolution, never in the user's local catalog).
 
-## Cascade dry run (`ValidateCascade`, AB#5437)
+## Cascade dry run (`ValidateCascade`)
 
 `ValidateVersion` only looks at the model itself; it is the **dependents** that break (2026-09-30: nine publications across seven
 repositories). `octo-ckc -c ValidateCascade -p <candidate model path>` is the read-only dry run of a base model's next version:
@@ -558,7 +558,7 @@ local and cached catalogs.
 | `Breaks` | A referenced element is gone or re-identified (`System-2.2.2/Entity-1`), became internal, or changed incompatibly (a Major change of the classifier); the candidate is below the dependent's floor (`floor not met`); or a name collision (below). The finding names the member. |
 | `NotInRange` | The dependent's range or pin does not cover the candidate's major, or the candidate is older than the pin. Listed, not counted. |
 
-**Skipping an unchanged published candidate (`-sp <targetCatalog>`, AB#6388).** A build that checks every CK of the repository
+**Skipping an unchanged published candidate (`-sp <targetCatalog>`).** A build that checks every CK of the repository
 would otherwise judge versions that are already published and unchanged, and a break that has been in the catalogs for a long time
 (a dependent pinned to an element a published base no longer defines) would turn every later build red. With
 `-sp <targetCatalog>` the command first asks whether the candidate's own version is already published to that catalog with
@@ -599,7 +599,7 @@ Candidate change level: MINOR (minimum version 2.3.0, declared 2.3.0: ok)
 2 dependent(s): 1 Breaks, 0 NeedsRepin, 1 Compatible, 0 NotInRange
 ```
 
-### Tenant upgrade guard (F2.5, AB#6867)
+### Tenant upgrade guard (F2.5)
 
 The cascade dry run judges a candidate against the **catalog** dependents. The tenant upgrade guard (`ITenantUpgradeGuard` in
 `octo-construction-kit-engine-mongodb`, reached through `ITenantContext.EvaluateCkUpdateAsync`) judges an **update set** against the
@@ -624,19 +624,19 @@ The codes come from `TenantUpgradeGuard.CodeOf`; a finding of the checker is map
 **Never reported** (not a blocker, whatever the candidate does):
 
 - dependents that are `ResolveFailed` or `Importing` (not caused by the update);
-- service-managed candidates (`System`, `System.*`), unless the caller is explicit (file import and its preview, AB#6966;
+- service-managed candidates (`System`, `System.*`), unless the caller is explicit (file import and its preview;
   `EvaluateExplicitCkImportAsync`): there the embedded-import downgrade guard and the service version decide;
 - candidates of another major than the installed one (a parallel install);
 - candidates that are not installed or already have the installed version;
 - a `ResolveFailed` installed base (the update may repair it).
 
-**Unknowns are announced, not guessed.** A range-retaining dependent without `usedSurface` (compiled before AB#4472) is judged by
+**Unknowns are announced, not guessed.** A range-retaining dependent without `usedSurface` (compiled by an older compiler) is judged by
 its referenced elements only and yields a note in `CkUpgradeGuardResult.Notes`, as does a dependent or baseline that cannot be
 loaded; neither is assumed healthy or broken.
 
 Sources of truth: `octo-construction-kit-engine-mongodb`
-[`CLAUDE.md`](https://github.com/meshmakers/octo-construction-kit-engine-mongodb/blob/main/CLAUDE.md), section "Tenant upgrade guard
-(CK v2 F2.5, AB#6867)" (rules and never-reported list),
+octo-construction-kit-engine-mongodb, section "Tenant upgrade guard
+(CK v2 F2.5)" (rules and never-reported list),
 [`CkUpgradeBlockerKind.cs`](https://github.com/meshmakers/octo-construction-kit-engine-mongodb/blob/main/src/Runtime.Contracts.MongoDb/UpgradeGuard/CkUpgradeBlockerKind.cs)
 and
 [`TenantUpgradeGuard.cs`](https://github.com/meshmakers/octo-construction-kit-engine-mongodb/blob/main/src/Runtime.Engine.MongoDb/UpgradeGuard/TenantUpgradeGuard.cs)
@@ -654,7 +654,7 @@ and
 The report also prints the catalog cache age of the baseline; `--refresh` forces a refresh
 (mandatory in CI, where a stale cache would validate against the wrong baseline).
 
-## Catalog validation (`ValidateCatalog`, AB#4469)
+## Catalog validation (`ValidateCatalog`)
 
 `ValidateVersion` proves that each model is individually honest; it does not prove that the **catalog as a whole** still resolves.
 `octo-ckc -c ValidateCatalog` is the read-only, standalone check (never part of a plain local build) that loads every model of a
@@ -668,7 +668,7 @@ octo-ckc -c ValidateCatalog -cn <catalogName> [-m <model> ...] [-o <report.md>] 
 | ------ | ---- |
 | Scope | The whole catalog; `-m System.Bot` (repeatable, case-insensitive) restricts it to the named models **and their transitive dependents**. An unknown name fails with a message listing the catalog's models. |
 | Roots | The listing spans `ck-models/v2/` and `ck-models/v3/`; a v3 model that depends on a v2 model resolves. |
-| Exact pins (ckLanguage 1) | Every pinned dependency version exists in the catalog (a pin to an older version is fine; a missing version is reported with model, dependency and the versions that exist) **and its model file loads** (AB#6582): a file deleted by hand while the index entry stays is a defect (`... which the catalog index lists, but the model file could not be loaded`). |
+| Exact pins (ckLanguage 1) | Every pinned dependency version exists in the catalog (a pin to an older version is fine; a missing version is reported with model, dependency and the versions that exist) **and its model file loads**: a file deleted by hand while the index entry stays is a defect (`... which the catalog index lists, but the model file could not be loaded`). |
 | Range-retaining | The range (with its floor) admits at least one version of each dependency. Against the **newest admitted version** every referenced element and every `usedSurface` member must exist, be public and not be changed incompatibly: the surface checker of the cascade dry run (`ICkSurfaceSatisfactionChecker`), judged against the dependency's predecessor in the catalog, so a catalog check and the dry run of the same version cannot disagree. A newer major outside the range is only noted as `not in range`; no admitted version at all is a defect. |
 | Case-only name variants | Models whose names differ only in case (`System.Bot` and `system.bot`, in one root or across `v2`/`v3`) are a defect; the report lists both spellings, the newest version and the catalog path of each (`ck-models/v3/s/system.bot/`). |
 | Severity | Follows the catalog: in the Meshmakers-run catalogs (`PrivateGitHubCatalog`, `PublicGitHubCatalog`) a defect is an **error** and the command exits non-zero (`ModelValidationException`, process code `-6`); in any other configured catalog it is listed as a **warning** and the exit code stays 0. |
@@ -678,7 +678,7 @@ Exact-pinned models cannot be compared one to one with the dry run: a pin to a p
 of a newer base reports `NeedsRepin`/`Breaks` for the re-pin. For range-retaining models `Breaks` and "does not resolve" agree.
 
 Not covered here: pipeline wiring (the catalogs train and the `octo-construction-kit` catalog lane run the command after publishing,
-Platform Ops) and the per-model resolution state in the catalog (AB#4470).
+Platform Ops) and the per-model resolution state in the catalog.
 
 Sample report (`-o`):
 
@@ -696,12 +696,12 @@ Severity: Meshmakers-run catalog, defects are errors
 3 model(s): 1 resolved, 2 do not resolve - defects are ERRORS in this catalog (exit code non-zero)
 ```
 
-## Range audit (`AuditRanges`, AB#6683)
+## Range audit (`AuditRanges`)
 
 A range-retaining compile stores references major-qualified (`System@2/Entity-1`), so every dependency range a model declares
 must stay inside the major of its floor (the one-major-per-range rule, review H6). `System-[2.5,3.0)` is fine; `Basic-[2.4,)`,
 a bare `System` (= `>=1.0.0`; `System-1.0.0` means the same), `System-[2.5,3.0]` and `System-[2.5,4.0)` are rejected, and with
-range retention as the compiler default (AB#6675) such a model no longer compiles. `octo-ckc -c AuditRanges` finds them
+range retention as the compiler default such a model no longer compiles. `octo-ckc -c AuditRanges` finds them
 before the flip, repeatably:
 
 ```
@@ -722,10 +722,10 @@ sources (state 2026-10-14): `demo-energy-iq`, `demo-process-automation`, `energy
 `octo-adapter-loxone`, `octo-ai-services`, `octo-asset-repo-services`, `octo-bot-services`, `octo-common-services`,
 `octo-communication-controller-services`, `octo-communication-sdk`, `octo-construction-kit`, `octo-construction-kit-engine`,
 `octo-construction-kit-engine-mongodb`, `octo-identity-services`, `octo-mesh-adapter`, `octo-pipeline-templates`,
-`octo-platform-services`, `octo-report-services`, `smart-meter-insights`, `wwc26-landing-page`. After AB#6683 the run reports only the
-two test models of this repository (`tests/TestCkModel/...`, `System-[2.0,)`), which the AB#6675 flip PR fixes itself.
+`octo-platform-services`, `octo-report-services`, `smart-meter-insights`, `wwc26-landing-page`. Now the run reports only the
+two test models of this repository (`tests/TestCkModel/...`, `System-[2.0,)`), which the default-flip PR fixes itself.
 
-## Withdrawing a published version (`Unpublish`, AB#5433)
+## Withdrawing a published version (`Unpublish`)
 
 Published versions are immutable, but a publish can turn out to be premature (2026-09-30: `System-2.3.0` broke the platform
 build and could not be taken back). `octo-ckc -c Unpublish` is the escape hatch; it is the model-side twin of `octo-bpm unpublish`:
@@ -743,7 +743,7 @@ octo-ckc -c Unpublish -m <model> -ve <version> [-cn <catalogName>] [-f] [-rs <re
   by no other remaining version of the model - an exact pin on it, or a range it is the only satisfying version of. The refusal names
   those models; the exit code is non-zero. This keeps the escape hatch from creating dangling references. A range that another
   version still satisfies does not block (the 2026-09-30 `System.Bot` pinned `System-2.2.2`, not 2.3.0).
-  The scan lists the catalog from its repository ("Fail closed" above), not from the Pages mirror (AB#6581): a dependent published
+  The scan lists the catalog from its repository ("Fail closed" above), not from the Pages mirror: a dependent published
   seconds ago blocks the unpublish, a version published seconds ago can be unpublished, and a catalog that cannot be read fails the
   command with `OCTO-CK202` instead of checking a partial list. A model file the mirror lacks is read through the Contents API.
 - **The version number is burned.** The removal records the number in `withdrawn.json` next to the model directory
@@ -751,7 +751,7 @@ octo-ckc -c Unpublish -m <model> -ve <version> [-cn <catalogName>] [-f] [-rs <re
   `CkCompile` MSBuild publish, also with `--replace`/force - refuses a burned number, also with identical content, because tenants and
   caches may already hold the old file; the next free number works. The record is a file of its own on purpose: a publish by an older
   engine rewrites only the index files it knows, so it cannot drop the record (an older engine does not enforce the burn, it only
-  cannot erase it). Withdrawn versions are not in any index any more, so the baseline resolver (AB#5450) never sees them as a baseline.
+  cannot erase it). Withdrawn versions are not in any index any more, so the baseline resolver never sees them as a baseline.
 - **Index and file order.** The burn record is written first, then the index tree is pruned (per-major index, model index, root index,
   in both roots; an index with nothing left is deleted), then the model file is removed. A failure in between leaves a burned number and
   an orphan file, never an index entry that points to a missing file; running the command again completes it.
@@ -760,20 +760,20 @@ octo-ckc -c Unpublish -m <model> -ve <version> [-cn <catalogName>] [-f] [-rs <re
   message of every catalog change and of the withdrawn record. The private and dev catalogs need `-f` only (a reason is recorded when given).
 - **Replay of 2026-09-30.** `System-2.3.0` published, nothing depends on it: `octo-ckc -c Unpublish -m System -ve 2.3.0 -cn <catalog> -f`
   withdraws it; `ValidateVersion` of `2.2.3` afterwards uses `2.2.2` as the baseline.
-- **Withdrawals so far.** `System-2.3.0` (2026-09-30, replay above); `Wwc26.Challenge` (AB#7258); and on 2026-10-28 (AB#7260) the retired
-  and test-only models `Monitoring` (1.0.0, 2.0.0, 2.1.0 - retired by AB#5432, replaced by platform CK health), `Test` 1.1.0,
-  `System.TestIdentity` 1.1.0 and `Smoke.CkV2` 1.0.0 (test-only models published by mistake, AB#6114), unpublished with `Unpublish -f`
+- **Withdrawals so far.** `System-2.3.0` (2026-09-30, replay above); `Wwc26.Challenge`; and on 2026-10-28 the retired
+  and test-only models `Monitoring` (1.0.0, 2.0.0, 2.1.0 - retired, replaced by platform CK health), `Test` 1.1.0,
+  `System.TestIdentity` 1.1.0 and `Smoke.CkV2` 1.0.0 (test-only models published by mistake), unpublished with `Unpublish -f`
   from both shared catalogs (private `construction-kit-libraries-build` HEAD `ea656323`, public `meshmakers.github.io` HEAD `3e4e3a46`).
   Afterwards `ValidateCatalog -rf` resolved 33/33 models in `PrivateGitHubCatalog` and 32/32 in `PublicGitHubCatalog`. Use `-rf`: without it
   a stale local cache reported `Smoke.CkV2-1.0.0` as not found. A copy already installed in a tenant stays (test-2 `octosystem` holds
-  `Monitoring 2.1.0`, ResolveFailed, accepted, AB#7137).
+  `Monitoring 2.1.0`, ResolveFailed, accepted).
 
 Engine API: `ICatalog.UnpublishAsync` (per catalog: `LocalFileSystemCatalog`, `GitHubCatalog`; the embedded catalog is read-only),
 `ICatalogService.PlanUnpublishAsync` (the dry run) and `ICatalogService.UnpublishAsync` (reason policy, dependents check, then the catalog).
 A real GitHub catalog is only ever written by an explicit command; the tests run against the local file system catalog and an in-memory
 GitHub client.
 
-## Older majors of published models ("legacy major, accepted", AB#7049)
+## Older majors of published models ("legacy major, accepted")
 
 Range retention (F2.6) applies to the **current** major of every published model. An **older major** whose newest version is
 exact-pinned (a classic `dependencies` list, no `dependencyRanges`) cannot be superseded inside its major: a range-retaining version
@@ -798,13 +798,13 @@ Why this is harmless for the current System line:
 
 **Condition (the real risk is installed copies, not the catalog).** Before a new System minor reaches a cluster, LibraryStatus of
 every tenant of that cluster must show no installed exact-pinned older major, or the entry is named and accepted. The tenant
-inventory (AB#6708) found none on the tenants read on 2026-10-27 (test-2, staging-1, prod-1, prod-2); the unreadable tenants and the
+inventory found none on the tenants read on 2026-10-27 (test-2, staging-1, prod-1, prod-2); the unreadable tenants and the
 accepted exceptions (`Monitoring 2.1.0`, ResolveFailed on one test-2 tenant; `Maco 1.0.0` on prod-2, not in any catalog) are
-tracked in AB#6708.
+tracked.
 
 **Entries (scan of 2026-10-27, newest version per older major, exact-pinned).** Every entry is **keep, legacy major, accepted**,
-except `Monitoring 1.0.0`. This table does not list current-major entries (AB#7260: `Monitoring 2.1.0`, `Test`,
-`System.TestIdentity`, `Smoke.CkV2`; AB#7048: `Demo.Tickets`), which are retired or republished instead.
+except `Monitoring 1.0.0`. This table does not list current-major entries (`Monitoring 2.1.0`, `Test`,
+`System.TestIdentity`, `Smoke.CkV2`: `Demo.Tickets`), which are retired or republished instead.
 
 | Catalog | Model and version (older major) | Decision | Reason |
 | ------- | ------------------------------- | -------- | ------ |
@@ -812,7 +812,7 @@ except `Monitoring 1.0.0`. This table does not list current-major entries (AB#72
 | Private | `Industry.Logistics 1.2.0`, `2.2.0` | keep, legacy major, accepted | Current major is 3.x |
 | Private | `Loxone 4.11.0` | keep, legacy major, accepted | Current major is 5.x |
 | Private | `Meshmakers.Accounting 1.31.0`, `2.5.0` | keep, legacy major, accepted | Current major is 3.x |
-| Private | `Monitoring 1.0.0` | **unpublish** (with `Monitoring 2.1.0`, AB#7260) | Retired model: source removed 2026-09-30 (AB#5432), CK health is a platform function; only the already ResolveFailed copy on one test-2 tenant remains |
+| Private | `Monitoring 1.0.0` | **unpublish** (with `Monitoring 2.1.0`) | Retired model: source removed 2026-09-30, CK health is a platform function; only the already ResolveFailed copy on one test-2 tenant remains |
 | Private | `System.Ai 1.0.0`, `2.0.0`, `3.13.0` | keep, legacy major, accepted | System lines are never withdrawn; later majors are range-retaining |
 | Private | `System.Bot 1.0.0`, `2.0.0` | keep, legacy major, accepted | as above |
 | Private | `System.Communication 1.0.0`, `2.2.0`, `3.41.0` | keep, legacy major, accepted | as above; the Pool to DeploymentSite migration references 3.x |
@@ -824,14 +824,14 @@ except `Monitoring 1.0.0`. This table does not list current-major entries (AB#72
 | Public | `Basic 1.0.0` | keep, legacy major, accepted | Current major is 2.x |
 | Public | `EnergyCommunity 1.0.0`, `2.0.0`, `3.4.0` | keep, legacy major, accepted | Current major is 4.x |
 | Public | `Environment 1.0.0`, `2.0.0` | keep, legacy major, accepted | Current major is 3.x |
-| Public | `Industry.Basic`, `Industry.Energy`, `Industry.Fluid`, `Industry.Maintenance` (older major lines 1.x and 2.x; newest exact-pinned version per line as in the scan) | keep, legacy major, accepted | The current version of each model is range-retaining; the exact version per line is in the scan (AB#7049) |
+| Public | `Industry.Basic`, `Industry.Energy`, `Industry.Fluid`, `Industry.Maintenance` (older major lines 1.x and 2.x; newest exact-pinned version per line as in the scan) | keep, legacy major, accepted | The current version of each model is range-retaining; the exact version per line is in the scan |
 | Private | `OctoSdkDemo 1.0.1` (private, older major; current major 2.5.0 range-retaining) | keep, legacy major, accepted | Superseded by the range-retaining current major; gets no further releases |
 | Public | `OctoSdkDemo 1.0.1` | keep, legacy major, accepted | Current major is 2.x |
 
-The scan of 2026-10-27 counts 19 older-major entries in the private and 27 in the public catalog (before `Monitoring 1.0.0` is withdrawn); with the private `OctoSdkDemo 1.0.1` row added by AB#6882 the private table lists 20. A new
+The scan of 2026-10-27 counts 19 older-major entries in the private and 27 in the public catalog (before `Monitoring 1.0.0` is withdrawn); with the private `OctoSdkDemo 1.0.1` row added the private table lists 20. A new
 older-major entry is added to the table with its decision when a major is superseded; the default is the rule above.
 
-## Dependency resolution by SemVer (AB#4468, AB#6671)
+## Dependency resolution by SemVer
 
 The rules above say when a version must change; the resolvers apply the same SemVer reading when a model is
 compiled, imported or re-validated. A dependency **range** (`System-[2.5,3.0)`) is satisfied by **any version
@@ -850,14 +850,14 @@ A rejection names the range and the visible versions (catalog side: unknown depe
 `ModelValidationException.UnknownCkModels(…, visibleVersions)`; repository side the same message built from
 `IRepositoryVersionLister`; tenant re-validation: `Acme.Assets-[1.0,2.0) (floor 1.1.0): installed Acme.Assets-1.0.0`).
 Where several constraints meet on one model name (ranges and the exact pins of classic dependencies) the compile
-picks the **highest version that satisfies all of them** (AB#6671, `CatalogConstraintSolver`).
+picks the **highest version that satisfies all of them** (`CatalogConstraintSolver`).
 
 - **Exact-pinned (classic) models** keep exact-match semantics: `System-2.5.0` is satisfied by 2.5.0 only.
-- **Decision (AB#4468, Thor 2026-10-13): no special treatment** for the System models and the models Meshmakers
+- **Decision (Thor 2026-10-13): no special treatment** for the System models and the models Meshmakers
   ships. They resolve by the same rules; their SemVer discipline is guaranteed by the compile and publish gates, not by
   a looser resolver.
 - **Blueprints:** a blueprint installs the floor of a CK dependency range and keeps a newer installed version that
-  satisfies the range (AB#4294); that rule is not changed here (see AB#6672).
+  satisfies the range; that rule is not changed here.
 
 Pinned by the same matrix on all three resolvers: `DependencyResolutionMatrixTests` (catalog/compile, with and without
 range retention), `RepositoryResolutionMatrixTests` (import) and, in `octo-construction-kit-engine-mongodb`,
@@ -913,7 +913,7 @@ surface in the dependency diff.
 | CK v2: type association `targetCkInterfaceId` set or changed | The allowed targets narrow — existing associations may become invalid |
 | CK v2: method **removed** | Callers of the method break |
 | CK v2: breaking method field change (rows M3–M10, M12, M15, M16, M18 Read → Write) | Callers break — publish a new method version (`ChangePassword-2`) instead |
-| CK v2: `access` tightened on an attribute that **became** `securitySensitive` within the same major line (row T7, AB#6585) | The security exception does not apply and cannot be acknowledged: the marker set in one Minor must not turn the next Minor's tightening into a Minor |
+| CK v2: `access` tightened on an attribute that **became** `securitySensitive` within the same major line (row T7) | The security exception does not apply and cannot be acknowledged: the marker set in one Minor must not turn the next Minor's tightening into a Minor |
 | CK v2: `ckLanguage` lowered (`2 → 1`) | CK v2 elements may disappear (defensive) |
 | CK v2: attribute-assignment `access` tightened (`ReadWrite < ReadOnly < MethodOnly < Hidden`; row T7) | Generic GraphQL clients and dependents lose write/read access |
 | CK v2: `visibility` `Public → Internal` (type, record, enum, attribute, association role, interface, method; resolved value, omitted = `Public`) | Other models referencing the element break |
@@ -937,8 +937,8 @@ surface in the dependency diff.
 | `isRuntimeState` changed (deprecated alias) | Blueprint re-apply behavior changes |
 | Attribute `ownership` changed (resolved value) | Blueprint re-apply and export behavior change |
 | Attribute-assignment `ownership` override set, cleared or changed | Re-apply and export behavior change for that assignment |
-| `valueType` changed from `String` to `Secret` (AB#5528, decision 2) | Stored values stay readable: readers accept legacy plaintext in a Secret slot until the encrypt sweep has run, and the effective ownership becomes `Secret` (re-apply keeps the value, export drops it). Clients that select the value as a string must switch to the is-set state before the model change (concept phase 2) |
-| Record `recordKey` set, cleared or changed (AB#5528) | Only decides how secret sub-values are carried over when a record array is replaced; no data or schema change |
+| `valueType` changed from `String` to `Secret` (decision 2) | Stored values stay readable: readers accept legacy plaintext in a Secret slot until the encrypt sweep has run, and the effective ownership becomes `Secret` (re-apply keeps the value, export drops it). Clients that select the value as a string must switch to the is-set state before the model change (concept phase 2) |
+| Record `recordKey` set, cleared or changed | Only decides how secret sub-values are carried over when a record array is replaced; no data or schema change |
 | Attribute `metaData` changed | Metadata only, no data break |
 | `enableChangeStreamPreAndPostImages` changed | Change stream behavior, no data break |
 | Type becomes a collection root (`isCollectionRoot: false → true`) | Additive |
@@ -949,13 +949,13 @@ surface in the dependency diff.
 | CK v2: new `implements` entry on a type | Additive |
 | CK v2: new method | Additive |
 | CK v2: attribute-assignment `access` relaxed (resolved value; omitted = `ReadWrite`; row T7) | "access/security" changelog note |
-| CK v2: `access` tightened on an attribute that is `securitySensitive` in the baseline, the current version **and every published version of the major that has the attribute** (row T7 exception, AB#6585) | Accepted security exception: Minor + `requiresAcknowledge` |
-| CK v2: `access` tightened on an attribute marked `securitySensitive` in the candidate, in the **first ckLanguage 2 release** of a classic model (baseline ckLanguage 1; row T7a, AB#7771) | Accepted security exception, once per model: Minor + `requiresAcknowledge` |
-| CK v2: method authorization widened (role added - also `Everyone` -, scope dropped, `allowSelf` set, looser block; row M12, AB#6585) | Minor + `requiresAcknowledge` (reason names the security impact) |
-| CK v2: method `authorization.dataAccess` `Write` → `Read` (omitted = `Write`; row M18, AB#7036) | Minor + `requiresAcknowledge` (reason names the security impact: a caller with only a read grant on the target may now call the method); listed under "Behavioural changes" as "security: method access widened" |
-| CK v2: method `authorization.dataAccess` `Read` → `Write` (row M18, AB#7036) | Callers with only a read grant lose access — Major, publish a new method version |
-| CK v2: method result `sensitive` set (row M17, AB#7006) | More protection, callers are unaffected (interface method: Major, row I12) |
-| CK v2: method result `sensitive` withdrawn (`true` → `false`; row M17, AB#7006) | Minor + `requiresAcknowledge` (reason names the security impact: a redaction is removed); listed under "Behavioural changes" as "security: result redaction removed" |
+| CK v2: `access` tightened on an attribute that is `securitySensitive` in the baseline, the current version **and every published version of the major that has the attribute** (row T7 exception) | Accepted security exception: Minor + `requiresAcknowledge` |
+| CK v2: `access` tightened on an attribute marked `securitySensitive` in the candidate, in the **first ckLanguage 2 release** of a classic model (baseline ckLanguage 1, row T7a) | Accepted security exception, once per model: Minor + `requiresAcknowledge` |
+| CK v2: method authorization widened (role added - also `Everyone` -, scope dropped, `allowSelf` set, looser block, row M12) | Minor + `requiresAcknowledge` (reason names the security impact) |
+| CK v2: method `authorization.dataAccess` `Write` → `Read` (omitted = `Write`, row M18) | Minor + `requiresAcknowledge` (reason names the security impact: a caller with only a read grant on the target may now call the method); listed under "Behavioural changes" as "security: method access widened" |
+| CK v2: method `authorization.dataAccess` `Read` → `Write` (row M18) | Callers with only a read grant lose access — Major, publish a new method version |
+| CK v2: method result `sensitive` set (row M17) | More protection, callers are unaffected (interface method: Major, row I12) |
+| CK v2: method result `sensitive` withdrawn (`true` → `false`, row M17) | Minor + `requiresAcknowledge` (reason names the security impact: a redaction is removed); listed under "Behavioural changes" as "security: result redaction removed" |
 | CK v2: attribute `securitySensitive` set or cleared (row A3) | Marker only, no data or API change |
 | CK v2: `ckLanguage` raised (`1 → 2`; omitted = 1) | Older engines reject the model with message 91 instead of misreading it. Major instead when it flips a `derivable` default (see Major) |
 | CK v2: `visibility` `Internal → Public` | Relaxation |
@@ -979,7 +979,7 @@ classification guard checks both directions. Rows apply to `ckLanguage: 2` eleme
 range retention, `securitySensitive`); no level of a v1 rule changes. Rows T, E, R and A restate the v1 rules for public
 types, enums, records and attribute definitions with one test each and add the CK v2 access rule (T7).
 
-**Internal elements (AB#6266).** Other models can never reference an internal element, so it is not part of the
+**Internal elements.** Other models can never reference an internal element, so it is not part of the
 compatibility surface. A change counts as internal when the element — itself or through its owner (type, record,
 association role, enum, interface, method) — is `internal` in every version in which it exists.
 
@@ -994,7 +994,7 @@ association role, enum, interface, method) — is `internal` in every version in
 Minor rather than none: a same-version re-import is short-circuited, so a structural change still needs a bump to reach
 tenants.
 
-**No internal element is reachable from a public one (AB#6334 / AB#6335, gate findings H1/H3).** The rows above are only
+**No internal element is reachable from a public one (gate findings H1/H3).** The rows above are only
 sound when "internal" really means "unreachable from other models". The compiler therefore rejects **inconsistent
 visibility** in a `ckLanguage: 2` model with message **129** (`CkInconsistentVisibility`): a public element may only
 reference public elements of its own model.
@@ -1021,13 +1021,13 @@ therefore public surface — removing the association or renaming the role is Ma
 associations (classifier rule only). `CkVisibilityReferenceCoverageTests` fails when a CK DTO gains an element reference that the
 visibility walk does not cover.
 
-**Interfaces (AB#6267).** An interface `X-n` grows by optional members; every change that breaks implementors or
+**Interfaces.** An interface `X-n` grows by optional members; every change that breaks implementors or
 consumers is Major and the reason recommends publishing `X-(n+1)` (e.g. `Named-2`) next to `X-n`. Association members are
 keyed by their role, so a changed target is one change (`target`), not remove + add.
 
 | Row | Change | Level |
 | --- | ------ | ----- |
-| I1 | Optional interface attribute added | Minor when its attribute definition is declared in this model **and** is new in this release or was internal in the baseline; otherwise Major (AB#6337): a type of another model may already assign the existing definition — as `Hidden` (error 99) or under another name (I-3) — and the member binds to it. Remedy: a new attribute definition for the member, or a new interface version |
+| I1 | Optional interface attribute added | Minor when its attribute definition is declared in this model **and** is new in this release or was internal in the baseline; otherwise Major: a type of another model may already assign the existing definition — as `Hidden` (error 99) or under another name (I-3) — and the member binds to it. Remedy: a new attribute definition for the member, or a new interface version |
 | I2 | Optional interface association added | Minor (optional association members are never checked against implementors, rule 121, so they cannot collide) |
 | I3 | Required attribute or association added | Major |
 | I4 | Member removed or renamed (remove + add) | Major |
@@ -1040,15 +1040,15 @@ keyed by their role, so a changed target is one change (`target`), not remove + 
 | I11 | Method added to an interface | Major (an optional interface method does not exist yet); an `internal` method on a public interface is a compile error (129), so it cannot be added as a capped Minor |
 | I12 | Invocation contract of an interface method changed (`kind`; parameter added or removed; parameter `valueType`, record, enum, `isOptional` in either direction, `sensitive`; `result`; result `sensitive`, row M17; error code added or removed; `execution.mode`, row M19) | Major — a type in another model that redeclares the method with the previous contract breaks with error 122; this lifts M2, M5 (required → optional) and M13 on interface methods. Metadata (descriptions, authorization, execution) keeps its M-row level. Type methods are unchanged (M1–M19) |
 
-**Invocation contract (AB#6336, gate finding H2).** A type may redeclare a method of an interface it implements; error
+**Invocation contract (gate finding H2).** A type may redeclare a method of an interface it implements; error
 **122** fires only when the redeclaration has another **invocation contract**: `kind`, the parameters as a set keyed
 by name (`valueType`, `valueCkRecordId`, `valueCkEnumId`, `isOptional`, `sensitive`), `result` (present or absent, its
-type and its `sensitive` marker), the set of error codes and the effective `execution.mode` (AB#6925: sync or async changes the
+type and its `sensitive` marker), the set of error codes and the effective `execution.mode` (sync or async changes the
 response shape). Descriptions, `authorization`, the rest of `execution` (timeout, idempotent, handler) and the order of parameters and
 errors may differ; the redeclaring type's own authorization and execution apply, with the mode of the interface method. The definition lives in one place,
 `CkMethodContract`, used by error 122 and by row I12.
 
-**Methods (AB#6268).** Type methods and interface methods follow the same rows (for interface methods, I12 lifts every
+**Methods.** Type methods and interface methods follow the same rows (for interface methods, I12 lifts every
 contract change to Major). The diff emits one change per method
 field; parameters (`Method parameter '<owner>/<method>/<name>'`) and error codes (`Method error '<owner>/<method>/<code>'`)
 are members of their own. The rendered `signature` is still reported as a readable before/after summary with level
@@ -1067,18 +1067,18 @@ are members of their own. The rendered `signature` is still reported as a readab
 | M9 | `kind` static ↔ instance | Major |
 | M10 | `idempotent` true → false / false → true | Major / Minor |
 | M11 | `timeoutSeconds` changed | Minor (behavioural) |
-| M12 | Authorization stricter (role removed or roles emptied, **scope added**, `allowSelf` true → false, block removed) / looser (role added — also to an empty list —, **scope removed**, `allowSelf` set, block added that only grants) | Major / Minor; mixed → Major. Roles are any-of and compared **case-insensitively** (like ASP.NET Identity's `NormalizedName`: `Admin` and `admin` are one role, a case-only change is no change; P3-3, 2026-10-10), **scopes all-of** and case-sensitive, and authorization is **default-deny**: an omitted block or empty roles admit administrators only (AB#6338, platform-owner decision 2026-10-10; the F3.4 gateway enforces the same). A block added or removed is one change compared field by field: an omitted block counts as no roles, no scopes and no self-calls — administrators only, the owner is not admitted (strict reading confirmed 2026-10-10). Role and scope names are validated by the compiler (message 104: letters, digits, `_ - . : /`, starting with a letter or digit), because they are compared as sets. Every looser change is also listed under "Behavioural changes" as "security: method access widened" and **requires an acknowledgement** (AB#6585, platform-owner decision 2026-10-12): `compatibility.acknowledge` with the change key (`TypeMethod:Machine-1/ChangePassword-1#Modified:roles`) and a reason that names the security impact (who may now invoke the method and why that is acceptable). The reason follows the usual entry rules (`CkAcknowledgeEntryRules`: single line, not empty); missing entry `OCTO-CK203`, stale entry `OCTO-CK204`. Stricter changes stay Major and are not acknowledgeable. A block that grants nothing is no change |
+| M12 | Authorization stricter (role removed or roles emptied, **scope added**, `allowSelf` true → false, block removed) / looser (role added — also to an empty list —, **scope removed**, `allowSelf` set, block added that only grants) | Major / Minor; mixed → Major. Roles are any-of and compared **case-insensitively** (like ASP.NET Identity's `NormalizedName`: `Admin` and `admin` are one role, a case-only change is no change; P3-3, 2026-10-10), **scopes all-of** and case-sensitive, and authorization is **default-deny**: an omitted block or empty roles admit administrators only (platform-owner decision 2026-10-10, the F3.4 gateway enforces the same). A block added or removed is one change compared field by field: an omitted block counts as no roles, no scopes and no self-calls — administrators only, the owner is not admitted (strict reading confirmed 2026-10-10). Role and scope names are validated by the compiler (message 104: letters, digits, `_ - . : /`, starting with a letter or digit), because they are compared as sets. Every looser change is also listed under "Behavioural changes" as "security: method access widened" and **requires an acknowledgement** (platform-owner decision 2026-10-12): `compatibility.acknowledge` with the change key (`TypeMethod:Machine-1/ChangePassword-1#Modified:roles`) and a reason that names the security impact (who may now invoke the method and why that is acceptable). The reason follows the usual entry rules (`CkAcknowledgeEntryRules`: single line, not empty); missing entry `OCTO-CK203`, stale entry `OCTO-CK204`. Stricter changes stay Major and are not acknowledgeable. A block that grants nothing is no change |
 | M13 | Parameter `sensitive` changed | Minor (interface method: Major, row I12) |
 | M14 | Description of the method, a parameter or an error | Patch |
-| M15 | `execution.handler` changed (`service` ↔ `pipeline`, AB#6877). An omitted key equals `service`, so adding `handler: service` to a method without the key is no change | Major — the implementation moves to another runtime and the handlers of the previous version stop serving the method; publish a new method version (`UpdateFirmware-2`). Not part of the invocation contract (rule 122), so a type may redeclare an interface method with another handler. Interface methods themselves cannot declare `pipeline` (message 131). A `pipeline` method cannot have a `sensitive` parameter (message 132, AB#7004): this is a compile rule, not a SemVer class — it refuses only new combinations, and switching a method to `pipeline` or marking a parameter `sensitive` on a pipeline method does not compile, so there is no classifier row for it |
-| M16 | `replacesGenericCreate` changed (AB#7024). An omitted key equals `false` | `false` → `true`: **Major** — callers that create entities of the type (and of every derived type) through the generic create break, they must call the method; publish a new type or method version. `true` → `false`: **Minor** — the generic create is available again. A **new** method that sets the flag on a type that **existed in the previous version** removes the generic create for its existing callers exactly like `false` → `true` and is **Major** as well (decision of 2026-10-19; the diff reports it as `replacesGenericCreate` `false` → `true` next to the method addition); on a **new type** it stays Minor (the type's own addition, row T1). The flag is a compile rule too (message 133, not a SemVer class): only a `static` method of a non-abstract type, never an interface method, at most one per concrete type including inherited ones, `ckLanguage: 2`. A model that sets the flag on any method carries `minEngineVersion` `CkEngineVersion.ReplacesGenericCreateMinEngineVersion`, so an older engine refuses it with message 126 instead of dropping the flag |
-| M17 | Result `sensitive` changed (AB#7006; the diff property is `resultSensitive`). An omitted key equals `false`; the marker covers the whole result value | `false` → `true`: **Minor** — more protection, callers are unaffected (the redaction is enforced at runtime). `true` → `false`: **Minor + requires acknowledge** — a redaction in audit events, logs and traces is withdrawn, so it is also listed under "Behavioural changes" as "security: result redaction removed"; `compatibility.acknowledge` with the change key (`TypeMethod:Machine-1/ChangePassword-1#Modified:resultSensitive`) and a reason that names the security impact (why the value may now be logged); missing entry `OCTO-CK203`, stale entry `OCTO-CK204` (same pattern as M12 looser and A3). On an **interface** method either direction is **Major** (row I12: the marker is part of the invocation contract, a type that redeclares the method with the previous marker breaks with error 122, reason `result sensitive`) and not acknowledgeable. A result added to or removed from a method is one `result` change (row M6, Major), not an additional `resultSensitive` change; a new method with a sensitive result is a new method (row M1, Minor). A `pipeline` method cannot have a sensitive result (message 134, AB#7006): this is a compile rule, not a SemVer class, so there is no classifier row for it |
-| M18 | `authorization.dataAccess` changed (AB#7036; the diff property is `dataAccess`). The effective value is compared: an omitted key equals `Write`, so `Write` stated explicitly is no change, and the property is diffed independently of the authorization block (a block added or removed does not hide it, and the block rule M12 ignores it) | `Write` → `Read`: **Minor + requires acknowledge** — the method needs only a read grant on its target now, so a caller that may merely read the record can call it; it is listed under "Behavioural changes" as "security: method access widened", and `compatibility.acknowledge` needs the change key (`TypeMethod:Machine-1/ChangePassword-1#Modified:dataAccess`) and a reason that names the security impact (why a read-only caller may call it); missing entry `OCTO-CK203`, stale entry `OCTO-CK204` (same pattern as M12 looser). `Read` → `Write`: **Major** — callers holding only a read grant on the target lose access; publish a new method version (`ChangePassword-2`); not acknowledgeable. On an **interface** method the same levels apply: `authorization` is not part of the invocation contract (row I12 does not lift it, error 122 does not compare it). A new method that declares `Read` is a new method (row M1, Minor). Compile rules (not SemVer classes): message 135 — `Read` on a method that replaces the generic create (a create is a write) or a value outside `Read`/`Write` (a YAML model is stopped by the schema first); the key in a `ckLanguage` 1 model is message 90. A model that declares `dataAccess` on any method — also `Write` — carries `minEngineVersion` `CkEngineVersion.DataAccessMinEngineVersion`, so an older engine refuses it with message 126 instead of dropping the key and treating a `Read` method as `Write` |
-| M19 | `execution.mode` changed (`sync` ↔ `async`, AB#6925). An omitted key equals `sync`, so adding `mode: sync` to a method without the key is no change | **Major** both ways — callers receive an operation handle instead of the result (or the other way round); publish a new method version (`Export-2`). The mode is part of the invocation contract: on an interface method row I12 applies as well, and a type that redeclares an interface method with another mode breaks with error 122 (reason `mode`). Compile rules (not SemVer classes): message 142 — an unknown value, `async` together with `handler: pipeline` (pipeline handlers answer synchronously only), or the key in a `ckLanguage` 1 model. `async` with `idempotent: true` is allowed. For an asynchronous method `timeoutSeconds` bounds the accept step (time until the handle is returned), not the operation (decision OD-5). A model that sets `execution.mode` on any method — also `sync` — carries `minEngineVersion` `CkEngineVersion.ExecutionModeMinEngineVersion`, so an older engine refuses it with message 126 instead of dropping the key and running an `async` method as sync |
+| M15 | `execution.handler` changed (`service` ↔ `pipeline`). An omitted key equals `service`, so adding `handler: service` to a method without the key is no change | Major — the implementation moves to another runtime and the handlers of the previous version stop serving the method; publish a new method version (`UpdateFirmware-2`). Not part of the invocation contract (rule 122), so a type may redeclare an interface method with another handler. Interface methods themselves cannot declare `pipeline` (message 131). A `pipeline` method cannot have a `sensitive` parameter (message 132): this is a compile rule, not a SemVer class — it refuses only new combinations, and switching a method to `pipeline` or marking a parameter `sensitive` on a pipeline method does not compile, so there is no classifier row for it |
+| M16 | `replacesGenericCreate` changed. An omitted key equals `false` | `false` → `true`: **Major** — callers that create entities of the type (and of every derived type) through the generic create break, they must call the method; publish a new type or method version. `true` → `false`: **Minor** — the generic create is available again. A **new** method that sets the flag on a type that **existed in the previous version** removes the generic create for its existing callers exactly like `false` → `true` and is **Major** as well (decision of 2026-10-19; the diff reports it as `replacesGenericCreate` `false` → `true` next to the method addition); on a **new type** it stays Minor (the type's own addition, row T1). The flag is a compile rule too (message 133, not a SemVer class): only a `static` method of a non-abstract type, never an interface method, at most one per concrete type including inherited ones, `ckLanguage: 2`. A model that sets the flag on any method carries `minEngineVersion` `CkEngineVersion.ReplacesGenericCreateMinEngineVersion`, so an older engine refuses it with message 126 instead of dropping the flag |
+| M17 | Result `sensitive` changed (the diff property is `resultSensitive`). An omitted key equals `false`; the marker covers the whole result value | `false` → `true`: **Minor** — more protection, callers are unaffected (the redaction is enforced at runtime). `true` → `false`: **Minor + requires acknowledge** — a redaction in audit events, logs and traces is withdrawn, so it is also listed under "Behavioural changes" as "security: result redaction removed"; `compatibility.acknowledge` with the change key (`TypeMethod:Machine-1/ChangePassword-1#Modified:resultSensitive`) and a reason that names the security impact (why the value may now be logged); missing entry `OCTO-CK203`, stale entry `OCTO-CK204` (same pattern as M12 looser and A3). On an **interface** method either direction is **Major** (row I12: the marker is part of the invocation contract, a type that redeclares the method with the previous marker breaks with error 122, reason `result sensitive`) and not acknowledgeable. A result added to or removed from a method is one `result` change (row M6, Major), not an additional `resultSensitive` change; a new method with a sensitive result is a new method (row M1, Minor). A `pipeline` method cannot have a sensitive result (message 134): this is a compile rule, not a SemVer class, so there is no classifier row for it |
+| M18 | `authorization.dataAccess` changed (the diff property is `dataAccess`). The effective value is compared: an omitted key equals `Write`, so `Write` stated explicitly is no change, and the property is diffed independently of the authorization block (a block added or removed does not hide it, and the block rule M12 ignores it) | `Write` → `Read`: **Minor + requires acknowledge** — the method needs only a read grant on its target now, so a caller that may merely read the record can call it; it is listed under "Behavioural changes" as "security: method access widened", and `compatibility.acknowledge` needs the change key (`TypeMethod:Machine-1/ChangePassword-1#Modified:dataAccess`) and a reason that names the security impact (why a read-only caller may call it); missing entry `OCTO-CK203`, stale entry `OCTO-CK204` (same pattern as M12 looser). `Read` → `Write`: **Major** — callers holding only a read grant on the target lose access; publish a new method version (`ChangePassword-2`); not acknowledgeable. On an **interface** method the same levels apply: `authorization` is not part of the invocation contract (row I12 does not lift it, error 122 does not compare it). A new method that declares `Read` is a new method (row M1, Minor). Compile rules (not SemVer classes): message 135 — `Read` on a method that replaces the generic create (a create is a write) or a value outside `Read`/`Write` (a YAML model is stopped by the schema first); the key in a `ckLanguage` 1 model is message 90. A model that declares `dataAccess` on any method — also `Write` — carries `minEngineVersion` `CkEngineVersion.DataAccessMinEngineVersion`, so an older engine refuses it with message 126 instead of dropping the key and treating a `Read` method as `Write` |
+| M19 | `execution.mode` changed (`sync` ↔ `async`). An omitted key equals `sync`, so adding `mode: sync` to a method without the key is no change | **Major** both ways — callers receive an operation handle instead of the result (or the other way round); publish a new method version (`Export-2`). The mode is part of the invocation contract: on an interface method row I12 applies as well, and a type that redeclares an interface method with another mode breaks with error 122 (reason `mode`). Compile rules (not SemVer classes): message 142 — an unknown value, `async` together with `handler: pipeline` (pipeline handlers answer synchronously only), or the key in a `ckLanguage` 1 model. `async` with `idempotent: true` is allowed. For an asynchronous method `timeoutSeconds` bounds the accept step (time until the handle is returned), not the operation (decision OD-5). A model that sets `execution.mode` on any method — also `sync` — carries `minEngineVersion` `CkEngineVersion.ExecutionModeMinEngineVersion`, so an older engine refuses it with message 126 instead of dropping the key and running an `async` method as sync |
 
-**Public types, stable bases, enums, records, attribute definitions (AB#6269).** A *stable base* is a type other
+**Public types, stable bases, enums, records, attribute definitions.** A *stable base* is a type other
 models may derive from: in a `ckLanguage: 2` model a public, non-final type with effective `derivable: Any`; in a v1
-model only `System/Entity` and `System/Configuration` (derived, no meta-model field). Since System 2.6.0 (AB#6928) both
+model only `System/Entity` and `System/Configuration` (derived, no meta-model field). Since System 2.6.0 both
 are stable bases **by declaration** (`ckLanguage: 2`, public, not final, explicit `derivable: Any`); the name branch for
 v1 models stays for the System versions up to 2.5.x only (see "The System model on ckLanguage 2" below). Stable bases are
 public types, so T1–T7 apply to them unchanged.
@@ -1091,22 +1091,22 @@ public types, so T1–T7 apply to them unchanged.
 | T4 | Base type changed | Major |
 | T5 | `isAbstract` / `isFinal` false → true / true → false | Major / Minor |
 | T6 | `derivable` Any → Model / Model → Any | Major / Minor |
-| T7 | Attribute `access` stricter (order `ReadWrite < ReadOnly < MethodOnly < Hidden`) / looser | Major / Minor. **Security exception** (platform-owner decision 2026-10-10, narrowed by AB#6585): tightening an attribute that is `securitySensitive: true` in the baseline, in the current version **and in every published version of the same major that has the attribute** is Minor + `requiresAcknowledge`. An attribute that became sensitive within the major line (not sensitive in any earlier version of the major that has it) is judged as if it were not marked: Major, and an acknowledgement cannot lower it, so "mark in one Minor, tighten in the next" ships as a Major. An attribute born sensitive (absent in the earliest versions, sensitive in every version that has it) qualifies. Every other change of such an attribute follows the normal rules. The history is the published versions of the baseline's major below the baseline, read from the same catalog as the baseline (the authoritative snapshot at publish); an unreadable version fails the verdict. The one exception to this history rule is row T7a (the release that moves a classic model to ckLanguage 2) |
-| T7a | Attribute `access` stricter, **in the first ckLanguage 2 release of a classic model** (AB#7771, decided by Gerald 2026-10-30, G1 = B) | **Minor + `requiresAcknowledge`** when the attribute is `securitySensitive: true` in the **candidate**. ckLanguage 1 cannot express the marker, so the baseline and the history can never satisfy row T7; this row judges by the candidate alone, once per model, with no allow-list. **Detection** (nothing the author sets): the published baseline is ckLanguage 1 (`EffectiveCkLanguage < 2`), the candidate is ckLanguage 2, and no published earlier version of the model is ckLanguage 2 - of **any** major, so the exception holds literally once per model, also when a model dropped back to ckLanguage 1 in a later major (the callers then load the earlier versions of every major, `ICkSemVerClassifier.NeedsFullModelHistory`; row T7 still looks at the baseline's major only). The very next release has a ckLanguage 2 baseline, so the exception cannot be used a second time; from then on row T7 applies unchanged. An attribute that is **not** marked sensitive in the candidate stays Major (row T7 first branch), also in this release. The candidate must still declare `derivable: Any` on its types and records (otherwise the `derivable` default flip is a Major of its own), and the access change needs its `compatibility.acknowledge` entry (`OCTO-CK203` without it, `OCTO-CK204` for a stale one). No new message code: the verdict is `OCTO-CK200`/`203`/`204` as for T7. The same classifier serves `ValidateVersion`, the compile gate, the publish gate and the cascade dry run |
-| T8 | Type `writeAccess` block added, removed or changed (AB#8574; compared as the set of principal kinds and channels, order and duplicates ignored) | **Minor + `requiresAcknowledge`**, marked behavioural. The reason says *restricted* (block added, or entries removed: client callers outside the block are refused at runtime), *widened* (block removed, or entries added) or *changed* (both). The data shape and the API do not change, so the level stays Minor in either direction; the acknowledgement with a security reason makes the reviewer decide (change key `Type:<Type>#Modified:writeAccess`) |
+| T7 | Attribute `access` stricter (order `ReadWrite < ReadOnly < MethodOnly < Hidden`) / looser | Major / Minor. **Security exception** (platform-owner decision 2026-10-10, narrowed): tightening an attribute that is `securitySensitive: true` in the baseline, in the current version **and in every published version of the same major that has the attribute** is Minor + `requiresAcknowledge`. An attribute that became sensitive within the major line (not sensitive in any earlier version of the major that has it) is judged as if it were not marked: Major, and an acknowledgement cannot lower it, so "mark in one Minor, tighten in the next" ships as a Major. An attribute born sensitive (absent in the earliest versions, sensitive in every version that has it) qualifies. Every other change of such an attribute follows the normal rules. The history is the published versions of the baseline's major below the baseline, read from the same catalog as the baseline (the authoritative snapshot at publish); an unreadable version fails the verdict. The one exception to this history rule is row T7a (the release that moves a classic model to ckLanguage 2) |
+| T7a | Attribute `access` stricter, **in the first ckLanguage 2 release of a classic model** (decided by Gerald 2026-10-30, G1 = B) | **Minor + `requiresAcknowledge`** when the attribute is `securitySensitive: true` in the **candidate**. ckLanguage 1 cannot express the marker, so the baseline and the history can never satisfy row T7; this row judges by the candidate alone, once per model, with no allow-list. **Detection** (nothing the author sets): the published baseline is ckLanguage 1 (`EffectiveCkLanguage < 2`), the candidate is ckLanguage 2, and no published earlier version of the model is ckLanguage 2 - of **any** major, so the exception holds literally once per model, also when a model dropped back to ckLanguage 1 in a later major (the callers then load the earlier versions of every major, `ICkSemVerClassifier.NeedsFullModelHistory`; row T7 still looks at the baseline's major only). The very next release has a ckLanguage 2 baseline, so the exception cannot be used a second time; from then on row T7 applies unchanged. An attribute that is **not** marked sensitive in the candidate stays Major (row T7 first branch), also in this release. The candidate must still declare `derivable: Any` on its types and records (otherwise the `derivable` default flip is a Major of its own), and the access change needs its `compatibility.acknowledge` entry (`OCTO-CK203` without it, `OCTO-CK204` for a stale one). No new message code: the verdict is `OCTO-CK200`/`203`/`204` as for T7. The same classifier serves `ValidateVersion`, the compile gate, the publish gate and the cascade dry run |
+| T8 | Type `writeAccess` block added, removed or changed (compared as the set of principal kinds and channels, order and duplicates ignored) | **Minor + `requiresAcknowledge`**, marked behavioural. The reason says *restricted* (block added, or entries removed: client callers outside the block are refused at runtime), *widened* (block removed, or entries added) or *changed* (both). The data shape and the API do not change, so the level stays Minor in either direction; the acknowledgement with a security reason makes the reviewer decide (change key `Type:<Type>#Modified:writeAccess`) |
 | E1 | Enum value added (also to a non-extensible enum) | Minor |
 | E2 | Enum value removed or renumbered; `useFlags` changed; `isExtensible` true → false | Major |
 | R1 | Optional record attribute added | Minor |
 | R2 | Record attribute removed, its attribute id changed, optional → required | Major |
 | A1 | Attribute definition `description` / `metaData` | Patch / Minor |
-| A2 | Attribute definition value type, record id or enum id (`String → Secret` stays Minor, AB#5528) | Major |
-| A3 | Attribute `securitySensitive` set or cleared (`ckLanguage: 2`, resolved value: omitted = false) | Minor. Setting it needs no acknowledgement, but a later tightening in the same major is judged against the major line (row T7, AB#6585), so splitting the change does not help |
+| A2 | Attribute definition value type, record id or enum id (`String → Secret` stays Minor) | Major |
+| A3 | Attribute `securitySensitive` set or cleared (`ckLanguage: 2`, resolved value: omitted = false) | Minor. Setting it needs no acknowledgement, but a later tightening in the same major is judged against the major line (row T7), so splitting the change does not help |
 
 `securitySensitive: true` marks password hashes, security stamps, tokens and 2FA secrets (System.Identity marks them in
 Phase 4, F4.2). It is a stored meta-model field (schema, DTO, graph, Mongo, reflection round-trip gate); a v1 model that
 declares it fails with message 90.
 
-**Behavioural changes (AB#6270).** Changes that keep the schema compatible but change runtime behaviour keep their
+**Behavioural changes.** Changes that keep the schema compatible but change runtime behaviour keep their
 level and are flagged `IsBehavioural`; the verdict report lists them under "Behavioural changes" (after the change
 list) and the changelog moves them from "Added" / "Changed" into a section `### Behavioural changes`. Changes that
 require an acknowledge (`RequiresAcknowledge`) are listed there too, with "(requires acknowledge)"; breaking ones stay
@@ -1116,12 +1116,12 @@ gets the extra list. Without behavioural changes the output is unchanged.
 
 | Row | Change | Level |
 | --- | ------ | ----- |
-| B1 | Attribute default values, `displayNameRule` / `displayDescriptionRule`, `autoCompleteValues`, `autoIncrementReference`, `enableChangeStreamPreAndPostImages`, method `timeoutSeconds` | unchanged (Minor/Patch), marked behavioural. **Exception (AB#6341, ckLanguage 2):** removing the default values of an attribute definition that is assigned as required anywhere in the model or is public is Major — otherwise "required with default" (Minor) plus "default removed" (Minor) would reach "required without default" (Major) in two minor releases |
+| B1 | Attribute default values, `displayNameRule` / `displayDescriptionRule`, `autoCompleteValues`, `autoIncrementReference`, `enableChangeStreamPreAndPostImages`, method `timeoutSeconds` | unchanged (Minor/Patch), marked behavioural. **Exception (ckLanguage 2):** removing the default values of an attribute definition that is assigned as required anywhere in the model or is public is Major — otherwise "required with default" (Minor) plus "default removed" (Minor) would reach "required without default" (Major) in two minor releases |
 | B2 | Non-unique index added or removed (any index removed) | Minor, marked behavioural |
 | B3 | Unique index added on a type that is not a stable base | Major, no marker |
 | B4 | Unique index added on a stable base | Major + `requiresAcknowledge`; the reason names the impact on derived types in other models |
 
-**Index pairing (AB#6339, ckLanguage 2 models).** Indexes have no id. In a `ckLanguage: 2` model a baseline and a
+**Index pairing (ckLanguage 2 models).** Indexes have no id. In a `ckLanguage: 2` model a baseline and a
 current index of a type with the same ordered field paths — compared case-insensitively, as the compiler and the
 database resolve them — are a pair: a pair that differs only in path case is no change; a pair whose `indexType`
 changed is one modification: `Unique` → `UniqueNotDeleted` and unique → non-unique are Minor (behavioural),
@@ -1129,24 +1129,24 @@ changed is one modification: `Unique` → `UniqueNotDeleted` and unique → non-
 non-unique → non-unique is Minor (behavioural). Unpaired indexes keep the added/removed rules above; ckLanguage 1
 models keep the v1 comparison.
 
-**Range retention (AB#6271).** For a range-retaining model the declared ranges are compared by dependency name
+**Range retention.** For a range-retaining model the declared ranges are compared by dependency name
 (`Dependency range '<name>'`). The exact closure (`dependencies`) is still diffed as before; removing the rule "resolved
-dependency changed → Minor" is F2.4 (AB#5686).
+dependency changed → Minor" is F2.4.
 
 | Row | Change (range-retaining model) | Level |
 | --- | ------------------------------ | ----- |
 | D1 | Floor raised within the same major | Minor while the new floor does not exceed the version the previous release resolved; **Major beyond it** (N5, 2026-10-10: the previous resolution is excluded — a tenant that installed the previous release with it cannot import this release without changing the dependency first) |
 | D2 | Floor lowered or range widened within the same major | Minor |
-| D3 | Upper bound narrowed within the same major | Minor, with a behavioural note (tenants with an excluded newer version cannot import the release) — **Major when the new range or floor excludes the version the previous release resolved** (AB#6340: a tenant that installed the previous release with it would need a dependency downgrade); a resolved dependency version that goes down on a range-retaining model is Major for the same reason (legacy exact-pinned input: the one rule of row D8, Minor inside the major) |
+| D3 | Upper bound narrowed within the same major | Minor, with a behavioural note (tenants with an excluded newer version cannot import the release) — **Major when the new range or floor excludes the version the previous release resolved** (a tenant that installed the previous release with it would need a dependency downgrade); a resolved dependency version that goes down on a range-retaining model is Major for the same reason (legacy exact-pinned input: the one rule of row D8, Minor inside the major) |
 | D4 | Range or floor moves to another major | Major |
 | D5 | Range dependency added / removed | Minor / Major (as for exact pins) |
 | D6 | Model switches from exact pins to range retention, or back (`rangeRetention`) | Minor, reason points to the one-time re-pin (F2.6); **Major** when the switch back to exact pins pins a version other than the one the previous release resolved (N3, 2026-10-10) |
-| D7 | `usedSurface` / `usedSurfaceHash` changed | not classified on its own (derived from the model's own changes); listed in `CkModelDiffService.ExcludedProperties` with that reason (AB#4472) |
-| D8 | The resolved dependency (closure entry) of a **range-retaining** model moved **up inside the dependency's major** (AB#5435), e.g. `System` 2.5.0 → 2.6.0 after a rebuild | **None** — no bump needed; the verdict line says why. The closure of a range-retaining model is compiler-set metadata (the same predicate, `CkClosureMove`, makes a rebuild an equivalent no-op in the publish gate, class (4) of the same-version rule); it only applies when the declared ranges and floors are unchanged. The model's references are major-qualified and bound at load, so the version the build resolved is not part of its surface; an additive base-model minor no longer forces a bump of every dependent (the cascade of AB#5432). Still Major: a version that goes down, a range or floor that excludes the previous resolution (D1–D4), a major switch, a removed dependency. Every other resolved-version move is judged by **one rule for every input** (AB#6882, no exact-pin special case): same major → Minor "compatible dependency version change", another major → Major. **Legacy input** (a model without range retention, i.e. exact pins: the 45 "legacy major, accepted" entries of AB#7049 and the exact-pinned baseline of a re-pin, row D6) is not rejected but judged by that rule, so the publish gate and `ValidateCascade` keep reading old catalog versions; no published model of a current major is exact-pinned any more (AB#6708 scan of 2026-10-30) |
+| D7 | `usedSurface` / `usedSurfaceHash` changed | not classified on its own (derived from the model's own changes); listed in `CkModelDiffService.ExcludedProperties` with that reason |
+| D8 | The resolved dependency (closure entry) of a **range-retaining** model moved **up inside the dependency's major**, e.g. `System` 2.5.0 → 2.6.0 after a rebuild | **None** — no bump needed; the verdict line says why. The closure of a range-retaining model is compiler-set metadata (the same predicate, `CkClosureMove`, makes a rebuild an equivalent no-op in the publish gate, class (4) of the same-version rule); it only applies when the declared ranges and floors are unchanged. The model's references are major-qualified and bound at load, so the version the build resolved is not part of its surface; an additive base-model minor no longer forces a bump of every dependent (the cascade). Still Major: a version that goes down, a range or floor that excludes the previous resolution (D1–D4), a major switch, a removed dependency. Every other resolved-version move is judged by **one rule for every input** (no exact-pin special case): same major → Minor "compatible dependency version change", another major → Major. **Legacy input** (a model without range retention, i.e. exact pins: the 45 "legacy major, accepted" entries and the exact-pinned baseline of a re-pin, row D6) is not rejected but judged by that rule, so the publish gate and `ValidateCascade` keep reading old catalog versions; no published model of a current major is exact-pinned any more (scan of 2026-10-30) |
 
-### The System model on ckLanguage 2 (AB#6928)
+### The System model on ckLanguage 2
 
-System 2.6.0 is the first System with `ckLanguage: 2` and the release is a **Minor** against 2.5.0. System 2.7.0 (AB#6929) adds the interfaces `Named-1`, `Describable-1`, `Enableable-1` and `Hierarchical-1` and lets `PersistentQuery` implement the first two: rows I10 (interface added, Minor) and T2 (implemented interface added, Minor); `ValidateVersion` System-2.7.0 against 2.5.0 = `MINOR bump -> minimum version 2.6.0`, against 2.6.0 = `MINOR bump -> minimum version 2.7.0`, `VALID`; `ValidateCascade` 21 Compatible. 2.6.0 had already been published when the interfaces were built, so the interfaces are 2.7.0 and never an extension of 2.6.0. System 2.8.0 (AB#7918) adds the enum value `AggregationTypes-1/Integral`: `ValidateVersion` against the published 2.7.0 = `MINOR  Enum value 'AggregationTypes-1/Integral' added — purely additive enum value`, `VALID` (test `System28_AgainstSystem270_IsAMinor_WithTheIntegralAggregationTypeAsTheOnlyChange`). Raising the language
+System 2.6.0 is the first System with `ckLanguage: 2` and the release is a **Minor** against 2.5.0. System 2.7.0 adds the interfaces `Named-1`, `Describable-1`, `Enableable-1` and `Hierarchical-1` and lets `PersistentQuery` implement the first two: rows I10 (interface added, Minor) and T2 (implemented interface added, Minor); `ValidateVersion` System-2.7.0 against 2.5.0 = `MINOR bump -> minimum version 2.6.0`, against 2.6.0 = `MINOR bump -> minimum version 2.7.0`, `VALID`; `ValidateCascade` 21 Compatible. 2.6.0 had already been published when the interfaces were built, so the interfaces are 2.7.0 and never an extension of 2.6.0. System 2.8.0 adds the enum value `AggregationTypes-1/Integral`: `ValidateVersion` against the published 2.7.0 = `MINOR  Enum value 'AggregationTypes-1/Integral' added — purely additive enum value`, `VALID` (test `System28_AgainstSystem270_IsAMinor_WithTheIntegralAggregationTypeAsTheOnlyChange`). Raising the language
 flips the `derivable` default from `Any` to `Model` (rows T6, and message 113 in every model that derives from the
 type), so every type and every record of the System declares `derivable: Any` explicitly. The other modifiers do not
 flip (`visibility` omitted = `Public`, attribute `access` omitted = `ReadWrite` in both languages). With that, the
@@ -1173,7 +1173,7 @@ purpose: the System 2.5.x sources and published files are ckLanguage 1 and are s
 golden tests, a patch release of the 2.5 line). It has no effect on a v2 System. It goes away together with the last
 ckLanguage 1 System version, not earlier.
 
-### usedSurface (AB#4472)
+### usedSurface
 
 A range-retaining compiled model records, per declared dependency, which elements and members of that dependency it
 uses: `dependencyRanges[].usedSurface` (sorted, de-duplicated, major-qualified, version-less ids) and
@@ -1194,12 +1194,12 @@ uses: `dependencyRanges[].usedSurface` (sorted, de-duplicated, major-qualified, 
   computed-column formulas, which are not parsed for attribute paths. Internal dependency elements cannot appear,
   the compiler rejects references to them (message 112).
 
-**Which change classes it covers (the research question of AB#4472).** A change of a dependency can be tolerated for a
+**Which change classes it covers (the research question).** A change of a dependency can be tolerated for a
 consumer — even across a major — exactly when it touches nothing listed in that consumer's `usedSurface`: removing or
 renaming an element or member, changing its value type, record or enum, its multiplicity, a base type, or tightening
 `access` / `visibility` / `derivable` of a listed element. With the F2.1 rules every such change of a *public* element
 is Major, so the classifier and `usedSurface` together answer "would break: Industry.Energy uses
-System@2/Entity-1.Name" (F2.5, AB#5687, consumes it at tenant import).
+System@2/Entity-1.Name" (F2.5, consumes it at tenant import).
 
 **What it cannot prove.** Behavioural and semantic changes keep the surface intact: a changed default value, display
 rule, index, method timeout or authorization semantics, a changed meaning of an enum value or attribute, or data a
@@ -1216,7 +1216,7 @@ A change without an explicit rule is classified as **Major**. Since only a minim
 enforced, an overly strict classification is annoying for the developer but never wrong — an
 overly lax one, however, is dangerous.
 
-### Classification guard (AB#6272)
+### Classification guard
 
 A meta-model field cannot reach main unless it has a diff **and** a classifier rule. The guard is
 `tests/ConstructionKit.Engine.Tests/SemVer/CkSemVerClassificationGuardTests.cs`; it fails, naming the item, when
@@ -1242,7 +1242,7 @@ rule to `CkSemVerClassifier`, and add the rule row to this page with a row test.
 part of the compatibility surface, add it to `ExcludedProperties` with the reason instead.
 
 **Known gaps.** Open items live in one place, `KnownGaps` in the guard test, each with the story that closes it:
-the rule rows T1–T7, E1–E2, R1–R2, A1–A2 (AB#6269) and B1–B4 (AB#6270). The list only shrinks — and it must be empty when F2.1 closes (AB#6273).
+the rule rows T1–T7, E1–E2, R1–R2, A1–A2 and B1–B4. The list only shrinks — and it must be empty when F2.1 closes.
 
 ### Renames
 
@@ -1250,17 +1250,17 @@ A rename is not structurally detectable and appears as remove+add — which corr
 major bump. The report hints at possible renames when removals and additions of the same element
 kind occur in one diff.
 
-## Record members and export (AB#7467)
+## Record members and export
 
 Ownership is evaluated per attribute, and `ExportRt` evaluates the members of an exported record individually against their own
 effective ownership. The rule for a model author: **members of an exported record need the same export behaviour as the
 record-valued attribute that carries them, or must be optional.** A required member without a default value whose ownership is
 `RuntimeState` or `Secret` is dropped from every exported record, so the exported record is incomplete and cannot be imported again
-(AB#7446: `Loxone/Control.States`, a `SeedOwned` `RecordArray` of `System.Communication/DataPoint` whose required member `ExternalId`
+(`Loxone/Control.States`, a `SeedOwned` `RecordArray` of `System.Communication/DataPoint` whose required member `ExternalId`
 was `RuntimeState`).
 
 The compiler reports this as warning **138** `ExportedRecordDropsRequiredMember` for the model being compiled (message table in
-`CLAUDE.md`). It is a diagnostic only: it does not change a verdict of the classifier, no row above applies, and existing models
+`docs/compiler-rules.md`). It is a diagnostic only: it does not change a verdict of the classifier, no row above applies, and existing models
 compile unchanged. Changing a member's `ownership` or `isOptional` is classified by the ownership and required/optional rows of
 the rule set as before.
 

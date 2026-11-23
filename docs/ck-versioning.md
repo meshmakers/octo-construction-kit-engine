@@ -1,11 +1,85 @@
 ---
-description: Range retention of CK v2 models, the compiler default and the audit script.
-applies_to: src/ConstructionKit.Engine/Resolvers/**, src/ConstructionKit.Engine/DependencyGraph/**, scripts/audit-ck-ranges.sh
+description: CK versioning contracts: minEngineVersion and message 126, and range retention of CK v2 models with the audit script.
+applies_to: src/ConstructionKit.Engine/Versioning/**, src/ConstructionKit.Engine/Resolvers/**, scripts/audit-ck-ranges.sh
 ---
 
-# CK v2 range retention
+# CK engine version contract (`minEngineVersion`, message 126)
 
-## CK v2 Range Retention (AB#5664 / AB#5665, Phase 1 F1.1-S2 AB#5905 — compiler default since AB#6675)
+Source: `src/ConstructionKit.Engine/Versioning/CkEngineVersion.cs`.
+
+## What a model requires
+
+| Compiled model | `minEngineVersion` |
+|----------------|--------------------|
+| `ckLanguage: 1`, no range retention, v1 dependencies | not written (output byte-identical to before) |
+| `ckLanguage: 2` or range-retaining | `3.5.1` (`CkEngineVersion.CkV2MinEngineVersion`) |
+| v1 model on a dependency that carries one | the highest value of its resolved dependencies |
+| a type or interface method uses a key that an older CK v2 engine would drop silently | the highest of the matching feature minimums below and the values above |
+
+Feature minimums (`CkEngineVersion.GetRequiredMinEngineVersion`; each one is the first libs release that ships the key):
+
+| A method sets | `minEngineVersion` | Why an older engine must refuse the model |
+|---------------|--------------------|-------------------------------------------|
+| `replacesGenericCreate: true` | `3.5.34` (`ReplacesGenericCreateMinEngineVersion`) | it would serve the generic create of the type |
+| `result.sensitive: true` | `3.5.36` (`SensitiveResultMinEngineVersion`) | it would log, audit and trace a secret result |
+| `authorization.dataAccess`, also `Write` | `3.5.40` (`DataAccessMinEngineVersion`) | it would treat a `Read` method as `Write` |
+| `execution.mode`, also `sync` | `3.5.67` (`ExecutionModeMinEngineVersion`) | it would run an `async` method as sync |
+
+| A type declares | `minEngineVersion` | Why an older engine must refuse the model |
+|-----------------|--------------------|-------------------------------------------|
+| `writeAccess` (`data-permissions.md`) | `3.5.71` (`WriteAccessMinEngineVersion`) | it would ignore the restriction and let every caller write the type |
+
+Models that use none of these keys keep their other minimum and compile byte-identically.
+
+`3.5.1` is the first libs release with the full CK v2 Phase 1 reader. The value is a constant, not the compiling
+engine's version, so compile output does not depend on the build configuration. A model that was published earlier
+keeps the value it was published with (published models are immutable), e.g. `3.4.0`.
+
+## What the running engine reports
+
+The pipeline stamps the AssemblyVersion as `Major.Minor.0.0` (`octo-pipeline-templates`, `set-version.yml`), which
+cannot tell 3.5.0 from 3.5.2. The engine therefore reads the first parsable value of
+
+1. `AssemblyFileVersion` (`$(BuildNumberLong)`), e.g. `3.5.2.0` on an `r3.5.2` build,
+2. `AssemblyInformationalVersion` with `-slug` and `+sourcelink` stripped,
+3. the AssemblyVersion,
+
+and uses major.minor.patch. Nothing throws; a missing or garbled version falls through to the next source.
+FileVersion wins because it is purely numeric (the SDK appends `+<commit sha>` to the informational version, test
+builds append `-<branch slug>`).
+
+| Build | FileVersion | Running engine |
+|-------|-------------|----------------|
+| `r3.5.2` release | `3.5.2.0` | 3.5.2 |
+| `test/3.5-*` lane | `3.5.<counter>.<rev>` | 3.5.`<counter>` (not a release patch) |
+| main (private feed) | `0.1.YYMM.NNNN` | none: check skipped |
+| DebugL | `999.0.0.0` | 999.0.0 |
+
+## Message 126
+
+A model whose `minEngineVersion` is above the running engine is refused with message 126, naming the model, the
+required version and the running engine as major.minor.patch:
+
+| Running engine | Model requires 3.5.1 |
+|----------------|----------------------|
+| 3.4.x, 3.5.0 | refused (126) |
+| 3.5.1, 3.5.2, 3.6.0 | read |
+| 999.0.0 (DebugL) | read (and `1000.0.0` is refused) |
+| below 1.0 (main line) | **check skipped** |
+
+**Main line rule.** An engine whose major version is below 1 (private-feed builds `0.1.YYMM.NNNN`) skips the check:
+it carries no number comparable with the release line. It is covered by the main-line floor `0.1.2610.9010` in
+`octo-mesh-deployment/docs/ck-v2-engine-inventory.md` and by rebuilt images. The rule lives in
+`CkEngineVersion.IsSatisfiedBy` and is tested in `CkEngineVersionTests`.
+
+## Tests
+
+Pin the running engine in tests with `CkEngineVersion.OverrideCurrentForTests(new Version(3, 5, 0))`; never
+rely on the ambient assembly version.
+
+## CK v2 range retention
+
+## CK v2 Range Retention (compiler default)
 
 Range retention is the **compiler default**: every compile (MSBuild `CkCompile` and `octo-ckc Compile`, CK
 language 1 and 2) writes the retained ranges. The switch is gone: the MSBuild property / environment
@@ -15,8 +89,8 @@ strips `-rr` from the ckc arguments and warns on stderr). `CkCompilerOptions.Ran
 remains only as a code seam for tests and re-pin tooling (`RangeRetention = false` = classic exact pins).
 Compiled output of unchanged sources therefore differs (added `dependencyRanges`, `minEngineVersion: 3.5.1`,
 `Name@major/` references); the first publish of an existing model needs a MINOR bump (SemVer row D6).
-Audit sources before rebuilding: `octo-ckc -c AuditRanges -p <dir>` / `scripts/audit-ck-ranges.sh` (AB#6683).
-Merge/release only after the O1 lift (AB#6279).
+Audit sources before rebuilding: `octo-ckc -c AuditRanges -p <dir>` / `scripts/audit-ck-ranges.sh`.
+Merge/release only after the O1 lift.
 
 **Compile side (`CatalogModelResolver.CompileAsync` → `ApplyRangeRetentionAsync`).** The model is still
 resolved and validated against the *highest* catalog version (the returned graph stays concrete — the
@@ -88,7 +162,7 @@ one matching element" when a System minor was imported into a tenant holding exa
 range-retaining models (or silently merged the range into the wrong exact entry). Pinned by
 `RangeRetentionRepositoryResolverTests`. `Equals` itself is unchanged (other callers rely on it).
 
-**One version per dependency model (AB#6671, replaces the former limitation N4).** A range-retaining resolve of the
+**One version per dependency model (replaces the former limitation N4).** A range-retaining resolve of the
 catalog (`CatalogDependencyResolver` with `RangeRetainingDependencyRanges` roots: compile with the flag on, hard
 resolve of a range-retaining compiled model) no longer resolves every queued range on its own. `CatalogConstraintSolver`
 collects every constraint of one model **name** over the whole closure — ranges and the exact pins of classic
@@ -104,7 +178,7 @@ installed version per model, so an exact pin fails on its own (`ResolveFailed`) 
 `RangeRetentionCompileTests` (`…ResolveSystemOnce`, `…ConstraintsNoVersionSatisfies…`, `…ThreeLevelChain…`,
 `…HighestWins`).
 
-**Resolution by SemVer, the matrix (AB#4468).** Range `System-[2.5,3.0)` (floor 2.5.0) against the available versions:
+**Resolution by SemVer, the matrix.** Range `System-[2.5,3.0)` (floor 2.5.0) against the available versions:
 `{2.5.0}` → 2.5.0; `{2.6.1}` → 2.6.1; `{2.4.9}` and `{3.0.0}` → rejected with a message naming the range and the visible
 versions; `{2.5.0, 2.6.1, 3.0.0}` → 2.6.1 (highest in range). The same table runs through the catalog/compile resolver
 (`DependencyResolutionMatrixTests`, Compiler.Tests; with and without range retention), the repository resolver
@@ -112,18 +186,18 @@ versions; `{2.5.0, 2.6.1, 3.0.0}` → 2.6.1 (highest in range). The same table r
 side lists the installed versions through the optional `IRepositoryVersionLister` (implemented by
 `RepositoryManagementService` → `IModelRepository`, by `DatabaseCkModelRepository` in engine-mongodb); a repository without
 it reports the range without versions. **No special treatment for System and Meshmakers-shipped models.** Blueprint floor
-semantics are not changed (AB#6672). Rules page: `docs/ck-semver-rules.md`, "Dependency resolution by SemVer".
+semantics are not changed. Rules page: `docs/ck-semver-rules.md`, "Dependency resolution by SemVer".
 
-**Message of an unsatisfiable dependency in a repository (AB#7381).** The repository (tenant) resolver judges against the repository's own
+**Message of an unsatisfiable dependency in a repository.** The repository (tenant) resolver judges against the repository's own
 `Available` models, not against a catalog. `RepositoryDependencyResolver` therefore asks the optional `IRepositoryInstalledVersionLister`
 (`ListInstalledVersionsAsync`: every held version with its state; `RepositoryManagementService` forwards to the `IModelRepository`, engine-mongodb
 implements it) and throws `ModelValidationException.UnknownCkModelsInRepository`: `Industry.Basic-[2.5,3.0): the tenant has no Available version of
 Industry.Basic (installed: 2.5.0 ResolveFailed)`, or `... has Available versions of X (2.4.0, 3.0.0), none satisfies the range`, or `... has no version of X
-installed`; the text never says "catalog". A repository without the interface keeps the AB#4468 text ("does not match any visible version of X (...)");
+installed`; the text never says "catalog". A repository without the interface keeps the previous text ("does not match any visible version of X (...)");
 the catalog resolver's message is unchanged. Tests: `RepositoryUnresolvedDependencyMessageTests`. The import itself (engine-mongodb) leaves a previously
-installed version of the imported model in place when this error (or any validation error) aborts it - see engine-mongodb `CLAUDE.md`.
+installed version of the imported model in place when this error (or any validation error) aborts it - see octo-construction-kit-engine-mongodb.
 
-**Range audit (AB#6683).** The one-major-per-range rule lives in `CkDependencyRangeRule` (`FloorOf`, `IsWithinOneMajor`), called by
+**Range audit.** The one-major-per-range rule lives in `CkDependencyRangeRule` (`FloorOf`, `IsWithinOneMajor`), called by
 `CatalogModelResolver` and by `CkModelRangeAudit` / `octo-ckc -c AuditRanges -p <dir>` (read-only scan of `ckModel.yaml` files, non-zero
 exit when a range is rejected) and `scripts/audit-ck-ranges.sh <monorepo-root>` (all repositories with CK sources, list in
 `docs/ck-semver-rules.md`, "Range audit"). `RangeAuditTests.Rule_AgreesWithTheRangeRetainingCompile` pins audit = compiler.

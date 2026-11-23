@@ -15,18 +15,18 @@ package, so it bootstraps through its own `Exec`-based targets. Every other CK-o
 (e.g. octo-identity-services, octo-communication-controller-services) uses the packaged
 targets, which do not re-enter the publish path from a test step.
 
-**System models are published automatically from main (AB#7343, default flipped by AB#8718).** The shared catalogs are published by the
+**System models are published automatically from main (default flipped).** The shared catalogs are published by the
 `validate-and-publish-ck-versions.yml` step of `azure-pipelines.yml`, not by the dotnet build. The pipeline parameter
 `publishSystemCkModels` (boolean, **default true** since 2026-11-10) feeds the template parameter `publishOnMain` (`tpl-v1.8.0` and later; pinned: `tpl-v1.11.0`):
 a main build runs ValidateVersion, the schema compile and the cascade check, which still refuse a breaking change declared as
 minor, and publishes the System models; an already-published version is a no-op. The gate was introduced as default false after
-System-2.6.0 reached `construction-kit-libraries-build` on 2026-10-23 before the re-pin (AB#6708); CK v2 range retention
-(AB#4696) and the completed re-pin (AB#5688, AB#6708) removed that exact-pin breakage. **To build main without publishing:**
+System-2.6.0 reached `construction-kit-libraries-build` on 2026-10-23 before the re-pin; CK v2 range retention
+ and the completed re-pin removed that exact-pin breakage. **To build main without publishing:**
 *Run pipeline* on `octo-construction-kit-engine-CI` -> branch `main` -> untick *Publish System CK models to the CK catalogs (main)*
 (CLI: `az pipelines run --id 108 --branch main --parameters publishSystemCkModels=false`). `r*` tags (release train) publish as
 before. All three models are System models and are gated together.
 
-**Test-only models are never published to a GitHub catalog (AB#6114).** `tests/TestCkModel`
+**Test-only models are never published to a GitHub catalog.** `tests/TestCkModel`
 (`Test`, `System.TestIdentity`) sets `OctoPublishCkModelToRemoteCatalog=false`, so its
 `CkCompile` publishes to the `LocalFileSystemCatalog` only. The tests consume both models
 embedded in `TestCkModel.dll`; nothing resolves them from a GitHub catalog. Both models were
@@ -34,7 +34,7 @@ removed from `construction-kit-libraries-build` and `meshmakers.github.io` on 20
 test-only CK model project must set the same property.
 
 Since `tpl-v1.0.0` of `meshmakers/octo-pipeline-templates` (pinned by the `ref:` of the
-`pipelineTemplates` resource in `azure-pipelines.yml`, `tpl-v1.3.1` since AB#6394) no MSBuild step
+`pipelineTemplates` resource in `azure-pipelines.yml`, `tpl-v1.3.1`) no MSBuild step
 publishes to a shared catalog. `update-build-number.yml` no longer exports `OctoPublishCatalog` /
 `effectivePublishCatalog`. The shared catalogs are published only by
 `templates/steps/validate-and-publish-ck-versions.yml`, which runs **after build and tests**, validates
@@ -51,9 +51,9 @@ System, System.Files and System.StreamData against the last published version, c
 explicitly** — `Build src`, `Build samples`, `Build test CK model`, `Build tests` and `Test` all do (the
 exception the template documents for solutions whose CK models depend on each other; the local catalog is
 run-isolated through `OctoLocalCatalogRootPath`). Omitting it on any one of them lets this repo's own
-`Directory.Build.targets` publish with whatever `OctoPublishCatalog` the environment holds (AB#5413).
+`Directory.Build.targets` publish with whatever `OctoPublishCatalog` the environment holds.
 
-**CI build/test layout (AB#6093).** The job builds every project exactly once and the
+**CI build/test layout.** The job builds every project exactly once and the
 `Test` step runs with `--no-build --no-restore`:
 
 1. `Build src` — each `src/**/*.csproj` (Release); compiles and publishes System and
@@ -61,16 +61,15 @@ run-isolated through `OctoLocalCatalogRootPath`). Omitting it on any one of them
    built twice (via StreamDataCkModel's ProjectReference and by its own invocation). The
    remote-catalog leg of `CkCompile` is therefore stamped in `obj/.../octo-ck-remote-publish/`
    by catalog + SHA-256 of the compiled yaml and skipped when the identical content was already
-   published from this output (AB#6119; before: System pushed twice, ~60 s, build 50758). The
+   published from this output (before: System pushed twice, ~60 s, build 50758). The
    LocalFileSystemCatalog publish still runs on every build. Look for `Skipping publish of
    construction kit library ...` in the log.
 2. `Build samples`.
 3. `Build test CK model` — `tests/TestCkModel` with `/p:BuildProjectReferences=false`;
-   publishes Test and System.TestIdentity to the LocalFileSystemCatalog only (AB#6114). It runs before the test projects because
+   publishes Test and System.TestIdentity to the LocalFileSystemCatalog only. It runs before the test projects because
    `Runtime.Engine.Tests` references `TestCkModel.dll` and the DotNetCoreCLI glob order is
    not guaranteed.
-4. `Build tests` — `tests/**/*Tests.csproj`, the `*SystemTests` projects included (AB#8921:
-   they need no running services; the GitHub write test skips itself without
+4. `Build tests` — `tests/**/*Tests.csproj`, the `*SystemTests` projects included (they need no running services; the GitHub write test skips itself without
    `CK_GITHUB_WRITE_TEST_REPO`/`CK_GITHUB_WRITE_TEST_TOKEN`), also with
    `/p:BuildProjectReferences=false`: the src projects are already built into the same
    output folders, so only the test assemblies compile.
@@ -93,15 +92,15 @@ assembly.
    job and nothing in this repo is at fault.
 2. Read: the catalog is served over GitHub Pages, whose deploy workflow serializes a burst
    of publishes and only deploys the final push, so the live tree can lag a cascade by
-   many minutes (AB#4872). On top of that, readers keep a cache at
+   many minutes. On top of that, readers keep a cache at
    `~/.octo/ck-catalog/cache/private-github-catalog-cache*.json` (60 s max age;
-   repository-scoped file name only on engines carrying the AB#5412 fix).
+   repository-scoped file name only on engines carrying that fix).
 3. Which repository is the private slot bound to? `octo-cli -c ListCatalogs` prints the
-   coordinates in the description (AB#5139) — the main installations read
+   coordinates in the description — the main installations read
    `construction-kit-libraries-build`, the 0.2-dev instance reads `octo-catalog-dev`,
    where `System` still tops out at 2.2.2.
 
-## Sibling CK Models and the Local Catalog (AB#5661)
+## Sibling CK Models and the Local Catalog
 
 A CK model project that depends on another CK model **built in the same repository / build**
 (System.StreamData → System) must follow two rules, or a parallel build can compile the dependent
@@ -113,7 +112,7 @@ against a stale or missing version of its sibling:
    published to the `LocalFileSystemCatalog`) the referenced model. Without the reference MSBuild may
    build both in parallel.
 2. **Visibility — local catalog enabled.** The dependent sets `OctoLocalCatalogIsEnabled=true`, otherwise
-   octo-ckc only sees the remote catalog caches, which know only already-published versions (AB#5532).
+   octo-ckc only sees the remote catalog caches, which know only already-published versions.
 
 **The local catalog answers lookups from disk, not from its cache file.** `LocalFileSystemCatalog`
 overrides both `IsExistingAsync` overloads to enumerate the compiled files
@@ -122,7 +121,7 @@ overrides both `IsExistingAsync` overloads to enumerate the compiled files
 parallel build, and a concurrent publish could overwrite it with a snapshot taken before a sibling model
 was published; the dependent compile then failed with `Dependencies 'System-[2.4,3.0)' are unknown`
 although the manifest was on disk (2026-10-06), or resolved a wide range to an older version (the
-stale-pin class of AB#5432 / AB#5359). `ListAsync` / `SearchAsync` still use the cache (listing only).
+stale-pin class). `ListAsync` / `SearchAsync` still use the cache (listing only).
 Pinned by `LocalFileSystemCatalogTests.IsExistingAsync_WithVersionRange_StaleCache_*`.
 
 **Publish is atomic (review M10).** Because lookups trust file existence, `PublishAsync` writes the model to a
@@ -148,7 +147,7 @@ publisher that already opened it. It is safe to delete while no build is running
 leading dot keeps it out of the `ck-*.json` / `catalog.json` lookups. Temp files of an interrupted write
 (`.<name>.<guid>.tmp` next to the target) are never read either and can be deleted at any time.
 
-**Two catalog roots: `ck-models/v2/` and `ck-models/v3/` (F1.1-S6, AB#5909).** `CkCatalogLayout` decides where a
+**Two catalog roots: `ck-models/v2/` and `ck-models/v3/` (F1.1-S6).** `CkCatalogLayout` decides where a
 model is published: classic models (`ckLanguage` 1, exact pins) go to `ck-models/v2/`, `ckLanguage: 2` and
 range-retaining models (and anything carrying `minEngineVersion`) to `ck-models/v3/`. Engines before CK v2 read
 only `v2` and tolerate unknown JSON properties, so the separate root is what keeps them from misreading a v2
@@ -156,12 +155,12 @@ model. Engines from CK v2 on read both (`ReadRoots` = v3, then v2): `LocalFileSy
 both directories, the refresh merges both index trees (a model may have versions in both), and `GitHubCatalog`
 takes the root from the cached `filePath`, otherwise probes v2 then v3 — v3 first only when the cache holds v3 models
 (review G3 E-L4: no extra 404 per v1 model). A missing v3 root index is normal and is not retried, so it does not
-spend the AB#4872 404-retry budget. Each root has its own `catalog.json` tree and its own `.catalog-index.lock`.
+spend the 404-retry budget. Each root has its own `catalog.json` tree and its own `.catalog-index.lock`.
 A version lives in one root only: publishing it into the other root needs `force` and deletes the old file — in the
 local **and** the GitHub catalog (review G3 E-M5). Known limitation (E-L3): the old root's `catalog.json` keeps a
 stale listing entry for a moved version (listing only; lookups use the files). The catalog CI side (Pages deploy of `ck-models/v3/`) is F2.3.
 
-**`minEngineVersion` (F1.1-S6, AB#6390).** The compiler writes `CkCompiledModelRoot.MinEngineVersion` =
+**`minEngineVersion` (F1.1-S6).** The compiler writes `CkCompiledModelRoot.MinEngineVersion` =
 `CkEngineVersion.CkV2MinEngineVersion` (**`3.5.1`**, the first libs release with the full CK v2 Phase 1 reader; a
 deterministic constant — not the compiling engine's own version, so DebugL and release builds produce the same
 output) for `ckLanguage: 2` and range-retaining models, **and the highest `minEngineVersion` of its resolved
@@ -187,7 +186,7 @@ the release line, it is covered by the main-line floor `0.1.2610.9010` of
 `octo-mesh-deployment/docs/ck-v2-engine-inventory.md` and by rebuilt images. **Tests of message 126 must not depend
 on the ambient assembly version** (DebugL `999.0.0`, CI `0.1.*` = check skipped, r-tag builds `3.x`): pin it
 with the internal test seam `using var _ = CkEngineVersion.OverrideCurrentForTests(new Version(3, 4, 149));`
-(AsyncLocal, restored on dispose, never set in production; AB#6274; visible to Engine.Tests, Compiler.Tests and
+(AsyncLocal, restored on dispose, never set in production; visible to Engine.Tests, Compiler.Tests and
 the engine-mongodb `Runtime.Engine.MongoDb.IntegrationTests`), or pass `engineVersion` to `CheckModel`
 directly. `CkEngineVersionTests` cover the version table (3.4.149/3.5.0 refuse, 3.5.1/3.5.2/3.6.0/999.0.0 accept,
 0.x skips), the stamping (a dynamic assembly with AssemblyVersion `3.5.0.0` and FileVersion `3.5.2.0` reads 3.5.2)

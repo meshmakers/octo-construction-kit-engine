@@ -37,7 +37,7 @@ Runtime.Engine/{CkModelMigrations,StreamData}/
 A host that wants events in the platform event log replaces step 1 only — see
 `EventRepositoryAuditEventSink` in `octo-common-services`.
 
-**Why this shape (history matters):** originally landed a per-interface bridge
+**Why this shape (history matters):** An earlier change landed a per-interface bridge
 (`EventRepositoryCkModelImportAuditTrail`) in `octo-common-services` that ctor-captured
 `IEventRepository`. That closed a DI bootstrap cycle:
 `SystemContext.ctor → IDatabaseCkModelRepository → ICkModelImportAuditTrail (bridge)

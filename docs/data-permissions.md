@@ -17,7 +17,7 @@ System context and bypasses everything. The rules live in exactly one place:
 | `DataSecurityFilterFactory` | `Runtime.Engine/Security` | read filter: classifies with the evaluator, the query renders the ownership predicate; denied reads behave as not found |
 | `DataPermissionRules` | `Runtime.Engine/Security` (internal) | shared by guard and evaluator: type classification, ownership predicate (`RtCreatedBy` or `CkType.ownerAttributePath`, fail closed), audit events |
 | `DataPermissionWriteGuard` | `Runtime.Engine/Security` (internal) | the write/delete funnel in `RuntimeRepositoryBase`: read visibility first, then batch write/delete checks per change set, atomic rejection, blueprint lock |
-| `TypeWriteAccessGuard` | `Runtime.Engine/Security` (internal) | model-declared type write restriction (`writeAccess`: principal kinds and in-process channels), checked for every non-system session before the policy guard, on tenants with and without policies; message 144 (`docs/data-permissions.md`) |
+| `TypeWriteAccessGuard` | `Runtime.Engine/Security` (internal) | model-declared type write restriction (`writeAccess`: principal kinds and in-process channels), checked for every non-system session before the policy guard, on tenants with and without policies; message 144 (see "Type write restriction" below) |
 | `IRtDataPermissionEvaluator` | `Runtime.Contracts/DataPermissions` (impl. `RtDataPermissionEvaluator`, registered singleton) | **the public question** "may this caller read / write / delete this entity (or type)?" |
 
 `IRtDataPermissionEvaluator` is the only public way to ask (a gateway or any caller-bound surface must not copy
@@ -97,7 +97,7 @@ Sources: `CkTypeWriteAccessDto` (Contracts), `ElementResolver.CheckWriteAccess` 
 `TypeWriteAccessGuard` (Runtime.Engine/Security, message 144), `RuntimeRepositoryBase.ApplyChangesGuardedAsync`,
 `ImportRtModelCommand.PreflightTypeWriteAccess`.
 
-## Model syntax
+### Model syntax
 
 ```yaml
 types:
@@ -129,7 +129,7 @@ Rules:
   (blueprint seeds, `ImportAsync` without caller) are never restricted.
 - **Unrestricted types** (no block) ignore the principal kind entirely.
 
-## Principal kind
+### Principal kind
 
 `RtSecurityContext.PrincipalKind` (`RtPrincipalKind`: `Unknown` | `Interactive` | `Client`) and
 `RtImportCallerContext.PrincipalKind` carry what the service that opened the session knows about the caller. The
@@ -138,7 +138,7 @@ listed channel. Services that open caller-scoped sessions set the principal kind
 (`RtSecurityContext.ForUser(subject, roles, principalKind)`, `RtImportCallerContext.UserInitiated(subject,
 principalKind)`); the engine never derives it.
 
-## Compiler validation (message 143)
+### Compiler validation (message 143)
 
 `Type '<type>' declares an invalid 'writeAccess': <reason>` for:
 
@@ -151,7 +151,7 @@ principalKind)`); the engine never derives it.
 
 Unknown keys inside the block are refused by the schema (message 27).
 
-## Runtime refusal (message 144)
+### Runtime refusal (message 144)
 
 `Write refused: the <operation> of entity '<rtId>' of type '<type>' is restricted by the 'writeAccess' of type
 '<restricting type>'. The caller is principal '<kind>' on channel '<channel>'; only the principals [..] or the
@@ -163,8 +163,7 @@ Parameters: `operation` (`create`, `update`, `replace`, `delete`, `create or rep
 - Repository write funnel (`ApplyChangesAsync` and the single-entity writes built on it): checked for every
   non-system session, on every tenant (with or without data policies), **before** the data-permission guard; the
   whole change set is rejected atomically with a `RuntimeRepositoryException` whose `OperationResult` carries the
-  144 messages. The check judges types only, never a stored entity, so it reveals nothing about existence
- . A create names the exact type; for an update, replace, delete and both ends of an association the named
+  144 messages. The check judges types only, never a stored entity, so it reveals nothing about existence. A create names the exact type; for an update, replace, delete and both ends of an association the named
   type may be a base of the stored entity's type, so the blocks of every derived type are checked as well (write
   through the concrete type when a derived type is more restricted).
 - Filter-based writes (`UpdateOneRtEntityAsync` / `UpdateManyRtEntityAsync` / `ReplaceOneRtEntityAsync` with a filter,
@@ -174,7 +173,7 @@ Parameters: `operation` (`create`, `update`, `replace`, `delete`, `create or rep
 - RT import, user path (`ImportAsCallerAsync`): preflight over the whole file (YAML list or the first pass over the
   JSON bulks) before the first write; one `ExchangeException` with message number 144 lists every offender.
 
-## Compatibility
+### Compatibility
 
 - **Additive.** Models without the key compile byte-identically and keep their `minEngineVersion`; types without the
   block behave exactly as before.
@@ -188,7 +187,7 @@ Parameters: `operation` (`create`, `update`, `replace`, `delete`, `create or rep
 - **Persistence:** the block is stored on the tenant's CK type document (engine-mongodb, `CkType.WriteAccess`,
   reflection round-trip gate); without it a tenant would not enforce the restriction.
 
-## Tests
+### Tests
 
 `CkTypeWriteAccessResolverTests` (143, 90), `CkV2CompileTests.WriteAccess_*` (compile, YAML round trip, graph,
 docs, minEngineVersion, invalid blocks), `CkEngineVersionTests` (`*WriteAccess*`), `PublicSurfaceRowTests.T8_*`,

@@ -376,7 +376,7 @@ Rules for a tenant-owned seed entity (`UpdateBlueprint` in `Merge` and `Full` mo
   - **Limits of the comparison.** "Unedited" is the result of the comparison, not the edit history: changed `TenantOwned`, `RuntimeState` or `Secret` attributes, or an edit reverted to the installed seed, still count as unedited (the preserved attributes keep their values). A tenant entity found only by its well-known name under another `rtId` is never refreshed (the import upserts by `rtId` and would create a second entity). A tenant entity with the seed's `rtId` but another well-known name (renamed by the tenant) counts as edited. Associations are not compared: an entity whose target seed declares associations is never refreshed automatically (the import would write the seed's associations over the tenant's), it is listed in `TenantOwnedUpdateAvailable` instead when its attributes changed; a change of the seed's associations alone is neither applied nor reported. The previous seed is rendered with the tenant's *current* blueprint variables; if a variable changed since the install, the stored content no longer equals that baseline and the entity counts as edited (kept). A CK default that changed while both seeds omit the attribute is no seed change (nothing is written).
   - **Blanking.** A refresh runs through the blanking guard like a locked entity: an attribute the new seed would blank is listed in `BlankedAttributes`, kept unless confirmed (`AllowBlanking` / `ConfirmedBlankings`) in the same update, and its values appear only as summaries in `Changes`. After the update the previous and the target seed are the same, so a blank that was not confirmed is not offered again.
   - **A report of the run.** `TenantOwnedUpdateAvailable` is not stored: applying the same version again lists nothing, although the edit is still there.
-  - **No marker on the entity.** The baseline of "unedited" (the *seed content hash* of the rule) is the previous seed itself, not a value stored on the entity, so no System CK attribute is needed and entities seeded before the rule change follow the same rule: they are unedited exactly when their content equals the previous seed, and after one refresh they equal the new seed. Re-applying the same version is a no-op (target and previous seed are the same).
+  - **No marker on the entity.** The baseline of "unedited" (the *seed content hash* considered earlier) is the previous seed itself, not a value stored on the entity, so no System CK attribute is needed and entities seeded before the rule change follow the same rule: they are unedited exactly when their content equals the previous seed, and after one refresh they equal the new seed. Re-applying the same version is a no-op (target and previous seed are the same).
   - **Versioned content** (for example knowledge pages): ship each content version as its own seed entity with a new key and let the page refer to its current version through an attribute that belongs to the page content. An unedited page then points to the new version; an edited page keeps its reference while the new version entity is created (new key) and is not referenced - a later check can report it from there.
 - **Removed by an uninstall while the tenant has not edited it.** `UninstallBlueprint` compares the tenant entity with the seed of the installed version, with the comparison of the update rule above plus the `TenantOwned` attributes (no stored hash): an unedited entity is erased, an edited one is kept and listed in `TenantOwnedKept` with the reason `Edited`; an unedited one that an entity staying in the tenant references is kept with the reason `Referenced`. Details in [Uninstall](#uninstall).
 - **Never re-created after a delete.** If the tenant lacks it and the seed of the previously installed version (read from the catalog) contains the same key (`rtWellKnownName`, else `rtId`) with the same CK type, the tenant deleted it and it stays deleted. If that previous seed cannot be read from the catalog, the update does **not** create the absent tenant-owned entities and returns a warning, because it cannot tell a deleted entity from a new one.
@@ -560,10 +560,8 @@ default the update would reset it, which is reported as `ResetToDefault` rather 
 A seed that declares the attribute as `null` or empty is still `SeedEmpty`, because a declared null
 is written as null and the default does not apply.
 
-`SeedEmpty` means exactly that the seed value is empty. A non-empty seed value is never `SeedEmpty`
-: when it is a JSON text that empties one string field the tenant filled, the reason is
-`SeedEmptiesJsonField`. The tenant value still wins by default, because that field may be a credential
-, but the report says which field is emptied, e.g. `string (184 chars), empties
+`SeedEmpty` means exactly that the seed value is empty. A non-empty seed value is never `SeedEmpty`: when it is a JSON text that empties one string field the tenant filled, the reason is
+`SeedEmptiesJsonField`. The tenant value still wins by default, because that field may be a credential, but the report says which field is emptied, e.g. `string (184 chars), empties
 $.valueAttribute`. When the new seed clears that field on purpose (a dashboard widget switched from a
 query value to a formula, for instance), confirm the attribute (`--confirm-blanking <rtId>:<attribute>`)
 and the whole seed value lands.
@@ -698,7 +696,7 @@ written as before and the runtime members are kept.
 
 The order of `Columns` carries no meaning: a column is identified by its key (the physical name of an ingested path, the name of a
 computed column) in the table and in every check above. The archive lifecycle appends a column a seed adds, so after an install or
-update the tenant can hold the columns in another order than the seed (prod-1 `energyiq`, EnergyIQ.Base 1.3.0: the computed columns
+update the tenant can hold the columns in another order than the seed (a production tenant, a customer model: the computed columns
 behind the ingested ones). Two rules keep that from turning into a change:
 
 - **Preview** (`BlueprintEntityComparer`): two lists of archive columns (`System.StreamData/CkArchiveColumn`) are paired by column key,
@@ -747,9 +745,9 @@ Rules:
   `Created` and one warning says so.
 - **A failed activation never fails the apply** (the seed is committed): the archive ends `Failed` (retry with `RetryArchiveActivation` once
   the cause is fixed) and is reported with the reason; the other archives go on. A rollup on a failed source is not attempted and is `Failed` too.
-- guard**: a new rollup with `TimeWeightedAvg` or `StateDuration` over a raw (non-windowed) source is activated, but its backfill is
-  **not** queued (the LOCF statement trips the CrateDB memory breaker over a long history); the result and a warning name the guard. The rollup
-  aggregates new buckets. Removing the guard is part.
+- **LOCF backfill guard**: a new rollup with `TimeWeightedAvg` or `StateDuration` over a raw (non-windowed) source is activated, but its backfill is
+  **not** queued (the LOCF statement trips the CrateDB memory breaker over a long history); the result and a warning name the tracking item. The rollup
+  aggregates new buckets. The guard is removed once the LOCF backfill is fixed.
 - An archive without an rtId in the seed cannot be identified before the import and is not activated (warning). Give seed archives an rtId.
 - Seed archives carry `Status: 0` (Created) or omit it; `Archive.Status` is runtime state.
 - The host wiring is `IStreamDataTenantServicesProvider` (`Runtime.Contracts/StreamData`), an optional constructor dependency of

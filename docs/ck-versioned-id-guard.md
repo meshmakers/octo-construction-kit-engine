@@ -62,7 +62,7 @@ converted at once with `.ToRtCkId()`. Not analysed: generated code and assemblie
 even with `TreatWarningsAsErrors` (a Warning would break it too, an Error certainly). A repository raises it after it has audited itself:
 `.editorconfig` `dotnet_diagnostic.OM1005.severity = error` (or `warning`), or `<WarningsAsErrors>$(WarningsAsErrors);OM1005</WarningsAsErrors>`
 in `Directory.Build.props` (verified: both turn the Info diagnostic into a build error, with `TreatWarningsAsErrors` on or off);
-`= none` opts out. Sequence: (1) audit the consumers (git grep `\w+CkIds\.Ck(?!ModelId\b)\w+`, see `docs/ck-versioned-id-guard.md`), fix
+`= none` opts out. Sequence: (1) audit the consumers (git grep `\w+CkIds\.Ck(?!ModelId\b)\w+`, see the rollout sequence above), fix
 or list the offenders; (2) release the package - consumers see a suggestion only; (3) each repo that is clean sets the severity to `error`
 in the same PR as its package update. Tests: `CkVersionedIdAnalyzerTests` (Roslyn `CompilationWithAnalyzers`: reported with the version-less
 replacement, every occurrence, allowed forms, test projects and generated code skipped, default severity Info, raised to error and

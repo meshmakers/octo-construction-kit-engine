@@ -13,7 +13,7 @@ engine `main` at `f914578d`, range retention as compiler default, engine PR #279
 Script: `scripts/prove-additive-system-releases.sh` (helpers `scripts/ab6676/proof_lib.py`, `scripts/ab6676/pipeline.yaml`). It prints a Markdown
 report to stdout and to `<work>/report.md`, and exits non-zero when a claim is not met.
 
-## Rerun (Ariadne)
+## Rerun
 
 Prerequisites: the DebugL chain built from `main` (`Invoke-BuildRange -branch main -from octo-distributedEventHub -to octo-communication-controller-services -include octo-asset-repo-services,octo-identity-services,octo-platform-services,octo-cli,octo-construction-kit -verifyTests`),
 infrastructure running (`Start-OctoInfrastructure` or the kind cluster), the stack **stopped**, and **one user login** of the context that may create and delete
@@ -145,7 +145,7 @@ No new bypass found; limitations 1 and 2 are the ones the platform owner accepte
 request of the tenant failed with `Failed loading tenant 'tmp-ab6676'. CkAttributeId 'System-2.8.0/DisplayName-1' of CkTypeId 'System.Identity-2.26.0/IdentityProvider-1' does not exist`;
 `Delete` of the tenant fails with the same message (no API path back; the tenant had to be dropped in MongoDB). The file import has no usedSurface check
 (the F2.5 guard covers `ImportFromCatalog`, batch import and `FixAll`), and the import's re-validation does not mark the dependents
-`ResolveFailed` for a removed attribute (known limitation D-M1 of `SoftResolveAsync`, documented in octo-construction-kit-engine-mongodb). Expected by AC 4: refused, or the dependents leave `Available` with a reason.
+`ResolveFailed` for a removed attribute (known limitation D-M1 of `SoftResolveAsync`, see `docs/compiler-rules.md`). Expected by AC 4: refused, or the dependents leave `Available` with a reason.
 
 **F2 (medium) - `CheckUpgrade` / `ImportFromCatalog` do not judge a System release.** System is service-managed: `ImportFromCatalog -m System-2.8.0` answers
 `No models need to be imported.` and `CheckUpgrade -m System-2.8.0` prints `Breaking Changes: False` although the release removes an attribute that System.Identity,
@@ -172,11 +172,11 @@ dependent on a bumped communication base) and a restart of all services; no `not
 - The tenant part depends on the service build of the lane (`Invoke-BuildRange ... -verifyTests`) and on the local catalog holding the 12 current models
   (`octo-construction-kit` build); the offline part reads only sources.
 - Timings of the run (run 4/5 of the day, M-series Mac): offline ~75 s, tenant preparation ~35 s, stack restart ~110 s, import of one System release with all checks ~100 s.
-- The tenant evidence combines run 4 (fresh tenant: preparation, restart, System-2.6.0/2.7.0, restart, guard test) and run 5 (the same steps on that tenant after the script fixes: wait for the adapter, retry of the first pipeline run). Run 5 could not recreate the tenant because the stored user login of `local_OctoSystem` had been replaced by a client-credentials token (fixed in the script: `octoa`); the System.Communication-4.10.0 step ran on the same tenant right afterwards. A clean end-to-end rerun with a fresh user login is the first thing Ariadne does.
+- The tenant evidence combines run 4 (fresh tenant: preparation, restart, System-2.6.0/2.7.0, restart, guard test) and run 5 (the same steps on that tenant after the script fixes: wait for the adapter, retry of the first pipeline run). Run 5 could not recreate the tenant because the stored user login of `local_OctoSystem` had been replaced by a client-credentials token (fixed in the script: `octoa`); the System.Communication-4.10.0 step ran on the same tenant right afterwards. A clean end-to-end rerun with a fresh user login is the first thing to do.
 
 ## Proof: additive System releases need zero dependent bumps
 
-`scripts/prove-additive-system-releases.sh` (helpers in `scripts/ab6676/`, write-up and evidence in `docs/ck-additive-system-proof.md`) is the
+`scripts/prove-additive-system-releases.sh` (helpers in `scripts/ab6676/`, write-up and evidence in this document) is the
 repeatable scenario behind the Phase 2 exit criterion "two consecutive additive System releases require zero dependent bumps, a breaking
 change is caught". It is **parameterised** (`--system-base`, compiler paths, tenant, context), **rerunnable** (work directory and tenant are recreated)
 and **restores the baseline** (throw-away tenant deleted; the stack's local catalog is only touched with `--guard-test` and is restored byte for byte).

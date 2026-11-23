@@ -1,6 +1,6 @@
 ---
 description: Run-time semantics: SetValue null, load by rtId, formula errors, enum import, delete as archive, record-array item update, rtVersion, unacknowledged writes.
-applies_to: src/Runtime.Contracts/RtPath*.cs, src/Runtime.Contracts/RtVersion*.cs, src/Runtime.Contracts/Unacknowledged*.cs, src/Runtime.Engine.Formulas/**
+applies_to: src/Runtime.Contracts/Rt*.cs, src/Runtime.Contracts/Unack*.cs, src/Runtime.Engine.Formulas/**, src/Runtime.Engine/Repos*/**
 ---
 
 # Runtime write and read semantics
@@ -12,7 +12,7 @@ with an `InvalidPathException` that names the path, before anything is changed. 
 does not exist yet (`Amount.Value` without `Amount`) is dropped by default (query-row cells must not create empty
 records); the overloads with `RtPathNullHandling.CreateMissingRecords` create the record with that member explicitly null
 (used by the mesh adapter's `CreateUpdateInfo@1`, so an explicit null reaches an archive as null). Rules and
-table: `docs/runtime-semantics.md`. Tests: `RtPathEvaluatorTests`, region `SetValue explicit null`.
+table: see "`RtPathEvaluator.SetValue`: values, explicit null and missing" below. Tests: `RtPathEvaluatorTests`, region `SetValue explicit null`.
 
 ## Load by rtId to use it: archived counts as not found
 
@@ -128,7 +128,7 @@ Semantics:
   transaction) and repeat. Two writers need at most one retry.
 - One mechanism per write: an expected version cannot be combined with `AttributeNewerThanGuard` or atomic RecordArray item
   updates (rule engine throws `RuntimeRepositoryException`), nor with a linked binary in the same update (the conflict would skip the
-  entity write after the bytes were stored, same reason as above). A replace checks the stored version once before it touches
+  entity write after the bytes were stored). A replace checks the stored version once before it touches
   linked binaries, so a replace that is bound to conflict does not delete them; the write itself repeats the check atomically.
 - A replace **without** an expected version is unchanged: it writes the entity as given (including its own `RtVersion`) and does not
   increment. A writer that wants to be detected by guarded writers must therefore also use the expected version.
@@ -158,10 +158,10 @@ update turns them red.
 ## `RtPathEvaluator.SetValue`: values, explicit null and missing
 
 `RtPathEvaluator.SetValue` writes a value into an entity or record along an attribute path
-(`Designation`, `Amount.Value`, `RecordArrayTests[0].Designation`, `nav->Attr`). This page describes what
+(`Designation`, `Amount.Value`, `RecordArrayTests[0].Designation`, `nav->Attr`). This section describes what
 a `null` value does.
 
-## Three cases
+### Three cases
 
 | Input | Result |
 | ----- | ------ |
@@ -172,7 +172,7 @@ a `null` value does.
 A missing attribute and an attribute that holds `null` are different: an archive write keeps the
 stored value of a missing column and clears a column that holds an explicit null.
 
-## Explicit null on an enum attribute
+### Explicit null on an enum attribute
 
 - **Optional enum** (`isOptional: true` on the type or record assignment): `null` sets the attribute to null.
 - **Required enum** (`isOptional: false`, the default): `null` is refused with an `InvalidPathException`
@@ -183,7 +183,7 @@ Earlier every `null` on an enum failed with `Invalid enum value type ... 'null'`
 Other value types are unchanged: a `null` on them is written whatever `isOptional` says; the entity rule
 engine checks required attributes when the entity is saved.
 
-## Explicit null on a sub-path of a record that does not exist yet
+### Explicit null on a sub-path of a record that does not exist yet
 
 `Amount.Value = null` while `Amount` is not set depends on the `RtPathNullHandling` argument:
 

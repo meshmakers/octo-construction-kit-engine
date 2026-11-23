@@ -142,7 +142,7 @@ path" in `docs/ck-schema-and-json-serialization.md`).
 **minEngineVersion:** `CkEngineVersion.GetRequiredMinEngineVersion` raises the value to `ExecutionModeMinEngineVersion` for a
 model in which any type **or interface** method sets `execution.mode` (also `sync`; the maximum with the other markers; models
 without the key keep their minimum and compile byte-identically), so an older CK v2 engine refuses the model with message 126
-instead of dropping the key and running an `async` method as sync (decision Odin). The constant must equal the number of
+instead of dropping the key and running an `async` method as sync. The constant must equal the number of
 the release that first ships the field (the next patch after the last `r3.5.x` tag at merge time; `3.5.67` when `r3.5.66` was the
 last tag). The runtime that produces operation handles is F3.6. Tests: `CkV2MethodResolverTests` (`Code142_*`,
 `Code122_*Mode*`), `CkV2CompileTests.MethodMode_*`, `CkV2GraphJsonRoundTripTests.AsyncMode_*`, `CkV2SchemaTests`,
@@ -165,7 +165,7 @@ method access widened", change key `TypeMethod:<Type>/<Method>#Modified:dataAcce
 `CkMethodAuthorizationDto.DataAccess`, the method `signature` summary appends `, dataAccess Read` only for `Read`; (8) source generator: the
 generated `{Type}{Method}Parameters` record gets `public const CkMethodDataAccessDto CkDataAccess` (effective value); (9) `Types.md` marks a
 `Read` method `(data access: Read)`, nothing for the default; (10) engine-mongodb `CkMethodAuthorization.DataAccess` (reflection gate);
-(11) asset-repo CK meta and (12) Studio: not part, cut when Studio needs to show the field. **minEngineVersion:**
+(11) asset-repo CK meta and (12) Studio: not done yet; cut it when Studio needs to show the field. **minEngineVersion:**
 `CkEngineVersion.GetRequiredMinEngineVersion` raises the value to `DataAccessMinEngineVersion` for a model in which any type **or interface**
 method declares `dataAccess` (also `Write`; the maximum with the other markers; models without it keep their minimum), so an engine that
 predates the field refuses the model with message 126 instead of dropping the key and treating a `Read` method as `Write`. The constant must

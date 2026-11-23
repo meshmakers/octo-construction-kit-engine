@@ -722,7 +722,7 @@ sources (state 2026-10-14): `demo-energy-iq`, `demo-process-automation`, `energy
 `octo-adapter-loxone`, `octo-ai-services`, `octo-asset-repo-services`, `octo-bot-services`, `octo-common-services`,
 `octo-communication-controller-services`, `octo-communication-sdk`, `octo-construction-kit`, `octo-construction-kit-engine`,
 `octo-construction-kit-engine-mongodb`, `octo-identity-services`, `octo-mesh-adapter`, `octo-pipeline-templates`,
-`octo-platform-services`, `octo-report-services`, `smart-meter-insights`, `wwc26-landing-page`. Now the run reports only the
+`octo-platform-services`, `octo-report-services` and two app repositories. Now the run reports only the
 two test models of this repository (`tests/TestCkModel/...`, `System-[2.0,)`), which the default-flip PR fixes itself.
 
 ## Withdrawing a published version (`Unpublish`)
@@ -765,7 +765,7 @@ octo-ckc -c Unpublish -m <model> -ve <version> [-cn <catalogName>] [-f] [-rs <re
   `System.TestIdentity` 1.1.0 and `Smoke.CkV2` 1.0.0 (test-only models published by mistake), unpublished with `Unpublish -f`
   from both shared catalogs (private `construction-kit-libraries-build` HEAD `ea656323`, public `meshmakers.github.io` HEAD `3e4e3a46`).
   Afterwards `ValidateCatalog -rf` resolved 33/33 models in `PrivateGitHubCatalog` and 32/32 in `PublicGitHubCatalog`. Use `-rf`: without it
-  a stale local cache reported `Smoke.CkV2-1.0.0` as not found. A copy already installed in a tenant stays (test-2 `octosystem` holds
+  a stale local cache reported `Smoke.CkV2-1.0.0` as not found. A copy already installed in a tenant stays (a test tenant holds
   `Monitoring 2.1.0`, ResolveFailed, accepted).
 
 Engine API: `ICatalog.UnpublishAsync` (per catalog: `LocalFileSystemCatalog`, `GitHubCatalog`; the embedded catalog is read-only),
@@ -779,7 +779,7 @@ Range retention (F2.6) applies to the **current** major of every published model
 exact-pinned (a classic `dependencies` list, no `dependencyRanges`) cannot be superseded inside its major: a range-retaining version
 needs a newer MINOR of that major, that is a rebuild against current dependencies for a line that receives no releases.
 
-**Rule (decided by Thor 2026-10-21, with Gerald's agreement via Odin):**
+**Rule (decided 2026-10-21, with Gerald's agreement):**
 
 > An exact-pinned older major stays published with the status **legacy major, accepted**. It is not unpublished and gets no
 > "last range-retaining MINOR". The only exception is a retired model, which is withdrawn as a whole (`Unpublish`, see above).
@@ -799,8 +799,8 @@ Why this is harmless for the current System line:
 **Condition (the real risk is installed copies, not the catalog).** Before a new System minor reaches a cluster, LibraryStatus of
 every tenant of that cluster must show no installed exact-pinned older major, or the entry is named and accepted. The tenant
 inventory found none on the tenants read on 2026-10-27 (test-2, staging-1, prod-1, prod-2); the unreadable tenants and the
-accepted exceptions (`Monitoring 2.1.0`, ResolveFailed on one test-2 tenant; `Maco 1.0.0` on prod-2, not in any catalog) are
-tracked.
+accepted exceptions (`Monitoring 2.1.0`, ResolveFailed on one test tenant; one model on a production cluster that is in no catalog) are
+tracked as open items.
 
 **Entries (scan of 2026-10-27, newest version per older major, exact-pinned).** Every entry is **keep, legacy major, accepted**,
 except `Monitoring 1.0.0`. This table does not list current-major entries (`Monitoring 2.1.0`, `Test`,
@@ -853,7 +853,7 @@ Where several constraints meet on one model name (ranges and the exact pins of c
 picks the **highest version that satisfies all of them** (`CatalogConstraintSolver`).
 
 - **Exact-pinned (classic) models** keep exact-match semantics: `System-2.5.0` is satisfied by 2.5.0 only.
-- **Decision (Thor 2026-10-13): no special treatment** for the System models and the models Meshmakers
+- **Decision (2026-10-13): no special treatment** for the System models and the models Meshmakers
   ships. They resolve by the same rules; their SemVer discipline is guaranteed by the compile and publish gates, not by
   a looser resolver.
 - **Blueprints:** a blueprint installs the floor of a CK dependency range and keeps a newer installed version that
@@ -1194,7 +1194,7 @@ uses: `dependencyRanges[].usedSurface` (sorted, de-duplicated, major-qualified, 
   computed-column formulas, which are not parsed for attribute paths. Internal dependency elements cannot appear,
   the compiler rejects references to them (message 112).
 
-**Which change classes it covers (the research question).** A change of a dependency can be tolerated for a
+**Which change classes it covers.** A change of a dependency can be tolerated for a
 consumer — even across a major — exactly when it touches nothing listed in that consumer's `usedSurface`: removing or
 renaming an element or member, changing its value type, record or enum, its multiplicity, a base type, or tightening
 `access` / `visibility` / `derivable` of a listed element. With the F2.1 rules every such change of a *public* element

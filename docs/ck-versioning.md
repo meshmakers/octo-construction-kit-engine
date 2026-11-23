@@ -3,7 +3,7 @@ description: CK versioning contracts: minEngineVersion and message 126, and rang
 applies_to: src/ConstructionKit.Engine/Versioning/**, src/ConstructionKit.Engine/Resolvers/**, scripts/audit-ck-ranges.sh
 ---
 
-# CK engine version contract (`minEngineVersion`, message 126)
+# CK versioning contracts: engine version and range retention
 
 Source: `src/ConstructionKit.Engine/Versioning/CkEngineVersion.cs`.
 
@@ -69,15 +69,13 @@ required version and the running engine as major.minor.patch:
 
 **Main line rule.** An engine whose major version is below 1 (private-feed builds `0.1.YYMM.NNNN`) skips the check:
 it carries no number comparable with the release line. It is covered by the main-line floor `0.1.2610.9010` in
-`octo-mesh-deployment/docs/ck-v2-engine-inventory.md` and by rebuilt images. The rule lives in
+the CK v2 engine inventory in octo-mesh-deployment and by rebuilt images. The rule lives in
 `CkEngineVersion.IsSatisfiedBy` and is tested in `CkEngineVersionTests`.
 
 ## Tests
 
 Pin the running engine in tests with `CkEngineVersion.OverrideCurrentForTests(new Version(3, 5, 0))`; never
 rely on the ambient assembly version.
-
-## CK v2 range retention
 
 ## CK v2 Range Retention (compiler default)
 

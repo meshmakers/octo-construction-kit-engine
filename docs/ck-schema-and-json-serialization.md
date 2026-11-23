@@ -21,9 +21,9 @@ and `src/Runtime.Contracts/Serialization/Schema/`. A schema change reaches model
 
 1. **Image** - this repository's CI builds `meshmakers/octo-schema-provider` (nginx, `src/ConstructionKit.SchemaProvider/Dockerfile`
    copies the three schema folders flat into the web root) and tags it with the libs version (`3.5.x.0`).
-2. **helm-core train** - `start-helm-core-release-train` (def 193, `octo-mesh-deployment/pipelines/release-helm-core-train.yml`)
+2. **helm-core train** - `start-helm-core-release-train` (def 193, `release-helm-core-train.yml` in octo-mesh-deployment)
    packages the chart `octo-mesh-schema-provider` (repo `octo-helm-core`) with `AppVersion` = libs tier + `.0`, i.e. the image above.
-3. **CD prod-1** - `octo-mesh-schema-provider-CD` (def 213, `octo-mesh-deployment/pipelines/deploy-octo-mesh-schema-provider.yml`)
+3. **CD prod-1** - `octo-mesh-schema-provider-CD` (def 213, `deploy-octo-mesh-schema-provider.yml` in octo-mesh-deployment)
    runs after every train run on `main`, waits for the approval on the environment `prod-1-schema-provider` and deploys the single
    global instance on prod-1. Its smoke step fails unless every `*.json` file of the running image answers 200 at the public host,
    byte-identical.
@@ -61,7 +61,7 @@ Rules:
 - Reals box to `double`.
 - ISO-8601 strings parse to `DateTime` when `parseDateStrings=true`.
 
-The parity contract is enforced by `Sdk.Common.PipelineParityTests` (in octo-sdk) using
+The parity contract is enforced by `Sdk.Common.PipelineParityTests` (in octo-communication-sdk, `tests/Sdk.Common.PipelineParityTests`) using
 Newtonsoft as the oracle. Irreducible divergences (float vs double, decimal vs double,
 DateTimeOffset vs DateTime — JSON has no source-CLR-type marker) are listed by name in
 `AttributeValueParityCorpus.IrreducibleDivergences`. Consumers needing exact source-CLR-type

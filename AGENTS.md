@@ -14,8 +14,8 @@ licensed.
 - `src/ConstructionKit.*`: `Contracts` (DTOs, serialization, JSON schemas), `Engine` (resolving, SemVer gates,
   catalogs), `Compiler` (the `octo-ckc` CLI), `SourceGeneration`, `MsBuildTasks`, `Analyzers`, `SchemaProvider`
   (image that serves the JSON schemas) and `Templates` (the `dotnet new ConstructionKit` template).
-- `src/Runtime.*`: `Contracts`, `Engine` (repositories' rules, blueprints, security, audit trail, secrets) and
-  `Engine.Formulas`. `src/BlueprintManager` holds the blueprint catalog tooling.
+- `src/Runtime.*`: `Contracts`, `Engine` (repository rules, blueprints, import and export, CK model migrations, stream
+  data, security, audit trail, secrets) and `Engine.Formulas`. `src/BlueprintManager` is the `octo-bpm` CLI.
 - `src/SystemCkModel`, `src/StreamDataCkModel`, `src/SystemFilesCkModel`: the CK models `System`, `System.StreamData`
   (archives, time series) and `System.Files` (platform file system) that this repository owns.
 - `tests/`, `samples/`, `scripts/` (CI helpers, the additive-release proof) and `azure-pipelines.yml`.
@@ -42,9 +42,9 @@ licensed.
 | `src/Runtime.Contracts/DataPermissions/**`, `src/Runtime.Engine/Security/**`, `src/ConstructionKit.Contracts/DataTransferObjects/CkTypeWriteAccessDto.cs` | `docs/data-permissions.md` |
 | `src/ConstructionKit.Engine/DependencyGraph/**`, `src/Runtime.Contracts/Repositories/Query/**` | `docs/query-columns.md` |
 | `src/*/CkModelMigrations/**`, `src/ConstructionKit.Engine/*Catalogs/**` | `docs/runtime-engine-interfaces.md` |
-| `src/Runtime.Contracts/RtPath*.cs`, `src/Runtime.Contracts/RtVersion*.cs`, `src/Runtime.Contracts/Unacknowledged*.cs`, `src/Runtime.Engine.Formulas/**` | `docs/runtime-semantics.md` |
+| `src/Runtime.Contracts/Rt*.cs`, `src/Runtime.Contracts/Unack*.cs`, `src/Runtime.Engine.Formulas/**`, `src/Runtime.Engine/Repos*/**` | `docs/runtime-semantics.md` |
 | `src/Runtime.*/Blueprints/**`, `src/Runtime.*/Exchange/**`, `src/ConstructionKit.MsBuildTasks/**` | `docs/runtime-state-preservation.md` |
-| `src/StreamDataCkModel/**`, `src/Runtime.Contracts/StreamData/**` | `docs/system-streamdata-model.md` |
+| `src/SystemCkModel/**`, `src/SystemFilesCkModel/**`, `src/StreamDataCkModel/**`, `src/Runtime.*/StreamData/**` | `docs/system-ck-models.md` |
 <!-- <<< end generated: routing -->
 
 Background, no path trigger: the design records of the stream-data archives
@@ -63,8 +63,7 @@ Background, no path trigger: the design records of the stream-data archives
 the blueprint history ([concept v2](docs/blueprints-concept-v2.md), [first plan](docs/blueprint-updates-plan.md));
 [Pascal case validation](docs/concept-pascal-case-validation.md),
 [hidden columns of an archive](docs/archive-hidden-columns.md) (read it before a CK change makes an archive column reach
-a Hidden attribute), [the models this repository owns](docs/system-ck-models.md) and
-[the additive release proof](docs/ck-additive-system-proof.md).
+a Hidden attribute) and [the additive release proof](docs/ck-additive-system-proof.md).
 
 ## Build & test
 
@@ -72,13 +71,15 @@ a Hidden attribute), [the models this repository owns](docs/system-ck-models.md)
 # Local build against the DebugL package chain (version 999.0.0, packages from ../nuget)
 dotnet build --configuration DebugL
 
-# Tests without the system tests; CI runs them too and they need no running services
+# Tests without the system tests
 dotnet test --configuration DebugL --filter "FullyQualifiedName!~SystemTests"
+
+# All tests; CI runs the system tests too and they need no running services
 dotnet test --configuration DebugL
 
 # One project, one test
-dotnet test tests/ConstructionKit.Engine.Tests/ConstructionKit.Engine.Tests.csproj
-dotnet test --filter "FullyQualifiedName~TestClassName.TestMethodName"
+dotnet test --configuration DebugL tests/ConstructionKit.Engine.Tests/ConstructionKit.Engine.Tests.csproj
+dotnet test --configuration DebugL --filter "FullyQualifiedName~TestClassName.TestMethodName"
 ```
 
 - The version comes only from the pipeline: a Debug or Release build with neither `-p:OctoVersion=X.Y.Z` nor
@@ -92,10 +93,11 @@ dotnet test --filter "FullyQualifiedName~TestClassName.TestMethodName"
 
 - The solution builds in `DebugL` without warnings and the tests above pass.
 - A change that model authors, blueprint authors or service owners must know about gets an entry under "Unreleased" in
-  `CHANGELOG.md`. A change to one of the three CK models of this repository bumps its version and adds the entry to the
-  `CHANGELOG.md` next to its `ckModel.yaml` (rule on versions below).
-- A new compiler message is added to `MessageCodes.json` and to the generated `MessageCodes.cs` (T4, not part of the
-  build); `MessageCodesSyncTests` fails when they differ ([docs/compiler-rules.md](docs/compiler-rules.md)).
+  `CHANGELOG.md`. A change to `System` or `System.StreamData` bumps its version and adds the entry to the `CHANGELOG.md`
+  next to its `ckModel.yaml`; `System.Files` has no such file (rule on versions below).
+- A new message is added to `MessageCodes.json` and to the generated `MessageCodes.cs` (T4, not part of the build) in
+  `src/ConstructionKit.Engine/Messages/` or `src/Runtime.Engine/Messages/`; `MessageCodesSyncTests` checks only the
+  Engine pair ([docs/compiler-rules.md](docs/compiler-rules.md)).
 - Run `Test-OctoAgentDocs` (octo-tools) after changing `AGENTS.md` or `docs/`; `Test-OctoAgentDocs -Fix` regenerates the
   routing table. The shim file for Claude Code is generated: edit this file, not the shim.
 

@@ -75,7 +75,7 @@ import choke point** so every Upsert caller gets it automatically:
     and the locked/merge import path) — the explicit pre-import preserve call
     that used to live in `BlueprintService` was removed; it is now automatic.
   - the plain `ImportRt -r` CLI path (`octo-bot-services` `ImportModelJob` →
-    `ImportAsync`) — the target (archive re-import).
+    `ImportAsync`) — the case that triggered it (archive re-import).
   - CK-model migration entity writes (`BlueprintMigrationExecutor`, Upsert).
     Note: an additive migration that introduces a new runtime-state attribute
     on a pre-existing entity still lands its value (existing entity has no
@@ -230,7 +230,7 @@ The `CkLintRuntimeStateMarkers` MSBuild task (opt-in per project via
 that declares neither (`OCTO-CK001`), both (`OCTO-CK003`), or an unknown
 ownership value (`OCTO-CK004`).
 
-Armed models (and earlier): System.Communication, System.Identity, System.Ai,
+Armed models: System.Communication, System.Identity, System.Ai,
 System.Notification, Meshmakers.Accounting(.Tesla) via the package targets, and
 **System.StreamData in this repository**. This repository cannot consume its own
 MsBuildTasks package, so `Directory.Build.targets` registers the same task from
@@ -238,7 +238,7 @@ MsBuildTasks package, so `Directory.Build.targets` registers the same task from
 a reused node); a model project that sets `OctoEnforceRuntimeStateMarkers=true` adds a
 `ProjectReference` to `ConstructionKit.MsBuildTasks` with `ReferenceOutputAssembly="false"`
 for the build order (see `StreamDataCkModel.csproj`). System.StreamData got 56
-restating `ownership: SeedOwned` markers. They change the compiled file; (equivalent-content rule, `CkPublishEquivalence`) the publish
+restating `ownership: SeedOwned` markers. They change the compiled file; since the equivalent-content rule (`CkPublishEquivalence`) the publish
 gate treats such a restatement under an already published version as a no-op with a WARNING instead of `OCTO-CK205` (System.StreamData was bumped
 to 1.17.1 before that rule existed). Rule: a change of the compiled output that is a real content change (also a flipped ownership other than the
 default restated, `TenantOwned`/`Secret`) needs a version bump before it reaches main; a pure restatement of a default no longer does. The F4

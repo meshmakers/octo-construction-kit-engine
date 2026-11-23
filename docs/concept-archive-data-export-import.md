@@ -5,8 +5,8 @@ background: true
 
 # Concept: Archive Data Export / Import in Studio UI
 
-> Work item: **AB#4230** (parent epic **AB#3364** "Stream data version 2").
-> Successor: **AB#4231** — tenant backup/restore reuses this export/import mechanism.
+> Work item: tracked in the backlog
+> Successor: tracked in the backlog — tenant backup/restore reuses this export/import mechanism.
 > Status: **Refinement / design**. Decisions captured in §2 were taken during refinement on 2026-06-25.
 
 ## §1 Goal & Scope
@@ -27,7 +27,7 @@ In scope:
 
 Out of scope (tracked separately):
 
-- Integration into tenant backup/restore (**AB#4231**) — this concept only provides the
+- Integration into tenant backup/restore — this concept only provides the
   reusable building block.
 - Migrating the archive **definition** export. That already exists in the Studio
   (`exportRtModelDeepGraph` / `importRtModel`) and exports the *entity*, **not** the row data.
@@ -37,7 +37,7 @@ Out of scope (tracked separately):
 
 The archives list (`archives-list.component.ts`) already has Export/Import actions, but they
 call `AssetRepoService.exportRtModelDeepGraph` / `importRtModel` — i.e. the **runtime-model**
-deep-graph of the `CkArchive` *definition*. They do **not** touch the CrateDB tables. AB#4230
+deep-graph of the `CkArchive` *definition*. They do **not** touch the CrateDB tables. tracked in the backlog
 adds a **second, clearly-labelled pair of actions** ("Export data" / "Import data") that move
 the actual time-series rows.
 
@@ -76,7 +76,7 @@ flowchart LR
   Repo --> Crate[("CrateDB<br/>archive_{rtId}")]
 ```
 
-The same split is exactly what AB#4231 will reuse: a tenant-backup job in bot-services can bundle
+The same split is exactly what tracked in the backlog will reuse: a tenant-backup job in bot-services can bundle
 the Mongo dump **and** one archive-data ZIP per archive into a single backup artifact.
 
 > **Alternative considered (rejected for now):** reference `Runtime.Engine.CrateDb` directly in

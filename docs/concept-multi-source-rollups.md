@@ -5,7 +5,7 @@ background: true
 
 # Concept: Multi-Source Rollup Archives, Validity Spans and Archive Coverage
 
-**Work item:** AB#5157 · **CK model:** `System.StreamData` 1.8.0 (non-breaking, no migration)
+**Work item: tracked in the backlog · **CK model:** `System.StreamData` 1.8.0 (non-breaking, no migration)
 
 A rollup archive used to aggregate from exactly **one** source archive. Since
 `System.StreamData` 1.8.0 it declares a **list of time-disjoint sources**, each with an optional
@@ -30,7 +30,7 @@ A tenant that has been metering for years typically holds its history in two dif
 - **native data** — ingested continuously at full resolution (15-minute values) into a
   `CkRawArchive`, from a cutover date onwards.
 
-Before AB#5157 a rollup could only follow one of the two, so the analytical ladder (daily →
+Before tracked in the backlog a rollup could only follow one of the two, so the analytical ladder (daily →
 monthly → yearly) either stopped at the cutover or had to be duplicated per source, and every
 consumer had to stitch the two series together itself.
 
@@ -175,7 +175,7 @@ Rules 1–7 need no repository access and are therefore cheap enough to run on e
 needs the tenant's rollups (`ValidateNoTransitiveCycle`) and runs at create and at activation;
 rules 10–14 need each source's snapshot and run at activation only.
 
-The aggregation rules that predate AB#5157 — at least one aggregation, no duplicate
+The aggregation rules that predate the change — at least one aggregation, no duplicate
 `(SourcePath, Function)` pair, a `ComparisonValue` on every `StateDuration` — now run at **create**
 as well (`ValidateForSave`). That is a deliberate behaviour change: `createRollupArchive` fails
 fast on inputs it used to accept silently and only reject at activation.
@@ -191,14 +191,14 @@ This is what guarantees the property the whole design rests on: **every bucket l
 exactly one source's span, or within none.** A boundary aligned in UTC but not in the rollup's
 reference zone is rejected, and vice versa.
 
-### Rule 13 — bucket granularity per source (AB#4289 reformulated)
+### Rule 13 — bucket granularity per source (reformulated)
 
 The source's granularity is its window length (`Period` for a time-range archive, `BucketSize` for
 a rollup source). A raw source with an undeclared sampling interval is not checked.
 
 | Rollup alignment | Source | Accepted when |
 |---|---|---|
-| `FixedSize` | any | `BucketSize >= sourceWindow` **and** an integer multiple of it (the original AB#4289 ms rule) |
+| `FixedSize` | any | `BucketSize >= sourceWindow` **and** an integer multiple of it (the original tracked in the backlog ms rule) |
 | calendar / ISO week | calendar-aligned rollup source | the source alignment **nests** inside the rollup alignment: `CalendarDay ⊂ CalendarMonth ⊂ CalendarQuarter ⊂ CalendarYear`; `Iso8601Week` contains only `CalendarDay` and nests inside nothing but itself |
 | calendar / ISO week | time-range, fixed-size or rollup source with a fixed bucket | the source window does not exceed the alignment's bucket length: 1 d (`CalendarDay`), 7 d (`Iso8601Week`), 31 d (`CalendarMonth`), 92 d (`CalendarQuarter`), 366 d (`CalendarYear`) |
 
@@ -218,7 +218,7 @@ step resolves is rejected with `RollupSourcePathMissingException` naming that so
 
 | Step | Applies when | Outcome |
 |---|---|---|
-| **Rule 1 — declared column** | the source's captured names contain the spec's `SourcePath` **verbatim** (an ingested column by `Path`, a computed column by `Name`, a rollup source's physical column by its physical name) | `DeclaredColumn`: the function is applied directly to that physical column — the pre-AB#5157 behaviour, unchanged |
+| **Rule 1 — declared column** | the source's captured names contain the spec's `SourcePath` **verbatim** (an ingested column by `Path`, a computed column by `Name`, a rollup source's physical column by its physical name) | `DeclaredColumn`: the function is applied directly to that physical column — the pre-the change behaviour, unchanged |
 | **Rule 2 — child aggregation** | the source is a rollup and one of its own specs has the **same function** and a source path that **normalises** to the same physical name (`NormalisePath`: dots removed, lower-cased — the `ColumnNameMapper.PathToColumnName` rule) | `ChildAggregation`: the child's target column(s) are the parent's source column(s), read function-preserving (§5) |
 
 Rule 1 wins when both apply: a verbatim declared column is the more specific match and keeps a
@@ -237,7 +237,7 @@ per-bucket SQL reads therefore depends on the source serving the bucket:
 
 - **Rule 1 — declared column** (base archives, computed columns, and chained specs that name the
   child's physical column): the function is applied to that single physical column exactly as
-  before AB#5157. Chained rollups written in the physical-name style (`amountvalue_sum` / `Sum`)
+  before the change. Chained rollups written in the physical-name style (`amountvalue_sum` / `Sum`)
   are unchanged.
 - **Rule 2 — child aggregation** (a logical spec over a rollup source): the child's target
   column(s) are read **function-preserving** over the child buckets inside the parent bucket:
@@ -278,7 +278,7 @@ The choice of *which* archive the SQL runs against becomes per-bucket.
      naming both rollup and source, and the watermark stays where it is. Buckets already committed
      in this tick remain committed. The orchestrator never skips past data a source will deliver
      once it is available again (§8).
-3. The AB#4306 open-bucket refresh resolves its source the same way and is skipped at `Debug` when
+3. The tracked in the backlog open-bucket refresh resolves its source the same way and is skipped at `Debug` when
    nothing covers the open bucket or its source is unavailable — a warning per tick while a bucket
    is still open would be noise; the closed-bucket loop emits it once the bucket closes.
 
@@ -422,7 +422,7 @@ selection rule of [concept-resolution-aware-series-queries §4.2](concept-resolu
    without coverage never covers.
 2. The **base rung takes part in the filter** like every other rung.
 3. If **no rung reports coverage at all**, the filter is **inert**: the plan is byte-for-byte the
-   pre-AB#5157 result, including its signal. This is what keeps hosts that do not wire a coverage
+   pre-the change result, including its signal. This is what keeps hosts that do not wire a coverage
    provider on the old behaviour.
 4. Candidates = the covering rungs. If none covers, the candidates are the rungs with the
    **earliest** `AvailableFrom`, ties kept.
@@ -453,7 +453,7 @@ delete an archive while a non-soft-deleted rollup lists it among its sources
 (`RollupSourceInUseException`, count from `CountActiveRollupsForSourceAsync`), in **either** storage
 form and whatever validity span the reference carries. Remove or replace the rollup first.
 
-**Sources are immutable after activation, and enforced (AB#7872).** `createRollupArchive` is the
+**Sources are immutable after activation, and enforced.** `createRollupArchive` is the
 supported way to declare sources, and Studio's edit mode is rename-only and shows them read-only. The generic
 CK mutation, `ImportRt` and a blueprint update are refused with `RollupSchemaImmutableException` when they would
 change the sources of an activated rollup, or of a disabled one that was activated before (`ArchiveDefinitionGuard`). The storage form does not count: a

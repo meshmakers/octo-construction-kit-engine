@@ -6,14 +6,14 @@ background: true
 # Concept: Timezone-Aware Rollup Queries (Civil-Time Ranges Across Mixed-Timezone Metering Points)
 
 **Status:** Draft / analysis. Design decisions resolved (§9); write-path primitives already shipped, read-path unimplemented (§3).
-**Work item:** AB#4190 (parent epic AB#4073 — voest M1).
+**Work item: tracked in the backlog
 **Motivating use case:** An operator asks a MeshBoard "what were the values *yesterday* / *this week* / *last month*?" and gets the answer for the **local civil day/week/month** of a chosen time zone — not for a UTC day shifted against it. Becomes critical the moment one chart compares metering points across time zones (a Linz site in `Europe/Vienna` next to a Portugal site in `Europe/Lisbon`): a single UTC bucket boundary cannot mean "yesterday" for both.
 **Related:**
-- [`concept-resolution-aware-series-queries.md`](concept-resolution-aware-series-queries.md) (AB#4290) — the resolution ladder + selector this concept extends. **Decision O6 already reserved a reference time zone on the archive/rollup; this concept turns that reservation into an end-to-end read path.**
+- [`concept-resolution-aware-series-queries.md`](concept-resolution-aware-series-queries.md) — the resolution ladder + selector this concept extends. **Decision O6 already reserved a reference time zone on the archive/rollup; this concept turns that reservation into an end-to-end read path.**
 - [`concept-rollup-archives.md`](concept-rollup-archives.md) — the `CalendarDay/CalendarMonth/CalendarYear/Iso8601Week` bucket alignments this concept aligns to civil boundaries.
-- [`concept-simple-downsampling.md`](concept-simple-downsampling.md) (AB#4233) — the UTC `DATE_BIN` / `generate_series` reducer whose civil-time boundaries this concept supplies.
-- AB#4184 — rollup recompute; AB#4188 — multi-aggregations; AB#4189 — computed columns. Compatibility required, no changes there (§8).
-- AB#4187 — MeshBoard stream-data widgets, the UI consumer (§7).
+- [`concept-simple-downsampling.md`](concept-simple-downsampling.md) — the UTC `DATE_BIN` / `generate_series` reducer whose civil-time boundaries this concept supplies.
+- rollup recompute — multi-aggregations — computed columns. Compatibility required, no changes there (§8).
+- MeshBoard stream-data widgets, the UI consumer (§7).
 
 ---
 
@@ -42,7 +42,7 @@ This concept specifies the **computation** concern and reaffirms the **display**
 - Calendar quirks beyond time zones (fiscal years, custom shift calendars).
 - Per-user timezone preferences in the UI — a separate concern.
 - Backfilling timezone metadata onto historical rows.
-- New aggregation functions or new downsampling SQL — AB#4233 already produces exactly `limit` bins.
+- New aggregation functions or new downsampling SQL — tracked in the backlog already produces exactly `limit` bins.
 
 ---
 
@@ -61,7 +61,7 @@ This concept specifies the **computation** concern and reaffirms the **display**
 | Gap | Evidence |
 |---|---|
 | The resolution ladder never carries the zone | `SeriesResolutionService.cs:83-88` builds each `ResolutionRung` **without** setting `ReferenceTimeZone`; it is always `null` ⇒ UTC. |
-| Explicitly deferred | `SeriesResolutionService.cs:127` comment: *"UTC in Phase 1; reference-time-zone alignment lands in Phase 4 / O6"*. The field exists and is documented but unset (`ResolutionRung.cs:44`, "AB#4290 Phase 4 / decision O6"). |
+| Explicitly deferred | `SeriesResolutionService.cs:127` comment: *"UTC in Phase 1; reference-time-zone alignment lands in Phase 4 / O6"*. The field exists and is documented but unset (`ResolutionRung.cs:44`, "tracked in the backlog Phase 4 / decision O6"). |
 | No query-time zone parameter | `SeriesResolutionRequest.cs:38-59` (`From/To/TargetPoints/RequiredAggregation/SourcePath/RtIds/ObisFilter`), `ResolveSeriesQueryInputDto.cs:12-22`, and `StreamDataArgumentsGraphType.cs:55-88` (`From/To/Interval/Limit/QueryMode/RtIds`) — **none carry a time zone**. All `From/To` are absolute UTC `DateTime`. |
 | Relative ranges resolved client-side against browser-local, not an explicit IANA zone | `time-range-picker.models.ts:167-309` (`TimeRangeUtils`) resolves *yesterday/this week/…* with a binary `zone: 'local' \| 'utc'` using `new Date(y,m,d)` (browser-local) or `Date.UTC(...)`. It **cannot** compute "yesterday in `Europe/Lisbon`" while the browser is in Vienna — the exact "off by hours" failure in the acceptance criteria. |
 
@@ -87,7 +87,7 @@ When one query covers metering points in different zones, bucket boundaries can 
 | **Query-wide** (default) | one civil day in the query zone, applied to every series | the **query zone** | one operator, one locale, comparing sites "as I experience the day" |
 | **Per-series** (override) | each point's *own* local yesterday | each series' archive **`ReferenceTimeZone`** | "each site's local day" — a Vienna site and a Lisbon site each on their own midnight |
 
-**Decision (T2): default query-wide, per-series is an explicit override.** Both are valid; query-wide is the least-surprising default for a single operator and is what M1 needs. Per-series reuses the existing per-rung fan-out (AB#4290 already fans out one downsampling query **per source rtId**), so each series simply aligns to its own rung `ReferenceTimeZone` instead of the query zone. The policy is a single enum on the query (`PerQuery` | `PerSeries`).
+**Decision (T2): default query-wide, per-series is an explicit override.** Both are valid; query-wide is the least-surprising default for a single operator and is what M1 needs. Per-series reuses the existing per-rung fan-out (already fans out one downsampling query **per source rtId**), so each series simply aligns to its own rung `ReferenceTimeZone` instead of the query zone. The policy is a single enum on the query (`PerQuery` | `PerSeries`).
 
 **Boundary-consistency invariant.** The `[from, to)` window and the rung's bucket boundaries must be computed against the **same** zone, or the window edges land mid-bucket. Under query-wide both use the query zone. Under per-series, the relative range is resolved **once per series** in that series' zone. This is the load-bearing rule that keeps side-by-side charts from being "off by hours".
 
@@ -107,7 +107,7 @@ How is a civil-day query assembled from pre-bucketed rollups **without re-readin
 
 - **Civil day and coarser** (`CalendarDay/Month/Year`, `Iso8601Week`): route to the calendar-aligned rung whose `ReferenceTimeZone` matches the resolution zone. Its buckets **already are** DST-correct local buckets (§3.1) — the query reads them directly, `1 bucket = 1 civil unit`. This is why the boundary-consistency invariant (§5) demands query-zone == rung-zone for query-wide.
 - **Sub-day, fixed-size** (1 h and finer, `BucketAlignment.FixedSize`): unaffected by time zone. `DATE_BIN` bins are evenly spaced from a UTC epoch and only coincide with civil boundaries when the offset is a whole number of hours — which DST breaks. **Decision (T3): sub-day queries stay UTC-computed; the zone affects only the X-axis labels (display, §7), not the bins.** Civil-boundary semantics are a property of **calendar-aligned rungs**; do not attempt DST-correct sub-day binning in SQL.
-- **Consequence for the ladder:** a civil-time relative range should prefer a calendar rung of matching zone. If none exists (e.g. only fixed-size hourly rollups are provisioned), the resolver returns the fixed-size rung with a **truthful signal** (reusing AB#4290's `resolution-limited` / `no-suitable-rollup` signals) rather than silently mis-aligning. Provisioning a `CalendarDay` rollup per reference zone is the clean enablement, exactly as O6 anticipated.
+- **Consequence for the ladder:** a civil-time relative range should prefer a calendar rung of matching zone. If none exists (e.g. only fixed-size hourly rollups are provisioned), the resolver returns the fixed-size rung with a **truthful signal** (reusing the `resolution-limited` / `no-suitable-rollup` signals) rather than silently mis-aligning. Provisioning a `CalendarDay` rollup per reference zone is the clean enablement, exactly as O6 anticipated.
 
 ---
 
@@ -123,9 +123,9 @@ How is a civil-day query assembled from pre-bucketed rollups **without re-readin
 
 ## §8 Composition with related work (unchanged)
 
-- **AB#4184 (recompute):** recompute already enumerates buckets via `BucketBoundary` with the archive zone (`CrateDbArchiveRecomputeExecutor.cs:106`). Timezone semantics are a read-path concern and do **not** touch the recompute model.
-- **AB#4188 (multi-aggregations):** the zone aligns buckets; it is orthogonal to *how many* aggregations a bucket carries. No interaction.
-- **AB#4189 (computed columns):** a timestamp-derived computed column evaluates per row over UTC storage; civil-time bucketing happens above it. Compatible.
+- tracked in the backlog (recompute):** recompute already enumerates buckets via `BucketBoundary` with the archive zone (`CrateDbArchiveRecomputeExecutor.cs:106`). Timezone semantics are a read-path concern and do **not** touch the recompute model.
+- tracked in the backlog (multi-aggregations):** the zone aligns buckets; it is orthogonal to *how many* aggregations a bucket carries. No interaction.
+- tracked in the backlog (computed columns):** a timestamp-derived computed column evaluates per row over UTC storage; civil-time bucketing happens above it. Compatible.
 
 ---
 
@@ -155,15 +155,15 @@ Grounded, minimal, mostly wiring — the DST math already exists.
 5. Give `TimeRangeUtils` true IANA resolution (§7.2) and forward the IANA `timeZone` (+ policy) from the line-chart widget into `resolveSeriesQuery` / `StreamDataArguments`.
 
 **Tests (acceptance criteria)**
-6. Civil-day boundaries; DST forward + backward (extend `BucketBoundaryTests` into the read path); mixed-timezone `PerSeries` (Vienna + Lisbon "yesterday" side by side, neither off by hours); alignment with multi-aggregate rollups (AB#4188).
+6. Civil-day boundaries; DST forward + backward (extend `BucketBoundaryTests` into the read path); mixed-timezone `PerSeries` (Vienna + Lisbon "yesterday" side by side, neither off by hours); alignment with multi-aggregate rollups.
 
 ## §11 Relation to existing work
 
-- **AB#4290 O6** reserved `ReferenceTimeZone` on the archive/rollup and on `ResolutionRung` explicitly for this ("Phase 4"). This concept is that Phase 4: it activates the field on the read path and adds the query-time zone + comparison policy on top.
-- **AB#4233** supplies the exact-N reducer; this concept only supplies its civil-time window and picks a calendar rung to run it against.
-- **AB#4236 / AB#4290** supply the addressing and per-rtId fan-out the per-series policy reuses unchanged.
+- O6** reserved `ReferenceTimeZone` on the archive/rollup and on `ResolutionRung` explicitly for this ("Phase 4"). This concept is that Phase 4: it activates the field on the read path and adds the query-time zone + comparison policy on top.
+- supplies the exact-N reducer; this concept only supplies its civil-time window and picks a calendar rung to run it against.
+- supply the addressing and per-rtId fan-out the per-series policy reuses unchanged.
 
-## §12 Gas day: a day rollup that starts at a local time of day (AB#7358, System.StreamData 1.22.0)
+## §12 Gas day: a day rollup that starts at a local time of day (System.StreamData 1.22.0)
 
 A gas day runs from 06:00 to 06:00 local time (Europe/Vienna), so it has 23, 24 or 25 hours. `RollupArchive.DayStartOffsetMs` (optional,
 Int64, milliseconds after local midnight of `ReferenceTimeZone`) moves the start of a `CalendarDay` bucket from midnight to that time of day.
@@ -201,20 +201,20 @@ offset. The older overloads with `(alignment, bucketSize, zone)` stay and mean a
 rung is only a candidate when its own `DayStartOffsetMs` equals the request's, so a midnight chart never reads gas days (also not through a midnight week / month rung) and a gas-day query never
 reads midnight days. `PerSeries` answers in each rung's own calendar and ignores the request's day start.
 
-**Rung width of a gas-day rung (AB#7360).** The effective grain of a day rung with a day start is the nominal 24 h, not the width of the bucket
+**Rung width of a gas-day rung.** The effective grain of a day rung with a day start is the nominal 24 h, not the width of the bucket
 that contains the window start: a window that begins on the 23 h gas day would otherwise yield a 23 h grain and fixed-width bins derived from it would drop
 the 24 h days next to it. Midnight day rungs (day start null / 0) and all other rungs keep the width of the first bucket. A `QueryDayStartOffsetMs` outside
 `[0, 24 h)` is refused (`BucketCalendar.DayStartFromMs` throws `ArgumentOutOfRangeException`; it used to read a negative value as midnight).
 
-**Gap days shorter than an hour (AB#7360).** `BucketBoundary` measures the spring-forward gap in minutes: a day start inside the 30 minute gap of
+**Gap days shorter than an hour.** `BucketBoundary` measures the spring-forward gap in minutes: a day start inside the 30 minute gap of
 Australia/Lord_Howe (02:15 on 4 October 2026) starts that one day at 02:45, the gap length later, not at 03:15.
 
-**Offsets of a zone (AB#7360).** `BucketBoundary.UtcOffsetsOf` collects the offsets of every adjustment rule that ends in 1970 or later. The cut-off is
+**Offsets of a zone.** `BucketBoundary.UtcOffsetsOf` collects the offsets of every adjustment rule that ends in 1970 or later. The cut-off is
 deliberate: an archive may hold data of any time since then, and a source that does not divide an offset the zone once used would cut local days in two for that
 data. Zones whose offset changed later (Europe/Moscow, Europe/Istanbul) are therefore judged against their former offsets too, and a fixed-size source that divides only the current ones
 can be refused. The offsets come from the host's time zone data, so two hosts with different tzdata can differ for such zones. Whole-hour zones such as Europe/Vienna are unaffected.
 
-## §13 Downsampling queries with local-day bins (AB#7360)
+## §13 Downsampling queries with local-day bins
 
 `StreamDataDownsamplingQueryOptions` (Runtime.Contracts) carries three options that replace the former unused `BinInterval` of type `TimeSpan`:
 

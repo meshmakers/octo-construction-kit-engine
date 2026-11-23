@@ -5,24 +5,23 @@ background: true
 
 # Concept: Rollup Threshold-Reset Policy (manual vs. automatic)
 
-Status: **Decision recorded** — 2026-07-14. Work item: **AB#4196**
-(parent epic AB#4073 — VOEST M1: EDA energy data to data lake).
+Status: **Decision recorded** — 2026-07-14. Work item: tracked in the backlog
 
 See also:
 - [concept-rollup-archives.md](./concept-rollup-archives.md) — the derived-rollup design; defines the
   `LastAggregatedBucketEnd` watermark (the "computed up to" threshold) and the manual
   `rewindRollupWatermark` escape hatch.
-- [concept-rollup-recompute.md](./concept-rollup-recompute.md) — **AB#4184** (Closed); built the
+- [concept-rollup-recompute.md](./concept-rollup-recompute.md) — tracked in the backlog (Closed); built the
   dirty-window ledger, dependency-graph propagation, the optimistic generation-swap recompute, and
   the observability this concept consumes. Its §12 lists *"bounded retro reach"* as the open item
   this concept closes.
-- [concept-computed-columns.md](./concept-computed-columns.md) — **AB#4189**; shares the same
+- [concept-computed-columns.md](./concept-computed-columns.md) — tracked in the backlog; shares the same
   recompute orchestration.
-- [concept-timezone-aware-queries.md](./concept-timezone-aware-queries.md) — **AB#4190**; no direct
+- [concept-timezone-aware-queries.md](./concept-timezone-aware-queries.md) — tracked in the backlog; no direct
   interaction (recompute ranges are already resolved on each dependent's own bucket grid + reference
   time zone).
 
-## §1 The question AB#4196 asks
+## §1 The question tracked in the backlog asks
 
 Each rollup archive tracks a **threshold** — `LastAggregatedBucketEnd` — marking how far it has been
 computed (a monotone high-water mark on the source time axis). When raw data changes *before* that
@@ -32,18 +31,18 @@ recomputed for the affected window. The open question:
 > Do we need an operator-driven **manual reset** of that threshold to force re-computation, or can we
 > find an **automatic** mechanism that detects the change and walks the threshold backwards itself?
 
-The answer depends on the recompute concept landed in AB#4184.
+The answer depends on the recompute concept landed.
 
 ## §2 Decision
 
 **Both — and, importantly, the automatic path is already implemented and does *not* literally walk
-the forward threshold backwards.** AB#4184 shipped a superior mechanism to a threshold rewind; this
+the forward threshold backwards.** shipped a superior mechanism to a threshold rewind; this
 concept records that as the answer and adds the one missing guardrail.
 
 | Path | Mechanism | Status |
 |---|---|---|
-| **Automatic** (the common case) | On every write, `RetroactiveWriteDetector` flags a write whose `timestamp < consumedWatermark` and records a `CkArchiveDirtyWindow`. The `RecomputeOrchestrator` periodic tick propagates that window onto dependents and recomputes **only the affected `[from, to)` range** via the optimistic per-window **generation-swap** — leaving `LastAggregatedBucketEnd` untouched. | ✅ Implemented (AB#4184) |
-| **Manual** (escape hatch) | `rewindRollupWatermark(rtId, toBucketEnd)` moves the threshold backwards; the forward orchestrator re-aggregates from there. Reconciled with the genmap via `ClearRecomputeGenerationsAsync`. Plus `recomputeArchive(rtId, from, to, rtId?)` for a reader-safe range recompute. | ✅ Implemented (AB#4184 / rollup MVP) |
+| **Automatic** (the common case) | On every write, `RetroactiveWriteDetector` flags a write whose `timestamp < consumedWatermark` and records a `CkArchiveDirtyWindow`. The `RecomputeOrchestrator` periodic tick propagates that window onto dependents and recomputes **only the affected `[from, to)` range** via the optimistic per-window **generation-swap** — leaving `LastAggregatedBucketEnd` untouched. | ✅ Implemented |
+| **Manual** (escape hatch) | `rewindRollupWatermark(rtId, toBucketEnd)` moves the threshold backwards; the forward orchestrator re-aggregates from there. Reconciled with the genmap via `ClearRecomputeGenerationsAsync`. Plus `recomputeArchive(rtId, from, to, rtId?)` for a reader-safe range recompute. | ✅ Implemented (/ rollup MVP) |
 | **Guardrail** ("bounded retro reach") | Cap how far back a single very-late write may drag an automatic recompute. | ❌ **Not yet implemented — the scope of this item's code work (b).** |
 
 ### Why automatic does not walk the threshold back
@@ -57,7 +56,7 @@ consistent old-or-new snapshot. The forward watermark therefore stays monotone a
 `rewindRollupWatermark` remains for the bulk case (a large re-ingest where the operator accepts brief
 in-progress reads).
 
-This means the AB#4196 title question — *"do we need to reset the threshold?"* — resolves to: **no
+This means the earlier title question — *"do we need to reset the threshold?"* — resolves to: **no
 threshold reset is needed for the automatic case; the dirty-window scoped recompute covers it.
 Threshold reset stays available as the manual bulk escape hatch.**
 
@@ -72,14 +71,14 @@ Threshold reset stays available as the manual bulk escape hatch.**
 
 2. **How far back may automatic reset go?** Today: **unbounded** — this is the gap. A single write with
    a very old timestamp produces a dirty window spanning back to that timestamp, and
-   `EnqueueOnDirectDependentsAsync` clamps only the **end** (to the dependent's own watermark, AB#4288),
+   `EnqueueOnDirectDependentsAsync` clamps only the **end** (to the dependent's own watermark),
    never the **start**. §4 specifies the cap.
 
 3. **Per-archive or per-window?** Per-window. Detection records a `[minRetroTs, maxRetroTs + 1 tick)`
    window; propagation snaps it to each dependent's bucket grid and enqueues a bounded
    `CkArchiveRecomputeRange`. The forward threshold is never the unit of reset.
 
-4. **Interaction with the AB#4184 concurrency policy.** Covered. Overlapping triggers **coalesce** into
+4. **Interaction with the tracked in the backlog concurrency policy.** Covered. Overlapping triggers **coalesce** into
    one active job per archive; a reset/recompute arriving mid-recompute merges its range into the
    active job (superseded trigger recorded as `Coalesced`). No corruption, no partial reads — the
    generation pointer only flips on a fully-staged range.
@@ -96,7 +95,7 @@ Threshold reset stays available as the manual bulk escape hatch.**
    carrying `consumedWatermark`, `cappedFloor`, `capMs`) into the platform event log — so an operator can
    decide to run an unbounded manual `recomputeArchive` for the dropped tail.
 
-6. **Shared threshold with computed-column backfills (AB#4189) and timezone-aware queries (AB#4190)?**
+6. **Shared threshold with computed-column backfills and timezone-aware queries?**
    Computed-column backfills reuse the same recompute orchestration + generation swap, so they inherit
    the same dirty/recompute machinery and (once built) the same cap — no separate threshold. Timezone
    handling is already per-dependent (`BucketBoundary.ResolveZone(rollup.ReferenceTimeZone)`); no
@@ -158,9 +157,9 @@ contract until an operator opts in, while the global ceiling still bounds a path
   `rewindRollupWatermark` + `recomputeArchive` (GraphQL / REST / octo-cli / Studio rollups panel);
   audited via `RecomputeJob` + `IArchiveAuditTrail`.
 - **Automatic: change-signal source defined; cap on reach; audit per automatic reset.** ⚠️ Signal +
-  audit shipped (AB#4184); **cap is the (b) work** specified in §4.
-- **Composes with AB#4184 concurrency (no corruption mid-recompute).** ✅ Coalesce policy.
-- **Test coverage.** Existing AB#4184 matrix covers manual reset → reprocess, late value → dirty window
+  audit shipped; **cap is the (b) work** specified in §4.
+- **Composes with tracked in the backlog concurrency (no corruption mid-recompute).** ✅ Coalesce policy.
+- **Test coverage.** Existing tracked in the backlog matrix covers manual reset → reprocess, late value → dirty window
   → exact-range recompute, reset mid-recompute safe. **(b) adds:** a very-late write beyond the cap →
   automatic reach is bounded to the cap (not further) and a capped-reach audit entry is emitted; a
   manual recompute of the same deep range remains unbounded.

@@ -5,8 +5,8 @@ background: true
 
 # Concept: Tenant Backup/Restore — optional archive data
 
-> Work item: **AB#4231** (parent epic **AB#3364** "Stream data version 2").
-> Predecessor: **AB#4230** (archive data export/import) — this feature **reuses** its mechanism
+> Work item: tracked in the backlog
+> Predecessor: tracked in the backlog (archive data export/import) — this feature **reuses** its mechanism
 > (`IStreamDataRepository.ExportRowsAsync` / `ImportRowsAsync`, the NDJSON format, the §6 schema
 > match). Read `concept-archive-data-export-import.md` first.
 > Status: **Refinement / design**. Decisions in §2 were taken at refinement on 2026-06-25.
@@ -22,13 +22,13 @@ In scope:
 - Tenant **restore** gains the matching option to also restore archive data.
 - The option is **disabled by default** — default backup/restore behaviour (Mongo metadata/config
   only) is unchanged, and existing `.tar.gz` backups keep restoring exactly as today.
-- On restore, the **same schema constraints** as AB#4230 apply (matching `rtCkTypeId` + configured
+- On restore, the **same schema constraints** as tracked in the backlog apply (matching `rtCkTypeId` + configured
   columns); see §6.
 
 Out of scope:
 
 - Per-archive selection / time-window filtering inside a tenant backup — backup includes **all**
-  archives, whole-archive (the standalone AB#4230 export already does selective/windowed export).
+  archives, whole-archive (the standalone tracked in the backlog export already does selective/windowed export).
 - Changing the Mongo dump/restore mechanism itself.
 
 ## §2 Decisions taken at refinement (2026-06-25)
@@ -45,7 +45,7 @@ Out of scope:
 
 `ITenantBackupService.BackupTenantAsync` runs `mongodump --archive --gzip`, which emits **one
 opaque binary blob** — not a tar of files we can add a folder to. So bundling archive data needs an
-**outer container**. We use a ZIP (matches the AB#4230 export ZIP and the TUS-upload restore path).
+**outer container**. We use a ZIP (matches the tracked in the backlog export ZIP and the TUS-upload restore path).
 The Mongo blob is stored verbatim inside it, so the existing `mongorestore` path is untouched — the
 restore job just extracts `mongo.tar.gz` back out and feeds it to `RestoreTenantAsync` exactly as
 today.
@@ -61,7 +61,7 @@ today.
 ├── mongo.tar.gz            # the mongodump blob, verbatim
 ├── manifest.json          # backup manifest (below)
 └── archives/
-    ├── <rtId>.ndjson       # one CrateDB row per line (AB#4230 data.ndjson format)
+    ├── <rtId>.ndjson       # one CrateDB row per line (data.ndjson format)
     └── ...
 ```
 
@@ -89,14 +89,14 @@ today.
 }
 ```
 
-The per-archive block is the AB#4230 `ArchiveSchemaDto` projection (from `ArchiveSnapshot`) — the
+The per-archive block is the tracked in the backlog `ArchiveSchemaDto` projection (from `ArchiveSnapshot`) — the
 restore job validates it against the post-restore archive (§6). `manifest.json` is the
 discriminator: a ZIP carrying it is an `.octobak`; anything else is treated as a legacy mongodump
 `.tar.gz`.
 
 ## §4 Backend — backup (dump) side
 
-`octo-bot-services` already has the CrateDB engine wired (AB#4230 rework:
+`octo-bot-services` already has the CrateDB engine wired (rework:
 `AddCrateDbStreamDataRepository` + runtime/Mongo store), so the dump job can read archive rows
 directly — no asset-repo hop.
 
@@ -115,7 +115,7 @@ flowchart TD
 
 - The mongodump blob is produced to a temp/intermediate path (or the existing dump path), then
   embedded verbatim into the ZIP. Streamed (`ZipArchive` entry streams) so multi-GB archives stay
-  flat in memory — same as the AB#4230 export job.
+  flat in memory — same as the tracked in the backlog export job.
 - Honors `IBotCancellationToken`. Filename `…-{ts}-{guid}.octobak.zip` when archives are included.
 
 ## §5 Backend — restore side
@@ -147,7 +147,7 @@ For each archive present in the manifest **and** in the post-restore tenant:
    any stale rows so the result is the exact backup state.
 2. `IArchiveLifecycleService.ActivateAsync(rtId)` — `EnsureArchiveCreatedAsync` re-provisions a fresh
    table; status → Activated.
-3. `DisableAsync(rtId)` — status → Disabled, satisfying the AB#4230 §7.1 import precondition.
+3. `DisableAsync(rtId)` — status → Disabled, satisfying the earlier §7.1 import precondition.
 4. `ImportRowsAsync(rtId, rows, InsertOnly, ct)` — stream `archives/<rtId>.ndjson` into the fresh
    table (InsertOnly is safe — table is empty).
 5. `EnableAsync(rtId)` — status → Activated (restored archive is live again).
@@ -159,7 +159,7 @@ continues (§2 decision #4).
 > `.octobak` with the flag off restores Mongo only and leaves archives at `Created` with no Crate
 > table (identical to today's behaviour). Flag on + legacy `.tar.gz` → no-op + warning.
 
-## §6 Schema-match validation (reused from AB#4230 §6)
+## §6 Schema-match validation (reused §6)
 
 Per archive, before its clean import, compare the manifest's schema block against the **post-restore**
 `ArchiveSnapshot` (read locally via `GetArchiveRuntimeStore().GetAsync`): `targetCkTypeId`, column
@@ -186,14 +186,14 @@ Default `false` everywhere — backward compatible signatures.
 
 ## §8 Edge cases
 
-- **Legacy backups**: a pre-AB#4231 `.tar.gz` restores unchanged (auto-detect = no manifest).
+- **Legacy backups**: a pre-the change `.tar.gz` restores unchanged (auto-detect = no manifest).
 - **`.octobak` restored with flag off**: Mongo restored, archives skipped (status Created, no table).
 - **Archive in manifest missing post-restore** (e.g. namespace-remapped subset): skip + warn.
 - **Archive exists post-restore but not in manifest** (backup predates the archive): left untouched
   (its Crate table, if any, is not dropped — clean-restore only acts on manifest archives). Noted in
   the summary so the operator knows it wasn't part of the backup.
 - **Size**: the `.octobak` can be large; restore upload reuses TUS (≤5 GiB cap — same open question
-  as AB#4230 §12 for very large archives; multi-part is a future enhancement). The dump streams each
+  as the earlier §12 for very large archives; multi-part is a future enhancement). The dump streams each
   NDJSON entry; no full-archive buffering.
 - **Cancellation**: honored between archives; a cancelled restore leaves Mongo restored and a partial
   set of archives imported — the summary reports which completed.
@@ -219,6 +219,6 @@ Default `false` everywhere — backward compatible signatures.
   status** (the manifest can carry it) rather than always `EnableAsync` — so a backup of a Disabled
   archive restores Disabled. Worth carrying `status` in the manifest per archive.
 - **Determinate progress**: emit per-archive progress (rows imported / total archives) for the job
-  status, like AB#4230 §12.
+  status, like the earlier §12.
 - **Very large artifacts**: multi-part / chunked TUS for `.octobak` beyond 5 GiB (shared with
-  AB#4230 §12).
+  the earlier §12).

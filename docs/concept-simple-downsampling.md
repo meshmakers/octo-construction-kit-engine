@@ -5,8 +5,8 @@ background: true
 
 # Concept: Downsampling for Simple (non-aggregating) Stream-Data Queries
 
-**Work item:** AB#4233 (Stream data v2 / epic AB#3364) — covers both backend and frontend.
-**Related:** AB#3621 (persistent SD queries + query types), AB#4187 (MeshBoard widgets consuming SD queries), [`concept-time-range-archives.md`](concept-time-range-archives.md) §7 (windowed-storage containment).
+**Work item: tracked in the backlog (Stream data v2 / tracked in the backlog) — covers both backend and frontend.
+**Work item: tracked in the backlog (persistent SD queries + query types) (MeshBoard widgets consuming SD queries), [`concept-time-range-archives.md`](concept-time-range-archives.md) §7 (windowed-storage containment).
 
 ## 1. Goal
 
@@ -59,7 +59,7 @@ Required-args validation (`From`/`To`/`Limit` all mandatory) lives in `CrateDbSt
 |---|---|---|
 | D1 | How `DOWNSAMPLING` reaches a `SimpleSdQuery` | `queryMode` on `StreamDataArguments` **overrides** the variant for `RtSimpleSdQuery` (and the transient `.simple` connection). Persisted CK type stays `SimpleSdQuery`. |
 | D2 | Reduce non-aggregating columns | Synthesize a default reducer per column **value type** and feed the existing aggregating path. |
-| D3 | Peak preservation | Numeric columns reduce to **MIN + MAX (+ AVG)** → line chart renders a min/max envelope band. (Extends AB#4233's AVG-only scope; chosen requirement.) |
+| D3 | Peak preservation | Numeric columns reduce to **MIN + MAX (+ AVG)** → line chart renders a min/max envelope band. (Extends the AVG-only scope; chosen requirement.) |
 | D4 | Multi-series separation | **Group by source `rtId` in addition to `bins.ts`** → `limit` bins **per series**. The frontend keeps grouping by its `seriesGroupField` (e.g. `obisCode`). |
 | D5 | Scope of widgets | Auto-downsampling for **all SD time-series charts**: line, bar, heatmap. Table excluded (paginates). KPI/Gauge excluded (single value). |
 | D6 | Default behavior | **Auto-on** for those charts when a time range is resolvable. |
@@ -143,7 +143,7 @@ flowchart TB
 - **Backend** (`StreamData.UnitTests/CrateQueryBuilderTests.cs`, mirror `:246–332`): simple downsampling emits `generate_series` + per-type reducers; numeric MIN/MAX/AVG present; LAST via `max_by` for string/enum/bool; `GROUP BY bins.ts, "rtId"`; full / partial / empty range; windowed-storage containment; back-compat: `SimpleSdQuery` + `queryMode: DEFAULT` still returns raw rows up to `Limit`.
 - **Frontend** (octo-meshboard specs): `limit` computation from width incl. clamping; `queryMode` only when from/to present; envelope column mapping (`__min`/`__max`); debounced resize fires one reload; table widget untouched.
 
-## 7. Phasing (all under AB#4233) — DELIVERED
+## 7. Phasing (all) — DELIVERED
 
 All phases shipped and live-verified against the windowed `energy-measurements` archive on
 voest (33 224 raw rows → `limit` bins per series, AVG line + MIN/MAX envelope).

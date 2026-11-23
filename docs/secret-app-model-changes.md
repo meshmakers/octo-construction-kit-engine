@@ -3,9 +3,9 @@ description: Changes that apps and adapter models need for the SECRET value type
 background: true
 ---
 
-# SECRET value type: required changes in app and adapter models (WP11, AB#5541)
+# SECRET value type: required changes in app and adapter models (WP11)
 
-> From: PO AB#5528 (SECRET value type). To: the owners of meshmakers-app, energy-community,
+> From: tracked in the backlog (SECRET value type). To: the owners of meshmakers-app, energy-community,
 > octo-adapter-loxone, octo-report-services, one-time-ticket and wwc26-landing-page.
 > Concept: [concept-secret-attribute-type.md](concept-secret-attribute-type.md) (§5.1, §5.2 phases 2/3, §6),
 > frontend contract: [secret-frontend-handover.md](secret-frontend-handover.md),
@@ -45,7 +45,7 @@ its form only (placeholder / empty / value).
      redeployed right after the blueprint install.
    - Configurations reached through `GetPipelineConfigByWellKnownName@1` (a `Uses` edge) keep
      working unchanged: the communication controller reveals Secret values when it ships the
-     configuration to the adapter (AB#5537). They are cached until the DataFlow is redeployed.
+     configuration to the adapter. They are cached until the DataFlow is redeployed.
    - Writing a plaintext with `CreateUpdateInfo@1` (`attributeValueType: String`) sets / rotates the
      secret (the engine encrypts it). **`""` now means "unchanged"**; clearing needs `null`. A
      placeholder string is an ordinary value (it would be stored encrypted and read as set).
@@ -247,7 +247,7 @@ is defined but **assigned to no type** (`Miniserver` uses only `Host`/`Port`). T
 |---|---|---|---|
 | `src/AdapterEdgeLoxone.CkModel/ConstructionKit/attributes/connection.yaml` | `Password: valueType: String` (unused) | `valueType: Secret`, `ownership: Secret` so it cannot be reused as a clear-text attribute (removing it would be Major). | 3 |
 | `src/AdapterEdgeLoxone.CkModel/ConstructionKit/ckModel.yaml` | `Loxone-4.9.0`; `Basic-[2.0,)`, `System.Communication-[3.12,)` | `Loxone-4.10.0`; add `System-[2.5,3.0)` | 3 |
-| `src/AdapterEdgeLoxone/Nodes/LoxoneConnectionNodeConfiguration.cs` (`LoxoneConnectionResolver.Resolve`), `Nodes/LoxonePollTriggerNode.cs` (l. 76–96), `Nodes/FromLoxoneStateChangeNode.cs` (`ExtractConnectionConfig`), `Nodes/LoxoneBrowseNode.cs` | password resolved from `passwordPath`, inline `password` or `GlobalConfiguration` | Call `nodeContext.RegisterSecret(password)` (communication-sdk AB#5538) right after resolving, so debug snapshots, dry runs and execution errors mask it. Deprecate the inline `password` node property (an inline password is stored in clear text in the pipeline definition); prefer `passwordPath` / `configurationName`. | 2 |
+| `src/AdapterEdgeLoxone/Nodes/LoxoneConnectionNodeConfiguration.cs` (`LoxoneConnectionResolver.Resolve`), `Nodes/LoxonePollTriggerNode.cs` (l. 76–96), `Nodes/FromLoxoneStateChangeNode.cs` (`ExtractConnectionConfig`), `Nodes/LoxoneBrowseNode.cs` | password resolved from `passwordPath`, inline `password` or `GlobalConfiguration` | Call `nodeContext.RegisterSecret(password)` (communication-sdk tracked in the backlog) right after resolving, so debug snapshots, dry runs and execution errors mask it. Deprecate the inline `password` node property (an inline password is stored in clear text in the pipeline definition); prefer `passwordPath` / `configurationName`. | 2 |
 | `src/AdapterEdgeLoxone/Services/LoxoneAdapterService.cs`, `Nodes/LoxoneGlobalConfiguration.cs` | read `Password` from the revealed configuration | No change (needs the controller with `SerializeWithRevealedSecrets`, phase 2 of WP7). | — |
 
 No seed or pipeline in the repo contains a Loxone password.
@@ -351,7 +351,7 @@ Recommendation: keep `String`, remove it from the §5.1 inventory, and if wanted
 | wwc26-landing-page | none (decided: not converted) | — | — | — | — |
 | octo-ai-services | System.Ai 3.12.0 → 3.14.0 (3.13.0 is the System 2.5 re-pin) | — (seeds none) | — | implemented, see §8 | 3 (code tolerates both forms) |
 
-## 8. octo-ai-services — implemented (AB#5541)
+## 8. octo-ai-services — implemented
 
 Branch `feat/gerald/secret-attribute-type`, commit `ab93f44`:
 - System.Ai 3.14.0 (`System-[2.5,3.0)`): `AiTokenLease.AccessToken` / `RefreshToken` /
@@ -365,7 +365,7 @@ Branch `feat/gerald/secret-attribute-type`, commit `ab93f44`:
 
 ## 9. Platform findings from this WP
 
-- **Typed point reads do not normalise legacy strings** (engine-mongodb, AB#5533 follow-up):
+- **Typed point reads do not normalise legacy strings** (engine-mongodb follow-up):
   `RuntimeRepositoryBase.GetRtEntityByRtIdAsync<T>` reads through `DocumentAsync` without
   `SecretAttributeReadNormalizer`, so a legacy string (clear text or enc:v1) in a Secret slot stays a
   plain `string` in `Attributes`. Writing such an entity back (`CreateUpdate(id, entity)`) makes the

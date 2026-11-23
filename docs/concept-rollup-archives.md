@@ -26,7 +26,7 @@ A rollup archive is a first-class archive: same lifecycle states, same query sur
 - Automatic schema propagation from source to rollup on source change.
 - Sub-bucket arithmetic on query (e.g. "give me 15 min from a 1 min rollup"). Re-aggregation across buckets is allowed but is a query-time concern, not part of this concept.
 
-> **Since `System.StreamData` 1.8.0 (AB#5157)** a rollup aggregates from a **list** of time-disjoint
+> **Since `System.StreamData` 1.8.0** a rollup aggregates from a **list** of time-disjoint
 > source archives, each with an optional validity span, instead of a single source archive. Every
 > statement in this document that speaks of "the source archive" applies per source; the multi-source
 > rules, the normalisation of the deprecated `SourceArchiveRtId` scalar and the archive-coverage
@@ -81,9 +81,9 @@ Subtype of `CkArchive`. `CkArchive` must lose `isFinal: true` to allow this.
 | `SourceArchiveRtId` | `OctoObjectId?` | **Deprecated since 1.8.0**, optional. A set value is normalised into one unbounded `Sources` entry on read; the platform never writes it. |
 | `BucketSize` | `Duration` | Bucket width, e.g. `PT1M`, `PT1H`, `P1D`. Must be a positive interval supported by CrateDB's `date_trunc` or `date_bin`. Immutable after `Activated`. |
 | `WatermarkLag` | `Duration` | How far behind real-time the orchestrator stays to absorb late inserts. Default `PT5M`. Mutable. |
-| `LastAggregatedBucketEnd` | `DateTime?` | The end timestamp (exclusive) of the most recently committed bucket. `null` before the first run. Maintained by the orchestrator. Runtime-state since System.StreamData 1.10.0 (AB#5232): a blueprint re-apply / `ImportRt -r` preserves the live watermark instead of nulling it (seeds never declare it) and stalling the rollup forever. |
+| `LastAggregatedBucketEnd` | `DateTime?` | The end timestamp (exclusive) of the most recently committed bucket. `null` before the first run. Maintained by the orchestrator. Runtime-state since System.StreamData 1.10.0: a blueprint re-apply / `ImportRt -r` preserves the live watermark instead of nulling it (seeds never declare it) and stalling the rollup forever. |
 | `Aggregations` | `RecordArray<CkRollupAggregation>` | Defines target columns. At least one entry required. Immutable after `Activated`. |
-| `FrozenUntil` | `DateTime?` | When set, the rollup is read-only and no new buckets are produced past this point. See §6. Runtime-state since System.StreamData 1.10.0 (AB#5232): engine-written protection state that must survive re-imports. |
+| `FrozenUntil` | `DateTime?` | When set, the rollup is read-only and no new buckets are produced past this point. See §6. Runtime-state since System.StreamData 1.10.0: engine-written protection state that must survive re-imports. |
 
 `CkArchive.Columns` and `CkArchive.TargetCkTypeId` are inherited but populated automatically at activation (see §4). Direct user editing of `Columns` on a `CkRollupArchive` is rejected.
 
@@ -113,8 +113,8 @@ Subtype of `CkArchive`. `CkArchive` must lose `isFinal: true` to allow this.
   values: [Avg, Min, Max, Sum, Count, TimeWeightedAvg, StateDuration, First, Last]
 ```
 
-`TimeWeightedAvg` / `StateDuration` are the AB#4336 event-based additions (see
-`concept-time-weighted-aggregation.md`). `First` / `Last` (AB#4188) store the value at the
+`TimeWeightedAvg` / `StateDuration` are the tracked in the backlog event-based additions (see
+`concept-time-weighted-aggregation.md`). `First` / `Last` store the value at the
 earliest / latest observation in the bucket — an `arg_min` / `arg_max` over time. CrateDB has no
 native `arg_min` / `arg_max`, so the orchestrator ranks the source rows with `ROW_NUMBER()` in a
 wrapping sub-select and the outer aggregate picks the value of the row ranked 1 (numeric source
@@ -148,7 +148,7 @@ When a `CkRollupArchive` is activated:
      - `MIN`/`MAX`/`SUM`/`COUNT`/`First`/`Last` → one column.
      - `AVG` → two columns (`{name}_sum`, `{name}_count`). The `AVG` is computed on read as `sum / NULLIF(count, 0)`.
      - `First`/`Last` → one column holding the value at the earliest/latest observation
-       (AB#4188); the ordering key (raw `timestamp` or child `window_end`) is not stored.
+      ; the ordering key (raw `timestamp` or child `window_end`) is not stored.
    - The derived columns are written to the inherited `CkArchive.Columns` slot at **create** time (by `RollupArchiveLifecycleService.CreateAsync`), so the generic CkEntity mandatory-attribute validation passes and the read-side mapping (`MongoCkArchiveRuntimeStore.MapToSnapshot`) re-derives them from `Aggregations[]` on every load.
    - `TargetCkTypeId` is **inherited from the source archive** — a rollup of an archive about `Industry.Energy/Meter` rows is itself about `Industry.Energy/Meter` rows (just grouped by bucket). This lets the existing `RtCkTypeId`-keyed query / DDL plumbing work transparently. The rollup rows are still identifiable as rollups via the `ckTypeId` SQL column (= the rollup's own `RtCkRollupArchive` CK type), written by the orchestrator's INSERT.
 3. **DDL** (concept §11):
@@ -194,7 +194,7 @@ For a single bucket the orchestrator issues one `INSERT INTO target (...) SELECT
 
 `SUM`/`MIN`/`MAX`/`COUNT` map 1:1 to CrateDB aggregation functions on the source column. `AVG` expands at SQL level to `SUM(...) AS x_sum, COUNT(...) AS x_count`. Chained rollups (a rollup-of-a-rollup) read from the *stored* `_sum`/`_count` columns and re-aggregate them with `SUM` — never with `AVG` on a previously averaged column. This is what makes chained AVG correct (§3-rationale).
 
-`First`/`Last` (AB#4188) have no native CrateDB aggregate (CrateDB has no `arg_min`/`arg_max`, and
+`First`/`Last` have no native CrateDB aggregate (CrateDB has no `arg_min`/`arg_max`, and
 `MIN`/`MAX` do not accept an array). Instead the source rows are wrapped in a sub-select that stamps
 each row with a `ROW_NUMBER()` rank per `rtId` — ascending time for `First`, descending for `Last` —
 and the outer `GROUP BY` picks the value of the row ranked 1 via `MAX(CASE WHEN rn = 1 THEN value END)`
@@ -241,14 +241,14 @@ Rollup column definitions (`Aggregations[]`) are **immutable** after `Activated`
 
 This avoids the question "what happens to existing rows when a column is added/removed/retyped?" — there is no in-place edit.
 
-> **Adding a new aggregation declaration to an existing archive (AB#4188 AC).** This is the
+> **Adding a new aggregation declaration to an existing archive (AC).** This is the
 > sanctioned answer to "add `max(B)` to an archive that already produces `sum(A)`": create a new
 > rollup carrying the full aggregation set (`sum(A)` + `max(B)`), activate it, and backfill it over
 > the historical range with `rewindRollupWatermark`. The old rollup's already-stored values are
 > never invalidated because they live in a separate table. In-place mutation of `Aggregations[]` on
 > an activated rollup — adding a column to the live table and backfilling only the new column — is
 > deliberately **not** supported: it would reopen the atomic-swap / partial-generation questions
-> that §3 (immutability) and AB#4184 (recompute) close by construction. Multiple aggregations across
+> that §3 (immutability) and tracked in the backlog (recompute) close by construction. Multiple aggregations across
 > different attributes *within one archive from the start* are fully supported and are the common
 > case; only after-the-fact addition to a live archive routes through the create-new-rollup flow.
 
@@ -297,7 +297,7 @@ A new query `rollupsFor(archiveRtId): [RollupArchiveInfo]` returns the rollups a
 | Save `CkRollupArchive` (any state) | At least one source; no duplicate source; spans non-empty, pairwise disjoint, at most one open start / open end, every boundary on the rollup's bucket grid; no source-graph cycle. | see [concept-multi-source-rollups.md](concept-multi-source-rollups.md) §4 |
 | Save `CkRollupArchive` (any state) | `Aggregations.Count >= 1`. | `RollupAggregationsRequiredException` |
 | Save `CkRollupArchive` (any state) | No duplicate `(SourcePath, Function)` pairs. | `DuplicateRollupAggregationException` |
-| Save `CkRollupArchive` (`Activated`, or `Disabled` and activated before) through `ImportRt`, a blueprint or the entity API | `Sources`, `BucketSize`, `BucketAlignment`, `ReferenceTimeZone`, `Aggregations` and the target type do not change (`ArchiveDefinitionGuard`, AB#7872). The stream data stores and CK model migrations do not pass this check. | `RollupSchemaImmutableException` |
+| Save `CkRollupArchive` (`Activated`, or `Disabled` and activated before) through `ImportRt`, a blueprint or the entity API | `Sources`, `BucketSize`, `BucketAlignment`, `ReferenceTimeZone`, `Aggregations` and the target type do not change (`ArchiveDefinitionGuard`). The stream data stores and CK model migrations do not pass this check. | `RollupSchemaImmutableException` |
 | Activate | Every source archive in `Activated`. | `RollupSourceNotActivatedException` |
 | Activate | Each aggregation spec resolves on **every** source: a column the source captures **verbatim** (ingested `Path`, computed `Name`, or a rollup source's physical column name), else — on a rollup source — a child aggregation with the **same function** whose source path normalises to the same physical name (see [concept-multi-source-rollups.md](concept-multi-source-rollups.md) §4 rule 14 / §5; `RollupSourceColumnResolver`). | `RollupSourcePathMissingException` |
 | Source cycle (rollup-of-self) | Graph check at save. | `RollupCycleException` |
@@ -338,7 +338,7 @@ Status transitions (`Activated`/`Disabled`/`Failed`) already flow through `Recor
 ## §13 Open Items (post-MVP)
 
 > Aggregating from several source archives into one rollup is **implemented** since
-> `System.StreamData` 1.8.0 (AB#5157) for *time-disjoint* sources — see
+> `System.StreamData` 1.8.0 for *time-disjoint* sources — see
 > [concept-multi-source-rollups.md](concept-multi-source-rollups.md). Overlapping (additive) sources
 > and a per-aggregation source remain out of scope.
 

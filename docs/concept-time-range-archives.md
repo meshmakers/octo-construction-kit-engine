@@ -229,7 +229,7 @@ ExtractFromEdaApi@1            // pulls quarter-hour reports
 
 The existing `SaveStreamDataInArchive@1` continues to work unchanged for raw archives.
 
-#### `SaveTimeRangeSeriesInArchive@1` — whole series, one anchor (AB#5248)
+#### `SaveTimeRangeSeriesInArchive@1` — whole series, one anchor
 
 The node above takes rows that already carry an `rtid`, which means the pipeline in front of it has
 to produce a runtime entity per window. For a measurement **series** that is the wrong shape: the
@@ -260,7 +260,7 @@ decided by the archive's `Archive.ConflictPrecedence` (see the storage concept i
 `octo-construction-kit-engine-mongodb/docs/streamdata-archive-concept.md`). The node's job is to map
 the ranking columns — a quality code, the source document's own date — into the archive alongside the
 values. Whether a value was entered manually or delivered automatically is not a quality code: it is the
-row's origin (`ArchiveRowOrigin`, column `row_origin`, AB#5356), which an archive ranks with the reserved
+row's origin (`ArchiveRowOrigin`, column `row_origin`), which an archive ranks with the reserved
 precedence key `$Origin` — a manual value then is permanent against automated deliveries.
 
 ## §4 Storage Layout
@@ -439,7 +439,7 @@ A `CkRollupArchive` can have either a `CkRawArchive` **or** another time-range a
 (`CkTimeRangeArchive` or `CkRollupArchive`) as a source. The orchestrator's aggregation SQL adapts
 to the source shape.
 
-Since `System.StreamData` 1.8.0 (AB#5157) a rollup declares a **list** of time-disjoint sources
+Since `System.StreamData` 1.8.0 a rollup declares a **list** of time-disjoint sources
 (`Sources`) with optional half-open validity spans instead of a single `SourceArchiveRtId`; the
 source is chosen **per bucket** and the SQL below is unchanged for the bucket it serves. A legacy
 time-range archive of quarterly totals and a native ladder can therefore feed one continuous rollup

@@ -1,16 +1,21 @@
+---
+description: Concept draft: recompute of rollup archives, stable and optimistic (reference, design record).
+background: true
+---
+
 # Concept: Recompute Rollup Archives (stable, optimistic)
 
 Status: **Draft** — concept agreed in chat on 2026-06-28, implementation pending.
-Work item: **AB#4184** (parent epic AB#4073 — VOEST M1: EDA energy data to data lake).
+Work item: tracked in the backlog
 
 See also:
 - [concept-rollup-archives.md](./concept-rollup-archives.md) — the derived-rollup design (watermark, orchestrator, freeze/rewind) this concept extends.
 - [concept-time-range-archives.md](./concept-time-range-archives.md) — the `(window_start, window_end, was_updated)` storage shape shared by rollup and time-range archives.
-- [concept-computed-columns.md](./concept-computed-columns.md) — **AB#4189**, which reuses this concept's backfill orchestration + atomic-swap + observability (its active-archive backfill, Phase 7, blocks on AB#4184).
-- AB#4188 — multiple aggregations per rollup archive (a recompute updates all declared aggregates of a window atomically).
-- AB#4190 — timezone-aware queries (must not break the recompute model).
-- AB#4196 — threshold-reset policy (manual vs. automatic); **builds on the dirty-tracking introduced here**. Decision recorded in [concept-rollup-threshold-reset.md](./concept-rollup-threshold-reset.md): both paths already ship (automatic dirty-window scoped recompute + manual `rewindRollupWatermark`); the remaining work is the *bounded retro reach* guardrail (§12 open item below).
-- AB#4186 / AB#4195 — App and mesh-adapter read paths that must tolerate an in-progress recompute.
+- [concept-computed-columns.md](./concept-computed-columns.md) — tracked in the backlog, which reuses this concept's backfill orchestration + atomic-swap + observability (its active-archive backfill, Phase 7, blocks on tracked in the backlog).
+- multiple aggregations per rollup archive (a recompute updates all declared aggregates of a window atomically).
+- timezone-aware queries (must not break the recompute model).
+- threshold-reset policy (manual vs. automatic); **builds on the dirty-tracking introduced here**. Decision recorded in [concept-rollup-threshold-reset.md](./concept-rollup-threshold-reset.md): both paths already ship (automatic dirty-window scoped recompute + manual `rewindRollupWatermark`); the remaining work is the *bounded retro reach* guardrail (§12 open item below).
+- App and mesh-adapter read paths that must tolerate an in-progress recompute.
 
 ## §1 Overview
 
@@ -46,9 +51,9 @@ This concept adds **stable, optimistic recompute**: recomputation that can be tr
 ### Non-Goals
 
 - **Automatic event-driven trigger policy** — whether a detected raw change *automatically*
-  walks the threshold back is **AB#4196**. This concept produces the dirty signal that 4196
+  walks the threshold back is tracked in the backlog. This concept produces the dirty signal that the threshold-reset policy
   consumes; it does not decide the auto-reset policy.
-- **New rollup aggregation types** — out of scope (AB#4188 owns multi-aggregate).
+- **New rollup aggregation types** — out of scope (owns multi-aggregate).
 - **Cross-archive consistency** — each archive is recomputed independently; a chain propagates
   top-down but there is no global transaction across sibling archives.
 - **Changing the raw archive's storage layout** beyond the additive dirty/observability fields.
@@ -88,7 +93,7 @@ reverse-dependency DAG. Per stale dependent it records the window range to recom
 
 - Reverse lookup uses the rollup→source links (`RollupArchiveSnapshot.Sources` /
   `HasSource`, `IRollupArchiveRuntimeStore` enumeration / `CountActiveRollupsForSourceAsync`).
-  Since AB#5157 a rollup may declare **several** time-disjoint sources, so the reverse adjacency
+  Since tracked in the backlog a rollup may declare **several** time-disjoint sources, so the reverse adjacency
   carries one edge per `(source, rollup)` pair and the dirty range is clipped to the writing
   source's validity span on **both** ends — see
   [concept-multi-source-rollups.md](concept-multi-source-rollups.md) §6.
@@ -125,7 +130,7 @@ RecomputeJob(
   trigger is recorded as `Coalesced` for traceability. No queue, no reject.
 - **Idempotency.** The same input range produces the same staging rows; a crash mid-job is
   recovered from the job state persisted in the Mongo ledger — re-running re-derives identical
-  staging output before any swap. Concretely (AB#5189): the obligations a run is working on stay
+  staging output before any swap. Concretely: the obligations a run is working on stay
   in the rollup's work list until the run has committed, and every job carries a heartbeat
   (`LastProgressAt`, stamped per committed chunk). A job whose heartbeat has been silent longer
   than the stale-job timeout (60 minutes) belongs to a dead process; the drain fails it, clears the
@@ -163,7 +168,7 @@ forced by CrateDB's lack of partial-range atomicity.
 - After the flip, a background sweep deletes the superseded `generation` rows for that range. The
   sweep runs once the flip time plus the **sweep grace period** has passed (next section).
 
-### Sweep grace period (AB#6968)
+### Sweep grace period
 
 A native tenant dump copies a rollup's generation map and its data table one after the other. Without
 a delay, a recompute between the two copies flips a range and removes the superseded generation: the
@@ -182,7 +187,7 @@ storage and a larger table to scan for as long as the grace period lasts.
   with a message naming the key. Choose it above the longest dump of a rollup.
 - **Durable record.** The deferred sweep is a row in the rollup's table `archive_<rtId>__sweep`
   (`range_start, range_end, rtid_scope, generation, flipped_at_ms`, created with the first deferred sweep), written
-  with every column explicit in the same call as the flip (no column default, AB#6647). It is a CrateDB row, not process
+  with every column explicit in the same call as the flip (no column default). It is a CrateDB row, not process
   memory: a restart between flip and sweep does not lose it.
 - **Execution.** Every recompute tick of the host runs the records that are due (`SweepSupersededGenerationsAsync`,
   one catalogue query for the tenant), and every recompute of a rollup runs its own due records first. A record whose
@@ -194,7 +199,7 @@ storage and a larger table to scan for as long as the grace period lasts.
 - **Dump order.** The dump copies the map first and the data after it; with the grace period the version the copied map
   names is still in the data when its copy starts, as long as the span between the map read and the last data slice
   (reported in the dump result) stays below the grace period.
-- **Disk while a range is recomputed repeatedly (AB#5490).** Every recompute of the same range inside the grace period
+- **Disk while a range is recomputed repeatedly.** Every recompute of the same range inside the grace period
   adds one full version of the range; a newer generation does **not** replace a pending older one, because each
   version is only removed by its own record once that record is due. The disk therefore grows linearly: with `n`
   recomputes of the range inside the grace period the table holds `n + 1` versions, at most `(n + 1) ×` the swept size
@@ -229,7 +234,7 @@ storage and a larger table to scan for as long as the grace period lasts.
 > flip a single-row write in the same store (atomicity without cross-store coordination) and avoids a
 > CK-model version bump. The full mechanism lives in `octo-construction-kit-engine-mongodb`'s
 > `Runtime.Engine.CrateDb` layer (`GenerationMapSqlBuilder`, `CrateDbArchiveRecomputeExecutor`,
-> `CrateQueryCompiler`); see that repo's CLAUDE.md "Optimistic Recompute — Per-Window Generation
+> `CrateQueryCompiler`); see that repo's documentation "Optimistic Recompute — Per-Window Generation
 > Pointer". **Status: implemented** (unit-tested + end-to-end validated against a CrateDB
 > Testcontainer by `RollupRecomputeGenerationPointerTests` in `octo-asset-repo-services`).
 >
@@ -301,7 +306,7 @@ boundary is the **watermark lag**:
 | Bucket | Forward aggregation | Recompute |
 |---|---|---|
 | `bucketEnd <= now - WatermarkLag` (lag-closed) | writes it **exactly once**, when it closes it | may write it any time after that |
-| `bucketEnd > now - WatermarkLag` (inside the lag window) | re-writes it on every tick (open-bucket refresh, AB#4306) | never |
+| `bucketEnd > now - WatermarkLag` (inside the lag window) | re-writes it on every tick (open-bucket refresh) | never |
 
 Both writes of a lag-closed bucket are final — the forward pass closes it from the complete source
 data, a recompute reads the same complete data — so with a backlog watermark the two may write the
@@ -313,7 +318,7 @@ generation-0 refresh for those buckets, freezing them on the value the recompute
 every row that arrived inside the lag. Corrections inside the lag window need no obligation of
 their own: the forward pass rewrites those buckets from the source on every tick until they close.
 
-## §4a Late deliveries (AB#9016)
+## §4a Late deliveries
 
 A late delivery (energy: EDA day packets one or two days late, a few metering points each) used to mark the window dirty
 for every series. Every packet then cost a full recompute of the window on every rollup level: a new generation, a pointer
@@ -323,7 +328,7 @@ CrateDB cost. Three rules now apply.
 **Only the affected series.** The storage layer records the distinct rtIds of the late, in-reach automated rows on the
 dirty window (`ArchiveDirtyWindow.RtIds`, `CkArchiveDirtyWindow.RtIds`, System.StreamData 1.26.0). Propagation copies them
 into the recompute range (`ArchiveRecomputeRange.RtIdSet`). A write with more than `MaxScopedRtIds` distinct rtIds records
-none, which means every series, as before. Manual writes (AB#7594) and manual recomputes, rewinds and backfills stay
+none, which means every series, as before. Manual writes and manual recomputes, rewinds and backfills stay
 unscoped.
 
 **In place.** A set-scoped range runs as `IArchiveRecomputeExecutor.ExecuteScopedRefreshAsync`. The executor stages the
@@ -336,7 +341,7 @@ TimeWeightedAvg carry bucket, rows at generation 0, at an unscoped and at a fore
 
 - Each row is replaced by one statement, but the refresh is not atomic across rows: while it runs, or after it failed part
   way, a reader can see some buckets of the series already refreshed and others not yet. Every written row holds its
-  final value, and the retry (AB#5189) completes the rest - up to the attempt cap (`maxRangeAttempts`, default 5). After
+  final value, and the retry completes the rest - up to the attempt cap (`maxRangeAttempts`, default 5). After
   that the remainder is parked: it stays visible on the archive and is not due again until a recompute that covers it
   succeeds (a later late delivery for the same series, or a manual `recomputeArchive` over the range). A full recompute keeps the old generation visible until its
   flip; the refresh trades that for the absence of a new generation and its sweep.
@@ -370,7 +375,7 @@ separate jobs.
 
 **Cascade.** A committed refresh enqueues the same set on its direct dependents. They do not wait for another debounce
 interval and refresh in place again; whether a dependent runs on the same tick or the next one depends on the order in
-which the drain visits the rollups, so a multi-level chain converges over one or more ticks. A failed refresh hands its remainder back with its set (AB#5189 retry and parking
+which the drain visits the rollups, so a multi-level chain converges over one or more ticks. A failed refresh hands its remainder back with its set (retry and parking
 apply unchanged).
 
 | Setting | Env var | Default | Meaning |
@@ -380,7 +385,7 @@ apply unchanged).
 
 Both settings are validated at start (`RecomputeLateDataOptions`). `RecomputeOrchestrator` keeps its previous constructor,
 which means no debounce, for hosts built against the earlier contract. The executor member has a default implementation
-(one rtId: scoped recompute; several: one unscoped recompute, as before AB#9016), so an executor built before AB#9016 still loads.
+(one rtId: scoped recompute; several: one unscoped recompute, as before the change), so an executor built before the change still loads.
 
 ## §5 Triggers
 
@@ -390,7 +395,7 @@ which means no debounce, for hosts built against the earlier contract. The execu
 | **Periodic** | `RecomputeOrchestratorHostedService` (per-tenant tick, analogous to `RollupOrchestratorHostedService`) | Reads the **dirty-dependents ledger** (Information B) and recomputes **only dirty windows** — not the whole archive. Schedule configurable per archive. |
 | **Chain propagation** | internal | After a rollup's swap succeeds, its own dependents are marked dirty in their ledgers, so a multi-level chain rolls forward top-down. |
 
-Event-driven automatic threshold reset is **out of scope** (AB#4196); the ledger is the prepared
+Event-driven automatic threshold reset is **out of scope**; the ledger is the prepared
 data source for it.
 
 ## §6 Read path (optimistic) — implemented
@@ -399,7 +404,7 @@ data source for it.
   windowed query methods) injects `generation = CASE WHEN <range> THEN <gen> … ELSE 0 END` for
   rollup archives, so a query during recompute returns a single consistent generation per window.
 - No hard error, no `500`, no abort while a recompute runs (acceptance criterion). The mesh-adapter
-  `GetQueryById` node (AB#4195) and the VOEST App (AB#4186) inherit this behavior for free.
+  `GetQueryById` node and the customer app inherit this behavior for free.
 - **Optional soft hint**: the existing `was_updated` flag plus the new
   `RecomputeInProgress` / `LastRecomputeSuccessAt` fields let a dashboard show "recompute in
   progress" without being required to.
@@ -426,7 +431,7 @@ state, so pre-1.6.0 rollups and rollups that have never been recomputed render c
 
 A `CkArchiveRecomputeJob` record per run — **not** just a boolean flag — with
 `state, trigger, range, rtIdScope, rowsProcessed, windowsProcessed, startedAt, finishedAt,
-durationMs, errorReason, stagingTableName`, plus the heartbeat `lastProgressAt` (AB#5189) the
+durationMs, errorReason, stagingTableName`, plus the heartbeat `lastProgressAt` the
 drain's stale-job detection reads (§3). Queryable via a new GraphQL `recomputeJobsFor(archiveRtId)`.
 This is what an operator reads to debug "why did last night's recompute fail?" — a job failed by
 the stale-job recovery says so in its `errorReason` ("Presumed dead …" / "Orphaned …"), as does one
@@ -436,7 +441,7 @@ that was merely interrupted by a shutdown ("Interrupted …").
 
 `IArchiveAuditTrail` is extended with `RecordRecomputeRunAsync(...)` and
 `RecordRecomputeFailureAsync(..., reason)`, routed through `IAuditEventSink` into the platform
-event log (see `octo-construction-kit-engine/CLAUDE.md` — Audit-Trail Architecture; never
+event log (see `docs/audit-trail.md`; never
 ctor-capture `IEventRepository`).
 
 ### Metrics (Prometheus / OTLP)
@@ -453,13 +458,13 @@ One structured log at each phase boundary — **Compute → Validate → Swap �
 
 | Element | Change |
 |---|---|
-| `CkArchive` / `CkRollupArchive` attributes | `DirtyWindows` (RecordArray — Information A), `PendingRecomputeRanges` (RecordArray — Information B), and the §7 observability fields. All marked `isRuntimeState: true` (see CLAUDE.md — runtime-state preservation, so a blueprint re-apply never tramples them). |
+| `CkArchive` / `CkRollupArchive` attributes | `DirtyWindows` (RecordArray — Information A), `PendingRecomputeRanges` (RecordArray — Information B), and the §7 observability fields. All marked `isRuntimeState: true` (see `docs/runtime-state-preservation.md` — runtime-state preservation, so a blueprint re-apply never tramples them). |
 | New record `CkArchiveDirtyWindow` | `WindowStart`, `WindowEnd`, `ChangeKind`, `Source`, `DetectedAt`. |
 | Record `CkArchiveRecomputeRange` | `DependentArchiveRtId`, `RangeStart`, `RangeEnd`, `RtIdScope`, `EnqueuedAt`, plus the retry bookkeeping `Attempts` (default 0), `NextAttemptAt` and `LastError` (System.StreamData 1.9.0 — see *Failure mode*). Ranges stored before 1.9.0 read back as attempt zero and are due immediately. |
 | New record `CkArchiveRecomputeJob` | the §7 job-history fields, plus the heartbeat `LastProgressAt` (1.9.0). Jobs stored before 1.9.0 carry none and are judged by `StartedAt`. |
 | New enums | `CkRecomputeChangeKind { Append, RetroactiveModify }`, `CkRecomputeChangeSource { Manual, Pipeline, Import }`, `CkRecomputeJobState { Pending, Running, Swapping, Completed, Failed, Coalesced }`. |
 
-The bump is additive; existing archives migrate via the no-migrations bridge (CLAUDE.md).
+The bump is additive; existing archives migrate via the no-migrations bridge (`docs/ck-model-migrations.md`).
 
 ## §9 Service / API surface
 
@@ -489,15 +494,14 @@ Frameworks: xUnit v3 (`Runtime.Engine.Tests`, `StreamData.UnitTests`), integrati
 ## §11 Sequencing
 
 1. **This concept first.** It provides backfill orchestration + atomic swap + dirty-tracking +
-   observability that AB#4189 (Phase 7) and AB#4196 depend on.
+   observability that tracked in the backlog (Phase 7) and tracked in the backlog depend on.
 2. CK-model bump → engine (dependency graph, staging/generation swap, dirty ledger) → orchestrator
    → GraphQL/REST/SDK → octo-cli → Studio → docs.
-3. AB#4196 then layers the **automatic** threshold-reset policy on top of the dirty ledger;
-   AB#4189 Phase 7 reuses the staging + generation-swap for computed-column backfills.
+3. tracked in the backlog then layers the **automatic** threshold-reset policy on top of the dirty ledger Phase 7 reuses the staging + generation-swap for computed-column backfills.
 
 ## §12 Open items (post-MVP)
 
-- **Generation-pointer GC cadence** — settled by AB#6968: the sweep runs after a configurable grace
+- **Generation-pointer GC cadence** — settled: the sweep runs after a configurable grace
   period (default two hours, `0` = immediate); see "Sweep grace period" in §4.
 - **Per-`rtId` generation granularity** — ~~start per-window; refine to per-`(window, rtId)`~~
   **Done.** The executor takes an optional `rtId` scope; a scoped recompute restricts staging
@@ -505,4 +509,4 @@ Frameworks: xUnit v3 (`Runtime.Engine.Tests`, `StreamData.UnitTests`), integrati
   genmap `rtid_scope` is a single value per pointer row (one scoped point per pointer); a future
   refinement could carry a set if many points need scoping in one job.
 - **Bounded retro reach** — cap how far back a single very-late row may drag a recompute (shared
-  with AB#4196's guardrail).
+  with the guardrail).

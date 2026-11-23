@@ -1,10 +1,15 @@
+---
+description: Concept of tenant backup of archive data through COPY TO and COPY FROM (reference, design record).
+background: true
+---
+
 # Concept: Tenant Backup/Restore — archive data through COPY TO and COPY FROM
 
-> Work item: **AB#5490** (Feature **AB#5967**, Epic **AB#3364**).
-> Predecessors: **AB#4230** (archive data export/import), **AB#4231** (tenant backup with archive
-> data, `concept-tenant-backup-archive-data.md`), **AB#5489** (export reads time slices).
-> Status: **Concept complete; local implementation under way** (Feature AB#5967, step 1 of §12; the
-> engine contract of slice AB#6967 is in §11). Decisions are in §3 and §12; §12 also lists what is
+> Work item: tracked in the backlog
+> Predecessors: tracked in the backlog (archive data export/import), tracked in the backlog (tenant backup with archive
+> data, `concept-tenant-backup-archive-data.md`), tracked in the backlog (export reads time slices).
+> Status: **Concept complete** (tracked in the backlog, step 1 of §12; the
+> engine contract of slice tracked in the backlog is in §11). Decisions are in §3 and §12; §12 also lists what is
 > still to be checked.
 
 ## §1 Goal
@@ -15,39 +20,39 @@ tenant with more than 100 million archive rows, and it carries everything a rest
 including the rollup generation pointers. The operator still gets one file to download and uploads
 one file to restore. A backup taken on CrateDB 5.x restores on CrateDB 6.x.
 
-This is the tenant backup, not disaster recovery: the nightly cluster-wide snapshots (AB#3865) are
+This is the tenant backup, not disaster recovery: the nightly cluster-wide snapshots are
 a separate mechanism and stay as they are.
 
-Targets (acceptance criteria of AB#5490), for a tenant with 115 million archive rows on a managed
+Targets (acceptance criteria), for a tenant with 115 million archive rows on a managed
 environment:
 
 | Step | Today | Target |
 |------|-------|--------|
-| Archive part of the dump | about 30 h before AB#5489; 45 min to 2 h estimated after it (never measured on a cluster) | at most 30 min |
+| Archive part of the dump | about 30 h before the change; 45 min to 2 h estimated after it (never measured on a cluster) | at most 30 min |
 | Archive part of the restore | 21 to 68 h (470 to 1,520 rows a second), tenant unusable for that time | at most 2 h |
 
 The dump runs against a live tenant. The restore replaces the tenant, so the target tenant is
 offline while it runs; the point is that this takes about an hour and a half, not days.
 
-Out of scope: export and import of a single archive (AB#4230); the MongoDB part of the backup;
+Out of scope: export and import of a single archive; the MongoDB part of the backup;
 the cluster snapshots.
 
 ## §2 Why the current path is slow and incomplete
 
 - **Rows travel through the bot service.** The dump reads every row over the PostgreSQL protocol,
-  turns it into NDJSON and compresses it in the bot. Since AB#5489 that reaches 197,000 rows a
+  turns it into NDJSON and compresses it in the bot. Since tracked in the backlog that reaches 197,000 rows a
   second locally, about a third of what `COPY TO` does on the same machine. The restore parses
   every line and writes it back as `INSERT … ON CONFLICT` statements of 5,000 rows, one after
   another; this is the part that takes days.
 - **The restore flattens rollup generations.** The import writes every rollup row with generation 0
-  (AB#4773), and the generation map `archive_<rtId>__genmap` is in neither the dump nor the
+ , and the generation map `archive_<rtId>__genmap` is in neither the dump nor the
   restore. A window that was recomputed can come back with the values of a superseded generation.
 - **Backups lie on the bot pod's own disk.** On the managed environments the bot service has no
   volume and no artifact store configured. A backup of several gigabytes is held on the pod's
   ephemeral disk during dump and restore and is gone after a pod restart.
 - **Size of the file.** The large tenant's backup is about 5.5 GB (3.4 GB MongoDB, 2.1 GB archive
   data). The restore upload accepts up to `Bot:MaxUploadSizeBytes`, 10 GiB by default (the 5 GiB
-  named in the AB#4231 concept is no longer the limit).
+  named in the tracked in the backlog concept is no longer the limit).
 
 What CrateDB does with its own bulk statements, measured on prod-2 (CrateDB 5.9.10, three nodes)
 during the EC v2 migration (`energy-community/scripts/migration/ec-v2/15-export-stream-data.py`,
@@ -68,7 +73,7 @@ service cannot do that, which is what §5 solves.
 |---|-------|----------|
 | 1 | Dump | `COPY TO`, issued by the bot service as SQL. The CrateDB nodes write the files themselves. |
 | 2 | Restore | `COPY FROM`, issued by the bot service as SQL. The CrateDB nodes read the files themselves. |
-| 3 | Where the files lie in between | A staging area in the platform artifact store of the environment (AB#5561), not in the disaster-recovery buckets (§5). No new service in the cluster. |
+| 3 | Where the files lie in between | A staging area in the platform artifact store of the environment, not in the disaster-recovery buckets (§5). No new service in the cluster. |
 | 4 | File format | CrateDB's line-wise JSON (`json_object`), gzip. No snapshots, no storage files, nothing that depends on the CrateDB version (§9). |
 | 5 | What the operator handles | One `.octobak.zip`, as today, `formatVersion: 2`. Download and upload through Studio, CLI and MCP are unchanged (§8). |
 | 6 | Completeness | Every table of an archive is copied verbatim: the data table with its `generation` column and the generation map (§6). |
@@ -97,7 +102,7 @@ one); letting the bot fetch files from the CrateDB pods (needs exec rights on th
 (read from `information_schema.columns` at dump time), the slices with their time range, the row
 count counted before the copy and the count `COPY TO` reported; at the top level the CrateDB
 version of the source cluster and the platform version. The schema block of format 1
-(`ArchiveSchemaDto`) stays, so the schema match of AB#4230 §6 works unchanged.
+(`ArchiveSchemaDto`) stays, so the schema match (§6 of [concept-tenant-backup-archive-data.md](concept-tenant-backup-archive-data.md)) works unchanged.
 
 Entries under `archives/` are stored without compression (they are gzip files). Building the
 container is a byte copy from the staging area, and a restore hands each entry to the staging area
@@ -112,12 +117,12 @@ from the manifest; today it refuses everything but 1, and it will branch on 1 an
 `COPY TO` and `COPY FROM` address a location, not a client connection: the node disk, an S3 bucket
 or an Azure Blob container. The location must be reachable by every CrateDB node and by the bot.
 
-**The staging area is the platform artifact store** (AB#5561, `secret-sweep-dump-storage.md`): one
+**The staging area is the platform artifact store** (`secret-sweep-dump-storage.md`): one
 object-storage target per environment for operational artifacts, apart from the disaster-recovery
 buckets, with credentials that reach nothing else. The bot already keeps tenant dumps and restore
 uploads there through `IArtifactStore` / `IBotArtifactStorage`; CrateDB writes to and reads from
 the same store. Dump and restore can then neither fill nor damage the snapshot storage. Setting the
-store up per environment (AB#5562 to AB#5565) is a precondition with stories of its own; this
+store up per environment (to tracked in the backlog) is a precondition with stories of its own; this
 feature adds the lifecycle entry for the new category (§11).
 
 | Environment | Artifact store | `COPY` scheme |
@@ -196,14 +201,14 @@ flowchart TD
   G --> H["pack staging files + mongo.tar.gz + manifest into .octobak.zip, store, delete staging"]
 ```
 
-- **Hidden columns (AB#9141).** A column that reaches a Hidden attribute (current CK model or recorded on the archive),
+- **Hidden columns.** A column that reaches a Hidden attribute (current CK model or recorded on the archive),
   the aggregate columns of a rollup over one, and the computed columns derived from either are not dumped: the plan and
   the manifest describe the table without them, and the slice is copied as
   `COPY archive_<rtId> ("col", …) WHERE … TO DIRECTORY … WITH (format = 'json_object', …)` (a column list alone would switch
   CrateDB to `json_array`, which `COPY FROM` cannot load). The restore of such an archive and the full rule:
   `docs/archive-hidden-columns.md`, "Backups".
 - **Slices.** One `COPY TO` per time slice, cut by `window_start` (or `timestamp` on a raw archive)
-  with the planner AB#5489 introduced. A slice is a short statement, shows progress, and the job
+  with the planner tracked in the backlog introduced. A slice is a short statement, shows progress, and the job
   can stop between two slices.
 - **The tenant stays online.** No archive is disabled. As today the dump is not a snapshot: a row
   written while it runs may or may not be part of it. Each slice is counted before the copy; a
@@ -228,7 +233,7 @@ flowchart TD
 
 ### Placement matrix: where a recompute can hit a dump
 
-Measured with real recomputes against a real CrateDB (AB#6968; asset-repo integration tests, 34 cases, 18 s). Each cell gives the
+Measured with real recomputes against a real CrateDB (asset-repo integration tests, 34 cases, 18 s). Each cell gives the
 defects found in the restored rollup, in this order: *empty windows / windows differing from the source at map-read time / orphan
 rows above the pointer / pointers without rows*. "No flip" and "flip before the dump" are 0/0/0/0 in every column.
 
@@ -261,7 +266,7 @@ asking changes nothing in the cluster.
 
 **Before the MongoDB restore: check that the whole backup fits.** The same restore job then adds up the staged bytes of all archives
 in the manifest (the files are in the staging area by then) and asks the cluster whether they fit on the nodes
-(`IStreamDataRepositoryFactory.CheckStagingDiskHeadroomAsync`, AB#7274). The estimate is the staged (gzip) bytes times the size factor
+(`IStreamDataRepositoryFactory.CheckStagingDiskHeadroomAsync`). The estimate is the staged (gzip) bytes times the size factor
 (`StagingCopyRunner.DiskSpaceFactor`, 12; one constant, measured on the sbeg raw archive: 10.5 times the staged gzip size right after the load), times the copies every shard has after the load (the
 tables get `number_of_replicas` back before the merge, so `min(2, nodes)` copies for the default `0-1`), divided by the number of nodes.
 A node fits when that is not more than its room **below the high disk watermark**
@@ -279,7 +284,7 @@ aggregation and recompute away from the tenant - until those rollups are restore
 Per archive of the manifest that exists after the MongoDB restore and passes the schema match:
 
 1. Disable, drop the table and its generation map, activate (the platform creates both tables with
-   its current DDL), disable — the sequence of AB#4231 §5.1.
+   its current DDL), disable — the sequence §5.1.
 2. Check before loading: the columns of the dumped table against the columns of the new table
    (`information_schema.columns`); the room per node below the high disk watermark against the expected size of the archive (the same
    rule as the whole-backup check above, with the replica setting of the table; the node disks are read now, so the archives loaded
@@ -288,7 +293,7 @@ Per archive of the manifest that exists after the MongoDB restore and passes the
    previous values.
 4. Put the archive's files into the staging area and run one `COPY FROM … RETURN SUMMARY` per
    slice. A slice counts as loaded when `success_count` equals the row count in the manifest and
-   `error_count` is 0. **A slice that CrateDB refuses for a transient reason is loaded again** (AB#7274): at most three attempts in total
+   `error_count` is 0. **A slice that CrateDB refuses for a transient reason is loaded again**: at most three attempts in total
    (`StagingCopyRunner.MaxLoadAttempts`), after 30 s and after 60 s, every repeat with `overwrite_duplicates = true` (a row the failed
    attempt wrote is replaced by the identical row; the slice files come from a table with the same primary key, so their rows are unique)
    and half the `bulk_size` of the attempt before (CrateDB's 10,000, then 5,000, then 2,500). Transient are: the memory circuit breaker
@@ -306,7 +311,7 @@ Per archive of the manifest that exists after the MongoDB restore and passes the
    (`OPTIMIZE … max_num_segments = 1`, can be switched off), refresh, compare the table's row count
    with the manifest.
 7. Restore the archive's backed-up status (enable only what was Activated), as today.
-8. **Reconcile the rollups of the tenant** (AB#6968), once all archives of the tenant are loaded: set the marker
+8. **Reconcile the rollups of the tenant**, once all archives of the tenant are loaded: set the marker
    *restore reconcile pending* (`SetRestoreReconcilePendingAsync(true)`; it stays set until step 11), run the validator, repair, validate again.
    The restore result carries both reports.
 9. `ValidateRollupsAsync`: a pointer entry whose generation has no rows **where a source holds rows in that range** (an entry over a range the
@@ -335,7 +340,7 @@ line and `COPY FROM` applies the column default to a missing value, so a NULL
 a column with a default is not meant to hold NULL, and the platform never writes one. Columns
 without a default keep their NULL.
 
-A failed archive is reported and the job continues with the next one (decision 4 of AB#4231). The
+A failed archive is reported and the job continues with the next one (decision 4). The
 rollup tables come back row for row, so no rollup has to be recomputed after a restore - unless the validator of step 8 finds the
 rollup inconsistent (a dump taken while a recompute ran, a backup of format 1, a lost map), in which case the repair recomputes exactly the
 affected ranges.
@@ -382,7 +387,7 @@ upgrade of a cluster, not `COPY`.
 Checked against the 6.0.0 release notes: no breaking change touches `COPY FROM`, `COPY TO` or the
 column types archives use. The same holds for the notes of 6.1.0 to 6.4.0. Three points of those
 notes concern the upgrade of a cluster and the row path, not this feature, and belong to the
-upgrade work (AB#6651): 6.1 to 6.3 can lose the data of tables created before 5.5.0 (fixed in
+upgrade work: 6.1 to 6.3 can lose the data of tables created before 5.5.0 (fixed in
 6.1.4, 6.2.6 and 6.3.2); since 6.2 a write to a system column is an error instead of being
 ignored; since 6.4 implicit casts of `INSERT` are checked the same way for one and for many rows.
 
@@ -422,13 +427,13 @@ There is no object storage, and the bot process cannot see the disk of the Crate
 
 | Repository | Change |
 |------------|--------|
-| `octo-construction-kit-engine` | Contract on `IStreamDataRepository` (AB#5967, slice AB#6967): copy an archive's tables to and from a staging location, with slice results. This document. See "The engine contract" below. |
+| `octo-construction-kit-engine` | Contract on `IStreamDataRepository` (slice tracked in the backlog): copy an archive's tables to and from a staging location, with slice results. This document. See "The engine contract" below. |
 | `octo-construction-kit-engine-mongodb` | CrateDB implementation: slice planning, `COPY` statements, summary evaluation, bulk settings, generation map handling, column and disk checks. |
 | `octo-common-services` | Artifact category `copy-staging`; builds the engine's `ArchiveCopyStagingLocation` per provider (SAS token, S3 key, endpoint as CrateDB sees it) from the artifact store settings. |
 | `octo-bot-services` | `DumpRepositoryJob` and `RestoreRepositoryJob`: format 2 writer and reader, format 1 kept; restore upload limit. |
 | `octo-asset-repo-services` | Integration tests against CrateDB (version matrix of §9). |
 | `octo-tools` | S3-compatible store in the local kind infrastructure. |
-| deployment (`meshmakers-infrastructure`, `octo-mesh-deployment`) | Artifact store per environment (AB#5562 to AB#5565, prepared, not applied yet); lifecycle entry for `copy-staging`; artifact store settings of the bot service. |
+| deployment (`meshmakers-infrastructure`, `octo-mesh-deployment`) | Artifact store per environment (to tracked in the backlog, prepared, not applied yet); lifecycle entry for `copy-staging`; artifact store settings of the bot service. |
 
 SDK, CLI, MCP and Studio need no change.
 
@@ -464,8 +469,8 @@ in-memory fake that drives the dump and load order is `FakeStagingCopyStreamData
 
 ### Setting up the artifact store per environment
 
-A precondition of this feature, rolled out with its own stories (AB#5562 test-2, AB#5563
-staging-1, AB#5564 prod-1, AB#5565 prod-2) by their owner. This feature starts when that rollout
+A precondition of this feature, rolled out with its own stories (test-2
+staging-1 prod-1 prod-2) by their owner. This feature starts when that rollout
 is finished, and adds two things to it: the lifecycle entry for `copy-staging` (step 1) and the
 job log filter (step 5). Terraform and Ansible for the store exist in `meshmakers-infrastructure`
 behind a switch that is off; no cluster runs the store yet. Per environment, in the order test-2,
@@ -482,7 +487,7 @@ staging-1, prod-1, prod-2:
    statement leaves no entry in `sys.jobs_log`.
 
 Every step on an environment needs the operator's go for that environment. The same store serves
-the secret dumps of AB#5539, so the set-up is coordinated with that work.
+the secret dumps, so the set-up is coordinated with that work.
 
 ## §12 Order of work and open points
 
@@ -495,7 +500,7 @@ the secret dumps of AB#5539, so the set-up is coordinated with that work.
 3. Lifecycle entry and job log filter on test-2 (S3) and staging-1 (Azure Blob); the Azure path is
    verified there.
 4. Run with a tenant of the large size on a managed environment; environment and time are the
-   operator's decision. Figures recorded in AB#5490.
+   operator's decision. Figures recorded.
 5. Lifecycle entry and job log filter on prod-1 and prod-2.
 
 **Local trial, 2026-10-13** (kind cluster, SeaweedFS 4.48 as the S3 store, addressed by cluster
@@ -543,7 +548,7 @@ Consequences:
 
 - The disk check before a restore (§7) takes its factors from the target version; the figures of
   §7 are those of 5.10.10. The larger disk use on 6.4.6 concerns every table after the upgrade and
-  belongs to the upgrade work (AB#6651).
+  belongs to the upgrade work.
 
 - NULL in a column that has a DEFAULT: accepted, no handling in dump or restore (§7, decision 6).
 - The S3 key must not stay readable: `COPY` statements are filtered out of `sys.jobs_log` (§5,
@@ -554,14 +559,14 @@ Consequences:
 - `COPY` with `az://` against an Azure container under 5.9.10 (on staging-1).
 - Whether the injected auto-instrumentation records the driver's command text on the environments
   (not visible locally; §5 excludes `COPY` from it either way).
-- The 50 MiB default part size of the upload (§8) is confirmed on staging-1 at acceptance (AB#5490);
+- The 50 MiB default part size of the upload (§8) is confirmed on staging-1 at acceptance;
   that needs Gerald's go for the environment.
 - The rates on a three-node cluster with replicas; the local figures come from a single node.
 
 **Decisions on the points that were open**
 
 1. **Credentials — decided:** one dedicated credential set per environment, limited to the
-   artifact store and kept in Vault (design decision on AB#5490, 2026-10-13); the keys of the
+   artifact store and kept in Vault (design decision on tracked in the backlog, 2026-10-13); the keys of the
    disaster-recovery jobs are not shared. Bot and CrateDB use the same credential set. S3: the key
    is part of the statement text. Azure: a SAS token issued by the bot for the run (the artifact
    store concept avoids SAS URLs as a way to hand out the secret dumps; a token passed to CrateDB
@@ -587,7 +592,7 @@ Consequences:
    `sys.jobs_log` through `stats.jobs_log_filter` (§5).
 8. **Schedule — decided: on hold after the concept.** The concept is worked out to the end and
    verified locally as far as possible; the implementation starts when the artifact store is
-   rolled out to the environments (AB#5562 to AB#5565, §11).
+   rolled out to the environments (to tracked in the backlog, §11).
 
 Not part of this concept, seen on the way: the dump lock is shared by all tenants and a running
 dump cannot be cancelled; the MongoDB dump and restore have a fixed limit of one hour.

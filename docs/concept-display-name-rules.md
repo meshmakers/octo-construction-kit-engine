@@ -1,14 +1,19 @@
+---
+description: Display name rules: how a CK type computes rtDisplayName and rtDisplayDescription on save.
+applies_to: src/ConstructionKit.Contracts/DisplayRules/**, src/Runtime.Contracts/DisplayRules/**
+---
+
 # Display Name Rules (rtDisplayName / rtDisplayDescription)
 
-Epic AB#4808. CK types can declare how a runtime entity's display name and display
+CK types can declare how a runtime entity's display name and display
 description are computed from its attribute values. On save, the engine evaluates the
 rule and stores the result in the read-only system fields `rtDisplayName` /
-`rtDisplayDescription` (fields land in Phase 2, AB#4810). This gives all consumers
+`rtDisplayDescription` (fields land in Phase 2). This gives all consumers
 (entity pickers, lists, CLI/MCP) a human-readable name without overloading
 `rtWellKnownName`, which is an identifier (blueprint/migration targeting) and null for
 almost all domain entities.
 
-## Model declaration (Phase 1, AB#4809 — this repo)
+## Model declaration (Phase 1 — this repo)
 
 Two optional type-level properties in the CK elements YAML:
 
@@ -65,11 +70,11 @@ computed display values change, no data or schema break.
 The declared rules round-trip through the MongoDB model cache
 (`octo-construction-kit-engine-mongodb`: `CkType` entity,
 `DatabaseCkModelRepository` import + read-back) — the standard three-point round-trip
-every new `CkTypeDto` property needs (see the `isRuntimeState` precedent, AB#4589).
+every new `CkTypeDto` property needs (see the `isRuntimeState` precedent).
 
 ## Runtime semantics
 
-- **Phase 2 (AB#4810, implemented):** `RtDisplayName` / `RtDisplayDescription` on
+- **Phase 2 (implemented):** `RtDisplayName` / `RtDisplayDescription` on
   `RtEntity` (+ TcDto/converter, SDK DTOs, serializer/mapper, query columns
   `rtDisplayName`/`rtDisplayDescription`, readable via `RtPathEvaluator` but deliberately
   not settable). The `DisplayNameModifier` (`IPreDocumentModification<RtEntity>` in
@@ -80,7 +85,7 @@ every new `CkTypeDto` property needs (see the `isRuntimeState` precedent, AB#458
   `rtDisplayDescription` nullable — on the generic entity type, the per-CK-type object +
   interface types and simple query rows; not present on any mutation input type.
   Filter/sort operate on the stored value, not the synthesized fallback.
-- **Phase 3 (AB#4811, implemented):** smart recompute on partial updates. When an update
+- **Phase 3 (implemented):** smart recompute on partial updates. When an update
   carries a root attribute referenced by the type's display rules (records are updated by
   their root attribute, so record sub-updates count), `BulkRtMutation` re-reads the stored
   entities once per batch and re-evaluates the rules against stored + updated attributes
@@ -90,7 +95,7 @@ every new `CkTypeDto` property needs (see the `isRuntimeState` precedent, AB#458
   unchanged", empty string = explicit clear sentinel — the Mongo update mapper translates
   it to `$unset`, the local mapper to `null`. Guarded (optimistic-concurrency) updates get
   the same treatment.
-- **Phase 4 (AB#4812, implemented — octo-construction-kit-engine-mongodb):** backfill
+- **Phase 4 (implemented — octo-construction-kit-engine-mongodb):** backfill
   sweep over existing entities when a model import changes a rule.
   - *Detection:* `TenantContext.ImportCkModelAsync` captures the declared rules of all
     available CK types directly from Mongo before the import (mirroring
@@ -112,7 +117,7 @@ every new `CkTypeDto` property needs (see the `isRuntimeState` precedent, AB#458
     subtree.
   - Evaluation semantics are shared across save/update/sweep via
     `Runtime.Contracts/DisplayRules/RtDisplayRuleEvaluator`.
-- **Phase 5 (AB#4813, implemented — octo-frontend-libraries):** the entity pickers
+- **Phase 5 (implemented — octo-frontend-libraries):** the entity pickers
   (`RuntimeEntitySelectDataSource` / `RuntimeEntityDialogDataSource` in
   `@meshmakers/octo-services`, used by the MeshBoard entity selectors and widget config
   dialogs) display `rtDisplayName` (Name column + select input, plus a Description

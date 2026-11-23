@@ -1,4 +1,9 @@
-# Durable storage for pre-sweep dumps (AB#5539)
+---
+description: Concept of durable storage for the dump taken before a secret sweep (reference, design record).
+background: true
+---
+
+# Durable storage for pre-sweep dumps
 
 Status: concept, 2026-10-06. Scope: where `octo-bot-services` keeps the tenant dump it takes before every
 writing secret sweep, and how that generalizes to a platform-level artifact store. Parent concept:
@@ -41,7 +46,7 @@ pass-through exists. There is no env value for the storage paths; the setting wo
 three bot deployments.
 
 **Existing DR backups we can use as a template** (`meshmakers-infrastructure`,
-`docs/MONGODB-BACKUP-RESTORE.md`, `docs/CONCEPT-CRATEDB-DISASTER-RECOVERY.md`, group_vars, terraform):
+the MongoDB backup and restore runbook, the CrateDB disaster recovery concept, group_vars, terraform):
 
 | Cluster | MongoDB DR (daily 03:00, keep last 5) | CrateDB DR snapshots | Object storage available | Credentials (Vault) |
 | --- | --- | --- | --- | --- |
@@ -201,7 +206,7 @@ sweep.
   service account, `Storage Blob Data Contributor` on the container only, then shared key off). Both are
   prepared in terraform and chart values; phase 2 is switched off by default.
 - **Q6:** Plaintext in DR backups after the `Encrypt` sweep (§5): accept, or trim?
-  **Decided 2026-10-06:** accept (AB#5566, see "Decision 2026-10-06 — DR backups").
+  **Decided 2026-10-06:** accept (see "Decision 2026-10-06 — DR backups").
 - **Q7:** test-2: put the artifact bucket in its own Hetzner project, or accept project-wide keys plus a
   bucket policy? **Decided 2026-10-06 (PO):** a **dedicated Hetzner project** for `test-2-octo-artifacts`,
   so the bot key cannot reach the DR bucket `meshmakers`. On Hetzner the `.octoenc` envelope is the only
@@ -215,8 +220,7 @@ sweep.
   test-2 `main` (namespace `octo`; the release-chart smoke deploys write to the same helm release
   `octo-mesh`, so test-2 has two bot deployments, not three) and `dev` (`octo-dev`); staging-1, prod-1 and
   prod-2 `octo-mesh`.
-- **Implementation (AB#5562–5565, 2026-10-06, local branches `feat/gerald/artifact-storage`, nothing
-  applied):** `meshmakers-infrastructure` — terraform per cluster (test-2: own root
+- **Implementation :** `meshmakers-infrastructure` — terraform per cluster (test-2: own root
   `src/infrastructure/octo-artifacts`; prod-1: `src/prod-1/octo-artifacts.tf`; staging-1/prod-2:
   `src/<cluster>/terraform/octo-artifacts.tf`), the `octo-artifact-storage` ansible component that copies the
   Vault credential into the Secret `octo-artifact-storage` per OctoMesh namespace, and runbooks
@@ -227,18 +231,18 @@ sweep.
 
 | WI | Scope | Epic |
 |---|---|---|
-| AB#5559 | Bot: encrypt pre-sweep dumps with the key ring, restore job | 4969 |
-| AB#5560 | octo-mesh chart: bot persistence and artifact-store values | 2157 |
-| AB#5561 | Platform artifact store (pre-sweep dumps, tenant dumps, restore staging) | 2157 |
-| AB#5562 | test-2: artifact bucket + bot configuration (pilot) | 2157 |
-| AB#5563 | staging-1: artifact container + bot configuration | 2157 |
-| AB#5564 | prod-1: SOS artifact bucket + bot configuration | 2157 |
-| AB#5565 | prod-2: artifact container + bot configuration (last; gate for the first Encrypt sweep) | 2157 |
-| AB#5566 | Plaintext in MongoDB DR backups after the Encrypt sweep — **decided 2026-10-06 (user): existing DR backups are kept; the residual risk of legacy plaintext in DR backups for up to their retention after the Encrypt sweep is accepted.** Closed. | 4969 |
+| | Bot: encrypt pre-sweep dumps with the key ring, restore job | 4969 |
+| | octo-mesh chart: bot persistence and artifact-store values | 2157 |
+| | Platform artifact store (pre-sweep dumps, tenant dumps, restore staging) | 2157 |
+| | test-2: artifact bucket + bot configuration (pilot) | 2157 |
+| | staging-1: artifact container + bot configuration | 2157 |
+| | prod-1: SOS artifact bucket + bot configuration | 2157 |
+| | prod-2: artifact container + bot configuration (last; gate for the first Encrypt sweep) | 2157 |
+| | Plaintext in MongoDB DR backups after the Encrypt sweep — **decided 2026-10-06 (user): existing DR backups are kept; the residual risk of legacy plaintext in DR backups for up to their retention after the Encrypt sweep is accepted.** Closed. | 4969 |
 
 ## Decision 2026-10-06 — DR backups
 
-Existing MongoDB DR backups are kept unchanged. Backups taken before an environment's Encrypt sweep still contain legacy plaintext secrets until they age out under the normal DR retention; this residual risk is accepted (AB#5566, closed). No trimming of DR backups.
+Existing MongoDB DR backups are kept unchanged. Backups taken before an environment's Encrypt sweep still contain legacy plaintext secrets until they age out under the normal DR retention; this residual risk is accepted (closed). No trimming of DR backups.
 
 ## Provider capabilities (verified 2026-10-06)
 
@@ -246,7 +250,7 @@ Answers Q2 and Q3 and part of Q4. Sources are official vendor docs; all were acc
 Bucket and account names come from a read-only look at the local infra repos (`meshmakers-infrastructure`
 at `b6a17b9`; `infrastructure-helm-charts`, `maintenance-deployment` and `octo-mesh-deployment` define no
 object storage). No live system was queried, so live names still need one `aws s3 ls` / `az storage account
-show` check during AB#5562–5565.
+show` check during the artifact storage work.
 
 ### Summary
 
@@ -399,10 +403,10 @@ show` check during AB#5562–5565.
 
 | Cluster | Provider | Existing DR target (source of truth) | Doc mismatch | Proposed artifact target |
 | --- | --- | --- | --- | --- |
-| test-2 | Hetzner Object Storage | Bucket and endpoint live **only in Vault** (`secret/meshmakers/test-2/hetzner-s3`, keys `bucket`, `endpoint`). `docs/CLUSTER-SERVICES-OVERVIEW.md` names bucket `meshmakers` (prefix `cratedb/`); `test_2_infrastructure.yml` has no bucket name. The location is not in the repo | none, but unconfirmed | `test-2-octo-artifacts` (same project unless Q7 decides otherwise) |
-| staging-1 | Azure Blob | Account **`mmstaging1backups`** (terraform `variables.tf` default and `staging_1_infrastructure.yml`), westeurope, Standard LRS; containers `mongodb-backups`, `cratedb-backups` (private) | `docs/CONCEPT-CRATEDB-DISASTER-RECOVERY.md` says `meshmakersstaging1backups`, which is **stale** | container `octo-artifacts` in `mmstaging1backups` (or a dedicated account, Q4) |
+| test-2 | Hetzner Object Storage | Bucket and endpoint live **only in Vault** (`secret/meshmakers/test-2/hetzner-s3`, keys `bucket`, `endpoint`). The cluster services overview names bucket `meshmakers` (prefix `cratedb/`); `test_2_infrastructure.yml` has no bucket name. The location is not in the repo | none, but unconfirmed | `test-2-octo-artifacts` (same project unless Q7 decides otherwise) |
+| staging-1 | Azure Blob | Account **`mmstaging1backups`** (terraform `variables.tf` default and `staging_1_infrastructure.yml`), westeurope, Standard LRS; containers `mongodb-backups`, `cratedb-backups` (private) | the CrateDB disaster recovery concept says `meshmakersstaging1backups`, which is **stale** | container `octo-artifacts` in `mmstaging1backups` (or a dedicated account, Q4) |
 | prod-2 | Azure Blob | Account **`meshmakersprod2backups`** (terraform and `prod_2_infrastructure.yml`), westeurope, Standard LRS; the same two containers | none | container `octo-artifacts` in `meshmakersprod2backups` (or a dedicated account) |
-| prod-1 | Exoscale SOS | Bucket **`prod-1-backups`** (`aws_s3_bucket "${var.cluster_name}-backups"`, `cluster_name = "prod-1"`; `exoscale_sos.bucket` in `prod_1_infrastructure.yml`), endpoint `https://sos-at-vie-1.exo.io`, zone `at-vie-1`; prefixes `mongodb/`, `cratedb/`, `signal-bridge/`. IAM role/key `prod-1-sos-backup` is limited to that bucket | `docs/MONGODB-BACKUP-RESTORE.md` says `meshmakers-prod-1-backups`, which is **stale** | bucket `prod-1-octo-artifacts`, its own IAM role/key `prod-1-octo-artifacts` (bucket count < 20 to be checked) |
+| prod-1 | Exoscale SOS | Bucket **`prod-1-backups`** (`aws_s3_bucket "${var.cluster_name}-backups"`, `cluster_name = "prod-1"`; `exoscale_sos.bucket` in `prod_1_infrastructure.yml`), endpoint `https://sos-at-vie-1.exo.io`, zone `at-vie-1`; prefixes `mongodb/`, `cratedb/`, `signal-bridge/`. IAM role/key `prod-1-sos-backup` is limited to that bucket | the MongoDB backup and restore runbook says `meshmakers-prod-1-backups`, which is **stale** | bucket `prod-1-octo-artifacts`, its own IAM role/key `prod-1-octo-artifacts` (bucket count < 20 to be checked) |
 
 Vault paths (names only): `secret/meshmakers/test-2/hetzner-s3`, `secret/meshmakers/staging-1/azure-storage`,
 `secret/meshmakers/prod-2/azure-storage`, `secret/meshmakers/prod-1/sos`.
@@ -422,7 +426,7 @@ Vault paths (names only): `secret/meshmakers/test-2/hetzner-s3`, `secret/meshmak
 **Q7 (new):** test-2: put the artifact bucket in its own Hetzner project (true key isolation from the DR bucket),
 or accept project-wide keys plus a bucket policy?
 
-## Encrypted dump file format (AB#5559)
+## Encrypted dump file format
 
 Status: implemented in the engine (`Runtime.Contracts.Secrets.ISecretFileProtector`, implementation
 `Runtime.Engine.Secrets.SecretFileProtector`, registered as a singleton by `AddRuntimeEngine()`). It uses the

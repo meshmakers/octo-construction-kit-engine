@@ -1,10 +1,14 @@
-# SECRET value type: required changes in app and adapter models (WP11, AB#5541)
+---
+description: Changes that apps and adapter models need for the SECRET value type (handover note, reference).
+background: true
+---
 
-> From: PO AB#5528 (SECRET value type). To: the owners of meshmakers-app, energy-community,
+# SECRET value type: required changes in app and adapter models (WP11)
+
+> From: tracked in the backlog (SECRET value type). To: the owners of meshmakers-app, energy-community,
 > octo-adapter-loxone, octo-report-services, one-time-ticket and wwc26-landing-page.
 > Concept: [concept-secret-attribute-type.md](concept-secret-attribute-type.md) (§5.1, §5.2 phases 2/3, §6),
-> frontend contract: [secret-frontend-handover.md](secret-frontend-handover.md),
-> progress: [secret-rollout-progress.md](secret-rollout-progress.md).
+> frontend contract: [secret-frontend-handover.md](secret-frontend-handover.md).
 > State: scanned read-only on 2026-10-06 against local `main` of every repo listed. Nothing was
 > changed in these repos. octo-ai-services is implemented (last section).
 > Amended 2026-10-06 for the round-2 decisions (concept §2.1): **placeholders are ordinary values**
@@ -40,7 +44,7 @@ its form only (placeholder / empty / value).
      redeployed right after the blueprint install.
    - Configurations reached through `GetPipelineConfigByWellKnownName@1` (a `Uses` edge) keep
      working unchanged: the communication controller reveals Secret values when it ships the
-     configuration to the adapter (AB#5537). They are cached until the DataFlow is redeployed.
+     configuration to the adapter. They are cached until the DataFlow is redeployed.
    - Writing a plaintext with `CreateUpdateInfo@1` (`attributeValueType: String`) sets / rotates the
      secret (the engine encrypts it). **`""` now means "unchanged"**; clearing needs `null`. A
      placeholder string is an ordinary value (it would be stored encrypted and read as set).
@@ -58,7 +62,7 @@ its form only (placeholder / empty / value).
 
 ## 1. meshmakers-app (Meshmakers.Accounting, Meshmakers.Accounting.Tesla)
 
-Repo: `/Users/gerald/RiderProjects/meshmakers/main/meshmakers-app` (branch `main`, ea98fac).
+Repo: `meshmakers-app` (branch `main`, ea98fac).
 The Meshmakers.Accounting model (3.1.0) has **no** credential attribute. The credentials the app
 manages live in System.Communication types (`AiConfiguration.ApiKey`,
 `MicrosoftGraphConfiguration.ClientSecret`, `EMailReceiverConfiguration.Password`,
@@ -151,7 +155,7 @@ semantics: an empty `serviceAccount.clientSecret` writes `ClientSecret: ""`, whi
 
 ## 2. energy-community (EnergyCommunity.Registration)
 
-Repo: `/Users/gerald/RiderProjects/meshmakers/main/energy-community` (branch `main`, c33caef).
+Repo: `energy-community` (branch `main`, c33caef).
 
 ### 2.1 Model — phase 3
 
@@ -231,7 +235,7 @@ Registration API" DataFlow after installing Billing 2.5.0.
 
 ## 3. octo-adapter-loxone (Loxone CK + edge adapter)
 
-Repo: `/Users/gerald/RiderProjects/meshmakers/main/octo-adapter-loxone` (branch `main`, d840ef9).
+Repo: `octo-adapter-loxone` (branch `main`, d840ef9).
 
 The Loxone CK attribute `Password` (`src/AdapterEdgeLoxone.CkModel/ConstructionKit/attributes/connection.yaml`)
 is defined but **assigned to no type** (`Miniserver` uses only `Host`/`Port`). The real credential is
@@ -242,14 +246,14 @@ is defined but **assigned to no type** (`Miniserver` uses only `Host`/`Port`). T
 |---|---|---|---|
 | `src/AdapterEdgeLoxone.CkModel/ConstructionKit/attributes/connection.yaml` | `Password: valueType: String` (unused) | `valueType: Secret`, `ownership: Secret` so it cannot be reused as a clear-text attribute (removing it would be Major). | 3 |
 | `src/AdapterEdgeLoxone.CkModel/ConstructionKit/ckModel.yaml` | `Loxone-4.9.0`; `Basic-[2.0,)`, `System.Communication-[3.12,)` | `Loxone-4.10.0`; add `System-[2.5,3.0)` | 3 |
-| `src/AdapterEdgeLoxone/Nodes/LoxoneConnectionNodeConfiguration.cs` (`LoxoneConnectionResolver.Resolve`), `Nodes/LoxonePollTriggerNode.cs` (l. 76–96), `Nodes/FromLoxoneStateChangeNode.cs` (`ExtractConnectionConfig`), `Nodes/LoxoneBrowseNode.cs` | password resolved from `passwordPath`, inline `password` or `GlobalConfiguration` | Call `nodeContext.RegisterSecret(password)` (communication-sdk AB#5538) right after resolving, so debug snapshots, dry runs and execution errors mask it. Deprecate the inline `password` node property (an inline password is stored in clear text in the pipeline definition); prefer `passwordPath` / `configurationName`. | 2 |
+| `src/AdapterEdgeLoxone/Nodes/LoxoneConnectionNodeConfiguration.cs` (`LoxoneConnectionResolver.Resolve`), `Nodes/LoxonePollTriggerNode.cs` (l. 76–96), `Nodes/FromLoxoneStateChangeNode.cs` (`ExtractConnectionConfig`), `Nodes/LoxoneBrowseNode.cs` | password resolved from `passwordPath`, inline `password` or `GlobalConfiguration` | Call `nodeContext.RegisterSecret(password)` (communication-sdk tracked in the backlog) right after resolving, so debug snapshots, dry runs and execution errors mask it. Deprecate the inline `password` node property (an inline password is stored in clear text in the pipeline definition); prefer `passwordPath` / `configurationName`. | 2 |
 | `src/AdapterEdgeLoxone/Services/LoxoneAdapterService.cs`, `Nodes/LoxoneGlobalConfiguration.cs` | read `Password` from the revealed configuration | No change (needs the controller with `SerializeWithRevealedSecrets`, phase 2 of WP7). | — |
 
 No seed or pipeline in the repo contains a Loxone password.
 
 ## 4. octo-report-services (System.Reporting)
 
-Repo: `/Users/gerald/RiderProjects/meshmakers/main/octo-report-services` (branch `main`, 5eb13cb).
+Repo: `octo-report-services` (branch `main`, 5eb13cb).
 The service hosts the runtime engine (`AddRuntimeEngine`), the key ring is delivered by the
 octo-helm-pro reporting chart (ef37529).
 
@@ -268,7 +272,7 @@ value type does not close; the designer should get connection names only.
 
 ## 5. one-time-ticket (Demo.Tickets)
 
-Repo: `/Users/gerald/RiderProjects/meshmakers/main/one-time-ticket` (branch `main`, e3e698b).
+Repo: `one-time-ticket` (branch `main`, e3e698b).
 The HTTP routes are called anonymously (the BFF `app/server/server.js` forwards without credentials).
 
 ### 5.1 Model — phase 3
@@ -319,7 +323,7 @@ pipeline need no change.
 
 ## 6. wwc26-landing-page (Wwc26.Challenge)
 
-Repo: `/Users/gerald/RiderProjects/meshmakers/main/wwc26-landing-page` (branch `main`, 9aeea2d).
+Repo: `wwc26-landing-page` (branch `main`, 9aeea2d).
 
 `Submission.SecretKey` (`ck/ConstructionKit/attributes/submission.yaml`) is the treasure-hunt answer a
 participant submits; the jury reads it: `src/we-are-developers-landing-page/src/app/graphQL/getSubmissions.graphql`
@@ -346,7 +350,7 @@ Recommendation: keep `String`, remove it from the §5.1 inventory, and if wanted
 | wwc26-landing-page | none (decided: not converted) | — | — | — | — |
 | octo-ai-services | System.Ai 3.12.0 → 3.14.0 (3.13.0 is the System 2.5 re-pin) | — (seeds none) | — | implemented, see §8 | 3 (code tolerates both forms) |
 
-## 8. octo-ai-services — implemented (AB#5541)
+## 8. octo-ai-services — implemented
 
 Branch `feat/gerald/secret-attribute-type`, commit `ab93f44`:
 - System.Ai 3.14.0 (`System-[2.5,3.0)`): `AiTokenLease.AccessToken` / `RefreshToken` /
@@ -360,7 +364,7 @@ Branch `feat/gerald/secret-attribute-type`, commit `ab93f44`:
 
 ## 9. Platform findings from this WP
 
-- **Typed point reads do not normalise legacy strings** (engine-mongodb, AB#5533 follow-up):
+- **Typed point reads do not normalise legacy strings** (engine-mongodb follow-up):
   `RuntimeRepositoryBase.GetRtEntityByRtIdAsync<T>` reads through `DocumentAsync` without
   `SecretAttributeReadNormalizer`, so a legacy string (clear text or enc:v1) in a Secret slot stays a
   plain `string` in `Attributes`. Writing such an entity back (`CreateUpdate(id, entity)`) makes the
@@ -375,4 +379,4 @@ Branch `feat/gerald/secret-attribute-type`, commit `ab93f44`:
 
 ## Version rule after the System 2.5 repins (decided 2026-10-06, G1-a)
 
-Wave 1 repins every model that pinned System 2.4 to `System-[2.5,3.0)` with a **minor** bump (CI `ValidateVersion` rule). Every phase-3 SECRET model change in this document therefore takes the **next minor after the repin version**, e.g. System.Reporting 2.3.0 (repin) → 2.4.0 (Secret `ConnectionString`), Meshmakers.Accounting.Tesla 1.3.0 (repin) → 1.4.0, Demo.Tickets / EnergyCommunity.Registration / Wwc26.Challenge likewise. The repin versions per model are listed in `wave1-push-pr-plan-backend.md` §4.5.
+Wave 1 repins every model that pinned System 2.4 to `System-[2.5,3.0)` with a **minor** bump (CI `ValidateVersion` rule). Every phase-3 SECRET model change in this document therefore takes the **next minor after the repin version**, e.g. System.Reporting 2.3.0 (repin) → 2.4.0 (Secret `ConnectionString`), Meshmakers.Accounting.Tesla 1.3.0 (repin) → 1.4.0, Demo.Tickets / EnergyCommunity.Registration / Wwc26.Challenge likewise.

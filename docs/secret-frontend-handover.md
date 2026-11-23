@@ -1,12 +1,17 @@
-# SECRET attribute value type — frontend handover (AB#5542, AB#5544)
+---
+description: Frontend handover of the SECRET attribute value type: admin API field names (reference).
+background: true
+---
 
-> From: PO AB#5528 (SECRET value type) · To: Studio / frontend-libraries PO via Chief Product Owner
-> Concept: [concept-secret-attribute-type.md](concept-secret-attribute-type.md) · Progress: [secret-rollout-progress.md](secret-rollout-progress.md)
+# SECRET attribute value type — frontend handover
+
+> From: tracked in the backlog (SECRET value type) · To: Studio / frontend-libraries PO via Chief Product Owner
+> Concept: [concept-secret-attribute-type.md](concept-secret-attribute-type.md)
 > State: backend implemented on local branches `feat/gerald/secret-attribute-type` (not pushed, not deployed), including the admin API of sections 6–12 (decisions 2026-10-06). Field names are binding.
 
 ## 1. Why the frontend must move first (rollout gate)
 
-Phase 2 (Studio documents secret-safe) must ship **before** phase 3 (models switch credential attributes to `valueType: Secret`) in every environment. After phase 3, a document that selects a secret field as a scalar fails GraphQL validation (intended: loud failure instead of a leak). Affected today: the ~36 Studio configuration documents, `getEntitiesByCkType`, `getRuntimeEntityById`, `updateRuntimeEntities` selections, identity-provider form, entity forms (AB#5522).
+Phase 2 (Studio documents secret-safe) must ship **before** phase 3 (models switch credential attributes to `valueType: Secret`) in every environment. After phase 3, a document that selects a secret field as a scalar fails GraphQL validation (intended: loud failure instead of a leak). Affected today: the ~36 Studio configuration documents, `getEntitiesByCkType`, `getRuntimeEntityById`, `updateRuntimeEntities` selections, identity-provider form, entity forms.
 
 Attributes that become Secret in phase 3 (System.Communication 3.41): `Password` (Sap, Sftp, EMailSender, EMailReceiver, Loxone, HelmRepository, FinApi), `PrivateKey`, `PrivateKeyPassphrase` (Sftp), `ClientSecret` (FinApi, MicrosoftGraph, ServiceAccount), `ApiKey` (Ai, WeClapp), `BotToken` (Discord), `AdminPassword` (Grafana), new Secret record member `ValueOverride.SecretValue` (record key `Path`; `ValueOverride.Value` stays String, see §5). System.Identity 2.22.0: identity-provider `ClientSecret`. Later (WP11): AI tokens, app models.
 
@@ -90,12 +95,12 @@ query { runtime { systemCommunicationEMailSenderConfiguration(
 ```
 (Typed field/type names follow the existing codegen naming; the integration tests use `AssetRepositoryIntegrationTest/ServiceCredential`.)
 
-## 3. UI behaviour (AB#5542, AB#5544)
+## 3. UI behaviour
 
 - **Write-only fields**: show a "set" / "not set" badge from `{ isSet }` / `secretIsSet`; the input is empty with hint "leave empty to keep"; only send the field when the user typed a value; offer an explicit **Clear** action for optional secrets (→ `clearSecretAttributes`); required secrets cannot be cleared.
 - **Mutations** return only `rtId` and `{ isSet }`.
 - **Property grid / runtime browser**: SECRET shows the badge, never a value. Generic attribute lists: use `secretIsSet`.
-- **Entity forms (AB#5522)**: map `SECRET` automatically to the write-only field; drop the credential-name heuristic once models use SECRET.
+- **Entity forms**: map `SECRET` automatically to the write-only field; drop the credential-name heuristic once models use SECRET.
 - **CK attribute editor**: offer `SECRET`; explain rules: no default values / auto-complete / auto-increment, not indexable, not in display rules/formulas/owner paths/query columns, ownership always Secret, records with secrets need a `recordKey` (required String/Int/Int64/Enum, not Secret), model must depend on `System >= 2.5`.
 - **MeshmakersAccounting app** (`meshmakers-app`): its seed must drop the `TODO_SET_*` placeholders (empty values), and `graph-credentials.service.ts` / `imap-connection.service.ts` must switch from string comparison to `isSet` (see `secret-app-model-changes.md`).
 
@@ -250,7 +255,7 @@ Enums as names, JSON camelCase. SDK: `IBotServicesClient` (methods listed per en
   "strictModeSince": null,            // ISO-8601 when strict mode is scheduled/active
   "recurringVerifyCron": "0 3 * * *", // daily Verify (Q6); null when disabled
   "lastVerifyAt": "2026-10-06T03:00:12Z", // this tenant's last Verify run, null if none
-  "warnings": []                      // warning codes (AB#5534): "NoKeyRing" when keyRingConfigured=false,
+  "warnings": []                      // warning codes: "NoKeyRing" when keyRingConfigured=false,
                                       // "NoLegacyV1Key" when the tenant's last completed sweep found enc:v1 values but no legacy key is configured;
                                       // unknown codes: show as a generic warning
 }
@@ -283,11 +288,11 @@ Enums as names, JSON camelCase. SDK: `IBotServicesClient` (methods listed per en
   }
 }
 ```
-**No key ring (AB#5534/AB#5539):** when `keyRingConfigured` is `false` (equivalently `warnings` contains `"NoKeyRing"`), Studio shows a **prominent banner** on the secrets overview and on every page with secret inputs ("No key ring configured on this environment — secrets cannot be saved; restored secrets were only classified. Configure the key ring, then run Encrypt."). Secret inputs stay disabled; Encrypt / CleanupUnreadable are not offered (they would be skipped). `NoLegacyV1Key` gets a smaller warning on the secrets overview ("enc:v1 values found but no legacy key configured — they count as key missing").
+**No key ring:** when `keyRingConfigured` is `false` (equivalently `warnings` contains `"NoKeyRing"`), Studio shows a **prominent banner** on the secrets overview and on every page with secret inputs ("No key ring configured on this environment — secrets cannot be saved; restored secrets were only classified. Configure the key ring, then run Encrypt."). Secret inputs stay disabled; Encrypt / CleanupUnreadable are not offered (they would be skipped). `NoLegacyV1Key` gets a smaller warning on the secrets overview ("enc:v1 values found but no legacy key configured — they count as key missing").
 
 A restore on a bot **without key ring** still produces the re-entry list: the post-restore run is a key-free Verify only (run `mode: "Verify"`, `trigger: "Restore"`, `outcome: "Succeeded"`, reason "No key ring configured: secrets were classified only; set the key ring and run Encrypt"). Its report lists every value it cannot read without keys in `unreadable[]` / `secretsToReEnter` (all `enc:v2` — key id not in the empty ring — and all `enc:v1` with `keyId: "enc:v1"`); nothing is written. Studio shows these as re-entry tasks like any other unreadable value.
 
-- **Before / after (AB#5532/5533/5539, live defect 2026-10-06):** `totals` of a run are the forms as FOUND, `totalsAfter` the state after it - the "Result" column shows `totalsAfter ?? totals`, plus `encryptedCount` ("8 encrypted"). An Encrypt that converted nothing used to say "Succeeded" with identical counts: the MongoDB rewrite looked for derived-type entities (all `System.Communication/*Configuration`) in a non-existent per-type collection and every value was "modified concurrently"; fixed, and such skips now yield `CompletedWithFailures` with `skippedConcurrentlyModified` > 0. Each report step also carries `encryptedCount`.
+- **Before / after (live defect 2026-10-06):** `totals` of a run are the forms as FOUND, `totalsAfter` the state after it - the "Result" column shows `totalsAfter ?? totals`, plus `encryptedCount` ("8 encrypted"). An Encrypt that converted nothing used to say "Succeeded" with identical counts: the MongoDB rewrite looked for derived-type entities (all `System.Communication/*Configuration`) in a non-existent per-type collection and every value was "modified concurrently"; fixed, and such skips now yield `CompletedWithFailures` with `skippedConcurrentlyModified` > 0. Each report step also carries `encryptedCount`.
 
 Runs left `Running` by a crash are marked `Failed` with reason "Interrupted (service restart)" shortly after the bot starts. The report and each step also carry `skippedLegacyV1KeyMissing`. MCP offers the same inventory read-only via `get_secret_inventory` (risk low). Dumps are never downloadable (no endpoint). The report (`SecretSweepReport`) gains `unreadable[] { ckTypeId, rtId, attributePath, keyId }` (re-entry list, decision 2026-10-06) and `placeholdersNormalized`; `cleared[]` is only filled by `CleanupUnreadable`. Sweep modes in Studio (Q6): **Verify** (no confirmation), **Encrypt** and **CleanupUnreadable** (confirmation dialog; a pre-sweep dump is taken first; CleanupUnreadable removes values whose key id is unknown — irreversible except via the dump; `enc:v1` values that are unreadable only because no legacy key is configured are kept and stay in `unreadable[]`).
 
@@ -316,7 +321,7 @@ On a bot without key ring the restore runs a key-free Verify only and still list
 - Bot `{tenantId}/v1/secrets/...` routes (status, sweep-runs, dump delete) accept only the token's own tenant; a parent-tenant administrator switches into the child tenant (Studio links per child tenant, Q16). The sweep trigger and report routes on `{tenantId}/v1/jobs/...` also accept parent-tenant administrators.
 - `setAt` is recorded from now on (new or rotated values); values set earlier and values converted by the Encrypt sweep show `setAt: null`.
 - An inventory entry is only listed for record members whose record element exists (an unset optional record contributes no slot).
-- Deleted (archived) entities are never listed in `inventory` / `summary` (same as `runtimeEntities` and typed queries) and never appear in a sweep report's `unreadable[]` / `cleared[]` / `secretsToReEnter`; the sweeps still process their stored values (concept §6, AB#5532/AB#5544).
+- Deleted (archived) entities are never listed in `inventory` / `summary` (same as `runtimeEntities` and typed queries) and never appear in a sweep report's `unreadable[]` / `cleared[]` / `secretsToReEnter`; the sweeps still process their stored values (concept §6).
 - `usedBy`/`usages` scan the tenant's pipeline definitions once per request, only when selected; they match the exact CK type of the RevealSecret@1 node.
 - Sweep report paths (`unreadable[]`, `cleared[]`, `failures[]`) use the same camelCase notation as `inventory.attributePath`, so report rows link to inventory rows.
 - Sweep `totals` additionally carry `placeholder` and `unknownKeyIdByKeyId`.
@@ -326,7 +331,7 @@ On a bot without key ring the restore runs a key-free Verify only and still list
 - Pipelines see `{ "isSet": false, "keyMissing": true }` for a stored value with an unknown key id; echoing any marker back means "unchanged".
 - Without a key ring on the host every protected value reads as key missing (`keyRingConfigured: false` in the status explains it).
 
-## 14. Pre-sweep dump restore and key-id retention (AB#5559, 2026-10-06)
+## 14. Pre-sweep dump restore and key-id retention (2026-10-06)
 
 Bot (local branch, contract binding):
 

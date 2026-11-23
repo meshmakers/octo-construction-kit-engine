@@ -1,7 +1,12 @@
+---
+description: Blueprint concept v2 (German): decisions of 2026-05-14 on tracking, history, multi-blueprint and conflict detection.
+background: true
+---
+
 # Blueprints — Konzept v2
 
 Dieses Dokument konsolidiert und aktualisiert den ursprünglichen Plan
-(`blueprint-updates-plan.md`) sowie die User-Doku (`blueprints.md`) auf den
+(removed) sowie die User-Doku (`blueprints.md`) auf den
 Stand der Architektur-Entscheidungen vom 2026-05-14. Es ist die
 verbindliche Grundlage für die Fertigstellung der Blueprint-Funktion.
 

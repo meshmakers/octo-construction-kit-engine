@@ -1,3 +1,8 @@
+---
+description: Architecture of the Construction Kit compiler: pipeline, validation, dependency resolution and output.
+applies_to: src/ConstructionKit.Compiler/**, src/ConstructionKit.Engine/Services/**
+---
+
 # Construction Kit Compiler Architecture
 
 ## Overview
@@ -214,7 +219,7 @@ public CkTypeGraph? GetAndUpdateTypeGraph(
 - No duplicate attribute names through inheritance
 - No conflicting association definitions from base types
 
-#### Secret value type rules (AB#5528)
+#### Secret value type rules
 
 **File**: `src/ConstructionKit.Engine/Resolvers/SecretAttributeValidator.cs`, called by
 `CatalogModelResolver.CompileAsync` after inheritance resolution, for the model being compiled only.
@@ -394,11 +399,11 @@ Defined in `Directory.Build.props`:
 |----------|---------|-------------|
 | `OctoCompileCkModel` | true | Enable CK model compilation |
 | `OctoPublishCkModel` | false | Publish compiled model to output |
-| `OctoPublishCkModelToRemoteCatalog` | true | This repo only (`Directory.Build.targets`): `false` publishes to the LocalFileSystemCatalog only and skips `$(OctoPublishCatalog)`. Set by `tests/TestCkModel` so the test-only models `Test` / `System.TestIdentity` never reach the GitHub catalogs (AB#6114) |
+| `OctoPublishCkModelToRemoteCatalog` | true | This repo only (`Directory.Build.targets`): `false` publishes to the LocalFileSystemCatalog only and skips `$(OctoPublishCatalog)`. Set by `tests/TestCkModel` so the test-only models `Test` / `System.TestIdentity` never reach the GitHub catalogs |
 | `OctoGenerateCkModelServiceClass` | true | Generate service registration classes |
 | `OctoEmbedCkMigrations` | true | Embed migration scripts as resources |
 
-**Remote publish once per content (AB#6119).** In this repo's `Directory.Build.targets`, the `$(OctoPublishCatalog)` leg of `CkCompile` writes a stamp to `obj/<cfg>/<tfm>/octo-ck-remote-publish/<Project>/<catalog>-<model>-<sha256>.stamp` after a successful publish and skips the publish (and the `octo-ckc -c config` token calls) when a stamp for the same catalog and the same compiled-yaml hash already exists. `CkCompile` re-runs on every build by design, and the CI `Build src` step runs one `dotnet build` per project, so without the stamp `System` was pushed to the GitHub catalog twice per run (once via StreamDataCkModel's ProjectReference, once by its own invocation). The LocalFileSystemCatalog publish is not guarded. Changed content gets a new hash and is published; delete `obj/` to force a re-publish of unchanged content.
+**Remote publish once per content.** In this repo's `Directory.Build.targets`, the `$(OctoPublishCatalog)` leg of `CkCompile` writes a stamp to `obj/<cfg>/<tfm>/octo-ck-remote-publish/<Project>/<catalog>-<model>-<sha256>.stamp` after a successful publish and skips the publish (and the `octo-ckc -c config` token calls) when a stamp for the same catalog and the same compiled-yaml hash already exists. `CkCompile` re-runs on every build by design, and the CI `Build src` step runs one `dotnet build` per project, so without the stamp `System` was pushed to the GitHub catalog twice per run (once via StreamDataCkModel's ProjectReference, once by its own invocation). The LocalFileSystemCatalog publish is not guarded. Changed content gets a new hash and is published; delete `obj/` to force a re-publish of unchanged content.
 
 ### Incremental Build and Clean
 

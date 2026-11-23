@@ -1,14 +1,19 @@
+---
+description: Concept draft: computed columns via formula for raw and time-range archives (reference, design record).
+background: true
+---
+
 # Concept: Computed Columns via Formula (Raw & Time-Range Archives)
 
 Status: **Draft** — concept agreed in chat on 2026-06-28, implementation pending.
-Work item: **AB#4189** (parent epic AB#4073 — VOEST M1: EDA energy data to data lake).
+Work item: tracked in the backlog
 
 See also:
 - [concept-rollup-archives.md](./concept-rollup-archives.md) — the derived-rollup design this concept consumes.
 - [concept-time-range-archives.md](./concept-time-range-archives.md) — the `(window_start, window_end)` storage shape shared by rollup and time-range archives.
-- AB#4184 — Recompute rollup archives when raw data changes (the optimistic / atomic-swap model this concept **builds on**).
-- AB#4188 — Multiple aggregations per rollup archive (computed columns compose with multi-aggregate).
-- AB#4190 — Timestamp-derived columns (compatibility for any time-derived formula).
+- Recompute rollup archives when raw data changes (the optimistic / atomic-swap model this concept **builds on**).
+- Multiple aggregations per rollup archive (computed columns compose with multi-aggregate).
+- Timestamp-derived columns (compatibility for any time-derived formula).
 
 ## §1 Overview
 
@@ -23,7 +28,7 @@ rollup's aggregated columns, e.g. `powerFactor = activeAvg / apparentAvg`).
 
 The hard requirement is that a computed column can be **added to or changed on an *active*
 archive** without breaking ingest or readers, with the same optimistic / atomic semantics
-established by AB#4184: while the backfill runs, consumers keep seeing the previous archive
+established: while the backfill runs, consumers keep seeing the previous archive
 state and switch to the new values atomically when it completes; a failed backfill leaves
 the previous state intact.
 
@@ -32,8 +37,8 @@ the previous state intact.
 | # | Decision | Consequence |
 |---|----------|-------------|
 | D1 | **Stored, evaluated in .NET via mXparser at ingest.** Reuse the existing `Runtime.Engine.MongoDb.Formulas` engine. | One formula semantics across the whole platform (adapter `DataPointMapping` and archive computed columns share the identical mXparser dialect). The computed value is a real, typed CrateDB column → natively aggregatable by rollups and visible to direct SQL consumers (Grafana datasource). Cost: backfill of past rows is a read→compute→write batch in .NET, not a single SQL `UPDATE`. |
-| D2 | **Rollup-internal computed columns are in scope** for AB#4189. | A `RollupArchive` may carry its own computed columns over its aggregated output columns. One mechanism, applied at orchestrator write time. |
-| D3 | **AB#4184 is sequenced first.** AB#4189 reuses its backfill orchestration + atomic-swap + observability. | AB#4189 does **not** re-invent the atomic swap. The CK-model + ingest-time evaluation + validation (§3–§7) can land independently; the *active-archive backfill* acceptance criteria block on AB#4184. |
+| D2 | **Rollup-internal computed columns are in scope** for this concept. | A `RollupArchive` may carry its own computed columns over its aggregated output columns. One mechanism, applied at orchestrator write time. |
+| D3 | **The rollup recompute is sequenced first.** Computed columns reuse its backfill orchestration + atomic-swap + observability. | Computed columns do **not** re-invent the atomic swap. The CK-model + ingest-time evaluation + validation (§3–§7) can land independently; the *active-archive backfill* acceptance criteria block on the rollup recompute work. |
 
 ### Goals
 
@@ -43,9 +48,9 @@ the previous state intact.
   (pipeline node, REST `insertTimeRange`, SDK `InsertAsync`), because evaluation lives in the
   server-side repository, not in any single producer.
 - Adding / changing a computed column works on an active archive via a backfill with
-  optimistic / atomic semantics (AB#4184).
+  optimistic / atomic semantics.
 - Rollups aggregate computed columns the same way as normal columns (single- and
-  multi-aggregate per AB#4188).
+  multi-aggregate).
 - Reuse the existing mXparser engine, its `now` / `startOfDay` functions, its `null`
   convention, and the existing syntax-validation service.
 
@@ -162,11 +167,10 @@ of another computed column. mXparser binds each referenced name as an `Argument`
 - Indexed per the column's `Indexed` flag (default on), same rules as ingested columns.
 - On an active archive, the physical column is added with `ALTER TABLE … ADD COLUMN` — a
   metadata-only operation on CrateDB.
-- **Atomic swap (from AB#4184).** For backfills that must preserve old values during a
+- **Atomic swap.** For backfills that must preserve old values during a
   formula change, the column is written under a **versioned physical name**
   (`{base} → {base}__v2`) and the logical→physical mapping is flipped atomically on
-  completion, the old physical column dropped afterwards. This is AB#4184 infrastructure;
-  AB#4189 reuses it and does not define it here. For a brand-new computed column (never
+  completion, the old physical column dropped afterwards. This is tracked separately infrastructure reuses it and does not define it here. For a brand-new computed column (never
   visible) the degenerate case is simply: column absent from the *logical* schema until the
   backfill completes, then a single `Pending → Active` flip exposes it.
 
@@ -177,7 +181,7 @@ of another computed column. mXparser binds each referenced name as an `Argument`
 > `BuildComputedPlan` → `ApplyComputedColumns`, writing the result into the row under the computed
 > column's physical name. A formula that yields no value (NaN / null sentinel, a NULL operand) stores
 > `NULL` — the insert never fails for bad data. **An evaluation aborted by an exception** (out of memory,
-> any `FormulaEvaluationException`) is **not** stored as `NULL` since AB#8331: the write fails and the
+> any `FormulaEvaluationException`) is **not** stored as `NULL`: the write fails and the
 > caller retries, because the value is unknown, not empty (see §8.3b). Plan building topologically sorts computed-vs-computed
 > dependencies (`TopologicalSort`); the common no-computed-column archive pays nothing (empty plan).
 >
@@ -186,15 +190,15 @@ of another computed column. mXparser binds each referenced name as an `Argument`
 > (e.g. CK path `ActivePower` → `activepower`). The row dictionary is already keyed this way, so
 > binding is direct and deterministic. Columns with a numeric reading (number, bool→0/1,
 > DateTime→ticks, numeric string) bind their value; every other operand column of the archive — absent
-> from the row, NULL, or non-numeric — binds `NaN`, the engine's NULL (**AB#8060**). Before AB#8060
+> from the row, NULL, or non-numeric — binds `NaN`, the engine's NULL. Before tracked in the backlog
 > such an operand stayed unbound, the expression failed its syntax check and the cell was NULL even
 > when the formula did not need the operand for the row (an `if` branch not taken), so a newly added
 > column backfilled NULL for every historical row and an on-change source that sends one of two
 > attributes produced NULL rows. NaN propagates (an unhandled NULL in arithmetic → `NULL`);
 > `coalesce(x, default)` and `isnull(x)` handle it explicitly. Standard columns (`timestamp`, `rtid`, …) are **not** bound today — a
-> timestamp-derived computed column (#4190) would add `timestamp` to the argument set later.
+> timestamp-derived computed column would add `timestamp` to the argument set later.
 >
-> **Logical names at create time — implemented (AB#4779).** A formula may be written in the archive's
+> **Logical names at create time — implemented.** A formula may be written in the archive's
 > logical column vocabulary — the CK attribute paths the Studio lists, e.g. `Amount.Value` — and is
 > rewritten to the physical form before it is validated or stored, so everything from validation
 > onwards is unchanged and the stored formula is still physical. `ComputedColumnFormulaRewriter`
@@ -216,9 +220,7 @@ attributes are flattened into the per-row column dictionary and before the INSER
 1. For each `Active` computed column of the archive (in dependency order — see §9):
    - Build an `OctoExpression(ConvertTernaryToIf(formula))`.
    - For each referenced column name, `addArguments(new Argument(name, value))`, where `value`
-     is the row's value for that column. A missing / NULL operand binds `NaN` (AB#8060; the
-     original design said the `null` constant `-Infinity`, which would make `-x` +Infinity and
-     `x < 0` true for a NULL `x`).
+     is the row's value for that column. A missing / NULL operand binds `NaN` .
    - `calculate()` returns a `double`. **Cast back to `ResultType`** — the identical pattern
      the runtime-query path uses (`FieldFilterResolver.ResolveSearchAttributeValue`):
 
@@ -233,7 +235,7 @@ attributes are flattened into the per-row column dictionary and before the INSER
 
      A formula that cannot produce a value (invalid syntax, NaN, a NULL operand) → store `NULL`;
      the insert succeeds (computed columns are nullable, mirroring `ApplyDataPointMappingsNode`).
-     A `FormulaEvaluationException` (evaluation aborted, e.g. out of memory; AB#8331) → the write
+     A `FormulaEvaluationException` (evaluation aborted, e.g. out of memory) → the write
      fails and nothing is stored as `NULL` (see §8.3b).
 2. Add the computed value to the row's column list. The existing multi-row
    `INSERT … ON CONFLICT DO UPDATE` handles the rest unchanged.
@@ -252,7 +254,7 @@ The mXparser dialect already in field use (`OctoExpression`):
 | Comparison / logic | `< <= > >= == !=`, `&&`, `\|\|`, `~` (not), mXparser boolean operators |
 | Conditional | `if(cond, a, b)`; C-style `cond ? a : b` sugar (translated to `if`) |
 | Built-in functions | mXparser math functions, plus Octo extensions `now(addMinutes)`, `startOfDay(dayCount)`, `isnull(x)` |
-| Null | NULL operands bind `NaN` and propagate (AB#8060); `coalesce(x, default, …)` / `isnull(x)` handle them; the `null` constant (`-Infinity`) produces NULL on purpose; NaN / `null` result → SQL NULL |
+| Null | NULL operands bind `NaN` and propagate; `coalesce(x, default, …)` / `isnull(x)` handle them; the `null` constant (`-Infinity`) produces NULL on purpose; NaN / `null` result → SQL NULL |
 | Operands | bound arguments by column name; numeric, boolean (0/1), and DateTime (ticks) columns can all feed a formula — only `String` columns cannot be referenced |
 | Result | `double` internally, **cast back to the declared `ResultType`** (`Boolean` / `Int` / `Int64` / `Double` / `DateTime`); stored nullable. No `String` result. |
 
@@ -271,7 +273,7 @@ The mXparser glue used to be split and partly duplicated:
 - `ApplyDataPointMappingsNode` (mesh-adapter) and `ExpressionValidationService` (communication
   controller) each carried their **own copy** of `ConvertTernaryToIf` + null/NaN handling.
 
-AB#4189 consolidated this into a single reusable surface so any layer (incl. the asset-repo
+tracked in the backlog consolidated this into a single reusable surface so any layer (incl. the asset-repo
 GraphQL layer) can evaluate / validate formulas without a direct mXparser dependency:
 
 - **`IFormulaEngine`** + `FormulaResultType` + `FormulaSyntaxResult` in `Runtime.Contracts/Formulas`
@@ -283,7 +285,7 @@ GraphQL layer) can evaluate / validate formulas without a direct mXparser depend
   function extensions + the `FormulaEngine` implementation + the `AddFormulaEngine()` DI extension.
   It is a **dedicated net10.0 package** rather than part of `Runtime.Engine` because mXparser ships
   `netstandard2.1` but **not** `netstandard2.0`, and `Runtime.Engine` still multi-targeted
-  `netstandard2.0` at the time. AB#5084 dropped that target (nothing in the generator / MSBuild-task
+  `netstandard2.0` at the time. tracked in the backlog dropped that target (nothing in the generator / MSBuild-task
   chain references `Runtime.Engine`); the package split is kept as is.
 - `OctoExpression` moved out of the MongoDB assembly; `FieldFilterResolver` / `RtFieldFilterResolver`
   now reference the new package. `ConvertTernaryToIf` lives in `FormulaEngine` only; the adapter node
@@ -291,7 +293,7 @@ GraphQL layer) can evaluate / validate formulas without a direct mXparser depend
   (duplication removed). `AddFormulaEngine()` is invoked from `AddMongoDbRuntimeRepository()`, so every
   host that wires the runtime engine gets `IFormulaEngine` registered.
 
-## §8 Active-archive lifecycle & backfill (Phase 7 — reuses AB#4184 orchestration, **not** its row-generation pointer)
+## §8 Active-archive lifecycle & backfill (Phase 7 — reuses the rollup-recompute orchestration, **not** its row-generation pointer)
 
 > **Status: implemented (Phase 7, 2026-06-29).** Add / remove / formula-change land across engine
 > (`ArchiveLifecycleService` orchestration + `IArchiveRuntimeStore` / `IStreamDataRepository`
@@ -332,11 +334,11 @@ ComputedState = Failed  +  drop the new physical column → readers never saw pa
 
 ### §8.1 Two different swap models — the key design decision
 
-AB#4189 reuses AB#4184's **orchestration** (job model, coalescing, observability, audit, the
+tracked in the backlog reuses the **orchestration** (job model, coalescing, observability, audit, the
 periodic hosted-service tick) but deliberately **does not** reuse its row-level generation
 pointer. The two swap units are different granularities:
 
-| | AB#4184 (rollup recompute) | AB#4189 Phase 7 (computed column) |
+| | | Phase 7 (computed column) |
 |---|---|---|
 | Swap unit | a **row/window range** | a whole **column** |
 | Atomic commit | `archive_<rtId>__genmap` side-table pointer per `(range_start, range_end, rtid_scope)` | logical→physical **column-name pointer** in the archive's Mongo runtime-state |
@@ -360,7 +362,7 @@ logical→physical name pointer atomically on completion.
 - **D-7.2 — Read-path projection gating (new work).** The logical→physical column resolver that
   builds the `SELECT` projection (`CrateQueryCompiler` / column resolver) must exclude computed
   columns with `ComputedState != Active` and resolve the active physical name. This is **not**
-  covered by AB#4184's generation-CASE injection.
+  covered by the generation-CASE injection.
 - **D-7.3 — Dual-write during a formula-change backfill.** While `Backfilling` a formula change,
   ingest must populate **both** physical columns — the old formula into the active column (so
   current readers stay correct) and the new formula into `{base}__v2` (so recent rows are
@@ -369,19 +371,19 @@ logical→physical name pointer atomically on completion.
   `Active`.
 - **D-7.4 — Dedicated backfill executor, shared orchestration.** A new
   `IArchiveColumnBackfillExecutor` (CrateDB layer) pages all rows of one archive, evaluates one
-  column via the existing `ApplyComputedColumns`, and writes it back. It reuses AB#4184's
+  column via the existing `ApplyComputedColumns`, and writes it back. It reuses tracked in the backlog's
   `IRecomputeJobStore`, `IArchiveRecomputeStateStore`, the hosted-service tick, the audit trail
   and the StreamData metrics — but **not** the `genmap` range logic.
-- **D-7.5 — Dependent rollups go through AB#4184.** After a raw / time-range computed-column
-  swap completes, rollups that aggregate it (§10) are marked dirty in the AB#4184
-  `DirtyWindows` / `PendingRecomputeRanges` ledger, so AB#4184's orchestrator recomputes them
-  downstream. This is the one place Phase 7 consumes AB#4184's recompute path directly.
+- **D-7.5 — Dependent rollups go through tracked in the backlog.** After a raw / time-range computed-column
+  swap completes, rollups that aggregate it (§10) are marked dirty in the tracked in the backlog
+  `DirtyWindows` / `PendingRecomputeRanges` ledger, so the orchestrator recomputes them
+  downstream. This is the one place Phase 7 consumes the recompute path directly.
 
 ### §8.3 Triggers, reader contract, removal
 
 - **Triggers:** implicit (column added / formula changed), manual (retry via API / octo-cli),
   periodic (the computed-column backfill service drains queued backfills, §8.3a). Concurrency /
-  coalescing / idempotency semantics follow AB#4184's job model.
+  coalescing / idempotency semantics follow the job model.
 - **Reader contract during backfill:** a query returns either the previous state (new column
   absent from the projection, or the previous formula's values via the still-active physical
   column) or the new state — never a half-populated mix. The gate is `ComputedState` +
@@ -389,10 +391,10 @@ logical→physical name pointer atomically on completion.
 - **Removing** a computed column: drop from the logical projection (flip first), then drop the
   physical column. Dependent rollups (§10) must be revalidated.
 
-### §8.3a Backfill as a background job (AB#8002)
+### §8.3a Backfill as a background job
 
 > **Status: implemented 2026-11-01.** Until then the add and the formula change ran the backfill
-> **inside** the GraphQL / REST request. On test-2 (energyiq, archives with ~750k–950k rows) the
+> **inside** the GraphQL / REST request. On test-2 (a customer tenant, archives with ~750k–950k rows) the
 > backfill outlived the client timeout and the CrateDB driver's 30 s default command timeout; CrateDB
 > killed the statements (`XX000: Job killed. Cancellation request by: octo-system`), the columns ended
 > `Failed`, and four parallel backfills starved the shared asset-repo until its probes failed.
@@ -443,9 +445,9 @@ logical→physical name pointer atomically on completion.
 - **Disable / delete** fail the archive's queued backfill jobs; the columns stay queued and get a new
   job once the archive is activated again.
 
-### §8.3b Bounded memory, no silent NULL, repair (AB#8331)
+### §8.3b Bounded memory, no silent NULL, repair
 
-> **Status: implemented 2026-11-06.** On prod-1 energyiq (release 3.5.62) the backfills of
+> **Status: implemented 2026-11-06.** On prod-1 a customer tenant (release 3.5.62) the backfills of
 > `ImportPower`/`ExportPower` (GridConnectionArchive, ~1.79 M rows) and `ChargePower`/`DischargePower`
 > (BatteryStorageArchive, ~2.31 M rows) ran into a `System.OutOfMemoryException` in
 > `ApplyComputedColumns` 40 s after they started; the catch-all stored `NULL` for the row (3 rows of
@@ -463,7 +465,7 @@ logical→physical name pointer atomically on completion.
   string (≤ 256 per thread); a shape holds one `PreparedFormula` per set of identifiers the row supplies
   (≤ 32), and an evaluation only sets the argument values. Measured: **~3 KiB and ~1.7 µs per evaluation**
   (1,000,000-row test `FormulaEngineReuseTests.MillionRows_AllocateOnlyAFewKiBPerEvaluation`). Results are
-  unchanged (AB#8060 NULL semantics included) except that a row value whose name does not occur in the
+  unchanged (NULL semantics included) except that a row value whose name does not occur in the
   formula is ignored — before, a column named like a built-in (`e`, `pi`, `sin`) made every formula of the
   row NULL. The engine finds the names with its own identifier scan, not with mXparser's missing-argument
   list (that list leaves out a supplied name that collides with a keyword; mXparser 6.x also split names
@@ -474,12 +476,12 @@ logical→physical name pointer atomically on completion.
   retries), the backfill retries the page once and then fails the job with the column, the time slice and
   the last written key in the reason; the column ends `Failed` like any failed backfill and is retried with
   `retryComputedColumnBackfill` (the job resumes at nothing — a backfill rewrites every row).
-- **mXparser 4.4.2, BSD-licensed (AB#8364).** mXparser is dual-licensed from 4.4.3 on (5.x, 6.x: commercial
+- **mXparser 4.4.2, BSD-licensed.** mXparser is dual-licensed from 4.4.3 on (5.x, 6.x: commercial
   use needs a purchased licence); Meshmakers holds none. The engine therefore ships **4.4.2**, the last
   version under the Simplified BSD licence (`LICENSE.txt` in the nupkg), until mXparser is replaced. Never
   raise the version and never call a `License.iConfirm*` method (4.4.2 has no `License` class). The test
   `MxParser_IsTheLastBsdLicensedVersion` fails on an upgrade; `FormulaEvaluations_WriteNoLineToTheConsole`
-  guards that no licence text reaches stdout/stderr. Differences to the 6.1.1 that AB#8331 shipped first:
+  guards that no licence text reaches stdout/stderr. Differences to the 6.1.1 that tracked in the backlog shipped first:
   - 6.x wrote a ten-line "License - use type not confirmed" warning to stderr on every `calculate()`
     (capped at 1000 per process, ~10,000 lines); 4.4.2 writes nothing.
   - 6.x caught every exception inside `calculate()` and returned NaN, so the engine had to find the
@@ -529,7 +531,7 @@ logical→physical name pointer atomically on completion.
 > that validates *without evaluating* — so a formula that merely divides by zero at probe values is
 > not a false-positive (unlike `Validate`). References resolve against **physical** column names (§5).
 >
-> The logical→physical translation at create time is **done** (AB#4779, see §5), so a reference may be
+> The logical→physical translation at create time is **done** (see §5), so a reference may be
 > written as `Amount.Value` or as `amountvalue`.
 >
 > *Still deferred (UX surface, not correctness):* a GraphQL operand-enumeration query for the Studio
@@ -560,7 +562,7 @@ saving, and offers the archive's existing column names as formula operands.
 > `Name`s, so `CkRollupAggregation.SourcePath` may target a source computed column. No SQL change —
 > `RollupAggregationColumns.Resolve` already maps `SourcePath` through `ColumnNameMapper.PathToColumnName`,
 > so `AVG("powerfactor")` aggregates the stored computed column exactly like an ingested one.
-> Recompute propagation when the source computed column is rebuilt remains AB#4184's job.
+> Recompute propagation when the source computed column is rebuilt remains the job.
 
 Because a computed column is a **real stored `DOUBLE`**, a rollup over a source archive
 aggregates it natively — `CkRollupAggregation.SourcePath` targets the computed column's name
@@ -572,7 +574,7 @@ One wiring change: rollup `SourcePath` resolution currently assumes a **CK attri
 attribute — so source-path resolution must also accept the source archive's computed-column
 names, the same way `RollupLogicalPathResolver` already handles rollup storage-column names
 for chained rollup-of-rollup. Recompute propagation when the source computed column is rebuilt
-is AB#4184's job (the rollup's watermark range is recomputed downstream).
+is the job (the rollup's watermark range is recomputed downstream).
 
 ## §11 Rollup-internal computed columns (D2 — in scope)
 
@@ -604,7 +606,7 @@ A `RollupArchive` may declare its own computed columns whose formula references 
 > over each, and `UPDATE`s the computed cells (`RollupComputedColumnSqlBuilder.BuildUpdate`).
 > Rollups without computed columns short-circuit (no read-back). The INSERT→SELECT→UPDATE steps are
 > not yet one transaction; a reader in the gap sees aggregates populated and computed columns still
-> NULL — the optimistic / atomic guarantee is AB#4184 (Phase 7). Recompute / rewind of a bucket
+> NULL — the optimistic / atomic guarantee is tracked separately (Phase 7). Recompute / rewind of a bucket
 > re-evaluates via the same path.
 
 ## §12 API surface
@@ -619,7 +621,7 @@ mutating an *active* archive is special, add explicit mutations alongside the ex
 | `addComputedColumn(archiveRtId, name, formula, indexed)` | Validate, `ALTER ADD COLUMN`, start backfill, `Pending → Active`. |
 | `updateComputedColumnFormula(archiveRtId, name, formula)` | Validate, backfill new physical column, atomic swap. |
 | `removeComputedColumn(archiveRtId, name)` | Drop from logical schema + physical column; revalidate dependent rollups. |
-| `repairComputedColumn(rtId, name, from?, to?)` | Queue a repair job: re-evaluate NULL cells whose operands are not NULL in `[from, to)`; column stays Active (AB#8331). |
+| `repairComputedColumn(rtId, name, from?, to?)` | Queue a repair job: re-evaluate NULL cells whose operands are not NULL in `[from, to)`; column stays Active. |
 
 - A path-enumeration extension lets the Studio list the archive's existing columns as
   candidate operands and validate a draft formula live.
@@ -639,30 +641,30 @@ columns, routing each through the backfill lifecycle (§8).
 | Situation | Behaviour |
 |---|---|
 | Per-row formula yields no value (NaN / null) at ingest | Store `NULL` for that cell. Insert succeeds. |
-| Evaluation aborted by an exception (OOM, …) at ingest | Insert fails, nothing stored as `NULL` (AB#8331). |
-| Evaluation aborted by an exception during a backfill | Page retried once, then the job fails with the slice in the reason (AB#8331). |
-| Active column has NULL cells with non-NULL operands | `repairComputedColumn` re-evaluates exactly those rows (AB#8331). |
+| Evaluation aborted by an exception (OOM, …) at ingest | Insert fails, nothing stored as `NULL`. |
+| Evaluation aborted by an exception during a backfill | Page retried once, then the job fails with the slice in the reason. |
+| Active column has NULL cells with non-NULL operands | `repairComputedColumn` re-evaluates exactly those rows. |
 | Backfill fails mid-run | `ComputedState = Failed`, new physical column dropped, readers keep previous state. |
 | Formula references a removed column | Caught at edit time (§9); a column removal revalidates dependents. |
 | Cyclic dependency | Rejected at edit time (§9). |
-| Source computed column recomputed | Dependent rollups recomputed downstream (AB#4184). |
+| Source computed column recomputed | Dependent rollups recomputed downstream. |
 
 ## §15 Observability
 
-Reuse archive metrics; fold computed-column backfill into AB#4184's recompute observability:
+Reuse archive metrics; fold computed-column backfill into the recompute observability:
 per archive — last successful backfill, in-progress flag, last failure (timestamp + reason);
 metrics — backfill duration, rows processed, per-row eval-failure count. Audit: who added /
 changed / removed a computed column, with the formula text.
 
-## §16 Test plan (maps to AB#4189 acceptance criteria)
+## §16 Test plan (maps to the earlier acceptance criteria)
 
 1. Ingest with a computed column — new rows carry the computed value (raw + time-range).
 2. Add a computed column to a live archive → backfill → atomic switch; reader sees previous
    state during backfill, new column atomically afterwards.
 3. Change a formula on a live archive → backfill with old-values-until-swap semantics.
 4. Mid-backfill failure → previous state intact, no partial computed data.
-5. Rollup single- and multi-aggregate (AB#4188) over a source computed column.
-6. Recompute propagation when the source computed column is rebuilt (AB#4184).
+5. Rollup single- and multi-aggregate over a source computed column.
+6. Recompute propagation when the source computed column is rebuilt.
 7. Rollup-internal computed column (`powerFactor = activeAvg / apparentAvg`) on ingest and on
    recompute/rewind.
 8. Validation: syntax error, unknown operand, cyclic dependency, `Path`+`Formula`, `Required`+
@@ -673,10 +675,10 @@ changed / removed a computed column, with the formula text.
 
 | Dependency | Relationship |
 |---|---|
-| **AB#4184** (first) | Provides backfill orchestration, atomic swap, recompute triggers, observability. The active-archive ACs of AB#4189 block on it. The CK-model + ingest-time evaluation + validation + the shared evaluator refactor (§3–§7, §9) can be implemented in parallel / ahead. |
-| **AB#4188** | Multi-aggregate composes trivially — a computed source column is just another aggregatable column. |
-| **AB#4190** | Timestamp-derived columns: `now` / `startOfDay` already cover the time-function need; compatibility noted. |
-| **AB#4186** | VOEST App must tolerate active-archive backfills without hard errors — same optimistic contract. |
+| Rollup recompute (first) | Provides backfill orchestration, atomic swap, recompute triggers, observability. The active-archive ACs block on it. The CK-model + ingest-time evaluation + validation + the shared evaluator refactor (§3–§7, §9) can be implemented in parallel / ahead. |
+| Multiple aggregations | Multi-aggregate composes trivially — a computed source column is just another aggregatable column. |
+| Timestamp-derived columns | Timestamp-derived columns: `now` / `startOfDay` already cover the time-function need; compatibility noted. |
+| Customer app | The customer app must tolerate active-archive backfills without hard errors — same optimistic contract. |
 
 ## §18 Open items to confirm during implementation
 

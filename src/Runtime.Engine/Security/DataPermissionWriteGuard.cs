@@ -30,7 +30,7 @@ internal static class DataPermissionWriteGuard
         IAuditEventSink? auditEventSink, IOctoSession session, RtSecurityContext securityContext,
         RtDataPolicyTable policyTable, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, OperationResult operationResult,
-        List<NotVisibleChange>? notVisible = null)
+        List<NotVisibleChange>? notVisible = null, IDictionary<RtEntityId, RtEntity?>? rawStoredEntities = null)
     {
         var tenantId = runtimeRepository.TenantId;
         var accessByType = new Dictionary<RtCkId<CkTypeId>, DataPermissionRules.TypeAccess>();
@@ -63,7 +63,7 @@ internal static class DataPermissionWriteGuard
         foreach (var typeGroup in entityUpdateInfoList.GroupBy(i => i.CkTypeId))
         {
             var access = AccessOf(typeGroup.Key);
-            var ownershipTargets = new List<NotVisibleChange>();
+            var ownershipCheckIds = new List<OctoObjectId>();
 
             foreach (var item in typeGroup)
             {
@@ -78,7 +78,7 @@ internal static class DataPermissionWriteGuard
                         continue;
                     case RtDataAccessLevel.OwnedOnly when item.ModOption != EntityModOptions.Insert &&
                                                           item.RtId != null:
-                        ownershipTargets.Add(new NotVisibleChange(typeGroup.Key, item.RtId.Value, action));
+                        ownershipCheckIds.Add(item.RtId.Value);
                         break;
                 }
 
@@ -91,10 +91,10 @@ internal static class DataPermissionWriteGuard
                 }
             }
 
-            if (ownershipTargets.Count > 0)
+            if (ownershipCheckIds.Count > 0)
             {
                 await CheckOwnershipAsync(runtimeRepository, ckCacheService, storedEntities, securityContext,
-                    typeGroup.Key, ownershipTargets, operationResult, notVisible).ConfigureAwait(false);
+                    typeGroup.Key, ownershipCheckIds, operationResult).ConfigureAwait(false);
             }
 
             if (access.BlueprintLock != RtBlueprintLockProtection.None)
@@ -120,10 +120,8 @@ internal static class DataPermissionWriteGuard
                     break;
                 case RtDataAccessLevel.OwnedOnly:
                     await CheckOwnershipAsync(runtimeRepository, ckCacheService, storedEntities, securityContext,
-                        associationGroup.Key, associationGroup.Select(association =>
-                                new NotVisibleChange(associationGroup.Key, association.Origin.RtId, RtDataAction.Write))
-                            .Distinct().ToList(),
-                        operationResult, notVisible).ConfigureAwait(false);
+                        associationGroup.Key, associationGroup.Select(a => a.Origin.RtId).Distinct().ToList(),
+                        operationResult).ConfigureAwait(false);
                     break;
                 case RtDataAccessLevel.Open or RtDataAccessLevel.Allowed when
                     access.AuditWrite is RtDataAccessLevel.Denied or RtDataAccessLevel.OwnedOnly:
@@ -133,6 +131,8 @@ internal static class DataPermissionWriteGuard
                     break;
             }
         }
+
+        storedEntities.CopyRawReadsTo(rawStoredEntities);
 
         // AuditOnly read policy that would hide an existing entity from this write: one audit event per
         // type, never a refusal — and none when the write audit of the same type already reported.
@@ -234,20 +234,14 @@ internal static class DataPermissionWriteGuard
                 }
 
                 refused = true;
-                AddNotVisible(operationResult, notVisible, change);
+                notVisible?.Add(change);
+                operationResult.AddMessage(new OperationMessage(MessageLevel.Error,
+                    $"{change.CkTypeId}@{change.RtId}", NotVisibleMessageNumber,
+                    $"Entity '{change.CkTypeId.SemanticVersionedFullName}@{change.RtId}' not found."));
             }
         }
 
         return refused;
-    }
-
-    private static void AddNotVisible(OperationResult operationResult, List<NotVisibleChange>? notVisible,
-        NotVisibleChange change)
-    {
-        notVisible?.Add(change);
-        operationResult.AddMessage(new OperationMessage(MessageLevel.Error,
-            $"{change.CkTypeId}@{change.RtId}", NotVisibleMessageNumber,
-            $"Entity '{change.CkTypeId.SemanticVersionedFullName}@{change.RtId}' not found."));
     }
 
     /// <summary>
@@ -257,7 +251,7 @@ internal static class DataPermissionWriteGuard
     ///     it can be neither visible, hidden nor missing: the insert is the write that is decided by the write
     ///     policy, the association is its part.
     /// </summary>
-    private static List<NotVisibleChange> CollectStoredTargets(
+    internal static List<NotVisibleChange> CollectStoredTargets(
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList)
     {
@@ -293,7 +287,7 @@ internal static class DataPermissionWriteGuard
         IOctoSession session)
     {
         private readonly Dictionary<RtEntityId, RtEntity?> _entities = new();
-        private readonly HashSet<RtEntityId> _storedAsAnotherType = new();
+        private readonly Dictionary<RtEntityId, RtEntity?> _rawReads = new();
 
         public async Task<RtEntity?> GetAsync(RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId)
         {
@@ -303,11 +297,7 @@ internal static class DataPermissionWriteGuard
                 var storedEntity = await runtimeRepository.GetRtEntityByRtIdAsync(session, key).ConfigureAwait(false);
                 var storedAsAddressedType = storedEntity != null && StoredTypeMatch.IsStoredAs(storedEntity,
                     ckCacheService, runtimeRepository.TenantId, ckTypeId);
-                if (storedEntity != null && !storedAsAddressedType)
-                {
-                    _storedAsAnotherType.Add(key);
-                }
-
+                _rawReads[key] = storedEntity;
                 entity = storedAsAddressedType ? storedEntity : null;
                 _entities[key] = entity;
             }
@@ -315,8 +305,22 @@ internal static class DataPermissionWriteGuard
             return entity;
         }
 
-        public bool IsStoredAsAnotherType(RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId) =>
-            _storedAsAnotherType.Contains(new RtEntityId(ckTypeId, rtId));
+        /// <summary>
+        ///     Hands the raw reads of this run (also a record of another type, also no record) to the write funnel, so
+        ///     its stored-type check does not read them again.
+        /// </summary>
+        public void CopyRawReadsTo(IDictionary<RtEntityId, RtEntity?>? rawStoredEntities)
+        {
+            if (rawStoredEntities == null)
+            {
+                return;
+            }
+
+            foreach (var (entityId, rawEntity) in _rawReads)
+            {
+                rawStoredEntities[entityId] = rawEntity;
+            }
+        }
     }
 
     /// <summary>
@@ -482,24 +486,17 @@ internal static class DataPermissionWriteGuard
 
     private static async Task CheckOwnershipAsync(IRuntimeRepository runtimeRepository,
         ICkCacheService ckCacheService, StoredEntityCache storedEntities, RtSecurityContext securityContext,
-        RtCkId<CkTypeId> ckTypeId, IReadOnlyList<NotVisibleChange> ownershipTargets, OperationResult operationResult,
-        List<NotVisibleChange>? notVisible)
+        RtCkId<CkTypeId> ckTypeId, IReadOnlyList<OctoObjectId> rtIds, OperationResult operationResult)
     {
         // AB#4978: a CK-model-declared owner attribute replaces the stamped creator as the owner.
         var ownerAttributePath = RtDataPermissionCkTypeHelper.GetEffectiveOwnerAttributePath(ckCacheService,
             runtimeRepository.TenantId, ckTypeId);
 
-        foreach (var ownershipTarget in ownershipTargets)
+        foreach (var rtId in rtIds)
         {
             // Deliberately the raw document read (not the query path): the caller's read filter hides
             // foreign owned-only entities, but the ownership check must see the stored owner.
-            var entity = await storedEntities.GetAsync(ckTypeId, ownershipTarget.RtId).ConfigureAwait(false);
-            if (entity == null && storedEntities.IsStoredAsAnotherType(ckTypeId, ownershipTarget.RtId))
-            {
-                AddNotVisible(operationResult, notVisible, ownershipTarget);
-                continue;
-            }
-
+            var entity = await storedEntities.GetAsync(ckTypeId, rtId).ConfigureAwait(false);
             if (entity == null)
             {
                 // Ids without a stored entity are left to the normal write path (no-op semantics).

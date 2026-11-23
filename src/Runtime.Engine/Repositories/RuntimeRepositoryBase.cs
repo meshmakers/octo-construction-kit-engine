@@ -603,6 +603,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             RuntimeRepositoryException.ThrowIfOperationResultError(writeAccessResult);
         }
 
+        var mutationOptions = options;
         if (!securityContext.IsSystem && _dataPermissionResolver != null)
         {
             var policyTable = await _dataPermissionResolver.GetPolicyTableAsync(this).ConfigureAwait(false);
@@ -610,9 +611,10 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             {
                 var guardResult = new OperationResult();
                 var notVisible = new List<DataPermissionWriteGuard.NotVisibleChange>();
+                var rawStoredEntities = new Dictionary<RtEntityId, RtEntity?>();
                 await DataPermissionWriteGuard.CheckAsync(this, cacheService, _auditEventSink, session,
                         securityContext, policyTable, entityUpdateInfoList, associationUpdateInfoList,
-                        guardResult, notVisible)
+                        guardResult, notVisible, rawStoredEntities)
                     .ConfigureAwait(false);
                 if (notVisible.Count > 0)
                 {
@@ -624,6 +626,13 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
                 }
 
                 RuntimeRepositoryException.ThrowIfOperationResultError(guardResult);
+
+                mutationOptions = options with
+                {
+                    BeforeApplyAsync = () => ThrowIfATargetIsStoredAsAnotherTypeAsync(session, cacheService,
+                        entityUpdateInfoList, associationUpdateInfoList, rawStoredEntities, options.DeleteStrategy,
+                        addressedCkTypeIdOfDelete)
+                };
             }
         }
 
@@ -636,8 +645,24 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         }
 
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entityUpdateInfoList,
-                associationUpdateInfoList, options, operationResult ?? new OperationResult())
+                associationUpdateInfoList, mutationOptions, operationResult ?? new OperationResult())
             .ConfigureAwait(false);
+    }
+
+    private async Task ThrowIfATargetIsStoredAsAnotherTypeAsync(IOctoSession session, ICkCacheService cacheService,
+        IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
+        IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
+        IReadOnlyDictionary<RtEntityId, RtEntity?> rawReadsOfTheGuard, DeleteStrategies deleteStrategy,
+        RtCkId<CkTypeId>? addressedCkTypeIdOfDelete)
+    {
+        var targetOfAnotherType = await StoredTypeTargets.FindFirstStoredAsAnotherTypeAsync(session,
+                RepositoryDataSource, cacheService, entityUpdateInfoList, associationUpdateInfoList, rawReadsOfTheGuard)
+            .ConfigureAwait(false);
+        if (targetOfAnotherType != null)
+        {
+            throw CreateEntityNotFoundException(addressedCkTypeIdOfDelete ?? targetOfAnotherType.CkTypeId,
+                targetOfAnotherType.RtId, targetOfAnotherType.Action, deleteStrategy);
+        }
     }
 
     /// <summary>

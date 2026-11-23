@@ -22,11 +22,14 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 ### Changed
 
 - **A sibling-type record is never written through another type, and a delete by abstract type answers a hidden
-  and a missing record alike (AB#7212).** The data-permission write guard judges a stored record only when it is
-  stored as the addressed CK type or one of its derived types; a record of another type that shares the collection
-  counts as missing. A caller with restricted read (owned-only or no read grant) therefore gets the same "entity not
-  found" answer for such a record as for a missing one, and a caller with an owned-only write grant gets "entity not
-  found" instead of having the record of the other type written or deleted. `DeleteOneRtEntityByRtIdAsync` with an
+  and a missing record alike (AB#7212).** In a tenant with data-permission policies, an update, replace or delete
+  by a non-system caller (or an association change at its origin) of a record that is stored as a type outside the
+  addressed CK type's subtree (a sibling type sharing the collection) answers exactly like the same change of a
+  missing rtId and writes nothing; before, such a record was written or deleted through the other type, also when the
+  caller could not see it. The data-permission write guard judges a stored record only when it is stored as the
+  addressed type or one of its derived types, so a caller with restricted read gets "entity not found" before the
+  payload is validated, as for a missing record; a caller with full read gets the validation error of an invalid
+  payload and otherwise "entity not found", as for a missing record. `DeleteOneRtEntityByRtIdAsync` with an
   abstract CK type:
   - an rtId that does not exist answers "entity not found" instead of returning silently, like the same call with a
     concrete type;
@@ -37,8 +40,12 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
     any read, for an existing and a missing rtId alike.
 
   Callers without a visibility question (system sessions, tenants without data policies, full read grant) keep their
-  answers for update, replace and association changes: an invalid payload of a missing record is a validation error,
-  a valid one is not found. Inserts are unchanged, and a valid change set pays no extra read.
+  answers for a missing record: an invalid payload is a validation error, a valid one is not found. Inserts are
+  unchanged.
+
+  Cost: system sessions and tenants without policies pay no extra read. Under policies, a valid change set pays one
+  read per addressed CK type whose collection also holds concrete types outside its subtree (the targets the guard has
+  already read are not read again); types with a collection of their own pay nothing.
 - **A catalog server that never answers no longer hangs the CK build (AB#9388).** A GitHub Pages connection that was
   accepted but never sent response headers kept a CK compile at "Refreshing construction kit model library cache" for
   20 minutes and more: every catalog request waited 3 x 100 s (HttpClient's default timeout, two retries), the refresh

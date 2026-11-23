@@ -29,6 +29,13 @@ public record BulkRtMutationOptions
     public DeleteStrategies DeleteStrategy { get; init; } = DeleteStrategies.Archive;
 
     /// <summary>
+    /// Runs after a successful rule validation, before anything is written. The write funnel refuses here a target that
+    /// is stored as a type outside the addressed subtree, so it answers exactly like a missing target: after the same
+    /// validation, with the same not-found answer.
+    /// </summary>
+    public Func<Task>? BeforeApplyAsync { get; init; }
+
+    /// <summary>
     /// Gets delete options
     /// </summary>
     /// <returns></returns>

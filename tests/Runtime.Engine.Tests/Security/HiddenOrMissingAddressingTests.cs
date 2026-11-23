@@ -11,8 +11,9 @@ using Xunit;
 namespace Meshmakers.Octo.Runtime.Engine.Tests.Security;
 
 /// <summary>
-///     A change by a restricted caller that addresses a stored record under a type it is not stored as (a sibling
-///     type sharing the collection) answers like a change of a missing record.
+///     A change that addresses a stored record under a type it is not stored as (a sibling type sharing the
+///     collection) answers exactly like a change of a missing record and writes nothing, for every caller under data
+///     policies; callers without policies read no stored type.
 /// </summary>
 public class HiddenOrMissingAddressingTests : HiddenOrMissingWriteFixture
 {
@@ -85,30 +86,37 @@ public class HiddenOrMissingAddressingTests : HiddenOrMissingWriteFixture
         }
     }
 
+    public static TheoryData<string, string> FullReadCallersAndOwners() =>
+        new()
+        {
+            { Full, OtherUser },
+            { OwnedWriter, OtherUser },
+            { OwnedWriter, "user-" + OwnedWriter }
+        };
+
     [Theory]
-    [InlineData(OtherUser)]
-    [InlineData("user-" + OwnedWriter)]
-    public async Task OwnedOnlyWriter_RecordAddressedUnderATypeItIsNotStoredAs_AnswersNotFoundAndIsNotWritten(
-        string createdBy)
+    [MemberData(nameof(FullReadCallersAndOwners))]
+    public async Task FullReadCaller_RecordAddressedUnderATypeItIsNotStoredAs_AnswersLikeMissingRecordAndIsNotWritten(
+        string role, string createdBy)
     {
         var recordOfOtherType = StoreRecordOfOtherType(createdBy);
         var repository = Repository(PolicyTable());
         var missingRtId = OctoObjectId.GenerateNewId();
-
-        foreach (var operation in new[] { "update", "replace", "delete" })
+        var changes = new[]
         {
-            var otherTypeAnswer = await AnswerOfAsync(() => ApplyAsync(repository, UserSession(OwnedWriter),
-                [Change(operation, recordOfOtherType.RtId, true)]), recordOfOtherType.RtId);
-            var missingAnswer = await AnswerOfAsync(() => ApplyAsync(repository, UserSession(OwnedWriter),
-                [Change(operation, missingRtId, true)]), missingRtId);
+            ("update", true), ("update", false), ("replace", true), ("replace", false), ("delete", true)
+        };
 
-            AssertNotFound(otherTypeAnswer);
-            Assert.Equal(otherTypeAnswer, missingAnswer);
+        foreach (var (operation, validPayload) in changes)
+        {
+            var otherTypeAnswer = await AnswerOfAsync(() => ApplyAsync(repository, UserSession(role),
+                [Change(operation, recordOfOtherType.RtId, validPayload)]), recordOfOtherType.RtId);
+            var missingAnswer = await AnswerOfAsync(() => ApplyAsync(repository, UserSession(role),
+                [Change(operation, missingRtId, validPayload)]), missingRtId);
+
+            Assert.Equal(missingAnswer, otherTypeAnswer);
         }
 
-        var invalidAnswer = await AnswerOfAsync(() => ApplyAsync(repository, UserSession(OwnedWriter),
-            [Change("update", recordOfOtherType.RtId, false)]), recordOfOtherType.RtId);
-        AssertNotFound(invalidAnswer);
         A.CallTo(() => Collection.UpdateOneAsync(A<IOctoSession>._,
                 A<IEnumerable<RtEntity>>.That.Matches(entities =>
                     entities.Any(entity => entity.RtId == recordOfOtherType.RtId))))
@@ -118,6 +126,53 @@ public class HiddenOrMissingAddressingTests : HiddenOrMissingWriteFixture
                     entities.Any(entity => entity.RtId == recordOfOtherType.RtId))))
             .MustNotHaveHappened();
         A.CallTo(() => Collection.DeleteOneAsync(A<IOctoSession>._, recordOfOtherType.RtId)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task FullReadCaller_ValidUpdatesInASharedCollection_ReadTheStoredTypesOnceAndAreWritten()
+    {
+        RegisterRequiredAndPlainInOneSharedCollection();
+        var storedRecords = Enumerable.Range(0, 5).Select(_ => Store(OtherUser)).ToList();
+
+        await ApplyAsync(Repository(PolicyTable()), UserSession(Full),
+            storedRecords.Select(storedRecord => Change("update", storedRecord.RtId, true)).ToList());
+
+        A.CallTo(() => Collection.DocumentsAsync(A<IOctoSession>._, A<IEnumerable<OctoObjectId>>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => Collection.UpdateOneAsync(A<IOctoSession>._, A<IEnumerable<RtEntity>>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task OwnedOnlyWriter_SharedCollection_ReusesTheGuardsReadOfItsOwnRecord()
+    {
+        RegisterRequiredAndPlainInOneSharedCollection();
+        var ownRecord = Store("user-" + OwnedWriter);
+
+        await ApplyAsync(Repository(PolicyTable()), UserSession(OwnedWriter), [Change("update", ownRecord.RtId, true)]);
+
+        A.CallTo(() => Collection.DocumentAsync(A<IOctoSession>._, ownRecord.RtId)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => Collection.DocumentsAsync(A<IOctoSession>._, A<IEnumerable<OctoObjectId>>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => Collection.UpdateOneAsync(A<IOctoSession>._, A<IEnumerable<RtEntity>>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CallerWithoutPolicies_SharedCollection_ReadsNoStoredType(bool systemSession)
+    {
+        RegisterRequiredAndPlainInOneSharedCollection();
+        var storedRecord = Store(OtherUser);
+        var session = systemSession ? SystemSession() : UserSession(Full);
+        var policyTable = systemSession ? PolicyTable() : RtDataPolicyTable.Empty;
+
+        await ApplyAsync(Repository(policyTable), session, [Change("update", storedRecord.RtId, true)]);
+
+        A.CallTo(() => Collection.DocumentAsync(A<IOctoSession>._, A<OctoObjectId>._)).MustNotHaveHappened();
+        A.CallTo(() => Collection.DocumentsAsync(A<IOctoSession>._, A<IEnumerable<OctoObjectId>>._))
+            .MustNotHaveHappened();
     }
 
     [Fact]

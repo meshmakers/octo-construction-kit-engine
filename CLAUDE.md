@@ -2064,35 +2064,21 @@ the classification):
   update, replace or delete existing records of that type; grant the matching Read policy (the shipped
   `FileManagement` role has it). Tests: `DataPermissionWriteGuardVisibilityTests`; the matrix test
   `Entity_AgreesWithWriteGuard` now covers every cell, `NotVisible` included.
-- **Existence and visibility before validation (AB#7212).** The order in `RuntimeRepositoryBase.ApplyChangesGuardedAsync`
-  is: type write restriction, data-permission guard (visibility first, then write/delete), **existence**
-  (`WriteTargetExistence`), archive-definition guard, then `BulkRtMutation` with the rule validation
-  (`EntityRuleEngine`, `GraphRuleEngine`); the existence step therefore runs in one of two places: eagerly before the
-  archive-definition guard for types that share their collection, otherwise only after a failed validation, inside
-  `BulkRtMutation`. The existence step reads before validation only the targets of types that
-  share their collection with concrete types outside their own subtree (`StoredTypeMatch.SharesCollectionWithOtherTypes`,
-  an unresolvable collection root counts as shared); for all other types it runs only when the validation fails
-  (`BulkRtMutationOptions.OnValidationFailedAsync`, called by `BulkRtMutation` before it throws the validation errors), so
-  a valid change set keeps its MongoDB command count (`RecordArrayItemUpdateTests`). The answer is the same either
-  way: whatever the payload, the caller never sees a validation error for a missing target. The step runs for every
-  caller, system sessions and tenants
-  without policies included: an update, replace or delete target, or an association origin, that is not stored as the
-  addressed type or one of its derived types (stored `CkTypeId`, compared like the read filter by
-  `SemanticVersionedFullName` in `StoredTypeMatch`; a stored entity without `CkTypeId` counts as matching; the guard's
-  own raw read applies the same match, so its visibility and ownership checks never judge a sibling-type record)
-  answers through the same
-  `CreateEntityNotFoundException` hook as a hidden one, whatever the payload, so a validation error never tells a
-  hidden record from a missing one. Entities the guard already read (`DataPermissionWriteGuard.CheckAsync`,
-  `storedTargets`) are not read again; the others cost one `DocumentsAsync` read per type. Inserts and association
-  origins inserted by the same change set have no stored target and are not checked; a type the CK cache does not
-  know is left to the rule validation. Visible records keep their validation errors. `DeleteOneRtEntityByRtIdAsync`
-  with an abstract type answers a missing rtId through the same hook (it no longer returns silently), so a delete by
-  base type of a hidden and of a missing record answer alike; both are refused under the addressed (abstract) type,
-  never under the concrete type of the stored record. A record stored outside the addressed subtree counts as missing
-  (`StoredTypeMatch.AcceptedStoredTypeNames`), and the type write restriction is judged on the addressed type and its
-  derived types before the record is read. Tests: `HiddenEqualsMissingWriteTests`,
-  `MissingBeforeValidationWriteTests`, `HiddenOrMissingAddressingTests`, `HiddenOrMissingAbstractDeleteTests` (real funnel, real `EntityRuleEngine`,
-  in-memory collection).
+- **Stored type and delete by abstract type (AB#7212).** The guard's raw read (`StoredEntityCache` in
+  `DataPermissionWriteGuard`) uses a stored record only when it is stored as the addressed type or one of its derived
+  types (stored `CkTypeId`, compared like the read filter by `SemanticVersionedFullName` in `StoredTypeMatch`; a stored
+  entity without `CkTypeId`, or an addressed type the CK cache does not know, counts as matching). A record of a sibling
+  type sharing the collection is therefore missing for the visibility check (restricted read: not found, like a
+  missing record) and refused as not found by the ownership check of an owned-only write grant, so it is never written
+  or deleted through another type. `DeleteOneRtEntityByRtIdAsync` with an abstract type judges the type write
+  restriction on the addressed type and its derived types before it reads the record, answers a missing rtId and a
+  record outside the addressed subtree (`StoredTypeMatch.AcceptedStoredTypeNames`) through
+  `CreateEntityNotFoundException` (it no longer returns silently), and refuses a hidden record under the addressed
+  (abstract) type, never under the concrete type of the stored record. Callers without a visibility question (system
+  session, tenant without policies, full read) keep the answers of before: an invalid payload of a missing record is a
+  validation error. Tests: `HiddenEqualsMissingWriteTests`, `HiddenOrMissingAddressingTests`,
+  `HiddenOrMissingAbstractDeleteTests`, `HiddenOrMissingPayloadTests`, `UnrestrictedCallerWriteTests` (real funnel,
+  real `EntityRuleEngine`, in-memory collection).
 - Tests: `RtDataPermissionEvaluatorTests` (matrix, agreement with the guard) in `Runtime.Engine.Tests`; the
   differential test against the real repository is `DataPermissionEvaluatorDifferentialTests` in
   engine-mongodb.

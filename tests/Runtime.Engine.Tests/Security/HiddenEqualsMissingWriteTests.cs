@@ -7,8 +7,8 @@ namespace Meshmakers.Octo.Runtime.Engine.Tests.Security;
 
 /// <summary>
 ///     An update, replace or delete of a record the caller may not see answers exactly like the same call with a
-///     missing rtId, whatever the payload: existence and visibility are resolved before rule validation, so a
-///     validation error never tells a hidden record from a missing one.
+///     missing rtId, whatever the payload: for a caller with restricted read, visibility is resolved before rule
+///     validation, so a validation error never tells a hidden record from a missing one.
 /// </summary>
 public class HiddenEqualsMissingWriteTests : HiddenOrMissingWriteFixture
 {
@@ -77,25 +77,6 @@ public class HiddenEqualsMissingWriteTests : HiddenOrMissingWriteFixture
             [Change(operation, ownRecord.RtId, false)]), ownRecord.RtId);
 
         AssertValidationError(answer, MandatoryTitleMessageNumberOf(operation));
-    }
-
-    [Theory]
-    [InlineData("update")]
-    [InlineData("replace")]
-    public async Task FullReadCaller_InvalidPayload_ValidationErrorForExistingRecord_NotFoundForMissingRecord(
-        string operation)
-    {
-        var repository = Repository(PolicyTable());
-        var foreignRecord = Store(OtherUser);
-        var missingRtId = OctoObjectId.GenerateNewId();
-
-        var existingAnswer = await AnswerOfAsync(() => ApplyAsync(repository, UserSession(Full),
-            [Change(operation, foreignRecord.RtId, false)]), foreignRecord.RtId);
-        var missingAnswer = await AnswerOfAsync(() => ApplyAsync(repository, UserSession(Full),
-            [Change(operation, missingRtId, false)]), missingRtId);
-
-        AssertValidationError(existingAnswer, MandatoryTitleMessageNumberOf(operation));
-        AssertNotFound(missingAnswer);
     }
 
     [Theory]

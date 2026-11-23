@@ -21,30 +21,24 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Changed
 
-- **A missing record answers "not found" before its payload is validated (AB#7212).** An update, replace or delete
-  through `IRuntimeRepository.ApplyChangesAsync` (and the by-id write methods built on it, e.g.
-  `UpdateOneRtEntityByIdAsync`, `DeleteOneRtEntityByRtIdAsync`; filter writes and bulk imports are unchanged) of an rtId
-  that does not exist now answers with the repository's "entity not found" exception (MongoDB:
-  `EntityNotFoundException`) even when the payload is invalid; before, an invalid payload answered with a validation
-  error (`RuntimeRepositoryException`, e.g. a missing mandatory attribute) and only a valid one with not found. A
-  record that is stored under another type than the addressed one (or one of its derived types) counts as missing.
-  This holds for every caller, system sessions and tenants without data policies included, and makes a missing
-  record answer exactly like a record the caller may not see. Records that exist (and are visible) and inserts keep
-  their validation errors. Two answers change type for every payload:
-  - an association change whose origin does not exist answers the repository's "entity not found" exception instead
-    of a `RuntimeRepositoryException` with the rule engine's `EntityNotFound` message; callers that caught
-    `RuntimeRepositoryException` for this case must catch the not-found exception;
-  - `DeleteOneRtEntityByRtIdAsync` with an abstract CK type and an rtId that does not exist answers "entity not
-    found" instead of returning silently, like the same call with a concrete type; a record the caller may not see
-    answers the same way, under the addressed abstract type and never under the concrete type it is stored as. A record
-    stored as a type outside the addressed subtree answers not found and is not deleted, and a caller the type write
-    restriction refuses for the addressed type or one of its derived types is refused before any read, for an existing
-    and a missing rtId alike.
+- **A sibling-type record is never written through another type, and a delete by abstract type answers a hidden
+  and a missing record alike (AB#7212).** The data-permission write guard judges a stored record only when it is
+  stored as the addressed CK type or one of its derived types; a record of another type that shares the collection
+  counts as missing. A caller with restricted read (owned-only or no read grant) therefore gets the same "entity not
+  found" answer for such a record as for a missing one, and a caller with an owned-only write grant gets "entity not
+  found" instead of having the record of the other type written or deleted. `DeleteOneRtEntityByRtIdAsync` with an
+  abstract CK type:
+  - an rtId that does not exist answers "entity not found" instead of returning silently, like the same call with a
+    concrete type;
+  - a record the caller may not see answers the same way, under the addressed abstract type and never under the
+    concrete type it is stored as;
+  - a record stored as a type outside the addressed subtree answers not found and is not deleted;
+  - a caller the type write restriction refuses for the addressed type or one of its derived types is refused before
+    any read, for an existing and a missing rtId alike.
 
-  Cost: a valid change set pays no extra read, unless the addressed CK type shares its MongoDB collection with types
-  outside its own subtree (then one read per such type before validation); a change set with validation errors pays
-  one read per CK type for the targets the data-permission guard has not already read, and the targets of such a
-  shared-collection type are read a second time then.
+  Callers without a visibility question (system sessions, tenants without data policies, full read grant) keep their
+  answers for update, replace and association changes: an invalid payload of a missing record is a validation error,
+  a valid one is not found. Inserts are unchanged, and a valid change set pays no extra read.
 - **A catalog server that never answers no longer hangs the CK build (AB#9388).** A GitHub Pages connection that was
   accepted but never sent response headers kept a CK compile at "Refreshing construction kit model library cache" for
   20 minutes and more: every catalog request waited 3 x 100 s (HttpClient's default timeout, two retries), the refresh

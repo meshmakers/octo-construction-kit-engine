@@ -23,6 +23,7 @@ public abstract class HiddenOrMissingWriteFixture
     protected const string OwnedWriter = "OwnedWriter";
 
     private const string RequiredType = "Test/Required";
+    private const string AbstractBaseName = "RequiredBase";
     private static readonly RtCkId<CkAssociationRoleId> ValidRoleId = new("Test/Related");
 
     private protected SecretTestModel Model { get; } = new();
@@ -70,6 +71,19 @@ public abstract class HiddenOrMissingWriteFixture
                 A<RtCkId<CkTypeId>>.That.Matches(id => id.FullName == rtCkTypeId.FullName), out typeGraphOut))
             .Returns(true).AssignsOutAndRefParameters(typeGraph);
         RegisterByCkId(typeGraph);
+    }
+
+    protected RtCkId<CkTypeId> RegisterAbstractBaseOfRequired()
+    {
+        var baseCkTypeId = new CkId<CkTypeId>($"{Model.Required.CkTypeId.ModelId}/{AbstractBaseName}");
+        var baseGraph = new CkTypeGraph(baseCkTypeId, isAbstract: true, isFinal: false, isCollectionRoot: true,
+            baseTypes: [], derivedFromCkTypeId: null, definingCollectionRootCkTypeId: null,
+            derivedTypes: [new CkGraphTypeInheritance(Model.Required.CkTypeId, baseCkTypeId, 0)],
+            definedAttributes: [], allAttributes: new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(),
+            indexes: [], associations: new CkGraphDirectedAssociations([]), description: AbstractBaseName,
+            enableChangeStreamPreAndPostImages: false);
+        RegisterGraph(baseGraph);
+        return baseCkTypeId.ToRtCkId();
     }
 
     private protected HiddenOrMissingTestRepository Repository(RtDataPolicyTable policyTable) =>

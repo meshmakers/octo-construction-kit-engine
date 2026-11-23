@@ -15,21 +15,7 @@ namespace Meshmakers.Octo.Runtime.Engine.Tests.Security;
 /// </summary>
 public class HiddenOrMissingAbstractDeleteTests : HiddenOrMissingWriteFixture
 {
-    private const string AbstractBaseName = "RequiredBase";
     private const int TypeWriteAccessDeniedMessageNumber = 144;
-
-    private RtCkId<CkTypeId> RegisterAbstractBaseOfRequired()
-    {
-        var baseCkTypeId = new CkId<CkTypeId>($"{Model.Required.CkTypeId.ModelId}/{AbstractBaseName}");
-        var baseGraph = new CkTypeGraph(baseCkTypeId, isAbstract: true, isFinal: false, isCollectionRoot: true,
-            baseTypes: [], derivedFromCkTypeId: null, definingCollectionRootCkTypeId: null,
-            derivedTypes: [new CkGraphTypeInheritance(Model.Required.CkTypeId, baseCkTypeId, 0)],
-            definedAttributes: [], allAttributes: new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(),
-            indexes: [], associations: new CkGraphDirectedAssociations([]), description: AbstractBaseName,
-            enableChangeStreamPreAndPostImages: false);
-        RegisterGraph(baseGraph);
-        return baseCkTypeId.ToRtCkId();
-    }
 
     private void RestrictWritesOfRequiredToClients()
     {

@@ -11,8 +11,8 @@ using Xunit;
 namespace Meshmakers.Octo.Runtime.Engine.Tests.Security;
 
 /// <summary>
-///     A change that addresses a stored record under a type it is not stored as (a sibling type sharing the
-///     collection) answers like a change of a missing record.
+///     A change by a restricted caller that addresses a stored record under a type it is not stored as (a sibling
+///     type sharing the collection) answers like a change of a missing record.
 /// </summary>
 public class HiddenOrMissingAddressingTests : HiddenOrMissingWriteFixture
 {
@@ -52,21 +52,28 @@ public class HiddenOrMissingAddressingTests : HiddenOrMissingWriteFixture
         RegisterByCkId(sharedGraph);
     }
 
+    private RtEntity StoreRecordOfOtherType(string createdBy)
+    {
+        RegisterRequiredAndPlainInOneSharedCollection();
+        var recordOfOtherType = new RtEntity(Model.Plain.CkTypeId.ToRtCkId(), OctoObjectId.GenerateNewId())
+        {
+            RtCreatedBy = createdBy
+        };
+        StoredEntities[recordOfOtherType.RtId] = recordOfOtherType;
+        return recordOfOtherType;
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task RecordAddressedUnderATypeItIsNotStoredAs_AnswersExactlyLikeMissingRecord(bool validPayload)
+    public async Task RestrictedReadCaller_RecordAddressedUnderATypeItIsNotStoredAs_AnswersExactlyLikeMissingRecord(
+        bool validPayload)
     {
-        RegisterRequiredAndPlainInOneSharedCollection();
+        var recordOfOtherType = StoreRecordOfOtherType(OtherUser);
         var repository = Repository(PolicyTable());
-        var recordOfOtherType = new RtEntity(Model.Plain.CkTypeId.ToRtCkId(), OctoObjectId.GenerateNewId())
-        {
-            RtCreatedBy = OtherUser
-        };
-        StoredEntities[recordOfOtherType.RtId] = recordOfOtherType;
         var missingRtId = OctoObjectId.GenerateNewId();
 
-        foreach (var role in new[] { WriterOwnedRead, WriteOnly, Full, OwnedWriter })
+        foreach (var role in new[] { WriterOwnedRead, WriteOnly })
         {
             var otherTypeAnswer = await AnswerOfAsync(() => ApplyAsync(repository, UserSession(role),
                 [Change("update", recordOfOtherType.RtId, validPayload)]), recordOfOtherType.RtId);
@@ -76,6 +83,41 @@ public class HiddenOrMissingAddressingTests : HiddenOrMissingWriteFixture
             AssertNotFound(otherTypeAnswer);
             Assert.Equal(otherTypeAnswer, missingAnswer);
         }
+    }
+
+    [Theory]
+    [InlineData(OtherUser)]
+    [InlineData("user-" + OwnedWriter)]
+    public async Task OwnedOnlyWriter_RecordAddressedUnderATypeItIsNotStoredAs_AnswersNotFoundAndIsNotWritten(
+        string createdBy)
+    {
+        var recordOfOtherType = StoreRecordOfOtherType(createdBy);
+        var repository = Repository(PolicyTable());
+        var missingRtId = OctoObjectId.GenerateNewId();
+
+        foreach (var operation in new[] { "update", "replace", "delete" })
+        {
+            var otherTypeAnswer = await AnswerOfAsync(() => ApplyAsync(repository, UserSession(OwnedWriter),
+                [Change(operation, recordOfOtherType.RtId, true)]), recordOfOtherType.RtId);
+            var missingAnswer = await AnswerOfAsync(() => ApplyAsync(repository, UserSession(OwnedWriter),
+                [Change(operation, missingRtId, true)]), missingRtId);
+
+            AssertNotFound(otherTypeAnswer);
+            Assert.Equal(otherTypeAnswer, missingAnswer);
+        }
+
+        var invalidAnswer = await AnswerOfAsync(() => ApplyAsync(repository, UserSession(OwnedWriter),
+            [Change("update", recordOfOtherType.RtId, false)]), recordOfOtherType.RtId);
+        AssertNotFound(invalidAnswer);
+        A.CallTo(() => Collection.UpdateOneAsync(A<IOctoSession>._,
+                A<IEnumerable<RtEntity>>.That.Matches(entities =>
+                    entities.Any(entity => entity.RtId == recordOfOtherType.RtId))))
+            .MustNotHaveHappened();
+        A.CallTo(() => Collection.ReplaceManyAsync(A<IOctoSession>._,
+                A<IEnumerable<RtEntity>>.That.Matches(entities =>
+                    entities.Any(entity => entity.RtId == recordOfOtherType.RtId))))
+            .MustNotHaveHappened();
+        A.CallTo(() => Collection.DeleteOneAsync(A<IOctoSession>._, recordOfOtherType.RtId)).MustNotHaveHappened();
     }
 
     [Fact]

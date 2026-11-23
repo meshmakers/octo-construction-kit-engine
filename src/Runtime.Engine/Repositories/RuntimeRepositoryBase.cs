@@ -603,7 +603,6 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             RuntimeRepositoryException.ThrowIfOperationResultError(writeAccessResult);
         }
 
-        var storedTargetsReadByGuard = new Dictionary<RtEntityId, RtEntity>();
         if (!securityContext.IsSystem && _dataPermissionResolver != null)
         {
             var policyTable = await _dataPermissionResolver.GetPolicyTableAsync(this).ConfigureAwait(false);
@@ -613,7 +612,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
                 var notVisible = new List<DataPermissionWriteGuard.NotVisibleChange>();
                 await DataPermissionWriteGuard.CheckAsync(this, cacheService, _auditEventSink, session,
                         securityContext, policyTable, entityUpdateInfoList, associationUpdateInfoList,
-                        guardResult, notVisible, storedTargetsReadByGuard)
+                        guardResult, notVisible)
                     .ConfigureAwait(false);
                 if (notVisible.Count > 0)
                 {
@@ -628,25 +627,6 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             }
         }
 
-        async Task ThrowIfATargetIsMissingAsync(bool onlyTypesSharingTheirCollection)
-        {
-            var missingTarget = await WriteTargetExistence.FindFirstMissingAsync(session, RepositoryDataSource,
-                    cacheService, entityUpdateInfoList, associationUpdateInfoList, storedTargetsReadByGuard,
-                    onlyTypesSharingTheirCollection)
-                .ConfigureAwait(false);
-            if (missingTarget != null)
-            {
-                throw CreateEntityNotFoundException(missingTarget.CkTypeId, missingTarget.RtId, missingTarget.Action,
-                    options.DeleteStrategy);
-            }
-        }
-
-        await ThrowIfATargetIsMissingAsync(onlyTypesSharingTheirCollection: true).ConfigureAwait(false);
-        var mutationOptions = options with
-        {
-            OnValidationFailedAsync = () => ThrowIfATargetIsMissingAsync(onlyTypesSharingTheirCollection: false)
-        };
-
         // After the data-permission guard: an archive the caller may not see stays a missing entity (AB#7126), the
         // refusal of the definition guard would tell its existence, status and name.
         if (checkArchiveDefinitions)
@@ -656,7 +636,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         }
 
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entityUpdateInfoList,
-                associationUpdateInfoList, mutationOptions, operationResult ?? new OperationResult())
+                associationUpdateInfoList, options, operationResult ?? new OperationResult())
             .ConfigureAwait(false);
     }
 

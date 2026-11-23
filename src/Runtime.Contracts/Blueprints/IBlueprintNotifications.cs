@@ -50,7 +50,21 @@ public record BlueprintAppliedNotification(
     int EntitiesUpdated,
     int EntitiesDeleted,
     Guid CorrelationId,
-    DateTime Timestamp);
+    DateTime Timestamp)
+{
+    /// <summary>
+    /// Names of the CK models the applied blueprint depends on (AB#9578): the direct CK model dependencies of the
+    /// blueprint and of every blueprint the apply resolved for it, distinct and sorted ordinally. Services use it to
+    /// switch on the capability a blueprint needs (e.g. <c>System.Communication</c>, <c>System.Ai</c>).
+    /// <c>null</c> when the raising engine does not report it (older engines); consumers then must not derive a
+    /// capability from the event.
+    /// </summary>
+    /// <remarks>
+    /// An init-only property instead of a positional parameter, so the constructor and <c>Deconstruct</c> of the
+    /// record stay binary compatible with callers compiled against an older engine.
+    /// </remarks>
+    public IReadOnlyList<string>? CkModelDependencies { get; init; }
+}
 
 /// <param name="TenantId">Target tenant.</param>
 /// <param name="BlueprintId">New blueprint version.</param>
@@ -70,7 +84,16 @@ public record BlueprintUpdatedNotification(
     int EntitiesUpdated,
     int EntitiesDeleted,
     Guid CorrelationId,
-    DateTime Timestamp);
+    DateTime Timestamp)
+{
+    /// <summary>
+    /// Names of the CK models the target blueprint version depends on (AB#9578): its direct CK model dependencies,
+    /// distinct and sorted ordinally. <c>null</c> when the raising engine does not report it (older engines);
+    /// consumers then must not derive a capability from the event.
+    /// </summary>
+    /// <remarks>Init-only for binary compatibility, see <see cref="BlueprintAppliedNotification.CkModelDependencies"/>.</remarks>
+    public IReadOnlyList<string>? CkModelDependencies { get; init; }
+}
 
 /// <param name="TenantId">Target tenant.</param>
 /// <param name="BlueprintId">Blueprint that was uninstalled.</param>

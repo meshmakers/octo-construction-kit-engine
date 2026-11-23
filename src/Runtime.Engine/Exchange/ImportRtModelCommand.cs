@@ -68,6 +68,9 @@ internal class ImportRtModelCommand(
         _pendingArchiveColumns = new();
     private readonly List<RtImportArchiveColumnAddition> _archiveColumnAdditions = [];
 
+    // AB#9651: the edges the dangling filter (AB#5005) dropped in the last import; blueprint seeds defer them.
+    private readonly List<RtImportSkippedAssociation> _skippedAssociations = [];
+
     // AB#8255: formula changes the seed declares for computed columns of activated archives, applied as versioned changes
     // with backfill through the archive lifecycle after the commit; and the outcome of each.
     private readonly ConcurrentQueue<(OctoObjectId ArchiveRtId, string? ArchiveName, ArchiveSeedFormulaChange Change)>
@@ -99,6 +102,7 @@ internal class ImportRtModelCommand(
         _associationsCount = 0;
         _pendingArchiveColumns.Clear();
         _archiveColumnAdditions.Clear();
+        _skippedAssociations.Clear();
         _pendingFormulaChanges.Clear();
         _archiveFormulaChanges.Clear();
         _archiveLifecycle = null;
@@ -112,6 +116,9 @@ internal class ImportRtModelCommand(
 
     /// <inheritdoc />
     public IReadOnlyList<RtImportArchiveColumnAddition> ArchiveColumnAdditions => _archiveColumnAdditions.ToArray();
+
+    /// <inheritdoc />
+    public IReadOnlyList<RtImportSkippedAssociation> SkippedAssociations => _skippedAssociations.ToArray();
 
     /// <inheritdoc />
     public IReadOnlyList<RtImportComputedFormulaChange> ArchiveFormulaChanges => _archiveFormulaChanges.ToArray();
@@ -1034,6 +1041,8 @@ internal class ImportRtModelCommand(
             return kept;
         }
 
+        _skippedAssociations.AddRange(ToSkippedAssociations(importAssociations, kept));
+
         logger.LogWarning(
             "Skipped {SkippedCount} association edge(s) on import into '{TenantId}' because an endpoint " +
             "entity exists neither in the archive nor in the tenant. Sample: {Sample}",
@@ -1216,6 +1225,21 @@ internal class ImportRtModelCommand(
         }
 
         return (kept, stale, samples);
+    }
+
+    /// <summary>
+    /// AB#9651: the edges of <paramref name="importAssociations" /> that are not in <paramref name="kept" /> (same
+    /// instances), in import order, as the contract type callers read from <see cref="SkippedAssociations" />.
+    /// </summary>
+    internal static IEnumerable<RtImportSkippedAssociation> ToSkippedAssociations(
+        IReadOnlyList<RtAssociation> importAssociations, IReadOnlyList<RtAssociation> kept)
+    {
+        var keptSet = new HashSet<RtAssociation>(kept, ReferenceEqualityComparer.Instance);
+        return importAssociations
+            .Where(a => !keptSet.Contains(a) && a.AssociationRoleId != null)
+            .Select(a => new RtImportSkippedAssociation(a.AssociationRoleId!, a.OriginCkTypeId, a.OriginRtId,
+                a.TargetCkTypeId, a.TargetRtId,
+                a.Attributes.Count > 0 || a.TargetCkAttributeIds is { Count: > 0 }));
     }
 
     /// <summary>

@@ -9,6 +9,19 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Added
 
+- **Seed associations to entities the tenant does not hold yet are kept and written later (AB#9651).** A blueprint seed
+  edge whose target (or origin) exists neither in the seed nor in the tenant used to be dropped for good (AB#5005); the
+  pipelines of a blueprint lost their `Executes` edge to the Mesh Adapter when the platform enabled Communication only
+  after the install (AB#9578). `BlueprintService` now keeps such edges in the tenant (`System/TenantConfiguration`
+  `Octo.Blueprints.DeferredSeedAssociations`), reports them as a warning in the install or update result (message 73) and
+  writes them with any later blueprint seed import of the tenant once both ends exist (message 74) - for example the
+  service-managed `System.Communication` seed that brings the Mesh Adapter. Never over another target of a to-one role,
+  never for identity roles or edges with attributes, forgotten on uninstall; details in `docs/blueprints.md`.
+  `IImportRtModelCommand` gets the default member `SkippedAssociations` (record `RtImportSkippedAssociation`).
+  **Compatibility:** binary and source compatible - a default interface member and a new record; implementations written
+  before it report no skipped edges, and nothing is kept then. Services that apply blueprints (asset repository) and those
+  that apply service-managed blueprints (Communication Controller) need the new engine for the edges to be written.
+
 - **The applied and updated blueprint notifications carry the CK model dependencies (AB#9578).**
   `BlueprintAppliedNotification` and `BlueprintUpdatedNotification` get the init-only property `CkModelDependencies`
   (distinct names, sorted ordinally). Apply: the CK model dependencies of the root blueprint and of every blueprint the

@@ -451,12 +451,12 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             await ResolveConcreteCkTypeIdForDeleteAsync(session, cacheService, ckTypeId, rtId).ConfigureAwait(false);
         if (resolvedCkTypeId == null)
         {
-            return;
+            throw CreateEntityNotFoundException(ckTypeId, rtId, RtDataAction.Delete, deleteOptions.Strategy);
         }
 
         var entitiesUpdate = new[] { EntityUpdateInfo<RtEntity>.CreateDelete(new RtEntityId(resolvedCkTypeId, rtId)) };
         await ApplyChangesGuardedAsync(session, cacheService, entitiesUpdate,
-                [], BulkRtMutationOptions.FromDeleteOptions(deleteOptions))
+                [], BulkRtMutationOptions.FromDeleteOptions(deleteOptions), addressedCkTypeIdOfDelete: ckTypeId)
             .ConfigureAwait(false);
     }
 
@@ -470,20 +470,22 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             await ResolveConcreteCkTypeIdForDeleteAsync(session, cacheService, ckTypeId, rtId).ConfigureAwait(false);
         if (resolvedCkTypeId == null)
         {
-            return;
+            throw CreateEntityNotFoundException(ckTypeId, rtId, RtDataAction.Delete, deleteOptions.Strategy);
         }
 
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateDelete(new RtEntityId(resolvedCkTypeId, rtId)) };
         await ApplyChangesGuardedAsync(session, cacheService, entitiesUpdate,
-                [], BulkRtMutationOptions.FromDeleteOptions(deleteOptions))
+                [], BulkRtMutationOptions.FromDeleteOptions(deleteOptions), addressedCkTypeIdOfDelete: ckTypeId)
             .ConfigureAwait(false);
     }
 
     // For delete-by-id with an abstract CK type, find the concrete CkTypeId of the entity at this
     // RtId. The validator rejects abstract types on insert/update/replace (correct: a concrete
     // subtype is required), but for delete the RtId is enough to identify the concrete entity.
-    // Returns null when the entity does not exist, so the caller can no-op (matches the idempotent
-    // semantics of the underlying collection.DeleteOneAsync).
+    // Returns null when the entity does not exist or is stored as a type outside the addressed subtree;
+    // the caller answers not found, as for a concrete type and as for a record the caller may not see.
+    // The type write restriction is judged on the addressed type and its subtree before any read, so a
+    // refused caller gets the same answer for an existing and a missing rtId.
     //
     // The probe order is backend-aware:
     //   1. Try the abstract base's collection first. In storage backends that share a single
@@ -501,11 +503,18 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             return ckTypeId;
         }
 
+        await ThrowIfTypeWriteRestrictedAsync(session,
+                [new TypeWriteTarget(ckTypeId, rtId, TypeWriteAccessGuard.OperationDelete, ExactType: false)])
+            .ConfigureAwait(false);
+
+        var acceptedStoredTypeNames = StoredTypeMatch.AcceptedStoredTypeNames(ckTypeGraph);
         var abstractCollection = RepositoryDataSource.GetRtCollection<RtEntity>(ckTypeGraph);
         var existing = await abstractCollection.DocumentAsync(session, rtId).ConfigureAwait(false);
         if (existing?.CkTypeId != null)
         {
-            return existing.CkTypeId;
+            var isInAddressedSubtree =
+                acceptedStoredTypeNames.Contains(existing.CkTypeId.SemanticVersionedFullName);
+            return isInAddressedSubtree ? existing.CkTypeId : null;
         }
 
         foreach (var derivedTypeId in ckTypeGraph.GetAllDerivedTypes(false))
@@ -521,7 +530,10 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             var match = await derivedCollection.DocumentAsync(session, rtId).ConfigureAwait(false);
             if (match != null)
             {
-                return match.CkTypeId ?? derivedRtCkId;
+                var storedCkTypeId = match.CkTypeId ?? derivedRtCkId;
+                var isInAddressedSubtree =
+                    acceptedStoredTypeNames.Contains(storedCkTypeId.SemanticVersionedFullName);
+                return isInAddressedSubtree ? storedCkTypeId : null;
             }
         }
 
@@ -571,11 +583,14 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     ///     (<c>writeAccess</c>, AB#8574): system sessions and
     ///     tenants without policies pass through untouched (dormant guarantee); denied changes reject
     ///     the whole set atomically with a <see cref="RuntimeRepositoryException" />.
+    ///     <paramref name="addressedCkTypeIdOfDelete" /> is the type a delete by id was addressed with; a record the
+    ///     caller may not see is then refused under that type, as a missing record of it is.
     /// </summary>
     private async Task ApplyChangesGuardedAsync(IOctoSession session, ICkCacheService cacheService,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
-        BulkRtMutationOptions options, OperationResult? operationResult = null, bool checkArchiveDefinitions = false)
+        BulkRtMutationOptions options, OperationResult? operationResult = null, bool checkArchiveDefinitions = false,
+        RtCkId<CkTypeId>? addressedCkTypeIdOfDelete = null)
     {
         var securityContext = session.GetSecurityContext();
         if (!securityContext.IsSystem)
@@ -588,6 +603,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             RuntimeRepositoryException.ThrowIfOperationResultError(writeAccessResult);
         }
 
+        var mutationOptions = options;
         if (!securityContext.IsSystem && _dataPermissionResolver != null)
         {
             var policyTable = await _dataPermissionResolver.GetPolicyTableAsync(this).ConfigureAwait(false);
@@ -595,18 +611,28 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             {
                 var guardResult = new OperationResult();
                 var notVisible = new List<DataPermissionWriteGuard.NotVisibleChange>();
+                var rawStoredEntities = new Dictionary<RtEntityId, RtEntity?>();
                 await DataPermissionWriteGuard.CheckAsync(this, cacheService, _auditEventSink, session,
                         securityContext, policyTable, entityUpdateInfoList, associationUpdateInfoList,
-                        guardResult, notVisible)
+                        guardResult, notVisible, rawStoredEntities)
                     .ConfigureAwait(false);
                 if (notVisible.Count > 0)
                 {
                     // AB#7126: a change of an entity the caller may not see is answered like a missing entity.
-                    throw CreateEntityNotFoundException(notVisible[0].CkTypeId, notVisible[0].RtId,
-                        notVisible[0].Action, options.DeleteStrategy);
+                    var firstNotVisible = notVisible[0];
+                    var refusedCkTypeId = addressedCkTypeIdOfDelete ?? firstNotVisible.CkTypeId;
+                    throw CreateEntityNotFoundException(refusedCkTypeId, firstNotVisible.RtId,
+                        firstNotVisible.Action, options.DeleteStrategy);
                 }
 
                 RuntimeRepositoryException.ThrowIfOperationResultError(guardResult);
+
+                mutationOptions = options with
+                {
+                    BeforeApplyAsync = () => ThrowIfATargetIsStoredAsAnotherTypeAsync(session, cacheService,
+                        entityUpdateInfoList, associationUpdateInfoList, rawStoredEntities, options.DeleteStrategy,
+                        addressedCkTypeIdOfDelete)
+                };
             }
         }
 
@@ -619,8 +645,24 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         }
 
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entityUpdateInfoList,
-                associationUpdateInfoList, options, operationResult ?? new OperationResult())
+                associationUpdateInfoList, mutationOptions, operationResult ?? new OperationResult())
             .ConfigureAwait(false);
+    }
+
+    private async Task ThrowIfATargetIsStoredAsAnotherTypeAsync(IOctoSession session, ICkCacheService cacheService,
+        IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
+        IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
+        IReadOnlyDictionary<RtEntityId, RtEntity?> rawReadsOfTheGuard, DeleteStrategies deleteStrategy,
+        RtCkId<CkTypeId>? addressedCkTypeIdOfDelete)
+    {
+        var targetOfAnotherType = await StoredTypeTargets.FindFirstStoredAsAnotherTypeAsync(session,
+                RepositoryDataSource, cacheService, entityUpdateInfoList, associationUpdateInfoList, rawReadsOfTheGuard)
+            .ConfigureAwait(false);
+        if (targetOfAnotherType != null)
+        {
+            throw CreateEntityNotFoundException(addressedCkTypeIdOfDelete ?? targetOfAnotherType.CkTypeId,
+                targetOfAnotherType.RtId, targetOfAnotherType.Action, deleteStrategy);
+        }
     }
 
     /// <summary>

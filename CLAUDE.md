@@ -2064,6 +2064,29 @@ the classification):
   update, replace or delete existing records of that type; grant the matching Read policy (the shipped
   `FileManagement` role has it). Tests: `DataPermissionWriteGuardVisibilityTests`; the matrix test
   `Entity_AgreesWithWriteGuard` now covers every cell, `NotVisible` included.
+- **Stored type and delete by abstract type (AB#7212).** The guard's raw read (`StoredEntityCache` in
+  `DataPermissionWriteGuard`) uses a stored record only when it is stored as the addressed type or one of its derived
+  types (stored `CkTypeId`, compared like the read filter by `SemanticVersionedFullName` in `StoredTypeMatch`; a stored
+  entity without `CkTypeId`, or an addressed type the CK cache does not know, counts as matching). A record of a sibling
+  type sharing the collection is therefore missing for the visibility and ownership checks (restricted read: not
+  found before validation, like a missing record). For every non-system caller in a tenant with policies, the funnel
+  then runs a **stored-type step after the rule validation, before anything is written**
+  (`BulkRtMutationOptions.BeforeApplyAsync`, `StoredTypeTargets`): an update, replace or delete target, or an
+  association origin, stored as a type outside the addressed subtree answers through `CreateEntityNotFoundException`,
+  so it answers exactly like a missing target (after the same validation) and is never written or deleted through
+  another type. It reads only types whose collection also holds concrete types outside their subtree
+  (`StoredTypeMatch.SharesCollectionWithOtherTypes`, an unresolvable collection root counts as shared), one
+  `DocumentsAsync` per such type, and reuses the guard's raw reads (`rawStoredEntities` of
+  `DataPermissionWriteGuard.CheckAsync`); system sessions and tenants without policies never run it, so
+  `RecordArrayItemUpdateTests` (system session) keep their command count. `DeleteOneRtEntityByRtIdAsync` with an abstract type judges the type write
+  restriction on the addressed type and its derived types before it reads the record, answers a missing rtId and a
+  record outside the addressed subtree (`StoredTypeMatch.AcceptedStoredTypeNames`) through
+  `CreateEntityNotFoundException` (it no longer returns silently), and refuses a hidden record under the addressed
+  (abstract) type, never under the concrete type of the stored record. Callers without a visibility question (system
+  session, tenant without policies, full read) keep the answers of before: an invalid payload of a missing record is a
+  validation error. Tests: `HiddenEqualsMissingWriteTests`, `HiddenOrMissingAddressingTests`,
+  `HiddenOrMissingAbstractDeleteTests`, `HiddenOrMissingPayloadTests`, `UnrestrictedCallerWriteTests` (real funnel,
+  real `EntityRuleEngine`, in-memory collection).
 - Tests: `RtDataPermissionEvaluatorTests` (matrix, agreement with the guard) in `Runtime.Engine.Tests`; the
   differential test against the real repository is `DataPermissionEvaluatorDifferentialTests` in
   engine-mongodb.

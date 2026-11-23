@@ -66,6 +66,11 @@ internal class BulkRtMutation(
 
         RuntimeRepositoryException.ThrowIfOperationResultError(operationResult);
 
+        if (options.BeforeApplyAsync != null)
+        {
+            await options.BeforeApplyAsync().ConfigureAwait(false);
+        }
+
         await ApplyRtEntityChangesAsync(session, repositoryDataSource, ckCacheService, entityValidatorResult, options,
                 callerResult)
             .ConfigureAwait(false);

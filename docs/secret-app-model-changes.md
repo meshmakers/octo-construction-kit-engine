@@ -8,8 +8,7 @@ background: true
 > From: tracked in the backlog (SECRET value type). To: the owners of meshmakers-app, energy-community,
 > octo-adapter-loxone, octo-report-services, one-time-ticket and wwc26-landing-page.
 > Concept: [concept-secret-attribute-type.md](concept-secret-attribute-type.md) (§5.1, §5.2 phases 2/3, §6),
-> frontend contract: [secret-frontend-handover.md](secret-frontend-handover.md),
-> progress: [secret-rollout-progress.md](secret-rollout-progress.md).
+> frontend contract: [secret-frontend-handover.md](secret-frontend-handover.md).
 > State: scanned read-only on 2026-10-06 against local `main` of every repo listed. Nothing was
 > changed in these repos. octo-ai-services is implemented (last section).
 > Amended 2026-10-06 for the round-2 decisions (concept §2.1): **placeholders are ordinary values**

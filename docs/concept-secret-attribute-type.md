@@ -1,6 +1,6 @@
 ---
 description: Concept of the SECRET attribute value type: storage, key ring, API and sweep decisions (reference, design record).
-background: true
+applies_to: src/Runtime.*/Secrets/**
 ---
 
 # SECRET attribute value type — concept

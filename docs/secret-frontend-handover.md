@@ -6,7 +6,7 @@ background: true
 # SECRET attribute value type — frontend handover
 
 > From: tracked in the backlog (SECRET value type) · To: Studio / frontend-libraries PO via Chief Product Owner
-> Concept: [concept-secret-attribute-type.md](concept-secret-attribute-type.md) · Progress: [secret-rollout-progress.md](secret-rollout-progress.md)
+> Concept: [concept-secret-attribute-type.md](concept-secret-attribute-type.md)
 > State: backend implemented on local branches `feat/gerald/secret-attribute-type` (not pushed, not deployed), including the admin API of sections 6–12 (decisions 2026-10-06). Field names are binding.
 
 ## 1. Why the frontend must move first (rollout gate)

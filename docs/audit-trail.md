@@ -1,6 +1,6 @@
 ---
 description: Audit-trail events, sinks and aggregation of repeated audit events in the runtime engine.
-applies_to: src/Runtime.Engine/AuditTrails/**, src/Runtime.Contracts/AuditTrails/**
+applies_to: src/Runtime.Engine/AuditTrails/**, src/Runtime.Contracts/AuditTrails/**, src/Runtime.Engine/StreamData/ForwardingArchiveAuditTrail.cs
 ---
 
 # Audit-trail architecture

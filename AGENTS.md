@@ -25,7 +25,7 @@ licensed.
 <!-- >>> generated: routing -->
 | When you change | Read first |
 |---|---|
-| `src/Runtime.Engine/AuditTrails/**`, `src/Runtime.Contracts/AuditTrails/**` | `docs/audit-trail.md` |
+| `src/Runtime.Engine/AuditTrails/**`, `src/Runtime.Contracts/AuditTrails/**`, `src/Runtime.Engine/StreamData/ForwardingArchiveAuditTrail.cs` | `docs/audit-trail.md` |
 | `src/Runtime.*/Blueprints/**`, `src/Runtime.*/Exchange/**` | `docs/blueprint-engine.md` |
 | `src/Runtime.*/Blueprints/**`, `src/BlueprintManager/**`, `src/ConstructionKit.Engine/BlueprintCatalogs/**` | `docs/blueprints.md` |
 | `Directory.Build.*`, `src/ConstructionKit.Templates/**`, `src/ConstructionKit.MsBuildTasks/**` | `docs/build-and-packaging.md` |
@@ -39,6 +39,7 @@ licensed.
 | `src/ConstructionKit.Compiler/**`, `src/ConstructionKit.Engine/Services/**` | `docs/compiler-architecture.md` |
 | `src/ConstructionKit.Compiler/**`, `src/ConstructionKit.Engine/Messages/**`, `src/ConstructionKit.Engine/Text.resx` | `docs/compiler-rules.md` |
 | `src/ConstructionKit.Contracts/DisplayRules/**`, `src/Runtime.Contracts/DisplayRules/**` | `docs/concept-display-name-rules.md` |
+| `src/Runtime.*/Secrets/**` | `docs/concept-secret-attribute-type.md` |
 | `src/Runtime.Contracts/DataPermissions/**`, `src/Runtime.Engine/Security/**`, `src/ConstructionKit.Contracts/DataTransferObjects/CkTypeWriteAccessDto.cs` | `docs/data-permissions.md` |
 | `src/ConstructionKit.Engine/DependencyGraph/**`, `src/Runtime.Contracts/Repositories/Query/**` | `docs/query-columns.md` |
 | `src/*/CkModelMigrations/**`, `src/ConstructionKit.Engine/*Catalogs/**` | `docs/runtime-engine-interfaces.md` |
@@ -57,10 +58,9 @@ Background, no path trigger: the design records of the stream-data archives
 [computed columns](docs/concept-computed-columns.md), [export and import](docs/concept-archive-data-export-import.md),
 [tenant backup](docs/concept-tenant-backup-archive-data.md),
 [native dump](docs/concept-tenant-backup-native-archive-dump.md)); the SECRET value type
-([concept](docs/concept-secret-attribute-type.md), [app model changes](docs/secret-app-model-changes.md),
-[frontend handover](docs/secret-frontend-handover.md), [progress](docs/secret-rollout-progress.md),
-[sweep dump storage](docs/secret-sweep-dump-storage.md), [wave 1 plan](docs/wave1-push-pr-plan-backend.md));
-the blueprint history ([concept v2](docs/blueprints-concept-v2.md), [first plan](docs/blueprint-updates-plan.md));
+([app model changes](docs/secret-app-model-changes.md),
+[frontend handover](docs/secret-frontend-handover.md),
+[sweep dump storage](docs/secret-sweep-dump-storage.md)); the [blueprint concept v2](docs/blueprints-concept-v2.md);
 [Pascal case validation](docs/concept-pascal-case-validation.md),
 [hidden columns of an archive](docs/archive-hidden-columns.md) (read it before a CK change makes an archive column reach
 a Hidden attribute) and [the additive release proof](docs/ck-additive-system-proof.md).
@@ -97,7 +97,8 @@ dotnet test --configuration DebugL --filter "FullyQualifiedName~TestClassName.Te
   next to its `ckModel.yaml`; `System.Files` has no such file (rule on versions below).
 - A new message is added to `MessageCodes.json` and to the generated `MessageCodes.cs` (T4, not part of the build) in
   `src/ConstructionKit.Engine/Messages/` or `src/Runtime.Engine/Messages/`; `MessageCodesSyncTests` checks only the
-  Engine pair ([docs/compiler-rules.md](docs/compiler-rules.md)).
+  Engine pair. A reason that tools must tell apart gets its own placeholder, because tools branch on the message
+  number and parameters, never on the text ([docs/compiler-rules.md](docs/compiler-rules.md)).
 - Run `Test-OctoAgentDocs` (octo-tools) after changing `AGENTS.md` or `docs/`; `Test-OctoAgentDocs -Fix` regenerates the
   routing table. The shim file for Claude Code is generated: edit this file, not the shim.
 
@@ -108,32 +109,28 @@ These rules bind new and changed code. Known exceptions in existing code are nam
 - **This repository is public.** No work item ids, internal hostnames, customer or tenant names, or secrets in docs and
   in new or changed code comments and test names (work item ids stay in `CHANGELOG.md` entries); remove an existing one
   when you touch its line.
-- **A new or changed CK meta-model field passes every touch point.** Schemas, DTOs, compiler copies, graph, resolvers,
-  the SemVer diff and classifier rule, source generator, docs generator, the persistence gate in
-  `octo-construction-kit-engine-mongodb` and the CK meta in the asset repository
-  ([docs/ck-field-touch-points.md](docs/ck-field-touch-points.md)).
-- **A changed CK model of this repository bumps its version honestly.** Version in `ckModel.yaml` by the rules
-  `octo-ckc ValidateVersion` checks; a published version is never edited; System models publish from `main`
-  ([docs/ck-semver-rules.md](docs/ck-semver-rules.md), [docs/ck-publishing.md](docs/ck-publishing.md)).
-- **Columns never reach Secret or Hidden attributes.** The query column collector emits none, and no archive column
-  reaches a Hidden attribute; an explicit request for such a path stays refused by the consumers' guards
-  ([docs/query-columns.md](docs/query-columns.md), [docs/archive-hidden-columns.md](docs/archive-hidden-columns.md)).
+- **A new or changed CK meta-model field passes every touch point** of
+  [docs/ck-field-touch-points.md](docs/ck-field-touch-points.md), also those in `octo-construction-kit-engine-mongodb`
+  and the asset repository; `CkSemVerClassificationGuardTests` checks only the SemVer row.
+- **Versions are honest.** A change to one of the three CK models bumps its `ckModel.yaml` version
+  (`octo-ckc ValidateVersion`); a published version is never edited; a test-only CK model project sets
+  `OctoPublishCkModelToRemoteCatalog=false` ([docs/ck-semver-rules.md](docs/ck-semver-rules.md),
+  [docs/ck-publishing.md](docs/ck-publishing.md)).
+- **A new or changed attribute of the three CK models declares its `ownership`.** Only System.StreamData runs the
+  `OCTO-CK001` lint ([docs/runtime-state-preservation.md](docs/runtime-state-preservation.md), "Attribute Ownership").
+- **Secret values and Hidden attributes stay inside the engine.** No query or archive column, export, diff, log line or
+  exception text carries a Secret value (plaintext or envelope) or reaches a Hidden attribute
+  ([docs/query-columns.md](docs/query-columns.md), [docs/archive-hidden-columns.md](docs/archive-hidden-columns.md),
+  [docs/concept-secret-attribute-type.md](docs/concept-secret-attribute-type.md)).
 - **Access decisions come from the one data-permission rule set.** New read and write paths classify through it and
   callers ask `IRtDataPermissionEvaluator`; an entity the caller may not see answers like a missing one
   ([docs/data-permissions.md](docs/data-permissions.md)).
-- **A write never loses a conflict or an unknown outcome silently.** A version mismatch raises
-  `RtVersionConflictException`, and a failure that may have taken effect is classified by
-  `UnacknowledgedWriteClassifier`, not by a copy per host ([docs/runtime-semantics.md](docs/runtime-semantics.md)).
-- **Rt data is serialized only with the canonical options.** Scalars box through `JsonScalar.ToClr`, a raw
-  `Utf8JsonWriter` honours the shared encoder, and the Newtonsoft parity tests stay green
-  ([docs/ck-schema-and-json-serialization.md](docs/ck-schema-and-json-serialization.md)).
 - **Imports and blueprint writes never trample runtime state.** A new import, seed or blueprint write path honours the
   attribute ownership markers, the `replacesGenericCreate` preflight and `access`
   ([docs/runtime-state-preservation.md](docs/runtime-state-preservation.md),
   [docs/blueprint-engine.md](docs/blueprint-engine.md)).
-- **Audit-trail interfaces forward through `IAuditEventSink`.** A host never gets a bridge class that captures
-  `IEventRepository` or `ISystemContext` in its constructor ([docs/audit-trail.md](docs/audit-trail.md)).
-- **Tools branch on message number and parameters, never on message text**
-  ([docs/compiler-rules.md](docs/compiler-rules.md)).
-- **mXparser stays at 4.4.2.** Never upgrade it or call a `License.iConfirm*` method
-  ([docs/runtime-semantics.md](docs/runtime-semantics.md)).
+- **Rt attribute values box only through `JsonScalar.ToClr`**, and a change to the Rt JSON converters keeps Newtonsoft
+  parity; the oracle, `Sdk.Common.PipelineParityTests`, runs in `octo-communication-sdk`, not here
+  ([docs/ck-schema-and-json-serialization.md](docs/ck-schema-and-json-serialization.md)).
+- **mXparser stays at 4.4.2**, the last BSD-licensed version: never upgrade it, and never raise the version that
+  `MxParser_IsTheLastBsdLicensedVersion` expects ([docs/runtime-semantics.md](docs/runtime-semantics.md)).

@@ -258,44 +258,27 @@ public abstract class CachedCatalog(
                     return new CacheTypes.CacheCatalog();
                 }
 
-#if NETSTANDARD2_0
-                using var streamReader = new FileStream(
-                    cachePath,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.ReadWrite, // Allow other processes to read/write while we read
-                    bufferSize: 4096,
-                    useAsync: true
-                );
-#else
-                await using var streamReader = new FileStream(
-                    cachePath,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.ReadWrite, // Allow other processes to read/write while we read
-                    bufferSize: 4096,
-                    useAsync: true
-                );
-#endif
-
+                // AB#9305: read the file into memory and close it before parsing - an open handle blocks a writer's
+                // rename on Windows, so it is held as briefly as possible.
+                using var content = await CatalogFileIo.ReadSharedAsync(cachePath).ConfigureAwait(false);
                 var r = await System.Text.Json.JsonSerializer
-                    .DeserializeAsync<CacheTypes.CacheCatalog>(streamReader,
+                    .DeserializeAsync<CacheTypes.CacheCatalog>(content,
                         new System.Text.Json.JsonSerializerOptions
                         {
                             PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
                             Converters = { new CkVersionConverter() }
                         }).ConfigureAwait(false);
-                streamReader.Close();
 
                 return r ?? new CacheTypes.CacheCatalog();
             }
             catch (Exception ex) when (
                 attempt < maxRetries &&
-                (ex is FileNotFoundException || ex is IOException || ex is System.Text.Json.JsonException))
+                (ex is IOException || ex is UnauthorizedAccessException || ex is System.Text.Json.JsonException))
             {
                 // Another process may be rewriting the cache file concurrently.
                 // FileNotFoundException: file was deleted between exists-check and open
                 // IOException: file is locked by another process
+                // UnauthorizedAccessException: on Windows, the file is being replaced at this moment (AB#9305)
                 // JsonException: file contains partial/corrupt content during a concurrent write
                 await Task.Delay(200).ConfigureAwait(false);
             }
@@ -328,28 +311,20 @@ public abstract class CachedCatalog(
     /// <returns>A task representing the asynchronous operation.</returns>
     protected async Task WriteCacheAsync(CacheTypes.CacheCatalog cacheCatalog)
     {
-        // Review N3: write a temp file in the cache directory and rename it into place. The former
-        // File.Copy(overwrite) from a temp file on another volume rewrote the cache in place (a parallel reader
-        // could see a partial file) and leaked the temp file after failed attempts.
+        // Review N3: write a temp file in the cache directory and rename it into place (a parallel reader sees the old
+        // or the new cache, never a partial one). AB#9305: parallel CK model builds of one solution write this cache
+        // at the same time; the writers are serialized by a lock file and transient rename failures are retried.
         var cachePath = Path.Combine(catalogOptions.CacheDirectory, catalogOptions.CacheFileName);
-        const int maxRetries = 5;
-        for (var attempt = 1; attempt <= maxRetries; attempt++)
-        {
-            try
+        await CatalogFileIo.WriteJsonExclusiveAsync(cachePath, cacheCatalog,
+            new System.Text.Json.JsonSerializerOptions
             {
-                await CatalogFileIo.WriteJsonAtomicallyAsync(cachePath, cacheCatalog,
-                    new System.Text.Json.JsonSerializerOptions
-                    {
-                        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
-                        Converters = { new CkVersionConverter() }
-                    }).ConfigureAwait(false);
-                return;
-            }
-            catch (IOException) when (attempt < maxRetries)
-            {
-                // Wait a bit before retrying
-                await Task.Delay(200).ConfigureAwait(false);
-            }
-        }
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+                Converters = { new CkVersionConverter() }
+            }, CacheWriteRetryBudget).ConfigureAwait(false);
     }
+
+    /// <summary>
+    ///     AB#9305: how long <see cref="WriteCacheAsync" /> retries transient write failures; tests shorten it.
+    /// </summary>
+    internal TimeSpan CacheWriteRetryBudget { get; set; } = CatalogFileIo.DefaultWriteRetryBudget;
 }

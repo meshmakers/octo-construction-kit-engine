@@ -151,8 +151,14 @@ side is N in the schema; a second released storno of one original is refused in 
 AB#9754 implements `PeriodKind`, `FiscalYearStartMonth`, `ReferenceTimeZone`, `Periods`, the format tokens and the
 first number of a new fiscal year (`StartValue`, or 1) in engine-mongodb (`AutoIncrementModifier`, rules in
 `AutoIncrementRangeSettings`): the fiscal year is read from the entity's creation time until AB#9758 switches ranges with
-`Release` to the release time. The `StartValue` floor of D5 for ranges without periods (AB#9755) and `Release`
-(AB#9758 ff.) are not built yet. A service built before AB#9754 ignores the new attributes and numbers a fiscal-year
+`Release` to the release time. AB#9755 adds the `StartValue` floor of D5: every allocation (with and without periods)
+takes its block from `max(counter, StartValue - 1) + 1` on, in the same single atomic statement (a pipeline update), so
+a start value continues an external range and one set below a counter in use is ignored. The range rules also refuse a
+`StartValue` below 1 or above `End`, and they are checked for partial updates of a range too (engine hook
+`IPreDocumentUpdateValidation`, called by `BulkRtMutation` before anything of the batch is written): an update that makes
+the stored range invalid is refused up front, not only when the next number is taken. Counters are entities of the
+tenant database, so company tenants under one group tenant number independently; `CurrentValue`, `Periods` and the
+configuration attributes are `TenantOwned`, so a seed re-apply keeps them. `Release` (AB#9758 ff.) is not built yet. A service built before AB#9754 ignores the new attributes and numbers a fiscal-year
 range like a legacy counter, so configure them only on an installation whose services contain the implementation.
 
 ## 5. Outside System

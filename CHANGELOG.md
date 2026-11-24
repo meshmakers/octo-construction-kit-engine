@@ -7,6 +7,16 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ## Unreleased
 
+### Added
+
+- **Partial updates can be validated before they are written (AB#9755).** New hook
+  `IPreDocumentUpdateValidation<RtEntity>` (`Runtime.Contracts.Repositories`): `BulkRtMutation` hands it the partial
+  entities of a batch's updates (with `RtId` and `CkTypeId`) before anything of the batch is written - deletes, inserts
+  and replaces included - so an implementation that throws refuses the whole batch. The pre-document modifications run
+  on insert and replace only; this closes the gap for rules a stored entity must keep (engine-mongodb uses it for the
+  number-range rules). Skipped, like the modifications, when `DisablePreDocumentModifications` is set; without a
+  registered implementation nothing changes. Tests: `BulkRtMutationUpdateValidationTests`.
+
 ### Fixed
 
 - **Blueprint applies of several tenants at the same time no longer share one import state (AB#9803, security).** The

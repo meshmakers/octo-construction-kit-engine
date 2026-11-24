@@ -18,11 +18,15 @@ internal class BulkRtMutation(
     IEntityRuleEngine entityRuleEngine,
     IGraphRuleEngine graphRuleEngine,
     IEnumerable<IPreDocumentModification<RtEntity>> preDocumentModifications,
-    ISecretWriteNormalizer secretWriteNormalizer)
+    ISecretWriteNormalizer secretWriteNormalizer,
+    IEnumerable<IPreDocumentUpdateValidation<RtEntity>>? preDocumentUpdateValidations = null)
     : IBulkRtMutation
 {
     private readonly List<IPreDocumentModification<RtEntity>> _preDocumentModifications =
         preDocumentModifications.ToList();
+
+    private readonly List<IPreDocumentUpdateValidation<RtEntity>> _preDocumentUpdateValidations =
+        preDocumentUpdateValidations?.ToList() ?? [];
 
     /// <inheritdoc />
     public ISecretWriteNormalizer SecretWriteNormalizer => secretWriteNormalizer;
@@ -83,6 +87,11 @@ internal class BulkRtMutation(
         EntityRuleEngineResult<RtEntity> entityRuleEngineResult, BulkRtMutationOptions options,
         OperationResult callerResult)
     {
+        // AB#9755: partial updates are checked before anything of the batch is written (deletes included), so a
+        // refused update leaves the whole batch unwritten.
+        await ValidateUpdatesAsync(session, repositoryDataSource, entityRuleEngineResult.RtEntitiesToUpdate, options)
+            .ConfigureAwait(false);
+
         if (entityRuleEngineResult.RtEntitiesToDelete.Any())
         {
             await DeleteRtEntityAsync(session, repositoryDataSource, ckCacheService,
@@ -109,6 +118,34 @@ internal class BulkRtMutation(
         {
             await InsertRtEntitiesAsync(session, repositoryDataSource, ckCacheService,
                 entityRuleEngineResult.RtEntitiesToInsert, options).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    ///     Runs the <see cref="IPreDocumentUpdateValidation{TDocument}" /> hooks over the partial updates (AB#9755): the
+    ///     pre-document modifications run on insert and replace only, so without this a partial update could store a
+    ///     configuration they refuse. Skipped like the modifications when they are disabled (restore, raw import).
+    /// </summary>
+    private async Task ValidateUpdatesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        IReadOnlyDictionary<RtEntityId, RtEntity> rtEntitiesToUpdate, BulkRtMutationOptions options)
+    {
+        if (_preDocumentUpdateValidations.Count == 0 || rtEntitiesToUpdate.Count == 0 ||
+            options.DisablePreDocumentModifications)
+        {
+            return;
+        }
+
+        var partialEntities = new List<RtEntity>(rtEntitiesToUpdate.Count);
+        foreach (var (rtEntityId, rtEntity) in rtEntitiesToUpdate)
+        {
+            rtEntity.RtId = rtEntityId.RtId;
+            rtEntity.CkTypeId = rtEntityId.CkTypeId;
+            partialEntities.Add(rtEntity);
+        }
+
+        foreach (var validation in _preDocumentUpdateValidations)
+        {
+            await validation.RunAsync(session, repositoryDataSource, partialEntities).ConfigureAwait(false);
         }
     }
 

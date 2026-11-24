@@ -22,6 +22,12 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   `BlueprintId` in a log scope, and the duplicate warning names the tenant. No CK model change; `IImportRtModelCommand`
   is unchanged.
 
+- **The entity rule engine keeps the order of the input for inserts and replaces (AB#9753).** `EntityRuleEngine`
+  validates a batch in parallel and collected the inserts in a `ConcurrentBag`, so `RtEntitiesToInsert` (and the
+  replaces) came out in an unspecified order and auto-increment numbers of one batch were not handed out in batch
+  order. Inserts and replaces are now returned in the order of the `IEntityUpdateInfo` list; the validation still runs
+  in parallel. Test: `EntityRuleEngineTests.ValidateAsync_InsertsAndReplaces_KeepTheInputOrder`.
+
 - **Parallel CK model builds no longer fail writing the catalog cache (AB#9305).** Two CK compile tasks of one solution
   (parallel MSBuild nodes) or parallel `octo-ckc` runs that wrote the same catalog cache at the same time failed about
   every third build on Windows with `UnauthorizedAccessException` ("Access to the path is denied") or an `IOException` in

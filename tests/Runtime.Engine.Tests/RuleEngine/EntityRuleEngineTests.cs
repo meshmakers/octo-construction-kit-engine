@@ -108,6 +108,37 @@ public class EntityRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<
         Assert.False(operationResult.HasFatalErrors);
     }
 
+    /// <summary>
+    ///     AB#9753: the validation runs in parallel, but inserts and replaces come out in the order of the input, so an
+    ///     auto-increment counter numbers a batch in batch order.
+    /// </summary>
+    [Fact]
+    public async Task ValidateAsync_InsertsAndReplaces_KeepTheInputOrder()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+
+        RtEntity Country(int i) => new("Test/Country", OctoObjectId.GenerateNewId(),
+            new Dictionary<string, object?> { { "Designation", $"Country {i}" }, { "RecordArrayTests", new List<object>() } });
+
+        var inserts = Enumerable.Range(0, 200).Select(Country).ToList();
+        var replaces = Enumerable.Range(0, 200).Select(Country).ToList();
+        var updateInfos = new List<IEntityUpdateInfo<RtEntity>>();
+        for (var i = 0; i < inserts.Count; i++)
+        {
+            updateInfos.Add(EntityUpdateInfo<RtEntity>.CreateInsert(inserts[i]));
+            updateInfos.Add(EntityUpdateInfo<RtEntity>.CreateReplace(
+                new RtEntityId(new RtCkId<CkTypeId>("Test/Country"), replaces[i].RtId), replaces[i]));
+        }
+
+        var operationResult = new OperationResult();
+        var ruleEngineResult = await new EntityRuleEngine(ckCacheService).ValidateAsync(fixture.TenantId, updateInfos,
+            new OriginFileResolver("Test"), operationResult);
+
+        Assert.False(operationResult.HasErrors || operationResult.HasFatalErrors, operationResult.GetMessages());
+        Assert.Equal(inserts.Select(e => e.RtId), ruleEngineResult.RtEntitiesToInsert.Select(e => e.RtId));
+        Assert.Equal(replaces.Select(e => e.RtId), ruleEngineResult.RtEntitiesToReplace.Values.Select(e => e.RtId));
+    }
+
     [Fact]
     public async Task ValidateAsync_Update_MissingMandatoryAttribute_Fail()
     {

@@ -42,8 +42,10 @@ initialises it, and a re-apply neither resets a counter nor undoes the tenant's 
 | `CurrentValue` | Int | last number handed out in this fiscal year |
 
 One entry per fiscal year, so that one atomic `findOneAndUpdate` advances exactly one fiscal year's counter
-(`$inc` on `Periods.$[p].CurrentValue` with an array filter on `FiscalYear`; a missing year is added with a
-conditional `$push` and the increment retried). `CurrentValue` stays the counter of ranges without periods.
+(`$inc` on `Periods.$[p].CurrentValue` with an array filter on `FiscalYear`). A missing year is added together with its
+first block by one conditional update that matches only while no entry of that year exists, so two writers never both
+create it; the loser increments the entry the winner added (AB#9754). `CurrentValue` stays the counter of ranges
+without periods.
 
 ### 1.3 Record `System/NumberRangeRelease`
 
@@ -146,8 +148,12 @@ side is N in the schema; a second released storno of one original is refused in 
 | Association role `Cancels` | Minor, new role; no existing type declares it, so no existing entity or GraphQL type changes until a document model opts in. |
 | Version | `System-2.8.0` -> `System-2.9.0`; no CK migration script; dependents with `System-[2.x,3.0)` need no re-pin. Verified by `System29_AgainstSystem280_IsAMinor_WithOnlyAddedElements` (`tests/ConstructionKit.Compiler.Tests/SystemInterfacesTests.cs`). |
 
-Until the engine stories are rolled out, a configured `PeriodKind`, `StartValue` or `Release` has no effect: such a
-range numbers like a legacy counter. Configure them only on an installation whose services contain the implementation.
+AB#9754 implements `PeriodKind`, `FiscalYearStartMonth`, `ReferenceTimeZone`, `Periods`, the format tokens and the
+first number of a new fiscal year (`StartValue`, or 1) in engine-mongodb (`AutoIncrementModifier`, rules in
+`AutoIncrementRangeSettings`): the fiscal year is read from the entity's creation time until AB#9758 switches ranges with
+`Release` to the release time. The `StartValue` floor of D5 for ranges without periods (AB#9755) and `Release`
+(AB#9758 ff.) are not built yet. A service built before AB#9754 ignores the new attributes and numbers a fiscal-year
+range like a legacy counter, so configure them only on an installation whose services contain the implementation.
 
 ## 5. Outside System
 

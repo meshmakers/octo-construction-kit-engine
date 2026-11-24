@@ -30,6 +30,9 @@ _Required bump level: minor._
   lock, storno, audit, gap report) comes with the engine and engine-mongodb stories of AB#8675 and AB#8676.
   Until a service runs that code, a range configured with `PeriodKind`, `StartValue` or `Release` numbers like
   a legacy counter: configure them only after the implementation is rolled out.
+- `ReferenceTimeZone` is optional in the schema but required by the engine for a range with
+  `PeriodKind: FiscalYear`: such a range without a valid IANA zone is refused when it is configured, there is no
+  silent UTC default. Ranges without a period reset may leave it empty.
 - `Cancels` is only a role: a document model declares it on its storno type (for example on Basic `Document`)
   in its own minor version.
 - Design note with the mapping of every acceptance criterion to these elements:

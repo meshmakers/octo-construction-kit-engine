@@ -19,7 +19,7 @@ attributes:
     valueType: Int
     ownership: TenantOwned
   - id: AutoIncrement.ReferenceTimeZone
-    description: "IANA time zone (e.g. 'Europe/Vienna') in which the allocation or release time is read to decide the fiscal year; absent means UTC."
+    description: "IANA time zone (e.g. 'Europe/Vienna') in which the allocation or release time is read to decide the fiscal year. Required when PeriodKind is FiscalYear: such a range without a valid zone is refused when it is configured (no silent UTC default); a range without a period reset may leave it empty."
     valueType: String
     ownership: TenantOwned
   - id: AutoIncrement.Periods

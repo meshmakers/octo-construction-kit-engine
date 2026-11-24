@@ -30,7 +30,7 @@ initialises it, and a re-apply neither resets a counter nor undoes the tenant's 
 | `StartValue` | Int | first number of the range and of every new period | continue from `CurrentValue` |
 | `PeriodKind` | Enum `AutoIncrementPeriodKinds` (`None` = 0, `FiscalYear` = 1) | whether the counter restarts per fiscal year | `None` |
 | `FiscalYearStartMonth` | Int 1-12 | month in which the fiscal year starts | 1 (calendar year) |
-| `ReferenceTimeZone` | String, IANA id | zone in which the allocation or release time is read to decide the fiscal year | UTC |
+| `ReferenceTimeZone` | String, IANA id | zone in which the allocation or release time is read to decide the fiscal year | allowed only without a period reset; with `PeriodKind = FiscalYear` the range is refused at configuration time (D2) |
 | `Periods` | RecordArray of `AutoIncrementPeriod` | the per-fiscal-year counters of a `FiscalYear` range | no periods |
 | `Release` | Record `NumberRangeRelease` | numbering on release and lock of released documents | numbering on insert, no lock |
 
@@ -94,7 +94,7 @@ side is N in the schema; a second released storno of one original is refused in 
 | # | Decision | Reason |
 |---|----------|--------|
 | D1 | **The release configuration lives on the number range** (`AutoIncrement.Release`), not on the CK type attribute and not through AB#5983 (decided by Odin, comment on AB#9752). The lock finds it through the type attribute's `autoIncrementReference`. If AB#5983 (state-conditional data policies) starts first, the lock of AB#8676 uses its mechanism. | No meta-schema change, tenants configure it at run time, one System bump. |
-| D2 | **The fiscal year is decided by the release date in the range's `ReferenceTimeZone`** (absent = UTC), not by UTC (Odin). A range without release configuration uses the allocation (insert) time. | The invoice date is the release date; a release at 00:30 local time on 1 January belongs to the new year. System has no tenant time zone, so the zone is part of the range. |
+| D2 | **The fiscal year is decided by the release date in the range's `ReferenceTimeZone`**, not by UTC (Odin). A range without release configuration uses the allocation (insert) time. The zone is **required** for a range with `PeriodKind = FiscalYear`: a missing or unknown IANA id is a validation error when the range is configured, never a silent UTC default; only a range without a period reset may leave it empty. No tenant-level time zone in this bump (Odin, 2026-11-24). | The invoice date is the release date; a release at 00:30 local time on 1 January belongs to the new year, and a missing zone must not quietly put it into the old one. A tenant time zone would be a System-wide concept beyond this Feature. |
 | D3 | **A batch that changes a released document is refused as a whole**, with a forbidden error naming the document (Odin). | No partial write next to a locked document; matches the all-or-nothing rule of AB#8674. |
 | D4 | **A fiscal year is named by the calendar year in which it starts** (`FiscalYearStartMonth` 7: July 2027 - June 2028 is 2027; `{yyyy}` shows 2027). | One integer key per period; with start month 1 it equals the calendar year. |
 | D5 | **`StartValue` is a floor, never a reset**: the next number is `max(counter, StartValue - 1) + 1`. A start value set below a counter already in use is ignored, so it never produces a duplicate. Every new fiscal year starts at `StartValue` (or 1). | Continuing an external range (1235 after 1234) and protecting numbers already issued, without a separate validation path. |

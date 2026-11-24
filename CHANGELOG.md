@@ -18,7 +18,8 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   and moved the cache, so a parallel reader could find no cache at all:
   - writers are serialized by a cross-process lock file next to the cache (`.<cache file>.lock`, kept like the index
     locks); the write stays a temp file next to the cache renamed into place, so a parallel reader sees the old or the new
-    cache, never a partial one, and the last writer wins; no temp file is left behind;
+    cache, never a partial one, and the last writer wins; no temp file is left behind (an older engine writing the
+    same cache at the same time can still leave the `~RF*.TMP` backup files of the Windows `File.Replace` behind);
   - a rename that still fails (a writer of an older engine without the lock, a reader or virus scanner holding the file)
     is retried on `IOException` and `UnauthorizedAccessException` with a growing delay for up to 30 seconds; the
     netstandard2.0 build (MSBuild on .NET Framework) no longer checks for the target and then replaces or moves it, a

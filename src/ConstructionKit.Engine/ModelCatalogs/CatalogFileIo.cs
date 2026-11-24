@@ -100,13 +100,16 @@ internal static class CatalogFileIo
         var lockPath = WriterLockPath(fullPath);
 
         IDisposable writerLock;
+        var lockStarted = DateTime.UtcNow;
         try
         {
             writerLock = await AcquireLockAsync(lockPath).ConfigureAwait(false);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            throw WriteFailed(fullPath, $"the writer lock '{lockPath}' was not free within {LockTimeout.TotalSeconds:0} s", e);
+            throw WriteFailed(fullPath, DateTime.UtcNow - lockStarted >= LockTimeout
+                ? $"the writer lock '{lockPath}' was not free within {LockTimeout.TotalSeconds:0} s"
+                : $"the writer lock '{lockPath}' could not be opened", e);
         }
 
         using (writerLock)

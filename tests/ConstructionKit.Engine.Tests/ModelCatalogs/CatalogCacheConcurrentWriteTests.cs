@@ -96,7 +96,8 @@ public sealed class CatalogCacheConcurrentWriteTests : IDisposable
         }
     }
 
-    private string[] LeftoverTempFiles() => Directory.GetFiles(_cacheDirectory, "*.tmp");
+    private string[] LeftoverTempFiles() =>
+        Directory.GetFiles(_cacheDirectory, "*.tmp").Select(Path.GetFileName).Select(n => n!).ToArray();
 
     [Fact]
     public async Task Concurrent_writers_and_readers_of_one_cache_never_fail_and_leave_one_complete_cache()
@@ -314,7 +315,17 @@ public sealed class CatalogCacheConcurrentWriteTests : IDisposable
         }
 
         Assert.Equal(modelsPerCatalog, ReadRaw<CacheTypes.CacheCatalog>(CachePath).Models.Count);
-        Assert.Empty(LeftoverTempFiles());
+        if (withUnlockedWriter && strategy == "replace")
+        {
+            // Two File.Replace calls that race (only possible with a writer that takes no lock, i.e. an older engine)
+            // can leave the Windows backup files "<cache>~RF<hex>.TMP" of ReplaceFile behind; this engine's own temp
+            // files never stay.
+            Assert.DoesNotContain(LeftoverTempFiles(), n => n.StartsWith($".{CacheFileName}.", StringComparison.Ordinal));
+        }
+        else
+        {
+            Assert.Empty(LeftoverTempFiles());
+        }
     }
 
     [Theory]

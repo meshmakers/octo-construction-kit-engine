@@ -12,3 +12,11 @@ associationRoles:
     inboundMultiplicity: N
     outboundName: RelatesTo
     outboundMultiplicity: N
+  # System 2.9.0 (AB#9752): a storno document cancels exactly one released original. The document
+  # model declares it on its storno type (e.g. Basic/Document); System declares only the role.
+  - id: Cancels
+    description: "A storno (cancellation) document references the released document it cancels; the original stays unchanged."
+    inboundName: CancelledBy
+    inboundMultiplicity: N
+    outboundName: Cancels
+    outboundMultiplicity: One

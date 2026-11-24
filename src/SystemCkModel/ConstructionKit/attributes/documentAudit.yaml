@@ -1,0 +1,42 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+attributes:
+  - id: DocumentAuditEntry.DocumentRtId
+    description: "RtId of the document the entry is about."
+    valueType: String
+  - id: DocumentAuditEntry.DocumentCkTypeId
+    description: "CK type id of the document the entry is about."
+    valueType: String
+  - id: DocumentAuditEntry.Action
+    description: "What happened: Release, Storno or Denied."
+    valueType: Enum
+    valueCkEnumId: ${this}/DocumentAuditActions
+  - id: DocumentAuditEntry.Timestamp
+    description: "When it happened (UTC)."
+    valueType: DateTime
+  - id: DocumentAuditEntry.SubjectId
+    description: "User id (subject) of the caller, if a user acted."
+    valueType: String
+  - id: DocumentAuditEntry.ClientId
+    description: "OAuth client id of the caller (service, pipeline or app)."
+    valueType: String
+  - id: DocumentAuditEntry.DocumentNumber
+    description: "The document number as formatted on release."
+    valueType: String
+  - id: DocumentAuditEntry.FiscalYear
+    description: "Fiscal year of the number (ranges with PeriodKind FiscalYear)."
+    valueType: Int
+  - id: DocumentAuditEntry.SequenceValue
+    description: "The unformatted counter value of the number, for the gap and duplicate report."
+    valueType: Int
+  - id: DocumentAuditEntry.ReferenceRtId
+    description: "Storno: on the original the RtId of the storno, on the storno the RtId of the original."
+    valueType: String
+  - id: DocumentAuditEntry.Source
+    description: "Denied: where the refused write came from (GraphQL, REST path or pipeline), if known."
+    valueType: String
+  - id: DocumentAuditEntry.AttributeNames
+    description: "Denied: names of the attributes the refused write tried to change."
+    valueType: StringArray
+  - id: DocumentAuditEntry.Message
+    description: "Optional detail, e.g. the error code of a refused write."
+    valueType: String

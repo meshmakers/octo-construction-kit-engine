@@ -1,0 +1,54 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+attributes:
+  # System 2.9.0 (AB#9752) - number ranges (Feature AB#8675) and released-document locks
+  # (Feature AB#8676) on System/AutoIncrement. All of them are TenantOwned like End, Format and
+  # CurrentValue (AB#5359): a finance admin configures the range on the running tenant, the seed
+  # only initialises it, and a blueprint re-apply must neither reset a counter nor undo the
+  # tenant's configuration. Design note: docs/concept-number-ranges-and-released-documents.md.
+  - id: AutoIncrement.StartValue
+    description: "First number of the range and of every new period. The next number is max(current value, StartValue - 1) + 1, so a start value below a counter already in use never produces a duplicate. Absent: the counter continues from CurrentValue as before."
+    valueType: Int
+    ownership: TenantOwned
+  - id: AutoIncrement.PeriodKind
+    description: "Whether the counter restarts per period. Absent or None: one counter for the whole range (CurrentValue), as before. FiscalYear: one counter per fiscal year in Periods."
+    valueType: Enum
+    valueCkEnumId: ${this}/AutoIncrementPeriodKinds
+    ownership: TenantOwned
+  - id: AutoIncrement.FiscalYearStartMonth
+    description: "Month (1-12) in which the fiscal year starts; absent means 1 (fiscal year = calendar year). A fiscal year is named by the calendar year in which it starts."
+    valueType: Int
+    ownership: TenantOwned
+  - id: AutoIncrement.ReferenceTimeZone
+    description: "IANA time zone (e.g. 'Europe/Vienna') in which the allocation or release time is read to decide the fiscal year; absent means UTC."
+    valueType: String
+    ownership: TenantOwned
+  - id: AutoIncrement.Periods
+    description: "Per-period counters of a range with PeriodKind FiscalYear, one entry per fiscal year, so that one atomic update can advance the counter of exactly one fiscal year."
+    valueType: RecordArray
+    valueCkRecordId: ${this}/AutoIncrementPeriod
+    ownership: TenantOwned
+  - id: AutoIncrement.Release
+    description: "Release configuration of the documents numbered by this range: absent means numbering on insert and no lock, as before. Present: the number is allocated when a document reaches a released state, and a released document is locked."
+    valueType: Record
+    valueCkRecordId: ${this}/NumberRangeRelease
+    ownership: TenantOwned
+
+  - id: AutoIncrementPeriod.FiscalYear
+    description: "The fiscal year of this counter, named by the calendar year in which it starts (e.g. 2026 for July 2026 - June 2027)."
+    valueType: Int
+  - id: AutoIncrementPeriod.CurrentValue
+    description: "The last number handed out in this fiscal year."
+    valueType: Int
+
+  - id: NumberRangeRelease.StateAttribute
+    description: "Name of the attribute of the document type that holds the document state (e.g. 'DocumentState')."
+    valueType: String
+  - id: NumberRangeRelease.ReleasedValues
+    description: "State values that mean released: an enum value by its name or a string value, compared case-sensitively. A document in one of these states gets its number and is locked."
+    valueType: StringArray
+  - id: NumberRangeRelease.ChangeableAttributes
+    description: "Names of the attributes that may still be changed on a released document (e.g. a payment status); absent means none."
+    valueType: StringArray
+  - id: NumberRangeRelease.StornoCkTypeId
+    description: "CK type id of the storno (cancellation) document of this document type; it references the original through the association role System/Cancels. Absent: no storno is configured."
+    valueType: String

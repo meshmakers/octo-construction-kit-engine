@@ -13,3 +13,23 @@ types:
         isOptional: true
       - id: ${this}/AutoIncrement.CurrentValue
         name: CurrentValue
+      # System 2.9.0 (AB#9752): number ranges per fiscal year and released-document locks.
+      # Every attribute below is optional; a counter without them numbers exactly as before.
+      - id: ${this}/AutoIncrement.StartValue
+        name: StartValue
+        isOptional: true
+      - id: ${this}/AutoIncrement.PeriodKind
+        name: PeriodKind
+        isOptional: true
+      - id: ${this}/AutoIncrement.FiscalYearStartMonth
+        name: FiscalYearStartMonth
+        isOptional: true
+      - id: ${this}/AutoIncrement.ReferenceTimeZone
+        name: ReferenceTimeZone
+        isOptional: true
+      - id: ${this}/AutoIncrement.Periods
+        name: Periods
+        isOptional: true
+      - id: ${this}/AutoIncrement.Release
+        name: Release
+        isOptional: true

@@ -95,14 +95,50 @@ public sealed class SystemInterfacesTests : IDisposable
         return dir;
     }
 
+    /// <summary>The files System 2.9.0 adds (AB#9752): number ranges, release configuration and the document audit trail.</summary>
+    private static readonly string[] System29Files =
+    [
+        "attributes/numberRange.yaml", "attributes/documentAudit.yaml", "records/numberRange.yaml",
+        "enums/numberRange.yaml", "types/documentAudit.yaml"
+    ];
+
+    /// <summary>
+    ///     Cuts the 2.9.0 additions off an existing file: the new <c>AutoIncrement</c> attributes and the
+    ///     <c>Cancels</c> association role are appended after a comment line that starts with this marker.
+    /// </summary>
+    private static string WithoutSystem29(string path, string yaml)
+    {
+        if (path is not ("types/autoIncrement.yaml" or "associations/ck-associations.yaml"))
+        {
+            return yaml;
+        }
+
+        var marker = yaml.IndexOf("# System 2.9.0 (AB#9752)", StringComparison.Ordinal);
+        Assert.True(marker > 0, $"2.9.0 marker missing in {path}");
+        return yaml[..(yaml.LastIndexOf('\n', marker) + 1)];
+    }
+
+    /// <summary>The real sources without the 2.9.0 additions, at <paramref name="version"/>, then <paramref name="transform"/>.</summary>
+    private string CopySystemBefore29(string name, string version, Func<string, string, string> transform)
+    {
+        var dir = CopySystem(name, (path, yaml) =>
+            transform(path, path == "ckModel.yaml" ? SetVersion(yaml, version) : WithoutSystem29(path, yaml)));
+        foreach (var file in System29Files)
+        {
+            File.Delete(Path.Combine(dir, file));
+        }
+
+        return dir;
+    }
+
+    /// <summary>System 2.8.0 as it was published: the 2.9.0 sources without the number-range and document-audit additions (AB#9752).</summary>
+    private string CopySystem280() => CopySystemBefore29("system-2.8.0", "2.8.0", (_, yaml) => yaml);
+
     /// <summary>System 2.7.0 as it was published: the 2.8.0 sources without the <c>Integral</c> aggregation type (AB#7918).</summary>
     private string CopySystem270() =>
-        CopySystem("system-2.7.0", (path, yaml) => path switch
-        {
-            "ckModel.yaml" => SetVersion(yaml, "2.7.0"),
-            "enums/aggregationTypes.yaml" => yaml[..yaml.IndexOf("  - key: 7", StringComparison.Ordinal)],
-            _ => yaml
-        });
+        CopySystemBefore29("system-2.7.0", "2.7.0", (path, yaml) => path == "enums/aggregationTypes.yaml"
+            ? yaml[..yaml.IndexOf("  - key: 7", StringComparison.Ordinal)]
+            : yaml);
 
     private async Task PublishAsync(string sourceDir, string catalog)
     {
@@ -157,8 +193,8 @@ public sealed class SystemInterfacesTests : IDisposable
         Assert.Null(parent.TargetCkTypeId);
         Assert.False(parent.IsOptional);
 
-        // No new association role: ParentChild and Related are the only roles, as before.
-        Assert.Equal(["ParentChild-1", "Related-1"], compiled.AssociationRoles!.Select(r => r.AssociationRoleId.ToString()!.Split('/').Last()).Order());
+        // The interfaces add no association role; Cancels comes with 2.9.0 (AB#9752, storno of a released document).
+        Assert.Equal(["Cancels-1", "ParentChild-1", "Related-1"], compiled.AssociationRoles!.Select(r => r.AssociationRoleId.ToString()!.Split('/').Last()).Order());
     }
 
     [Fact]
@@ -209,7 +245,7 @@ public sealed class SystemInterfacesTests : IDisposable
         // AB#7918: AggregationTypes gains Integral (key 7). An added enum value is additive (Minor),
         // needs no migration, and stored AggregationSdQuery entities keep their values.
         await PublishAsync(CopySystem270(), InMemoryPublishedCatalog.Name);
-        var against270 = await RunGateAsync(RealSystemSource());
+        var against270 = await RunGateAsync(CopySystem280());
 
         Assert.Empty(Errors(against270));
         Assert.Equal(CkSemVerLevel.Minor, against270.Verdict!.RequiredLevel);
@@ -222,6 +258,54 @@ public sealed class SystemInterfacesTests : IDisposable
         Assert.Equal(CkModelChangeKind.Added, change.Change.ChangeKind);
         Assert.Contains("AggregationTypes", change.Change.ElementId, StringComparison.Ordinal);
         Assert.Equal(CkSemVerLevel.Minor, change.Level);
+    }
+
+    [Fact]
+    public async Task System29_AgainstSystem280_IsAMinor_WithOnlyAddedElements()
+    {
+        // AB#9752: number ranges (AB#8675) and released-document locks (AB#8676) ship in one System bump.
+        // Every change is an addition (optional attributes on AutoIncrement, new records, enums, a type and an
+        // association role), so 2.8.0 -> 2.9.0 is a Minor, needs no migration and dependents need no re-pin.
+        await PublishAsync(CopySystem280(), InMemoryPublishedCatalog.Name);
+        var against280 = await RunGateAsync(RealSystemSource());
+
+        Assert.Empty(Errors(against280));
+        Assert.Equal(CkSemVerLevel.Minor, against280.Verdict!.RequiredLevel);
+        Assert.Contains("2.8.0", against280.Verdict.BaselineId.ToString());
+        var structural = against280.Verdict.ClassifiedChanges
+            .Where(c => c.Change.ElementKind != CkModelElementKind.Model)
+            .ToList();
+        Assert.NotEmpty(structural);
+        Assert.All(structural, c =>
+        {
+            Assert.Equal(CkModelChangeKind.Added, c.Change.ChangeKind);
+            Assert.NotEqual(CkSemVerLevel.Major, c.Level);
+        });
+    }
+
+    [Fact]
+    public async Task System29_NumberRangeAndAuditAdditions_AreOptional_SoExistingCountersStayValid()
+    {
+        // AB#9752: an existing counter (End, Format, CurrentValue only - the shape of the Basic and
+        // energy-community seeds) must stay valid, so every new AutoIncrement attribute is optional.
+        var compiled = await _fixture.CompileAsync(RealSystemSource());
+        Assert.Contains("2.9.0", compiled.ModelId.ToString());
+
+        var autoIncrement = Assert.Single(compiled.Types!, t => t.TypeId.Name == "AutoIncrement");
+        var attributes = autoIncrement.Attributes!.ToDictionary(a => a.AttributeName);
+        Assert.False(attributes["End"].IsOptional);
+        Assert.False(attributes["CurrentValue"].IsOptional);
+        foreach (var name in new[] { "Format", "StartValue", "PeriodKind", "FiscalYearStartMonth", "ReferenceTimeZone", "Periods", "Release" })
+        {
+            Assert.True(attributes[name].IsOptional, $"AutoIncrement.{name} must be optional");
+        }
+
+        Assert.Contains(compiled.Types!, t => t.TypeId.Name == "DocumentAuditEntry");
+        Assert.Contains(compiled.Records!, r => r.RecordId.Name == "AutoIncrementPeriod");
+        Assert.Contains(compiled.Records!, r => r.RecordId.Name == "NumberRangeRelease");
+        Assert.Contains(compiled.Enums!, e => e.EnumId.Name == "AutoIncrementPeriodKinds");
+        Assert.Contains(compiled.Enums!, e => e.EnumId.Name == "DocumentAuditActions");
+        Assert.Contains(compiled.AssociationRoles!, r => r.AssociationRoleId.FullName.StartsWith("Cancels", StringComparison.Ordinal));
     }
 
     private async Task<(OperationResult Result, CkCompiledModelRoot? Compiled)> CompileProbeAsync(string typeYaml)

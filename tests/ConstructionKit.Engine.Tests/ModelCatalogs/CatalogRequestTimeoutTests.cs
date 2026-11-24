@@ -286,7 +286,8 @@ public sealed class CatalogRequestTimeoutTests : IDisposable
 
     private bool ReadSourceUnreachable()
     {
-        var cacheFile = Assert.Single(Directory.GetFiles(_cacheDirectory, "*", SearchOption.AllDirectories));
+        // AB#9305: the cache directory also holds the writer lock file (.<cache file>.lock); the cache is the JSON file.
+        var cacheFile = Assert.Single(Directory.GetFiles(_cacheDirectory, "*.json", SearchOption.AllDirectories));
         using var cache = System.Text.Json.JsonDocument.Parse(File.ReadAllText(cacheFile));
         return cache.RootElement.EnumerateObject()
             .Single(p => string.Equals(p.Name, "SourceUnreachable", StringComparison.OrdinalIgnoreCase)).Value

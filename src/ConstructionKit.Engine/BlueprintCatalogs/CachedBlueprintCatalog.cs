@@ -2,6 +2,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
+using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
 
@@ -235,36 +236,30 @@ public abstract class CachedBlueprintCatalog(
             }
         }
 
-#if NETSTANDARD2_0
-        using var streamReader = new FileStream(
-            cachePath,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.ReadWrite,
-            bufferSize: 4096,
-            useAsync: true
-        );
-#else
-        await using var streamReader = new FileStream(
-            cachePath,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.ReadWrite,
-            bufferSize: 4096,
-            useAsync: true
-        );
-#endif
+        // AB#9305: a parallel writer replaces the file by a rename; read it into memory (the handle open only for the
+        // copy) and retry the rare open that meets the rename on Windows. The rename keeps the content complete.
+        const int maxRetries = 3;
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                using var content = await CatalogFileIo.ReadSharedAsync(cachePath).ConfigureAwait(false);
+                var result = await System.Text.Json.JsonSerializer
+                    .DeserializeAsync<BlueprintCacheTypes.BlueprintCacheCatalog>(content,
+                        new System.Text.Json.JsonSerializerOptions
+                        {
+                            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+                            Converters = { new CkVersionConverter() }
+                        }).ConfigureAwait(false);
 
-        var result = await System.Text.Json.JsonSerializer
-            .DeserializeAsync<BlueprintCacheTypes.BlueprintCacheCatalog>(streamReader,
-                new System.Text.Json.JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
-                    Converters = { new CkVersionConverter() }
-                }).ConfigureAwait(false);
-        streamReader.Close();
-
-        return result ?? new BlueprintCacheTypes.BlueprintCacheCatalog();
+                return result ?? new BlueprintCacheTypes.BlueprintCacheCatalog();
+            }
+            catch (Exception ex) when (attempt < maxRetries &&
+                                       (ex is IOException || ex is UnauthorizedAccessException))
+            {
+                await Task.Delay(200).ConfigureAwait(false);
+            }
+        }
     }
 
     /// <summary>
@@ -291,45 +286,15 @@ public abstract class CachedBlueprintCatalog(
     /// <returns>A task representing the asynchronous operation.</returns>
     protected async Task WriteCacheAsync(BlueprintCacheTypes.BlueprintCacheCatalog cacheCatalog)
     {
-        var tempFileName = Path.GetTempFileName();
-
-#if NETSTANDARD2_0
-        using var streamWriter = File.Create(tempFileName);
-#else
-        await using var streamWriter = File.Create(tempFileName);
-#endif
-        await System.Text.Json.JsonSerializer
-            .SerializeAsync(streamWriter, cacheCatalog,
-                new System.Text.Json.JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
-                    Converters = { new CkVersionConverter() }
-                }).ConfigureAwait(false);
-        streamWriter.Close();
-
-        if (!Directory.Exists(catalogOptions.CacheDirectory))
-        {
-            Directory.CreateDirectory(catalogOptions.CacheDirectory);
-        }
-
+        // AB#9305: the former write (temp file in %TEMP%, then delete and move) was not atomic - a parallel reader
+        // could find no cache or fail on the file being deleted - and raced with parallel writers. Same path as the CK
+        // model cache now: lock file, temp file next to the cache, atomic rename, transient failures retried.
         var cachePath = Path.Combine(catalogOptions.CacheDirectory, catalogOptions.CacheFileName);
-
-        const int maxRetries = 5;
-        for (int attempt = 1; attempt <= maxRetries; attempt++)
-        {
-            try
+        await CatalogFileIo.WriteJsonExclusiveAsync(cachePath, cacheCatalog,
+            new System.Text.Json.JsonSerializerOptions
             {
-                if (File.Exists(cachePath))
-                {
-                    File.Delete(cachePath);
-                }
-                File.Move(tempFileName, cachePath);
-                break;
-            }
-            catch (IOException) when (attempt < maxRetries)
-            {
-                await Task.Delay(200).ConfigureAwait(false);
-            }
-        }
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+                Converters = { new CkVersionConverter() }
+            }).ConfigureAwait(false);
     }
 }

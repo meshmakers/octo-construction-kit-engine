@@ -7,6 +7,28 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ## Unreleased
 
+### Fixed
+
+- **Parallel CK model builds no longer fail writing the catalog cache (AB#9305).** Two CK compile tasks of one solution
+  (parallel MSBuild nodes) or parallel `octo-ckc` runs that wrote the same catalog cache at the same time failed about
+  every third build on Windows with `UnauthorizedAccessException` ("Access to the path is denied") or an `IOException` in
+  `CatalogFileIo.MoveIntoPlace`: only `IOException` was retried, for about one second, and a reader holding the cache open
+  blocked the rename. Both caches are fixed - the **CK model catalog cache** (`CachedCatalog`) and the **blueprint catalog
+  cache** (`CachedBlueprintCatalog`), which wrote a temp file in `%TEMP%` and then deleted
+  and moved the cache, so a parallel reader could find no cache at all:
+  - writers are serialized by a cross-process lock file next to the cache (`.<cache file>.lock`, kept like the index
+    locks); the write stays a temp file next to the cache renamed into place, so a parallel reader sees the old or the new
+    cache, never a partial one, and the last writer wins; no temp file is left behind (an older engine writing the
+    same cache at the same time can still leave the `~RF*.TMP` backup files of the Windows `File.Replace` behind);
+  - a rename that still fails (a writer of an older engine without the lock, a reader or virus scanner holding the file)
+    is retried on `IOException` and `UnauthorizedAccessException` with a growing delay for up to 30 seconds; the
+    netstandard2.0 build (MSBuild on .NET Framework) no longer checks for the target and then replaces or moves it, a
+    lost race is retried instead;
+  - readers copy the cache into memory and close it before parsing (a handle open on Windows blocks a writer's rename),
+    open it with `FileShare.Delete`, and retry an open that meets a rename;
+  - a write that still fails names the cache path and the type of the last error.
+  No interface change. Builds pick the fix up with the next `Meshmakers.Octo.ConstructionKit.MsBuildTasks` package.
+
 ### Added
 
 - **Seed associations to entities the tenant does not hold yet are kept and written later (AB#9651).** A blueprint seed

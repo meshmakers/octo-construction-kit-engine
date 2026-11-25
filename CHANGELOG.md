@@ -19,6 +19,13 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Fixed
 
+- **A replace no longer looks like a new entity to the pre-document modifications (AB#6209).** `BulkRtMutation` copied
+  the target key's `RtId` and `CkTypeId` into the replace payload only after the `IPreDocumentModification<RtEntity>`
+  pipeline had run. A replace whose payload carried an empty or another `RtId` (for example an entity from
+  `CreateTransientRtEntityAsync` passed to `ReplaceOneRtEntityByIdAsync`) therefore reached the modifications as a new
+  entity: the AutoIncrement modifier of engine-mongodb took a new number, overwrote the stored one and advanced the
+  counter. The target key now goes into the payload before the modifications run; inserts keep their own `RtId`. Tests:
+  `BulkRtMutationReplaceTargetKeyTests`.
 - **Blueprint applies of several tenants at the same time no longer share one import state (AB#9803, security).** The
   tenant setup on startup applies blueprints to the child tenants in parallel through one `BlueprintService`, which held
   one `ImportRtModelCommand`. Every import reset the command's state, so a tenant import that started cleared the entity

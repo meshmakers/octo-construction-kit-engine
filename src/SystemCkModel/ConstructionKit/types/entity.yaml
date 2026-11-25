@@ -15,6 +15,9 @@ types:
       - id: ${this}/RtBlueprintAppliedAt
         name: RtBlueprintAppliedAt
         isOptional: true
+      - id: ${this}/RtSyncOrigin
+        name: RtSyncOrigin
+        isOptional: true
     associations:
     - id: ${this}/Related
       targetCkTypeId: ${this}/Entity

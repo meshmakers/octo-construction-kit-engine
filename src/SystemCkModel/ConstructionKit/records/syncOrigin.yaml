@@ -1,0 +1,12 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+records:
+- recordId: SyncOrigin
+  derivable: Any
+  description: "Origin of an entity that a cross-tenant master-data sync wrote into this tenant: the source tenant, the runtime id of the source entity and the time of the last sync. Source tenant and source RtId together are the idempotency key of the sync; an entity whose SyncOrigin names another tenant is owned by that tenant and is not edited locally (AB#9770, Feature AB#8673)."
+  attributes:
+    - id: ${this}/SyncOrigin.SourceTenantId
+      name: SourceTenantId
+    - id: ${this}/SyncOrigin.SourceRtId
+      name: SourceRtId
+    - id: ${this}/SyncOrigin.SyncedAt
+      name: SyncedAt

@@ -1,0 +1,15 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+attributes:
+  - id: SyncOrigin.SourceTenantId
+    valueType: String
+    description: "Id of the tenant the synced entity comes from."
+  - id: SyncOrigin.SourceRtId
+    valueType: String
+    description: "Runtime id of the source entity in the source tenant. Stored as OctoObjectId string."
+  - id: SyncOrigin.SyncedAt
+    valueType: DateTime
+    description: "Time (UTC) the sync last wrote the entity."
+  - id: RtSyncOrigin
+    valueType: Record
+    valueCkRecordId: ${this}/SyncOrigin
+    description: "Origin of an entity written by a cross-tenant master-data sync. Null for every entity the sync did not write (local entities); the sync never touches an entity without it."

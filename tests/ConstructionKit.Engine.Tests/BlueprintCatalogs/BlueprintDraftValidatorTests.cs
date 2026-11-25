@@ -160,6 +160,39 @@ public class BlueprintDraftValidatorTests
         Assert.Equal("[7.0,8.0)", error.Parameters["versionRange"]);
     }
 
+    [Theory]
+    [InlineData("'-[1.0,2.0)'")] // found on the lane stack: read as a model named '-[1.0,2.0)', reported as 163 + 161
+    [InlineData("''")]
+    public async Task DependencyWithoutName_Error162_Once_NotCheckedAgainstCatalogs(string entry)
+    {
+        var result = await CreateValidator().ValidateAsync(Source(("blueprint.yaml", $"""
+                blueprintId: Draft-1.0.0
+                ckModelDependencies:
+                  - System-[2.0,3.0)
+                  - {entry}
+                """)), AllCatalogs, TestContext.Current.CancellationToken);
+
+        AssertSingleError(result, BlueprintDraftValidationCodes.CkModelDependencyNameMissing);
+        Assert.DoesNotContain(result.Findings,
+            f => f.MessageNumber == BlueprintDraftValidationCodes.CkModelDependencyNotInCatalogs);
+        A.CallTo(() => _catalogs.IsExistingAsync(A<CkModelIdVersionRange>.That.Matches(d => d.Name != "System"),
+            A<object?>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task DependencyRangeWithoutMinimum_Error164_WithModelId()
+    {
+        var result = await CreateValidator().ValidateAsync(Source(("blueprint.yaml", """
+                blueprintId: Draft-1.0.0
+                ckModelDependencies:
+                  - System-(,3.0)
+                """)), AllCatalogs, TestContext.Current.CancellationToken);
+
+        var error = AssertSingleError(result, BlueprintDraftValidationCodes.CkModelDependencyNoMinimumVersion);
+        Assert.Equal("System", error.Parameters["modelId"]);
+        A.CallTo(() => _catalogs.IsExistingAsync(A<CkModelIdVersionRange>._, A<object?>._)).MustNotHaveHappened();
+    }
+
     [Fact]
     public async Task NamedCatalogs_AreQueriedOneByOne()
     {

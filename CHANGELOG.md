@@ -24,7 +24,8 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   `octo-bpm validate|pack|publish` print each finding with its code and take `--ck-catalogs all|<names>` (default off,
   offline). `IBlueprintService.ValidateBlueprintAsync` delegates to the validator (the empty CK dependency check is gone).
   `ApplyBlueprintAsync` runs it before anything is installed and refuses only on findings that make the install fail
-  anyway (149, 150, 151, 153, 155, 162, 164); every other finding is a warning in the install result. Regression: of 557
+  anyway (149, 150, 151, 153, 155, 162, 164); every other finding is a warning in the install result. A dependency entry
+  that starts with the version (`-[1.0,2.0)`) counts as nameless (162), not as a model of that name. Regression: of 557
   catalog blueprint versions (public and private) 554 have no blocking finding; the 3 others (private
   MeshmakersAccounting 3.10.0, 3.15.0, MeshmakersAccounting.Tesla 3.1.15) miss declared seed files and fail today already.
 

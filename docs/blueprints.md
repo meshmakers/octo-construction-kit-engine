@@ -487,7 +487,7 @@ parameters, never on the text. The texts of the former octo-bpm messages are unc
 | 159 | Warning | rtId reused under another CK type | - |
 | 160 | Error | seed sets a Secret attribute | warning |
 | 161 | Warning | Secret lint could not resolve a CK model | - |
-| 162 | Error | CK model dependency without a name | yes |
+| 162 | Error | CK model dependency without a name (empty, or starting with the version: `-[1.0,2.0)`) | yes |
 | 163 | Error | CK dependency range resolves in none of the CK model catalogs (parameter `modelId`) | warning |
 | 164 | Error | CK dependency range without a minimum version | yes |
 | 165 | Info | CK dependency ranges not checked (no catalogs given) | - |

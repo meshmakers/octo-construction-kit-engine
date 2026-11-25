@@ -233,7 +233,9 @@ internal class BlueprintDraftValidator : IBlueprintDraftValidator
             return;
         }
 
-        var dependencies = new List<CkModelIdVersionRange>(blueprintMeta.CkModelDependencies ?? []);
+        // A nameless dependency is reported once as 162, not again as an unresolvable model (161).
+        var dependencies = new List<CkModelIdVersionRange>((blueprintMeta.CkModelDependencies ?? [])
+            .Where(d => d != null && !IsNameless(d)));
         foreach (var seed in seeds)
         {
             dependencies.AddRange(BlueprintSeedSecretLint.ReadDependencies(seed.Yaml));
@@ -270,7 +272,7 @@ internal class BlueprintDraftValidator : IBlueprintDraftValidator
         foreach (var dependency in dependencies)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (dependency == null || dependency.IsEmpty)
+            if (dependency == null || IsNameless(dependency))
             {
                 result.AddMessage(MessageCodes.BlueprintCkModelDependencyNameMissing(BlueprintMetaFileName));
                 continue;
@@ -296,6 +298,13 @@ internal class BlueprintDraftValidator : IBlueprintDraftValidator
             await CheckDependencyInCatalogsAsync(dependency, options.CkModelCatalogs!, result).ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    ///     A dependency entry without a model name: empty, or starting with the version separator ('-[1.0,2.0)'), which
+    ///     <see cref="CkModelIdVersionRange" /> would otherwise read as a model named '-[1.0,2.0)'.
+    /// </summary>
+    private static bool IsNameless(CkModelIdVersionRange dependency) =>
+        dependency.IsEmpty || dependency.Name.StartsWith("-", StringComparison.Ordinal);
 
     private async Task CheckDependencyInCatalogsAsync(CkModelIdVersionRange dependency,
         IReadOnlyList<string> catalogNames, OperationResult result)

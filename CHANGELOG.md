@@ -28,6 +28,7 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   that starts with the version (`-[1.0,2.0)`) counts as nameless (162), not as a model of that name. Regression: of 557
   catalog blueprint versions (public and private) 554 have no blocking finding; the 3 others (private
   MeshmakersAccounting 3.10.0, 3.15.0, MeshmakersAccounting.Tesla 3.1.15) miss declared seed files and fail today already.
+  A draft with an error still ends `octo-bpm publish` with a non-zero exit code (exit code -100, nothing published).
 
 ### Fixed
 

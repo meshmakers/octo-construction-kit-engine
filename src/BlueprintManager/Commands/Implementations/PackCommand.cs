@@ -47,7 +47,7 @@ internal class PackCommand : Command<BpmToolOptions>
         Logger.LogInformation("Path: {Path}", path);
         Logger.LogInformation("Output: {Output}", outputPath);
 
-        // AB#9371: findings of the shared draft validator with their stable codes; errors stop the pack.
+        // Findings of the shared draft validator with their stable codes; errors stop the pack.
         await BpmDraftValidation.RunAsync(_draftValidator, path,
             BpmDraftValidation.ReadCkCatalogs(CommandArgumentValue, _ckCatalogsArg), Logger);
 

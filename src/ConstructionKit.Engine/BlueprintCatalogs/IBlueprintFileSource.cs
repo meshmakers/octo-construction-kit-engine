@@ -1,7 +1,7 @@
 namespace Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
 
 /// <summary>
-///     The files of one blueprint draft, read by <see cref="IBlueprintDraftValidator" /> (AB#9371). Paths are relative
+///     The files of one blueprint draft, read by <see cref="IBlueprintDraftValidator" />. Paths are relative
 ///     to the blueprint root (the folder that holds <c>blueprint.yaml</c>) and always use <c>/</c>.
 /// </summary>
 /// <remarks>

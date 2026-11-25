@@ -1,7 +1,7 @@
 namespace Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
 
 /// <summary>
-///     The stable codes of the blueprint draft findings (construction kit message catalog, AB#9371). Tools branch on
+///     The stable codes of the blueprint draft findings (construction kit message catalog). Tools branch on
 ///     these numbers, never on the text.
 /// </summary>
 public static class BlueprintDraftValidationCodes

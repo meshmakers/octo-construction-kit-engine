@@ -356,7 +356,7 @@ internal class BlueprintService : IBlueprintService
 
             loadedCkModels.AddRange(aggregatedCkDeps);
 
-            // 2a'. AB#9371: the shared draft validator judges the root blueprint before anything is installed. Only
+            // 2a'. The shared draft validator judges the root blueprint before anything is installed. Only
             //      findings that would make the install fail anyway refuse it (manifest, seed files, CK ranges without
             //      a floor); every other finding - also a CK range no catalog offers - is a warning in the result, so a
             //      blueprint that installed before still installs.
@@ -905,7 +905,7 @@ internal class BlueprintService : IBlueprintService
     }
 
     /// <summary>
-    /// AB#9371: runs <see cref="IBlueprintDraftValidator" /> over the catalog blueprint <paramref name="blueprintId" />
+    /// Runs <see cref="IBlueprintDraftValidator" /> over the catalog blueprint <paramref name="blueprintId" />
     /// with the CK catalog check. Install-blocking findings (<see cref="BlueprintDraftValidationCodes.InstallBlockingCodes" />)
     /// stay errors; everything else is added as a warning with the same code. Read-only.
     /// </summary>
@@ -973,7 +973,7 @@ internal class BlueprintService : IBlueprintService
             var blueprint = await _blueprintCatalogManager.GetAsync(blueprintId, operationResult)
                 .ConfigureAwait(false);
 
-            // AB#9371: the shared draft validator judges manifest, seed data, Secret seed lint and the CK model
+            // The shared draft validator judges manifest, seed data, Secret seed lint and the CK model
             // dependency ranges against the CK model catalogs - the same checks as octo-bpm validate and
             // POST {tenantId}/v1/blueprints/validate.
             if (_draftValidator != null)

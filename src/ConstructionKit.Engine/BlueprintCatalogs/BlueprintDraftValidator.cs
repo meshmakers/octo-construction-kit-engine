@@ -12,7 +12,7 @@ using YamlDotNet.RepresentationModel;
 namespace Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
 
 /// <summary>
-///     The blueprint draft validator (AB#9371). Every finding carries a stable code of the construction kit message
+///     The blueprint draft validator. Every finding carries a stable code of the construction kit message
 ///     catalog (149-167); the texts of the former octo-bpm messages are unchanged.
 /// </summary>
 internal class BlueprintDraftValidator : IBlueprintDraftValidator

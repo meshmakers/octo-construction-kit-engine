@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace Meshmakers.Octo.BlueprintManager.Commands.Implementations;
 
 /// <summary>
-///     The shared blueprint draft validation of <c>validate</c>, <c>pack</c> and <c>publish</c> (AB#9371): runs
+///     The shared blueprint draft validation of <c>validate</c>, <c>pack</c> and <c>publish</c>: runs
 ///     <see cref="IBlueprintDraftValidator" /> over the blueprint directory and logs every finding with its stable code.
 ///     Offline by default; <c>--ck-catalogs</c> adds the CK model dependency-range check.
 /// </summary>

@@ -61,7 +61,7 @@ internal class PublishCommand : Command<BpmToolOptions>
             Logger.LogInformation("Force mode: existing blueprints will be replaced");
         }
 
-        // First validate the blueprint (AB#9371: shared draft validator, findings with stable codes)
+        // First validate the blueprint (shared draft validator, findings with stable codes)
         BlueprintDraftValidationResult validation;
         try
         {
@@ -70,8 +70,10 @@ internal class PublishCommand : Command<BpmToolOptions>
         }
         catch (BlueprintCatalogException)
         {
+            // Rethrow: Program.Main turns the exception into a non-zero exit code, so a catalog pipeline that runs
+            // publish fails instead of going green with nothing published (as before the shared draft validator).
             Logger.LogError("Blueprint validation failed");
-            return;
+            throw;
         }
 
         var blueprintMeta = validation.BlueprintMeta!;

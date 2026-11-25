@@ -9,7 +9,7 @@ using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.BlueprintCatalogs;
 
 /// <summary>
-///     AB#9371: the shared blueprint draft validator - one finding class per test, stable codes, the CK dependency
+///     The shared blueprint draft validator - one finding class per test, stable codes, the CK dependency
 ///     range check against the catalogs and the zip source.
 /// </summary>
 public class BlueprintDraftValidatorTests

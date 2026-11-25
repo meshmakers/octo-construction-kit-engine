@@ -5,7 +5,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 namespace Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
 
 /// <summary>
-///     The one validation core of a blueprint draft (AB#9371): manifest, seed data, Secret seed lint and CK model
+///     The one validation core of a blueprint draft: manifest, seed data, Secret seed lint and CK model
 ///     dependencies incl. their version ranges against the CK model catalogs. Used by octo-bpm (validate, pack, publish),
 ///     the asset repository (<c>POST {tenantId}/v1/blueprints/validate</c>, install path) and, through that endpoint,
 ///     the MCP tool <c>validate_blueprint</c>. Writes nothing.
@@ -45,7 +45,7 @@ public sealed class BlueprintValidationOptions
 }
 
 /// <summary>
-///     Result of a blueprint draft validation (AB#9371).
+///     Result of a blueprint draft validation.
 /// </summary>
 public sealed class BlueprintDraftValidationResult
 {

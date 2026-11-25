@@ -455,7 +455,7 @@ guard - one code path):
 - Request contract: `InitiatedBySubjectId` is an optional additive field; an old consumer ignores it (no protection,
   no break).
 
-## Validating a blueprint draft (AB#9371)
+## Validating a blueprint draft
 
 One validator judges a blueprint draft everywhere: `IBlueprintDraftValidator` in
 `Meshmakers.Octo.ConstructionKit.Engine` (`BlueprintCatalogs/`). It reads the draft through an `IBlueprintFileSource`
@@ -463,7 +463,8 @@ One validator judges a blueprint draft everywhere: `IBlueprintDraftValidator` in
 `CatalogBlueprintFileSource` for a catalog blueprint) and writes nothing. Users:
 
 - `octo-bpm validate`, `pack` and `publish` (offline by default; `--ck-catalogs all` or `--ck-catalogs <name>,<name>`
-  adds the CK dependency-range check),
+  adds the CK dependency-range check; a draft with an error ends each of them with a non-zero exit code and
+  `publish` publishes nothing),
 - the asset repository: `POST {tenantId}/v1/blueprints/validate` (a zip of the blueprint folder or a single
   `blueprint.yaml`; CK ranges checked against the CK model catalogs the tenant reads), `IBlueprintService.ValidateBlueprintAsync`
   and the install path (`ApplyBlueprintAsync`),
@@ -498,7 +499,10 @@ parameters, never on the text. The texts of the former octo-bpm messages are unc
 Only the codes marked *yes* (`BlueprintDraftValidationCodes.InstallBlockingCodes`) refuse the install - each of them
 makes the install fail anyway, now earlier and with a code. Every other error is reported as a warning in the install
 result, so a blueprint that installed before still installs. 163 is a warning there because the install step can still
-take a model from a service-managed descriptor or keep the one the tenant runs.
+take a model from a service-managed descriptor or keep the one the tenant runs. 167 (the manifest cannot be read) is
+not install-blocking either: it becomes a warning and the validator skips its other checks, while the later install
+steps still refuse a draft they cannot read. The update path (`ApplyUpdateAsync`) and the dependency blueprints of the
+root are not run through the validator; they fail later in the existing install steps, as before.
 
 ## Seed Data Format
 

@@ -30,7 +30,7 @@ public class BlueprintCompilerService : IBlueprintCompilerService
     /// decision 9). Without it the lint is skipped.
     /// </param>
     /// <param name="draftValidator">
-    /// The shared blueprint draft validator (AB#9371); without it one without CK catalog check is created.
+    /// The shared blueprint draft validator; without it one without CK catalog check is created.
     /// </param>
     public BlueprintCompilerService(
         IBlueprintSerializer blueprintSerializer,
@@ -112,7 +112,7 @@ public class BlueprintCompilerService : IBlueprintCompilerService
 
     /// <summary>
     ///     Validates the blueprint directory <paramref name="path" /> with the shared
-    ///     <see cref="IBlueprintDraftValidator" /> (AB#9371) and copies its findings into
+    ///     <see cref="IBlueprintDraftValidator" /> and copies its findings into
     ///     <paramref name="operationResult" />.
     /// </summary>
     /// <param name="path">The blueprint directory</param>

@@ -38,7 +38,7 @@ internal class ValidateCommand : Command<BpmToolOptions>
         var path = CommandArgumentValue.GetArgumentScalarValue<string>(_pathArg);
         Logger.LogInformation("Path: {Path}", path);
 
-        // AB#9371: the shared draft validator; every finding is logged with its stable code.
+        // The shared draft validator; every finding is logged with its stable code.
         var result = await BpmDraftValidation.RunAsync(_draftValidator, path,
             BpmDraftValidation.ReadCkCatalogs(CommandArgumentValue, _ckCatalogsArg), Logger);
         var blueprintMeta = result.BlueprintMeta!;

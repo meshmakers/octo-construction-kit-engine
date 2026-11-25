@@ -16,7 +16,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Meshmakers.Octo.Runtime.Engine.Tests.Blueprints;
 
 /// <summary>
-///     AB#9371: the install path runs the shared blueprint draft validator before anything is installed. Only
+///     The install path runs the shared blueprint draft validator before anything is installed. Only
 ///     findings that would make the install fail anyway refuse it; every other finding becomes a warning, so a
 ///     blueprint that installed before still installs. <c>ValidateBlueprintAsync</c> reports all findings.
 /// </summary>

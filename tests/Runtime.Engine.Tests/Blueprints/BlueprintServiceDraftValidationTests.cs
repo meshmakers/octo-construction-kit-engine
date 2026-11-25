@@ -61,7 +61,7 @@ public class BlueprintServiceDraftValidationTests
     private BlueprintService CreateService() => new(
         A.Fake<ICkCacheService>(), _catalog, A.Fake<ITenantBlueprintHistory>(),
         A.Fake<IBlueprintMigrationExecutor>(), A.Fake<IBlueprintMigrationParser>(), _upgrade, _provider,
-        A.Fake<IImportRtModelCommand>(), A.Fake<IRtYamlSerializer>(), A.Fake<IBlueprintNotifications>(), _resolver,
+        () => A.Fake<IImportRtModelCommand>(), A.Fake<IRtYamlSerializer>(), A.Fake<IBlueprintNotifications>(), _resolver,
         _installations, A.Fake<IBlueprintVariableProvider>(), NullLogger<BlueprintService>.Instance,
         draftValidator: _validator);
 

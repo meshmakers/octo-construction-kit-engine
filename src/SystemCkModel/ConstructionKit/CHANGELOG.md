@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.10.0 - 2026-11-25
+
+_Required bump level: minor._
+
+### Added
+
+- Record `System/SyncOrigin` with `SourceTenantId` (String), `SourceRtId` (String, the source entity's
+  OctoObjectId) and `SyncedAt` (DateTime, UTC) _(minor — new record)_ (AB#9770, Feature AB#8673)
+- Optional attribute `RtSyncOrigin` (Record `System/SyncOrigin`) on `System/Entity` _(minor — optional attribute
+  added to a public type, row T1)_
+
+### Compatibility
+
+- Additive, no data migration: no attribute is required, no existing element changes, and existing entities carry no
+  `RtSyncOrigin` (null). Dependent models need no re-pin (`System-[2.x,3.0)` ranges resolve 2.10.0).
+- Meaning: an entity that a cross-tenant master-data sync wrote carries `RtSyncOrigin`; source tenant and source RtId
+  are the idempotency key of the sync, and an entity whose `RtSyncOrigin` names another tenant is owned by that tenant.
+  The sync never touches entities without it. The write guard and the sync itself are not part of this model.
+- The `Rt` prefix follows the other system-managed Entity attributes (`RtBlueprintSource`, ...); a type of a dependent
+  model that already declares an attribute named `RtSyncOrigin` would collide (rows H6 / N2 of the SemVer rules).
+- Roll out like every System minor (release train, dependency check, `FixAll`/`ClearCache` per tenant).
+
 ## 2.9.0 - 2026-11-24
 
 _Required bump level: minor._

@@ -160,6 +160,16 @@ public sealed class SystemInterfacesTests : IDisposable
         return dir;
     }
 
+    /// <summary>System 2.9.0 as it was published: the 2.10.0 sources without the <c>SyncOrigin</c> record (AB#9770).</summary>
+    private string CopySystem290()
+    {
+        var dir = CopySystem("system-2.9.0", (path, yaml) => path == "ckModel.yaml"
+            ? SetVersion(yaml, "2.9.0")
+            : WithoutSyncOrigin(path, yaml));
+        DeleteFiles(dir, SyncOriginFiles);
+        return dir;
+    }
+
     /// <summary>System 2.8.0 as it was published: the 2.9.0 sources without the number-range and document-audit additions (AB#9752).</summary>
     private string CopySystem280() => CopySystemBefore29("system-2.8.0", "2.8.0", (_, yaml) => yaml);
 
@@ -296,7 +306,7 @@ public sealed class SystemInterfacesTests : IDisposable
         // Every change is an addition (optional attributes on AutoIncrement, new records, enums, a type and an
         // association role), so 2.8.0 -> 2.9.0 is a Minor, needs no migration and dependents need no re-pin.
         await PublishAsync(CopySystem280(), InMemoryPublishedCatalog.Name);
-        var against280 = await RunGateAsync(RealSystemSource());
+        var against280 = await RunGateAsync(CopySystem290());
 
         Assert.Empty(Errors(against280));
         Assert.Equal(CkSemVerLevel.Minor, against280.Verdict!.RequiredLevel);
@@ -310,7 +320,29 @@ public sealed class SystemInterfacesTests : IDisposable
             Assert.Equal(CkModelChangeKind.Added, c.Change.ChangeKind);
             Assert.NotEqual(CkSemVerLevel.Major, c.Level);
         });
-        // AB#9770: System/SyncOrigin and the optional System/Entity attribute RtSyncOrigin are additions too.
+    }
+
+    [Fact]
+    public async Task System210_AgainstSystem290_IsAMinor_WithOnlyTheSyncOriginRecordAndItsOptionalEntityAttributeAdded()
+    {
+        // AB#9770: System/SyncOrigin (source tenant, source RtId, sync time) and the optional System/Entity attribute
+        // RtSyncOrigin. Purely additive: no element is removed or changed, nothing is required, so no data migration.
+        await PublishAsync(CopySystem290(), InMemoryPublishedCatalog.Name);
+        var against290 = await RunGateAsync(RealSystemSource());
+
+        Assert.Empty(Errors(against290));
+        Assert.Equal(CkSemVerLevel.Minor, against290.Verdict!.RequiredLevel);
+        Assert.Contains("2.9.0", against290.Verdict.BaselineId.ToString());
+        var structural = against290.Verdict.ClassifiedChanges
+            .Where(c => c.Change.ElementKind != CkModelElementKind.Model)
+            .ToList();
+        Assert.NotEmpty(structural);
+        Assert.All(structural, c =>
+        {
+            Assert.Equal(CkModelChangeKind.Added, c.Change.ChangeKind);
+            Assert.True(c.Level <= CkSemVerLevel.Minor, $"{c.Change.ElementKind} {c.Change.ElementId}: {c.Level}");
+            Assert.False(c.RequiresAcknowledge, c.Change.ElementId);
+        });
         Assert.Contains(structural, c => c.Change.ElementKind == CkModelElementKind.Record &&
                                          c.Change.ElementId.Contains("SyncOrigin", StringComparison.Ordinal));
         Assert.Contains(structural, c => c.Change.ElementKind == CkModelElementKind.TypeAttribute &&
@@ -347,7 +379,7 @@ public sealed class SystemInterfacesTests : IDisposable
     {
         // AB#9752: an existing counter (End, Format, CurrentValue only - the shape of the Basic and
         // energy-community seeds) must stay valid, so every new AutoIncrement attribute is optional.
-        var compiled = await _fixture.CompileAsync(RealSystemSource());
+        var compiled = await _fixture.CompileAsync(CopySystem290());
         Assert.Contains("2.9.0", compiled.ModelId.ToString());
 
         var autoIncrement = Assert.Single(compiled.Types!, t => t.TypeId.Name == "AutoIncrement");

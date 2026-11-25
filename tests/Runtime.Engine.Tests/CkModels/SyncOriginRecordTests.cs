@@ -7,7 +7,7 @@ using Meshmakers.Octo.Runtime.Contracts.Serialization;
 namespace Meshmakers.Octo.Runtime.Engine.Tests.CkModels;
 
 /// <summary>
-///     AB#9770 (Feature AB#8673): System 2.9.0 adds the record <c>System/SyncOrigin</c> (source tenant, source RtId,
+///     AB#9770 (Feature AB#8673): System 2.10.0 adds the record <c>System/SyncOrigin</c> (source tenant, source RtId,
 ///     sync time) and the optional attribute <c>RtSyncOrigin</c> on <c>System/Entity</c>. Like the other
 ///     system-managed Entity attributes (<c>RtBlueprintSource</c>, ...) it lives in the attribute dictionary; the
 ///     generator emits the typed record class <see cref="RtSyncOriginRecord" />.

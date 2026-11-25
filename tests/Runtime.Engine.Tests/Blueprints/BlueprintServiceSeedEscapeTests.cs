@@ -95,7 +95,7 @@ public class BlueprintServiceSeedEscapeTests
 
     private BlueprintService CreateService() => new(
         A.Fake<ICkCacheService>(), _catalog, _history, A.Fake<IBlueprintMigrationExecutor>(),
-        A.Fake<IBlueprintMigrationParser>(), _upgrade, _repositoryProvider, _import, _serializer,
+        A.Fake<IBlueprintMigrationParser>(), _upgrade, _repositoryProvider, () => _import, _serializer,
         A.Fake<IBlueprintNotifications>(), _resolver, _installations, _variables,
         NullLogger<BlueprintService>.Instance, null, null);
 

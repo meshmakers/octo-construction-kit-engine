@@ -93,7 +93,7 @@ public class BlueprintServiceCkUpgradeGuardTests
 
     private BlueprintService CreateService(bool withGuard = true) => new(
         A.Fake<ICkCacheService>(), _catalog, _history, A.Fake<IBlueprintMigrationExecutor>(),
-        A.Fake<IBlueprintMigrationParser>(), _upgrade, _provider, A.Fake<IImportRtModelCommand>(),
+        A.Fake<IBlueprintMigrationParser>(), _upgrade, _provider, () => A.Fake<IImportRtModelCommand>(),
         A.Fake<IRtYamlSerializer>(), A.Fake<IBlueprintNotifications>(), _resolver, _installations,
         A.Fake<IBlueprintVariableProvider>(), NullLogger<BlueprintService>.Instance, withGuard ? _guard : null);
 

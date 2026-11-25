@@ -131,7 +131,7 @@ public class BlueprintGenericCreateRefusalTests
         A.Fake<IBlueprintMigrationParser>(),
         A.Fake<ICkModelUpgradeService>(),
         _repositoryProvider,
-        _import,
+        () => _import,
         _serializer,
         A.Fake<IBlueprintNotifications>(),
         _resolver,
@@ -337,7 +337,7 @@ public class BlueprintGenericCreateRefusalTests
 
     // ---- migration Add step -----------------------------------------------------------------
 
-    private BlueprintMigrationExecutor CreateExecutor() => new(_repositoryProvider, _import, _ckCache,
+    private BlueprintMigrationExecutor CreateExecutor() => new(_repositoryProvider, () => _import, _ckCache,
         NullLogger<BlueprintMigrationExecutor>.Instance);
 
     private static BlueprintMigrationDto AddStep(RtCkId<CkTypeId> type, string rtId)

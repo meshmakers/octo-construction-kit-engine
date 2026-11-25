@@ -97,10 +97,10 @@ public class BlueprintAttributeAccessRefusalTests
 
     private BlueprintService CreateService() => new(
         _ckCache, _catalog, _history, A.Fake<IBlueprintMigrationExecutor>(), A.Fake<IBlueprintMigrationParser>(),
-        A.Fake<ICkModelUpgradeService>(), _repositoryProvider, _import, _serializer, A.Fake<IBlueprintNotifications>(),
+        A.Fake<ICkModelUpgradeService>(), _repositoryProvider, () => _import, _serializer, A.Fake<IBlueprintNotifications>(),
         _resolver, _installations, _variables, NullLogger<BlueprintService>.Instance);
 
-    private BlueprintMigrationExecutor CreateExecutor() => new(_repositoryProvider, _import, _ckCache,
+    private BlueprintMigrationExecutor CreateExecutor() => new(_repositoryProvider, () => _import, _ckCache,
         NullLogger<BlueprintMigrationExecutor>.Instance);
 
     private static BlueprintMetaRootDto Meta(BlueprintId id) => new() { BlueprintId = id, SeedDataPath = "seed.yaml" };

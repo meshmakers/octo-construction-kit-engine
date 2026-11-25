@@ -15,6 +15,7 @@ using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Meshmakers.Octo.Runtime.Engine.Blueprints;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -94,11 +95,13 @@ public class BlueprintServiceDeferredSeedEdgesTests
         return set;
     }
 
-    private BlueprintService CreateService() => new(
+    private BlueprintService CreateService(Func<IImportRtModelCommand>? importCommandFactory = null,
+        ILogger<BlueprintService>? logger = null) => new(
         A.Fake<ICkCacheService>(), _catalog, _history, A.Fake<IBlueprintMigrationExecutor>(),
-        A.Fake<IBlueprintMigrationParser>(), _upgrade, _repositoryProvider, _import, _serializer,
+        A.Fake<IBlueprintMigrationParser>(), _upgrade, _repositoryProvider, importCommandFactory ?? (() => _import),
+        _serializer,
         A.Fake<IBlueprintNotifications>(), _resolver, _installations, _variables,
-        NullLogger<BlueprintService>.Instance, null, null);
+        logger ?? NullLogger<BlueprintService>.Instance, null, null);
 
     private static BlueprintMetaRootDto Meta(BlueprintId id) => new()
     {
@@ -221,5 +224,192 @@ public class BlueprintServiceDeferredSeedEdgesTests
 
         Assert.True(result.Success, string.Join("; ", result.Errors));
         Assert.Contains(result.Warnings, w => w.Contains("670000000000000000000002") && w.Contains("kept"));
+    }
+
+    // ---- one import command per apply ---------------------------------------------------------------------------
+    // One BlueprintService applies blueprints to many tenants at the same time (parallel tenant setup on startup). The
+    // import command holds the state of the import running on it, so every apply takes its own command and reads the
+    // results of its import (here: the skipped seed edges) from that command only.
+
+    [Fact]
+    public async Task Install_TakesANewImportCommand_AndReadsTheResultsOfItsOwnImportOnly()
+    {
+        _seedBodies[V1.FullName] = "body";
+        GivenResolution(V1);
+        var withSkippedEdge = ImportCommand(new RtImportSkippedAssociation(Executes, TemplateType, Template, AdapterType,
+            Adapter, false));
+        var clean = ImportCommand();
+        var commands = new Queue<IImportRtModelCommand>([withSkippedEdge, clean]);
+        var service = CreateService(() => commands.Dequeue());
+
+        var first = await service.ApplyBlueprintAsync(TenantId, V1, false, TestContext.Current.CancellationToken);
+        var second = await service.ApplyBlueprintAsync(TenantId, V1, false, TestContext.Current.CancellationToken);
+
+        Assert.Empty(commands);
+        Assert.Contains(first.OperationResult.Messages, m => m.MessageNumber == 73);
+        Assert.DoesNotContain(second.OperationResult.Messages, m => m.MessageNumber == 73);
+        A.CallTo(() => withSkippedEdge.ImportModelAsync(A<IRuntimeRepository>._, A<RtModelRootTcDto>._,
+                A<ImportStrategy>._, A<CancellationToken?>._, A<RtImportBlankingPolicy>._,
+                A<IReadOnlyCollection<RtImportBlankingConfirmation>?>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => clean.ImportModelAsync(A<IRuntimeRepository>._, A<RtModelRootTcDto>._,
+                A<ImportStrategy>._, A<CancellationToken?>._, A<RtImportBlankingPolicy>._,
+                A<IReadOnlyCollection<RtImportBlankingConfirmation>?>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task ConcurrentInstalls_OnOneService_ImportOnSeparateCommands()
+    {
+        _seedBodies[V1.FullName] = "body";
+        GivenResolution(V1);
+        var bothImporting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var importing = 0;
+        var used = new System.Collections.Concurrent.ConcurrentBag<IImportRtModelCommand>();
+        var service = CreateService(() =>
+        {
+            var command = ImportCommand();
+            A.CallTo(() => command.ImportModelAsync(A<IRuntimeRepository>._, A<RtModelRootTcDto>._,
+                    A<ImportStrategy>._, A<CancellationToken?>._, A<RtImportBlankingPolicy>._,
+                    A<IReadOnlyCollection<RtImportBlankingConfirmation>?>._))
+                .ReturnsLazily(async () =>
+                {
+                    used.Add(command);
+                    // Both imports are in flight at the same time before either finishes.
+                    if (Interlocked.Increment(ref importing) == 2)
+                    {
+                        bothImporting.SetResult();
+                    }
+
+                    await bothImporting.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                });
+            return command;
+        });
+
+        var results = await Task.WhenAll(
+            service.ApplyBlueprintAsync(TenantId, V1, false, TestContext.Current.CancellationToken),
+            service.ApplyBlueprintAsync(TenantId, V1, false, TestContext.Current.CancellationToken));
+
+        Assert.All(results, r => Assert.True(r.IsSuccess));
+        Assert.Equal(2, used.Distinct().Count());
+    }
+
+    [Fact]
+    public async Task Update_TakesANewImportCommand()
+    {
+        GivenInstalled(V1);
+        _seedBodies[V1.FullName] = "old";
+        _seedBodies[V2.FullName] = "new";
+        var created = 0;
+        var service = CreateService(() =>
+        {
+            created++;
+            return ImportCommand();
+        });
+
+        await service.ApplyUpdateAsync(TenantId, V2, BlueprintUpdateMode.Merge,
+            cancellationToken: TestContext.Current.CancellationToken);
+        await service.ApplyUpdateAsync(TenantId, V2, BlueprintUpdateMode.Merge,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, created);
+    }
+
+    [Fact]
+    public async Task Install_LogLinesOfTheImport_CarryTenantAndBlueprintId()
+    {
+        _seedBodies[V1.FullName] = "body";
+        GivenResolution(V1);
+        GivenSkipped();
+        var sink = new ScopeCapturingProvider();
+        using var loggerFactory = LoggerFactory.Create(b => b.AddProvider(sink));
+        var importLogger = loggerFactory.CreateLogger("import");
+        A.CallTo(() => _import.ImportModelAsync(A<IRuntimeRepository>._, A<RtModelRootTcDto>._,
+                A<ImportStrategy>._, A<CancellationToken?>._, A<RtImportBlankingPolicy>._,
+                A<IReadOnlyCollection<RtImportBlankingConfirmation>?>._))
+            .ReturnsLazily(() =>
+            {
+                importLogger.LogWarning("line written by the import command");
+                return Task.CompletedTask;
+            });
+
+        await CreateService(logger: loggerFactory.CreateLogger<BlueprintService>())
+            .ApplyBlueprintAsync(TenantId, V1, false, TestContext.Current.CancellationToken);
+
+        var scope = Assert.Single(sink.Lines, l => l.Message == "line written by the import command").Scope;
+        Assert.Equal(TenantId, scope["TenantId"]);
+        Assert.Equal(V1.ToString(), scope["BlueprintId"]);
+    }
+
+    [Fact]
+    public async Task Update_EveryLogLineOfTheUpdate_CarriesTenantAndBlueprintId()
+    {
+        GivenInstalled(V1);
+        _seedBodies[V1.FullName] = "old";
+        _seedBodies[V2.FullName] = "new";
+        GivenSkipped();
+        var sink = new ScopeCapturingProvider();
+        using var loggerFactory = LoggerFactory.Create(b => b.AddProvider(sink));
+
+        await CreateService(logger: loggerFactory.CreateLogger<BlueprintService>())
+            .ApplyUpdateAsync(TenantId, V2, BlueprintUpdateMode.Merge,
+                cancellationToken: TestContext.Current.CancellationToken);
+
+        // Also the lines outside the diff import (start of the update, migration steps) carry the scope.
+        Assert.NotEmpty(sink.Lines);
+        Assert.All(sink.Lines, l =>
+        {
+            Assert.Equal(TenantId, l.Scope["TenantId"]);
+            Assert.Equal(V2.ToString(), l.Scope["BlueprintId"]);
+        });
+    }
+
+    private sealed class ScopeCapturingProvider : ILoggerProvider, ISupportExternalScope
+    {
+        private IExternalScopeProvider _scopes = new LoggerExternalScopeProvider();
+
+        public System.Collections.Concurrent.ConcurrentQueue<(string Message, Dictionary<string, object?> Scope)> Lines
+        {
+            get;
+        } = new();
+
+        public ILogger CreateLogger(string categoryName) => new Logger(this);
+
+        public void SetScopeProvider(IExternalScopeProvider scopeProvider) => _scopes = scopeProvider;
+
+        public void Dispose()
+        {
+        }
+
+        private sealed class Logger(ScopeCapturingProvider owner) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => owner._scopes.Push(state);
+
+            public bool IsEnabled(LogLevel logLevel) => true;
+
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+                Func<TState, Exception?, string> formatter)
+            {
+                var scope = new Dictionary<string, object?>();
+                owner._scopes.ForEachScope((value, target) =>
+                {
+                    if (value is IEnumerable<KeyValuePair<string, object>> pairs)
+                    {
+                        foreach (var pair in pairs)
+                        {
+                            target[pair.Key] = pair.Value;
+                        }
+                    }
+                }, scope);
+                owner.Lines.Enqueue((formatter(state, exception), scope));
+            }
+        }
+    }
+
+    private static IImportRtModelCommand ImportCommand(params RtImportSkippedAssociation[] skipped)
+    {
+        var command = A.Fake<IImportRtModelCommand>();
+        A.CallTo(() => command.SkippedAssociations).Returns(skipped);
+        return command;
     }
 }

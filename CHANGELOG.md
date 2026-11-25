@@ -9,6 +9,19 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Fixed
 
+- **Blueprint applies of several tenants at the same time no longer share one import state (AB#9803, security).** The
+  tenant setup on startup applies blueprints to the child tenants in parallel through one `BlueprintService`, which held
+  one `ImportRtModelCommand`. Every import reset the command's state, so a tenant import that started cleared the entity
+  and association queues, the duplicate check and the guard entries of the import still running for another tenant:
+  seed entities or associations could go missing in one tenant or be flushed into another tenant's session, and every
+  overlap logged `Duplicate RtId ... within one import payload` for a seed without duplicates. `BlueprintService` and
+  `BlueprintMigrationExecutor` now take a new command for every import from `Func<IImportRtModelCommand>` (registered by
+  `AddRuntimeEngine`, transient), and the results read after the import (guard entries, skipped seed edges, archive
+  column and formula changes) come from that command. Chosen over serializing the imports: the parallel tenant setup
+  stays, and no lock can deadlock. Every log line of a blueprint apply (also the import's) carries `TenantId` and
+  `BlueprintId` in a log scope, and the duplicate warning names the tenant. No CK model change; `IImportRtModelCommand`
+  is unchanged.
+
 - **Parallel CK model builds no longer fail writing the catalog cache (AB#9305).** Two CK compile tasks of one solution
   (parallel MSBuild nodes) or parallel `octo-ckc` runs that wrote the same catalog cache at the same time failed about
   every third build on Windows with `UnauthorizedAccessException` ("Access to the path is denied") or an `IOException` in

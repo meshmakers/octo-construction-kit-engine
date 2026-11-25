@@ -17,6 +17,20 @@ Key services:
 - `IBlueprintCkUpgradeGuard` (host-registered, optional) - tenant upgrade guard for the CK models a blueprint installs or raises (CK v2 F2.5), see below
 - `IStreamDataTenantServicesProvider` (host-registered, optional, `Runtime.Contracts/StreamData`; engine-mongodb `TenantStreamDataServicesProvider`) - after the seed import `BlueprintService` activates the archives the seed created (raw first, rollups in source order; pre-existing archives never touched; `archiveActivation.exclude` opt-out; guard: no backfill for TimeWeightedAvg/StateDuration rollups over a raw source) and queues the backfill of new rollups through `BlueprintArchiveActivator`; results in `ArchiveActivations`. Without a provider new archives stay Created. Rules: `docs/blueprints.md`, "Archives and rollups in a blueprint"; tests `BlueprintArchiveActivatorTests`, `BlueprintServiceArchiveActivationTests`
 
+#### One import command per import
+
+`ImportRtModelCommand` holds the state of the one import running on it (entity and association queues, duplicate check,
+guard entries, skipped seed edges, archive column and formula changes) and resets it at the start of every import, so it
+is not safe for concurrent imports. One `BlueprintService` applies blueprints to several tenants at the same time (the
+tenant setup on startup runs the child tenants in parallel), so `BlueprintService` and `BlueprintMigrationExecutor` take
+a new command for every import from `Func<IImportRtModelCommand>` (registered by `AddRuntimeEngine`, transient) and read
+the results of the import from that command only. A host that imports for several tenants itself does the same. Every
+log line of a blueprint apply carries `TenantId` and `BlueprintId` in a log scope, so the lines of parallel applies can be
+told apart. Tests: `BlueprintServiceDeferredSeedEdgesTests` (`Install_TakesANewImportCommand_*`,
+`ConcurrentInstalls_OnOneService_ImportOnSeparateCommands`, `Install_LogLinesOfTheImport_CarryTenantAndBlueprintId`),
+`ImportRtModelCommandFactoryRegistrationTests`; end to end over the parallel tenant setup:
+`ConcurrentTenantSeedImportIntegrationTests` in the identity service.
+
 #### Tenant upgrade guard in `BlueprintService` (CK v2 F2.5)
 
 A blueprint installs the floor of each `ckModelDependencies` range as an exact model version, so an apply or update can replace an installed model

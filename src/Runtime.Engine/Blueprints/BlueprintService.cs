@@ -34,7 +34,10 @@ internal class BlueprintService : IBlueprintService
     private readonly IBlueprintMigrationParser _migrationParser;
     private readonly ICkModelUpgradeService _ckModelUpgradeService;
     private readonly IRuntimeRepositoryProvider _runtimeRepositoryProvider;
-    private readonly IImportRtModelCommand _importRtModelCommand;
+    // One import command per blueprint apply: the command keeps the state of the import that runs on it (queues,
+    // duplicate check, guard entries, skipped edges, archive changes), and one BlueprintService applies blueprints to
+    // many tenants at the same time (parallel tenant setup on startup).
+    private readonly Func<IImportRtModelCommand> _importRtModelCommandFactory;
     private readonly IRtYamlSerializer _rtYamlSerializer;
     private readonly IBlueprintNotifications _notifications;
     private readonly IBlueprintDependencyResolver _dependencyResolver;
@@ -69,7 +72,7 @@ internal class BlueprintService : IBlueprintService
         IBlueprintMigrationParser migrationParser,
         ICkModelUpgradeService ckModelUpgradeService,
         IRuntimeRepositoryProvider runtimeRepositoryProvider,
-        IImportRtModelCommand importRtModelCommand,
+        Func<IImportRtModelCommand> importRtModelCommandFactory,
         IRtYamlSerializer rtYamlSerializer,
         IBlueprintNotifications notifications,
         IBlueprintDependencyResolver dependencyResolver,
@@ -86,7 +89,7 @@ internal class BlueprintService : IBlueprintService
         _migrationParser = migrationParser;
         _ckModelUpgradeService = ckModelUpgradeService;
         _runtimeRepositoryProvider = runtimeRepositoryProvider;
-        _importRtModelCommand = importRtModelCommand;
+        _importRtModelCommandFactory = importRtModelCommandFactory;
         _rtYamlSerializer = rtYamlSerializer;
         _notifications = notifications;
         _dependencyResolver = dependencyResolver;
@@ -97,6 +100,17 @@ internal class BlueprintService : IBlueprintService
         // AB#7991: without a stream-data backend new archives of a seed stay Created, reported per archive.
         _archiveActivator = new BlueprintArchiveActivator(streamDataServices, logger);
     }
+
+    /// <summary>
+    /// Log scope of one blueprint apply: tenant and blueprint id on every line written inside it, also by the import
+    /// command, so lines of tenant applies that run at the same time can be told apart.
+    /// </summary>
+    private IDisposable? BeginApplyLogScope(string tenantId, BlueprintId blueprintId) =>
+        _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["TenantId"] = tenantId,
+            ["BlueprintId"] = blueprintId.ToString()
+        });
 
     /// <summary>
     /// Stamps blueprint provenance attributes on every entity in the seed root.
@@ -2622,6 +2636,10 @@ internal class BlueprintService : IBlueprintService
             return;
         }
 
+        // Every log line of this apply (also the import command's) carries the tenant and the blueprint.
+        using var logScope = BeginApplyLogScope(tenantId, targetVersion);
+        var importCommand = _importRtModelCommandFactory();
+
         var diff = await ComputeUpdateDiffAsync(
             tenantId, targetVersion, targetBlueprint, mode, previousVersion, cancellationToken)
             .ConfigureAwait(false);
@@ -2712,7 +2730,7 @@ internal class BlueprintService : IBlueprintService
                 result.Warnings.AddRange(archiveWarnings);
 
                 var confirmations = ToImportConfirmations(options, result);
-                await _importRtModelCommand.ImportModelAsync(
+                await importCommand.ImportModelAsync(
                     repository,
                     importRoot,
                     ImportStrategy.Upsert,
@@ -2720,12 +2738,12 @@ internal class BlueprintService : IBlueprintService
                     options.AllowBlanking ? RtImportBlankingPolicy.Allow : RtImportBlankingPolicy.Keep,
                     confirmations).ConfigureAwait(false);
 
-                ReportBlankedAttributes(diff.Blanked, options, confirmations, result);
-                result.ArchiveColumnsAdded.AddRange(_importRtModelCommand.ArchiveColumnAdditions);
+                ReportBlankedAttributes(importCommand, diff.Blanked, options, confirmations, result);
+                result.ArchiveColumnsAdded.AddRange(importCommand.ArchiveColumnAdditions);
 
                 // AB#9651: seed edges to entities the tenant does not hold yet are kept and written once both ends exist.
                 // An update result has no info list: message 74 (edges written) reaches only the log here.
-                await ProcessDeferredSeedAssociationsAsync(tenantId, repository, targetVersion,
+                await ProcessDeferredSeedAssociationsAsync(importCommand, tenantId, repository, targetVersion,
                         entitiesToImport.Select(e => e.RtId).ToList(),
                         (level, _, text) =>
                         {
@@ -2736,7 +2754,7 @@ internal class BlueprintService : IBlueprintService
                         },
                         cancellationToken)
                     .ConfigureAwait(false);
-                ReportFormulaChanges(_importRtModelCommand.ArchiveFormulaChanges, result);
+                ReportFormulaChanges(importCommand.ArchiveFormulaChanges, result);
 
                 // AB#7991: the import committed; activate the archives it created and queue the new rollups' backfill.
                 importedArchives.AddRange(skippedStreamDataArchives);
@@ -2751,15 +2769,15 @@ internal class BlueprintService : IBlueprintService
                 if (ex is ArchiveColumnAdditionFailedException columnFailure)
                 {
                     result.ArchiveColumnsAdded.AddRange(columnFailure.Additions);
-                    ReportFormulaChanges(_importRtModelCommand.ArchiveFormulaChanges, result);
-                    result.Errors.AddRange(_importRtModelCommand.ArchiveFormulaChanges.Where(c => !c.Succeeded)
+                    ReportFormulaChanges(importCommand.ArchiveFormulaChanges, result);
+                    result.Errors.AddRange(importCommand.ArchiveFormulaChanges.Where(c => !c.Succeeded)
                         .Select(c => $"Formula of computed column '{c.Column}' of archive {c.ArchiveRtId} could not be changed: {c.Error}"));
                 }
 
                 // AB#8255: thrown after every addition and every formula change was tried.
                 if (ex is ArchiveFormulaChangeFailedException formulaFailure)
                 {
-                    result.ArchiveColumnsAdded.AddRange(_importRtModelCommand.ArchiveColumnAdditions);
+                    result.ArchiveColumnsAdded.AddRange(importCommand.ArchiveColumnAdditions);
                     ReportFormulaChanges(formulaFailure.Changes, result);
                 }
 
@@ -2862,12 +2880,13 @@ internal class BlueprintService : IBlueprintService
     /// import's own guard reported beyond it (e.g. an entity promoted by a conflict resolution).
     /// </summary>
     internal void ReportBlankedAttributes(
+        IImportRtModelCommand importCommand,
         IReadOnlyList<BlueprintBlankedAttribute> detected,
         BlueprintUpdateOptions options,
         List<RtImportBlankingConfirmation>? confirmations,
         BlueprintUpdateResult result)
     {
-        var guardEntries = _importRtModelCommand.GuardEntries;
+        var guardEntries = importCommand.GuardEntries;
         var reported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var blanked in detected)
@@ -4033,14 +4052,15 @@ internal class BlueprintService : IBlueprintService
     /// pipelines of an installed blueprint once the service-managed System.Communication seed brought the Mesh Adapter)
     /// and reports both. Never fails the apply: an error is logged and reported as a warning.
     /// </summary>
-    private async Task ProcessDeferredSeedAssociationsAsync(string tenantId, IRuntimeRepository repository,
+    private async Task ProcessDeferredSeedAssociationsAsync(IImportRtModelCommand importCommand, string tenantId,
+        IRuntimeRepository repository,
         BlueprintId blueprintId, IReadOnlyCollection<OctoObjectId> importedEntityIds,
         Action<MessageLevel, int, string> report, CancellationToken cancellationToken)
     {
         try
         {
             var store = new DeferredSeedAssociations(repository, _ckCacheService, _logger);
-            var outcome = await store.ProcessAsync(blueprintId, _importRtModelCommand.SkippedAssociations,
+            var outcome = await store.ProcessAsync(blueprintId, importCommand.SkippedAssociations,
                     importedEntityIds,
                     async name => await _installations.GetByBlueprintNameAsync(tenantId, name, cancellationToken)
                         .ConfigureAwait(false) != null,
@@ -4148,6 +4168,10 @@ internal class BlueprintService : IBlueprintService
             return 0;
         }
 
+        // Every log line of this seed apply (also the import command's) carries the tenant and the blueprint.
+        using var logScope = BeginApplyLogScope(tenantId, blueprint.BlueprintId);
+        var importCommand = _importRtModelCommandFactory();
+
         try
         {
             var repository = await _runtimeRepositoryProvider
@@ -4229,12 +4253,12 @@ internal class BlueprintService : IBlueprintService
                     warning));
             }
 
-            await _importRtModelCommand.ImportModelAsync(
+            await importCommand.ImportModelAsync(
                 repository, seedRoot, ImportStrategy.Upsert, cancellationToken).ConfigureAwait(false);
             archiveCandidates.AddRange(seedArchives);
 
             // AB#9651: seed edges to entities the tenant does not hold yet are kept and written once both ends exist.
-            await ProcessDeferredSeedAssociationsAsync(tenantId, repository, blueprint.BlueprintId,
+            await ProcessDeferredSeedAssociationsAsync(importCommand, tenantId, repository, blueprint.BlueprintId,
                     seedRoot.Entities.Select(e => e.RtId).ToList(),
                     (level, code, text) => operationResult.AddMessage(
                         new OperationMessage(level, SeedDataDescription(blueprint), code, text)),
@@ -4243,7 +4267,7 @@ internal class BlueprintService : IBlueprintService
             archiveCandidates.AddRange(skippedStreamDataArchives);
 
             // AB#7997: columns the seed added to activated archives (an addition that failed throws above).
-            foreach (var addition in _importRtModelCommand.ArchiveColumnAdditions)
+            foreach (var addition in importCommand.ArchiveColumnAdditions)
             {
                 operationResult.AddMessage(new OperationMessage(MessageLevel.Info, SeedDataDescription(blueprint), 21,
                     $"Added {(addition.IsComputed ? "computed" : "ingested")} column '{addition.Column}' to activated archive " +
@@ -4251,7 +4275,7 @@ internal class BlueprintService : IBlueprintService
             }
 
             // AB#8255: computed columns whose seed formula differs from the live one run a versioned change with backfill.
-            foreach (var change in _importRtModelCommand.ArchiveFormulaChanges)
+            foreach (var change in importCommand.ArchiveFormulaChanges)
             {
                 operationResult.AddMessage(new OperationMessage(MessageLevel.Info, SeedDataDescription(blueprint), 21,
                     DescribeFormulaChange(change)));

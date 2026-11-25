@@ -36,7 +36,7 @@ public class BlueprintServiceCkDependencyRangeTests
     private BlueprintService CreateService() => new(
         A.Fake<ICkCacheService>(), A.Fake<IBlueprintCatalogManager>(), A.Fake<ITenantBlueprintHistory>(),
         A.Fake<IBlueprintMigrationExecutor>(), A.Fake<IBlueprintMigrationParser>(), _upgrade, _provider,
-        A.Fake<IImportRtModelCommand>(), A.Fake<IRtYamlSerializer>(), A.Fake<IBlueprintNotifications>(), _resolver,
+        () => A.Fake<IImportRtModelCommand>(), A.Fake<IRtYamlSerializer>(), A.Fake<IBlueprintNotifications>(), _resolver,
         _installations, A.Fake<IBlueprintVariableProvider>(), NullLogger<BlueprintService>.Instance);
 
     private void Given(string installedSystem, string dependencyRange)

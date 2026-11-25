@@ -89,6 +89,9 @@ public static class ServiceCollectionExtensions
         // Implementation of bulk operations
         services.AddTransient<IBulkRtMutation, BulkRtMutation>();
         services.AddTransient<IImportRtModelCommand, ImportRtModelCommand>();
+        // The blueprint services take a new import command for every import: one command holds the state of the
+        // import running on it, and one blueprint service applies blueprints to several tenants at the same time.
+        services.TryAddTransient<Func<IImportRtModelCommand>>(sp => sp.GetRequiredService<IImportRtModelCommand>);
         // AB#4772 stage-2: default options keep strict mandatory validation OFF (warn + audit
         // only). Hosts opt in by registering a bound instance (e.g. from the Import config
         // section — Import:StrictMandatoryValidation).

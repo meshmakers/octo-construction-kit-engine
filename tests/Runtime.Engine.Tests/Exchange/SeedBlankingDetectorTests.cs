@@ -212,7 +212,8 @@ public class SeedBlankingDetectorTests
         var result = new BlueprintUpdateResult();
         var confirmations = BlueprintService.ToImportConfirmations(options, result);
 
-        CreateService().ReportBlankedAttributes([kept, applied], options, confirmations, result);
+        CreateService().ReportBlankedAttributes(A.Fake<IImportRtModelCommand>(), [kept, applied], options,
+            confirmations, result);
 
         Assert.False(result.BlankedAttributes.Single(b => b.RtId == kept.RtId).AppliedOnUpdate);
         Assert.True(result.BlankedAttributes.Single(b => b.RtId == applied.RtId).AppliedOnUpdate);
@@ -229,7 +230,7 @@ public class SeedBlankingDetectorTests
         var options = new BlueprintUpdateOptions { AllowBlanking = true };
         var result = new BlueprintUpdateResult();
 
-        CreateService(command).ReportBlankedAttributes([Blanked("aaaaaaaaaaaaaaaaaaaaaaaa", "Configuration")],
+        CreateService().ReportBlankedAttributes(command, [Blanked("aaaaaaaaaaaaaaaaaaaaaaaa", "Configuration")],
             options, null, result);
 
         Assert.Equal(2, result.BlankedAttributes.Count);
@@ -249,7 +250,7 @@ public class SeedBlankingDetectorTests
         IncomingSummary = "string (110 chars)"
     };
 
-    private static BlueprintService CreateService(IImportRtModelCommand? command = null) => new(
+    private static BlueprintService CreateService() => new(
         A.Fake<ICkCacheService>(),
         A.Fake<Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs.IBlueprintCatalogManager>(),
         A.Fake<ITenantBlueprintHistory>(),
@@ -257,7 +258,7 @@ public class SeedBlankingDetectorTests
         A.Fake<IBlueprintMigrationParser>(),
         A.Fake<Meshmakers.Octo.Runtime.Contracts.CkModelMigrations.ICkModelUpgradeService>(),
         A.Fake<IRuntimeRepositoryProvider>(),
-        command ?? A.Fake<IImportRtModelCommand>(),
+        () => A.Fake<IImportRtModelCommand>(),
         A.Fake<IRtYamlSerializer>(),
         A.Fake<IBlueprintNotifications>(),
         A.Fake<IBlueprintDependencyResolver>(),

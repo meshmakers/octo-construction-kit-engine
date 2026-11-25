@@ -137,7 +137,7 @@ public class BlueprintServiceTenantOwnedSeedTests
         A.Fake<IBlueprintMigrationParser>(),
         A.Fake<ICkModelUpgradeService>(),
         _repositoryProvider,
-        _import,
+        () => _import,
         _serializer,
         A.Fake<IBlueprintNotifications>(),
         _resolver,

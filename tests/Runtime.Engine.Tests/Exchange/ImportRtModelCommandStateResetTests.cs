@@ -182,4 +182,17 @@ public class ImportRtModelCommandStateResetTests
                  l.Message.Contains(id.ToString()));
         Assert.DoesNotContain(h.Logger.Lines, l => l.Level >= LogLevel.Error);
     }
+
+    [Fact]
+    public async Task DuplicateRtIdWarning_NamesTheTenant()
+    {
+        var h = new Harness();
+        var id = OctoObjectId.GenerateNewId();
+
+        await h.ImportAsync(Dto(id, true), Dto(id, true));
+
+        // Imports of several tenants run at the same time; the line must say which tenant's payload holds the duplicate.
+        var warning = Assert.Single(h.Logger.Lines, l => l.Message.StartsWith("Duplicate RtId"));
+        Assert.Contains("of tenant 'tenant1'", warning.Message);
+    }
 }

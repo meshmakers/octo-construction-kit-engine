@@ -83,12 +83,16 @@ internal class ImportRtModelCommand(
     private RtImportBlueprintLockSummary _blueprintLockSummary = RtImportBlueprintLockSummary.Empty;
 
     /// <summary>
-    /// AB#6652: the command is transient, but callers such as <c>DefaultConfigurationCreatorService</c> (scoped)
-    /// reuse one instance for the imports of many tenants. Every <c>Import*Async</c> entry point therefore starts
-    /// from an empty state; otherwise the duplicate-RtId check reports every id of the second import as
-    /// "already imported", and mandatory violations, guard entries and counters of an earlier tenant leak into
-    /// the next one. Imports on one instance are sequential (the state is per instance, never shared by
-    /// concurrent imports), so the reset needs no locking.
+    /// The command holds the state of ONE import at a time and is not safe for concurrent imports: a second import
+    /// on the same instance resets the queues, the duplicate check, the guard entries and the archive changes of the
+    /// one still running. Callers that import for several tenants at the same time therefore take a new instance per
+    /// import (the blueprint services resolve one per apply through <c>Func&lt;IImportRtModelCommand&gt;</c>; the tenant
+    /// setup on startup applies blueprints to the child tenants in parallel through one blueprint service). That was
+    /// chosen over serializing the imports on a shared instance: it keeps the parallel tenant setup, needs no lock and
+    /// cannot deadlock, and the results the caller reads after the import (guard entries, skipped edges, archive
+    /// changes) stay with that import. Sequential imports on one instance stay supported: every <c>Import*Async</c>
+    /// entry point starts from an empty state, so mandatory violations, guard entries and counters of an earlier
+    /// import never leak into the next one.
     /// </summary>
     private void ResetImportState()
     {
@@ -580,10 +584,11 @@ internal class ImportRtModelCommand(
             // second one with a duplicate key.
             if (!_entityImportIds.TryAdd(rtEntity.RtId, 0))
             {
+                // The tenant is named here; the blueprint id comes from the log scope of the blueprint apply.
                 logger.LogWarning(
-                    "Duplicate RtId '{RtEntityRtId}' within one import payload; with Upsert only one of the entries " +
-                    "is stored, with Insert the duplicate is rejected by the database",
-                    rtEntity.RtId);
+                    "Duplicate RtId '{RtEntityRtId}' within one import payload of tenant '{TenantId}'; with Upsert only " +
+                    "one of the entries is stored, with Insert the duplicate is rejected by the database",
+                    rtEntity.RtId, runtimeRepository.TenantId);
             }
 
             token.ThrowIfCancellationRequested();

@@ -185,7 +185,7 @@ public class BlueprintServiceUninstallTenantOwnedTests
         A.Fake<IBlueprintMigrationParser>(),
         A.Fake<ICkModelUpgradeService>(),
         _repositoryProvider,
-        _import,
+        () => _import,
         _serializer,
         _notifications,
         _resolver,

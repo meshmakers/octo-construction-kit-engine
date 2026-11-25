@@ -30,7 +30,9 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
         new("System/RtBlueprintAppliedAt");
 
     private readonly IRuntimeRepositoryProvider _runtimeRepositoryProvider;
-    private readonly IImportRtModelCommand _importRtModelCommand;
+    // One import command per Add step: the command keeps the state of the import that runs on it, and one executor
+    // serves the blueprint applies of many tenants at the same time.
+    private readonly Func<IImportRtModelCommand> _importRtModelCommandFactory;
     private readonly ICkCacheService _ckCacheService;
     private readonly ILogger<BlueprintMigrationExecutor> _logger;
 
@@ -39,12 +41,12 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
     /// </summary>
     public BlueprintMigrationExecutor(
         IRuntimeRepositoryProvider runtimeRepositoryProvider,
-        IImportRtModelCommand importRtModelCommand,
+        Func<IImportRtModelCommand> importRtModelCommandFactory,
         ICkCacheService ckCacheService,
         ILogger<BlueprintMigrationExecutor> logger)
     {
         _runtimeRepositoryProvider = runtimeRepositoryProvider;
-        _importRtModelCommand = importRtModelCommand;
+        _importRtModelCommandFactory = importRtModelCommandFactory;
         _ckCacheService = ckCacheService;
         _logger = logger;
     }
@@ -341,7 +343,7 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
                 createRefusals.Select(BlueprintGenericCreateGuard.ToErrorString)));
         }
 
-        await _importRtModelCommand.ImportModelAsync(
+        await _importRtModelCommandFactory().ImportModelAsync(
             repository, root, ImportStrategy.Upsert, cancellationToken).ConfigureAwait(false);
 
         return 1;

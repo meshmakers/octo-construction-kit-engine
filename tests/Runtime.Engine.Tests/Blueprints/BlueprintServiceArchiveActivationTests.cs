@@ -138,7 +138,7 @@ public class BlueprintServiceArchiveActivationTests
 
     private BlueprintService CreateService(bool withStreamData = true) => new(
         _cache, _catalog, _history, A.Fake<IBlueprintMigrationExecutor>(), A.Fake<IBlueprintMigrationParser>(),
-        _upgrade, _repositoryProvider, _import, _serializer, A.Fake<IBlueprintNotifications>(),
+        _upgrade, _repositoryProvider, () => _import, _serializer, A.Fake<IBlueprintNotifications>(),
         _resolver, _installations, _variables, NullLogger<BlueprintService>.Instance, null,
         withStreamData ? _streamData : null);
 

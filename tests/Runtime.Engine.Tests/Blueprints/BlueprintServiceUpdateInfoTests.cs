@@ -35,7 +35,7 @@ public class BlueprintServiceUpdateInfoTests
         A.Fake<IBlueprintMigrationParser>(),
         A.Fake<ICkModelUpgradeService>(),
         A.Fake<IRuntimeRepositoryProvider>(),
-        A.Fake<IImportRtModelCommand>(),
+        () => A.Fake<IImportRtModelCommand>(),
         A.Fake<IRtYamlSerializer>(),
         A.Fake<IBlueprintNotifications>(),
         A.Fake<IBlueprintDependencyResolver>(),

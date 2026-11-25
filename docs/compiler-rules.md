@@ -81,10 +81,7 @@ Notes:
   unbound-reference diagnostic is the source-generator diagnostic OM1004.
   Warnings (e.g. 110, 124) of a successful compile are printed by `octo-ckc -c compile` (to **stderr**, also with
   `-v none`, so stdout keeps only the `-cr` file path) and by the `CkCompile` MSBuild task (`Log.LogWarning`; not
-  promoted by `TreatWarningsAsErrors`, which applies to the C# compiler only). Known v1 sources hitting 110:
-  `octo-construction-kit/src/ConstructionKits/Octo.Energy.Demo/ConstructionKit/types/UkDale*.yaml` (top-level
-  `attributes:` in `types/` — were silently ignored before); that project is not in `Octo.ConstructionKit.sln` nor in
-  any pipeline, so no build breaks.
+  promoted by `TreatWarningsAsErrors`, which applies to the C# compiler only).
   `MessageCodes.cs` is generated from `MessageCodes.json` by `MessageCodes.tt` (not part of the build);
   **Message parameters are the machine-readable contract, message texts are not**: `OperationMessage.Parameters`
   (name → string, invariant culture) is filled by `OperationMessageTemplate.CreateMessage` for every message from the

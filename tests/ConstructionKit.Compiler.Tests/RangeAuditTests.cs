@@ -38,7 +38,7 @@ public sealed class RangeAuditTests : IDisposable
         { "System-[2.5.0]", true },
         { "System-[2.5,)", false }, // unbounded (Loxone: Basic-[2.4,))
         { "System-2.5", false }, // >= 2.5.0
-        { "System", false }, // bare model name = >= 1.0.0 (System.Sdk, OctoEnergyDemo)
+        { "System", false }, // bare model name = >= 1.0.0 (System.Sdk)
         { "System-[2.5,3.0]", false }, // the next major itself is inside
         { "System-[2.5,4.0)", false } // two majors
     };

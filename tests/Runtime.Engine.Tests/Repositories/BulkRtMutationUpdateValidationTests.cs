@@ -51,14 +51,19 @@ public class BulkRtMutationUpdateValidationTests
     [Fact]
     public async Task Update_PassesThePartialEntitiesWithIdAndType_ToTheValidation()
     {
-        var entity = Partial("changed");
+        // The partial entity carries neither the target's RtId nor a CkTypeId: both must come from the update key.
+        var entity = new RtEntity();
+        entity.SetAttributeRawValue("Name", "changed");
+        var target = new RtEntityId(_model.Document.CkTypeId.ToRtCkId(), OctoObjectId.GenerateNewId());
+        Assert.NotEqual(target.RtId, entity.RtId);
 
-        await ApplyAsync(BulkRtMutationOptions.Default, EntityUpdateInfo<RtEntity>.CreateUpdate(IdOf(entity), entity));
+        await ApplyAsync(BulkRtMutationOptions.Default, EntityUpdateInfo<RtEntity>.CreateUpdate(target, entity));
 
         var validated = Assert.Single(Assert.Single(_validation.Calls));
         Assert.Same(entity, validated);
-        Assert.Equal(IdOf(entity).RtId, validated.RtId);
-        Assert.Equal(IdOf(entity).CkTypeId, validated.CkTypeId);
+        var (validatedRtId, validatedCkTypeId) = Assert.Single(Assert.Single(_validation.Identities));
+        Assert.Equal(target.RtId, validatedRtId);
+        Assert.Equal(target.CkTypeId, validatedCkTypeId);
         Assert.Same(_session, _validation.Session);
         Assert.Same(_dataSource, _validation.DataSource);
         A.CallTo(() => _collection.UpdateOneAsync(_session, A<IEnumerable<RtEntity>>._))
@@ -118,6 +123,9 @@ public class BulkRtMutationUpdateValidationTests
     {
         public List<IReadOnlyList<RtEntity>> Calls { get; } = [];
 
+        /// <summary>RtId and CkTypeId of every partial document as the validation received it.</summary>
+        public List<IReadOnlyList<(OctoObjectId RtId, RtCkId<CkTypeId>? CkTypeId)>> Identities { get; } = [];
+
         public bool Refuse { get; set; }
 
         public IOctoSession? Session { get; private set; }
@@ -135,6 +143,7 @@ public class BulkRtMutationUpdateValidationTests
             }
 
             Calls.Add(partialDocuments.ToList());
+            Identities.Add(partialDocuments.Select(d => (d.RtId, d.CkTypeId)).ToList());
             return Task.CompletedTask;
         }
     }

@@ -156,10 +156,13 @@ takes its block from `max(counter, StartValue - 1) + 1` on, in the same single a
 a start value continues an external range and one set below a counter in use is ignored. The range rules also refuse a
 `StartValue` below 1 or above `End`, and they are checked for partial updates of a range too (engine hook
 `IPreDocumentUpdateValidation`, called by `BulkRtMutation` before anything of the batch is written): an update that makes
-the stored range invalid is refused up front, not only when the next number is taken. Counters are entities of the
-tenant database, so company tenants under one group tenant number independently; `CurrentValue`, `Periods` and the
-configuration attributes are `TenantOwned`, so a seed re-apply keeps them. `Release` (AB#9758 ff.) is not built yet. A service built before AB#9754 ignores the new attributes and numbers a fiscal-year
-range like a legacy counter, so configure them only on an installation whose services contain the implementation.
+the stored range invalid is refused up front, not only when the next number is taken. Every update through
+`BulkRtMutation` is checked, the repository's `UpdateOneRtEntity*` and `UpdateManyRtEntity*` methods included; a direct
+collection write or a mutation with `DisablePreDocumentModifications` is not, and the allocation checks the rules again.
+Counters are entities of the tenant database, so company tenants under one group tenant number independently;
+`CurrentValue`, `Periods` and the configuration attributes are `TenantOwned`, so a seed re-apply keeps them. A service
+built before AB#9754 ignores the new attributes and numbers a fiscal-year range like a legacy counter, so configure them
+only on an installation whose services contain the implementation.
 
 ## 5. Outside System
 

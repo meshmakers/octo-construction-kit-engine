@@ -455,6 +455,51 @@ guard - one code path):
 - Request contract: `InitiatedBySubjectId` is an optional additive field; an old consumer ignores it (no protection,
   no break).
 
+## Validating a blueprint draft (AB#9371)
+
+One validator judges a blueprint draft everywhere: `IBlueprintDraftValidator` in
+`Meshmakers.Octo.ConstructionKit.Engine` (`BlueprintCatalogs/`). It reads the draft through an `IBlueprintFileSource`
+(`DirectoryBlueprintFileSource` for octo-bpm, `InMemoryBlueprintFileSource` for an uploaded zip or inline files,
+`CatalogBlueprintFileSource` for a catalog blueprint) and writes nothing. Users:
+
+- `octo-bpm validate`, `pack` and `publish` (offline by default; `--ck-catalogs all` or `--ck-catalogs <name>,<name>`
+  adds the CK dependency-range check),
+- the asset repository: `POST {tenantId}/v1/blueprints/validate` (a zip of the blueprint folder or a single
+  `blueprint.yaml`; CK ranges checked against the CK model catalogs the tenant reads), `IBlueprintService.ValidateBlueprintAsync`
+  and the install path (`ApplyBlueprintAsync`),
+- the MCP tool `validate_blueprint` (through the endpoint).
+
+Every finding carries a stable code of the construction kit message catalog; tools branch on the code and its
+parameters, never on the text. The texts of the former octo-bpm messages are unchanged.
+
+| Code | Level | Finding | Blocks install |
+|------|-------|---------|----------------|
+| 149 | Error | `blueprint.yaml` not found | yes |
+| 150 | Error | `blueprint.yaml` cannot be parsed | yes |
+| 151 | Error | blueprint id missing | yes |
+| 152 | Warning | the single seed file is missing | - |
+| 153 | Error | one of several declared seed files is missing | yes |
+| 154 | Warning | both `seedDataPath` and `seedDataPaths` declared | - |
+| 155 | Error | a seed file cannot be parsed | yes |
+| 156 | Warning | duplicate entity (CK type + rtId) in one seed file | - |
+| 157 | Error | duplicate entity across seed files | warning |
+| 158 | Warning | YAML file under `seed-data/` not referenced | - |
+| 159 | Warning | rtId reused under another CK type | - |
+| 160 | Error | seed sets a Secret attribute | warning |
+| 161 | Warning | Secret lint could not resolve a CK model | - |
+| 162 | Error | CK model dependency without a name | yes |
+| 163 | Error | CK dependency range resolves in none of the CK model catalogs (parameter `modelId`) | warning |
+| 164 | Error | CK dependency range without a minimum version | yes |
+| 165 | Info | CK dependency ranges not checked (no catalogs given) | - |
+| 166 | Warning | a CK dependency could not be checked (catalog unreachable) | - |
+| 167 | Error | the draft (zip) cannot be read: invalid, too large, unsafe path | - |
+
+**Install path.** `ApplyBlueprintAsync` runs the validator over the root blueprint before anything is installed.
+Only the codes marked *yes* (`BlueprintDraftValidationCodes.InstallBlockingCodes`) refuse the install - each of them
+makes the install fail anyway, now earlier and with a code. Every other error is reported as a warning in the install
+result, so a blueprint that installed before still installs. 163 is a warning there because the install step can still
+take a model from a service-managed descriptor or keep the one the tenant runs.
+
 ## Seed Data Format
 
 Seed data is a runtime-model YAML file. The blueprint engine stamps the source attributes during import; you do not write them yourself.

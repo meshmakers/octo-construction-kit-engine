@@ -418,6 +418,63 @@ internal static class MessageCodes
     internal static OperationMessage CkModelInlineDraftTooLarge(string? location, object detail) =>
         GetMessage("CkModelInlineDraftTooLarge", location, detail);
 
+    internal static OperationMessage BlueprintManifestMissing(string? location, object fileName) =>
+        GetMessage("BlueprintManifestMissing", location, fileName);
+
+    internal static OperationMessage BlueprintManifestUnreadable(string? location, object detail) =>
+        GetMessage("BlueprintManifestUnreadable", location, detail);
+
+    internal static OperationMessage BlueprintIdMissing(string? location) =>
+        GetMessage("BlueprintIdMissing", location);
+
+    internal static OperationMessage BlueprintSeedDataFileMissing(string? location, object seedDataPath) =>
+        GetMessage("BlueprintSeedDataFileMissing", location, seedDataPath);
+
+    internal static OperationMessage BlueprintSeedDataFileOfSeveralMissing(string? location, object seedDataPath) =>
+        GetMessage("BlueprintSeedDataFileOfSeveralMissing", location, seedDataPath);
+
+    internal static OperationMessage BlueprintSeedDataPathAndPathsDeclared(string? location) =>
+        GetMessage("BlueprintSeedDataPathAndPathsDeclared", location);
+
+    internal static OperationMessage BlueprintSeedDataFileUnparsable(string? location, object detail) =>
+        GetMessage("BlueprintSeedDataFileUnparsable", location, detail);
+
+    internal static OperationMessage BlueprintSeedEntityDuplicateInFile(string? location, object identity) =>
+        GetMessage("BlueprintSeedEntityDuplicateInFile", location, identity);
+
+    internal static OperationMessage BlueprintSeedEntityDuplicateAcrossFiles(string? location, object identity, object declaredIn) =>
+        GetMessage("BlueprintSeedEntityDuplicateAcrossFiles", location, identity, declaredIn);
+
+    internal static OperationMessage BlueprintSeedDataFileUnreferenced(string? location, object seedDataPath) =>
+        GetMessage("BlueprintSeedDataFileUnreferenced", location, seedDataPath);
+
+    internal static OperationMessage BlueprintSeedRtIdReusedAcrossTypes(string? location, object rtId, object identity, object otherIdentity) =>
+        GetMessage("BlueprintSeedRtIdReusedAcrossTypes", location, rtId, identity, otherIdentity);
+
+    internal static OperationMessage BlueprintSeedSecretValue(string? location, object identity, object attributeId) =>
+        GetMessage("BlueprintSeedSecretValue", location, identity, attributeId);
+
+    internal static OperationMessage BlueprintSecretLintModelUnresolved(string? location, object modelId) =>
+        GetMessage("BlueprintSecretLintModelUnresolved", location, modelId);
+
+    internal static OperationMessage BlueprintCkModelDependencyNameMissing(string? location) =>
+        GetMessage("BlueprintCkModelDependencyNameMissing", location);
+
+    internal static OperationMessage BlueprintCkModelDependencyNotInCatalogs(string? location, object modelId, object versionRange, object catalogs) =>
+        GetMessage("BlueprintCkModelDependencyNotInCatalogs", location, modelId, versionRange, catalogs);
+
+    internal static OperationMessage BlueprintCkModelDependencyNoMinimumVersion(string? location, object modelId, object versionRange) =>
+        GetMessage("BlueprintCkModelDependencyNoMinimumVersion", location, modelId, versionRange);
+
+    internal static OperationMessage BlueprintCkModelDependenciesNotChecked(string? location, object reason) =>
+        GetMessage("BlueprintCkModelDependenciesNotChecked", location, reason);
+
+    internal static OperationMessage BlueprintCkModelDependencyNotCheckable(string? location, object modelId, object versionRange, object reason) =>
+        GetMessage("BlueprintCkModelDependencyNotCheckable", location, modelId, versionRange, reason);
+
+    internal static OperationMessage BlueprintDraftUnreadable(string? location, object detail) =>
+        GetMessage("BlueprintDraftUnreadable", location, detail);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1205,6 +1262,120 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  148, "The inline CK model draft is too large: {detail}",
                  new [] {"detail"})
+        },
+        {
+            "BlueprintManifestMissing",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 149, "Blueprint metadata file not found: {fileName}",
+                 new string[] {"fileName"})
+        },
+        {
+            "BlueprintManifestUnreadable",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 150, "The blueprint metadata file cannot be read: {detail}",
+                 new string[] {"detail"})
+        },
+        {
+            "BlueprintIdMissing",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 151, "Blueprint ID is required",
+                 new string[] {})
+        },
+        {
+            "BlueprintSeedDataFileMissing",
+             new OperationMessageTemplate(MessageLevel.Warning,
+                 152, "Seed data file not found: {seedDataPath}",
+                 new string[] {"seedDataPath"})
+        },
+        {
+            "BlueprintSeedDataFileOfSeveralMissing",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 153, "Seed data file not found: {seedDataPath}",
+                 new string[] {"seedDataPath"})
+        },
+        {
+            "BlueprintSeedDataPathAndPathsDeclared",
+             new OperationMessageTemplate(MessageLevel.Warning,
+                 154, "Blueprint declares both 'seedDataPath' and 'seedDataPaths'. Both are loaded ('seedDataPath' first), but listing every file in 'seedDataPaths' keeps the seed in one place.",
+                 new string[] {})
+        },
+        {
+            "BlueprintSeedDataFileUnparsable",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 155, "Seed data file could not be parsed: {detail}",
+                 new string[] {"detail"})
+        },
+        {
+            "BlueprintSeedEntityDuplicateInFile",
+             new OperationMessageTemplate(MessageLevel.Warning,
+                 156, "Duplicate entity '{identity}' in the same seed data file",
+                 new string[] {"identity"})
+        },
+        {
+            "BlueprintSeedEntityDuplicateAcrossFiles",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 157, "Duplicate entity '{identity}' — already declared in '{declaredIn}'",
+                 new string[] {"identity", "declaredIn"})
+        },
+        {
+            "BlueprintSeedDataFileUnreferenced",
+             new OperationMessageTemplate(MessageLevel.Warning,
+                 158, "Seed data file '{seedDataPath}' is not referenced by 'seedDataPath' / 'seedDataPaths' and will not be imported",
+                 new string[] {"seedDataPath"})
+        },
+        {
+            "BlueprintSeedRtIdReusedAcrossTypes",
+             new OperationMessageTemplate(MessageLevel.Warning,
+                 159, "rtId '{rtId}' is used by '{identity}' and by '{otherIdentity}'. That is legal (entities are keyed by CK type plus rtId) but makes association targets easy to get wrong - prefer a distinct id per entity.",
+                 new string[] {"rtId", "identity", "otherIdentity"})
+        },
+        {
+            "BlueprintSeedSecretValue",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 160, "Seed entity '{identity}' sets Secret attribute '{attributeId}' to a value. Seeds may only leave Secret attributes empty or omit them; placeholders such as '<...>' or 'TODO_SET_<NAME>' are values and not allowed either. Set the secret after installation (Studio, octo-cli) and rotate any credential that was committed.",
+                 new string[] {"identity", "attributeId"})
+        },
+        {
+            "BlueprintSecretLintModelUnresolved",
+             new OperationMessageTemplate(MessageLevel.Warning,
+                 161, "Secret seed lint: CK model '{modelId}' could not be resolved from any catalog; seed values of its attributes are not checked.",
+                 new string[] {"modelId"})
+        },
+        {
+            "BlueprintCkModelDependencyNameMissing",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 162, "CK model dependency name is required",
+                 new string[] {})
+        },
+        {
+            "BlueprintCkModelDependencyNotInCatalogs",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 163, "CK model dependency '{modelId}' in range '{versionRange}' resolves in none of the CK model catalogs ({catalogs})",
+                 new string[] {"modelId", "versionRange", "catalogs"})
+        },
+        {
+            "BlueprintCkModelDependencyNoMinimumVersion",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 164, "CK model dependency '{modelId}' has no minimum version in range '{versionRange}'",
+                 new string[] {"modelId", "versionRange"})
+        },
+        {
+            "BlueprintCkModelDependenciesNotChecked",
+             new OperationMessageTemplate(MessageLevel.Info,
+                 165, "The CK model dependency ranges were not checked against CK model catalogs: {reason}",
+                 new string[] {"reason"})
+        },
+        {
+            "BlueprintCkModelDependencyNotCheckable",
+             new OperationMessageTemplate(MessageLevel.Warning,
+                 166, "CK model dependency '{modelId}' in range '{versionRange}' could not be checked: {reason}",
+                 new string[] {"modelId", "versionRange", "reason"})
+        },
+        {
+            "BlueprintDraftUnreadable",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 167, "The blueprint draft cannot be read: {detail}",
+                 new string[] {"detail"})
         },
     };
 }

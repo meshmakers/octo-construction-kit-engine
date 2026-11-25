@@ -16,6 +16,17 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   on insert and replace only; this closes the gap for rules a stored entity must keep (engine-mongodb uses it for the
   number-range rules). Skipped, like the modifications, when `DisablePreDocumentModifications` is set; without a
   registered implementation nothing changes. Tests: `BulkRtMutationUpdateValidationTests`.
+- **One blueprint draft validator for octo-bpm, the asset repository, the install path and MCP (AB#9371).**
+  `IBlueprintDraftValidator` (`BlueprintCatalogs/`) checks manifest, seed data, the Secret seed lint and the CK model
+  dependencies incl. their version ranges against the CK model catalogs; file sources for a directory, a zip/inline files
+  and a catalog blueprint. Findings carry stable catalog codes 149-167 (`BlueprintDraftValidationCodes`); the texts of the
+  former octo-bpm messages are unchanged, the Secret lint moves from the ad-hoc numbers 10/11 to 160/161.
+  `octo-bpm validate|pack|publish` print each finding with its code and take `--ck-catalogs all|<names>` (default off,
+  offline). `IBlueprintService.ValidateBlueprintAsync` delegates to the validator (the empty CK dependency check is gone).
+  `ApplyBlueprintAsync` runs it before anything is installed and refuses only on findings that make the install fail
+  anyway (149, 150, 151, 153, 155, 162, 164); every other finding is a warning in the install result. Regression: of 557
+  catalog blueprint versions (public and private) 554 have no blocking finding; the 3 others (private
+  MeshmakersAccounting 3.10.0, 3.15.0, MeshmakersAccounting.Tesla 3.1.15) miss declared seed files and fail today already.
 
 ### Fixed
 

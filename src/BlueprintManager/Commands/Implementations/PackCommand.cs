@@ -2,6 +2,7 @@ using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs;
+using Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -15,11 +16,14 @@ internal class PackCommand : Command<BpmToolOptions>
     private readonly IBlueprintCompilerService _blueprintCompilerService;
     private readonly IArgument _pathArg;
     private readonly IArgument _outputArg;
+    private readonly IArgument _ckCatalogsArg;
+    private readonly IBlueprintDraftValidator _draftValidator;
 
     public PackCommand(
         ILogger<PackCommand> logger,
         IOptions<BpmToolOptions> options,
-        IBlueprintCompilerService blueprintCompilerService)
+        IBlueprintCompilerService blueprintCompilerService,
+        IBlueprintDraftValidator draftValidator)
         : base(logger, "pack", "Packs a blueprint directory into a distributable archive", options)
     {
         _blueprintCompilerService = blueprintCompilerService;
@@ -29,6 +33,8 @@ internal class PackCommand : Command<BpmToolOptions>
 
         _outputArg = CommandArgumentValue.AddArgument("o", "output",
             ["Output directory for the packed blueprint"], true, 1);
+        _ckCatalogsArg = BpmDraftValidation.AddCkCatalogsArgument(CommandArgumentValue);
+        _draftValidator = draftValidator;
     }
 
     public override async Task Execute()
@@ -40,6 +46,10 @@ internal class PackCommand : Command<BpmToolOptions>
 
         Logger.LogInformation("Path: {Path}", path);
         Logger.LogInformation("Output: {Output}", outputPath);
+
+        // AB#9371: findings of the shared draft validator with their stable codes; errors stop the pack.
+        await BpmDraftValidation.RunAsync(_draftValidator, path,
+            BpmDraftValidation.ReadCkCatalogs(CommandArgumentValue, _ckCatalogsArg), Logger);
 
         var operationResult = new OperationResult();
         var zipPath = await _blueprintCompilerService.PackAsync(path, outputPath, operationResult);

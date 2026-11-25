@@ -167,7 +167,9 @@ public class BlueprintSeedSecretLintTests : IDisposable
         var operationResult = new OperationResult();
         await compiler.ValidateAsync(_blueprintDirectory, operationResult, TestContext.Current.CancellationToken);
 
-        Assert.Empty(operationResult.Messages);
+        // AB#9371: only the info that the CK dependency ranges were not checked (offline default) remains.
+        Assert.DoesNotContain(operationResult.Messages,
+            m => m.MessageNumber != BlueprintDraftValidationCodes.CkModelDependenciesNotChecked);
     }
 
     [Theory]

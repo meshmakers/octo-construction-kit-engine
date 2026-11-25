@@ -28,7 +28,7 @@ public class PublishCommandTests
         A.CallTo(() => manager.IsExistingAsync(A<string>._, A<BlueprintId>._, A<object?>._)).Returns(false);
 
         var cmd = new PublishCommand(NullLogger<PublishCommand>.Instance, Options.Create(new BpmToolOptions()),
-            manager, compiler);
+            manager, compiler, ValidatorFor(meta));
         cmd.CommandArgumentValue.ParseLayer(["-p", "/tmp/does-not-need-to-exist"]); // no -c
 
         await cmd.Execute();
@@ -96,11 +96,21 @@ public class PublishCommandTests
         A.CallTo(() => compiler.ValidateAsync(A<string>._, A<OperationResult>._, A<CancellationToken>._)).Returns(meta);
 
         var cmd = new PublishCommand(NullLogger<PublishCommand>.Instance, Options.Create(new BpmToolOptions()),
-            manager, compiler);
+            manager, compiler, ValidatorFor(meta));
         cmd.CommandArgumentValue.ParseLayer(force
             ? ["-p", "/tmp/does-not-need-to-exist", "-c", catalogName, "-f"]
             : ["-p", "/tmp/does-not-need-to-exist", "-c", catalogName]);
 
         await cmd.Execute();
+    }
+
+    /// <summary>AB#9371: publish validates with the shared draft validator; a valid draft returns its manifest.</summary>
+    private static IBlueprintDraftValidator ValidatorFor(BlueprintMetaRootDto meta)
+    {
+        var validator = A.Fake<IBlueprintDraftValidator>();
+        A.CallTo(() => validator.ValidateAsync(A<IBlueprintFileSource>._, A<BlueprintValidationOptions?>._,
+                A<CancellationToken>._))
+            .Returns(new BlueprintDraftValidationResult(meta, []));
+        return validator;
     }
 }

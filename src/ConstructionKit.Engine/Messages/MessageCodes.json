@@ -785,6 +785,120 @@
       "number": 148,
       "level": "ERROR",
       "text": "The inline CK model draft is too large: {detail}"
+    },
+    {
+      "key": "BlueprintManifestMissing",
+      "number": 149,
+      "level": "ERROR",
+      "text": "Blueprint metadata file not found: {fileName}"
+    },
+    {
+      "key": "BlueprintManifestUnreadable",
+      "number": 150,
+      "level": "ERROR",
+      "text": "The blueprint metadata file cannot be read: {detail}"
+    },
+    {
+      "key": "BlueprintIdMissing",
+      "number": 151,
+      "level": "ERROR",
+      "text": "Blueprint ID is required"
+    },
+    {
+      "key": "BlueprintSeedDataFileMissing",
+      "number": 152,
+      "level": "WARNING",
+      "text": "Seed data file not found: {seedDataPath}"
+    },
+    {
+      "key": "BlueprintSeedDataFileOfSeveralMissing",
+      "number": 153,
+      "level": "ERROR",
+      "text": "Seed data file not found: {seedDataPath}"
+    },
+    {
+      "key": "BlueprintSeedDataPathAndPathsDeclared",
+      "number": 154,
+      "level": "WARNING",
+      "text": "Blueprint declares both 'seedDataPath' and 'seedDataPaths'. Both are loaded ('seedDataPath' first), but listing every file in 'seedDataPaths' keeps the seed in one place."
+    },
+    {
+      "key": "BlueprintSeedDataFileUnparsable",
+      "number": 155,
+      "level": "ERROR",
+      "text": "Seed data file could not be parsed: {detail}"
+    },
+    {
+      "key": "BlueprintSeedEntityDuplicateInFile",
+      "number": 156,
+      "level": "WARNING",
+      "text": "Duplicate entity '{identity}' in the same seed data file"
+    },
+    {
+      "key": "BlueprintSeedEntityDuplicateAcrossFiles",
+      "number": 157,
+      "level": "ERROR",
+      "text": "Duplicate entity '{identity}' — already declared in '{declaredIn}'"
+    },
+    {
+      "key": "BlueprintSeedDataFileUnreferenced",
+      "number": 158,
+      "level": "WARNING",
+      "text": "Seed data file '{seedDataPath}' is not referenced by 'seedDataPath' / 'seedDataPaths' and will not be imported"
+    },
+    {
+      "key": "BlueprintSeedRtIdReusedAcrossTypes",
+      "number": 159,
+      "level": "WARNING",
+      "text": "rtId '{rtId}' is used by '{identity}' and by '{otherIdentity}'. That is legal (entities are keyed by CK type plus rtId) but makes association targets easy to get wrong - prefer a distinct id per entity."
+    },
+    {
+      "key": "BlueprintSeedSecretValue",
+      "number": 160,
+      "level": "ERROR",
+      "text": "Seed entity '{identity}' sets Secret attribute '{attributeId}' to a value. Seeds may only leave Secret attributes empty or omit them; placeholders such as '<...>' or 'TODO_SET_<NAME>' are values and not allowed either. Set the secret after installation (Studio, octo-cli) and rotate any credential that was committed."
+    },
+    {
+      "key": "BlueprintSecretLintModelUnresolved",
+      "number": 161,
+      "level": "WARNING",
+      "text": "Secret seed lint: CK model '{modelId}' could not be resolved from any catalog; seed values of its attributes are not checked."
+    },
+    {
+      "key": "BlueprintCkModelDependencyNameMissing",
+      "number": 162,
+      "level": "ERROR",
+      "text": "CK model dependency name is required"
+    },
+    {
+      "key": "BlueprintCkModelDependencyNotInCatalogs",
+      "number": 163,
+      "level": "ERROR",
+      "text": "CK model dependency '{modelId}' in range '{versionRange}' resolves in none of the CK model catalogs ({catalogs})"
+    },
+    {
+      "key": "BlueprintCkModelDependencyNoMinimumVersion",
+      "number": 164,
+      "level": "ERROR",
+      "text": "CK model dependency '{modelId}' has no minimum version in range '{versionRange}'"
+    },
+    {
+      "key": "BlueprintCkModelDependenciesNotChecked",
+      "number": 165,
+      "level": "INFO",
+      "text": "The CK model dependency ranges were not checked against CK model catalogs: {reason}"
+    },
+    {
+      "key": "BlueprintCkModelDependencyNotCheckable",
+      "number": 166,
+      "level": "WARNING",
+      "text": "CK model dependency '{modelId}' in range '{versionRange}' could not be checked: {reason}"
+    },
+    {
+      "key": "BlueprintDraftUnreadable",
+      "number": 167,
+      "level": "ERROR",
+      "text": "The blueprint draft cannot be read: {detail}"
     }
   ]
 }

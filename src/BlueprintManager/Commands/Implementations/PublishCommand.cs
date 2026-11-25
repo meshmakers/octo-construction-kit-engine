@@ -18,12 +18,15 @@ internal class PublishCommand : Command<BpmToolOptions>
     private readonly IArgument _pathArg;
     private readonly IArgument _catalogArg;
     private readonly IArgument _forceArg;
+    private readonly IArgument _ckCatalogsArg;
+    private readonly IBlueprintDraftValidator _draftValidator;
 
     public PublishCommand(
         ILogger<PublishCommand> logger,
         IOptions<BpmToolOptions> options,
         IBlueprintCatalogManager catalogManager,
-        IBlueprintCompilerService blueprintCompilerService)
+        IBlueprintCompilerService blueprintCompilerService,
+        IBlueprintDraftValidator draftValidator)
         : base(logger, "publish", "Publishes a blueprint to a catalog", options)
     {
         _catalogManager = catalogManager;
@@ -37,6 +40,8 @@ internal class PublishCommand : Command<BpmToolOptions>
 
         _forceArg = CommandArgumentValue.AddArgument("f", "force",
             ["Replace the blueprint if it already exists in the target catalog"], false, 0);
+        _ckCatalogsArg = BpmDraftValidation.AddCkCatalogsArgument(CommandArgumentValue);
+        _draftValidator = draftValidator;
     }
 
     public override async Task Execute()
@@ -56,16 +61,20 @@ internal class PublishCommand : Command<BpmToolOptions>
             Logger.LogInformation("Force mode: existing blueprints will be replaced");
         }
 
-        // First validate the blueprint
-        var operationResult = new OperationResult();
-        var blueprintMeta = await _blueprintCompilerService.ValidateAsync(path, operationResult);
-
-        if (operationResult.HasErrors || operationResult.HasFatalErrors)
+        // First validate the blueprint (AB#9371: shared draft validator, findings with stable codes)
+        BlueprintDraftValidationResult validation;
+        try
+        {
+            validation = await BpmDraftValidation.RunAsync(_draftValidator, path,
+                BpmDraftValidation.ReadCkCatalogs(CommandArgumentValue, _ckCatalogsArg), Logger);
+        }
+        catch (BlueprintCatalogException)
         {
             Logger.LogError("Blueprint validation failed");
-            operationResult.WriteMessagesToLogger(Logger);
             return;
         }
+
+        var blueprintMeta = validation.BlueprintMeta!;
 
         Logger.LogInformation("Blueprint '{BlueprintId}' validated successfully", blueprintMeta.BlueprintId.FullName);
 

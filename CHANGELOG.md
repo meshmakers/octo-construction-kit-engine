@@ -67,6 +67,14 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Added
 
+- **Catalog numbers for the CK model validation refusals (AB#8502).** The message catalog (`MessageCodes.json`) has four
+  new entries, so a tool branches on the number instead of a work item id plus a free-text `reason`:
+  145 `CkModelSystemReferenceMismatch` (`modelId`, `referencedModelId`, `installedModelId`), 146
+  `CkModelDependencyNotResolvable` (`modelId`, `detail`), 147 `CkModelDraftUnreadable` (`detail`) and 148
+  `CkModelInlineDraftTooLarge` (`detail`). The tenant validation of engine-mongodb, the draft validation of the asset
+  repository and the MCP service use them instead of 8492 and 9005; the import's `ModelValidationException` texts stay
+  unchanged.
+
 - **Seed associations to entities the tenant does not hold yet are kept and written later (AB#9651).** A blueprint seed
   edge whose target (or origin) exists neither in the seed nor in the tenant used to be dropped for good (AB#5005); the
   pipelines of a blueprint lost their `Executes` edge to the Mesh Adapter when the platform enabled Communication only

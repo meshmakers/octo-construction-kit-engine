@@ -761,6 +761,30 @@
       "number": 144,
       "level": "ERROR",
       "text": "Write refused: the {operation} of entity '{rtId}' of type '{ckTypeId}' is restricted by the 'writeAccess' of type '{restrictingCkTypeId}'. The caller is principal '{principalKind}' on channel '{channel}'; only the principals [{principals}] or the channels [{channels}] may write it"
+    },
+    {
+      "key": "CkModelSystemReferenceMismatch",
+      "number": 145,
+      "level": "ERROR",
+      "text": "Model '{modelId}' was compiled against '{referencedModelId}' but '{installedModelId}' is installed. The model needs to be recompiled against the current system version."
+    },
+    {
+      "key": "CkModelDependencyNotResolvable",
+      "number": 146,
+      "level": "ERROR",
+      "text": "The dependencies of model '{modelId}' cannot be resolved against the installed models: {detail}"
+    },
+    {
+      "key": "CkModelDraftUnreadable",
+      "number": 147,
+      "level": "ERROR",
+      "text": "The CK model draft cannot be read: {detail}"
+    },
+    {
+      "key": "CkModelInlineDraftTooLarge",
+      "number": 148,
+      "level": "ERROR",
+      "text": "The inline CK model draft is too large: {detail}"
     }
   ]
 }

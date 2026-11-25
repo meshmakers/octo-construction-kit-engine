@@ -406,6 +406,18 @@ internal static class MessageCodes
     internal static OperationMessage RtTypeWriteAccessDenied(string? location, object operation, object rtId, object ckTypeId, object restrictingCkTypeId, object principalKind, object channel, object principals, object channels) =>
         GetMessage("RtTypeWriteAccessDenied", location, operation, rtId, ckTypeId, restrictingCkTypeId, principalKind, channel, principals, channels);
 
+    internal static OperationMessage CkModelSystemReferenceMismatch(string? location, object modelId, object referencedModelId, object installedModelId) =>
+        GetMessage("CkModelSystemReferenceMismatch", location, modelId, referencedModelId, installedModelId);
+
+    internal static OperationMessage CkModelDependencyNotResolvable(string? location, object modelId, object detail) =>
+        GetMessage("CkModelDependencyNotResolvable", location, modelId, detail);
+
+    internal static OperationMessage CkModelDraftUnreadable(string? location, object detail) =>
+        GetMessage("CkModelDraftUnreadable", location, detail);
+
+    internal static OperationMessage CkModelInlineDraftTooLarge(string? location, object detail) =>
+        GetMessage("CkModelInlineDraftTooLarge", location, detail);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1169,6 +1181,30 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  144, "Write refused: the {operation} of entity '{rtId}' of type '{ckTypeId}' is restricted by the 'writeAccess' of type '{restrictingCkTypeId}'. The caller is principal '{principalKind}' on channel '{channel}'; only the principals [{principals}] or the channels [{channels}] may write it",
                  new [] {"operation", "rtId", "ckTypeId", "restrictingCkTypeId", "principalKind", "channel", "principals", "channels"})
+        },
+        {
+            "CkModelSystemReferenceMismatch",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 145, "Model '{modelId}' was compiled against '{referencedModelId}' but '{installedModelId}' is installed. The model needs to be recompiled against the current system version.",
+                 new [] {"modelId", "referencedModelId", "installedModelId"})
+        },
+        {
+            "CkModelDependencyNotResolvable",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 146, "The dependencies of model '{modelId}' cannot be resolved against the installed models: {detail}",
+                 new [] {"modelId", "detail"})
+        },
+        {
+            "CkModelDraftUnreadable",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 147, "The CK model draft cannot be read: {detail}",
+                 new [] {"detail"})
+        },
+        {
+            "CkModelInlineDraftTooLarge",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 148, "The inline CK model draft is too large: {detail}",
+                 new [] {"detail"})
         },
     };
 }

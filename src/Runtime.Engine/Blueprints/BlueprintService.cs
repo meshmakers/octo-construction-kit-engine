@@ -242,6 +242,9 @@ internal class BlueprintService : IBlueprintService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(options);
+        // Every log line of this apply carries the tenant and the blueprint (a dependency's seed import opens its own
+        // scope with the dependency's id).
+        using var logScope = BeginApplyLogScope(tenantId, blueprintId);
         var force = options.Force;
         IReadOnlyList<BlueprintCkUpgradeBlocker> forcedCkBlockers = [];
         IReadOnlyList<string> judgedCkUpdateSet = [];
@@ -2152,6 +2155,9 @@ internal class BlueprintService : IBlueprintService
         CancellationToken cancellationToken = default)
     {
         options ??= new BlueprintUpdateOptions();
+        // Every log line of this update (also those of the migration steps and their imports) carries the tenant and the
+        // blueprint.
+        using var logScope = BeginApplyLogScope(tenantId, targetVersion);
 
         _logger.LogInformation("Applying update to tenant {TenantId} to version {TargetVersion} with mode {UpdateMode}",
             tenantId, targetVersion, updateMode);

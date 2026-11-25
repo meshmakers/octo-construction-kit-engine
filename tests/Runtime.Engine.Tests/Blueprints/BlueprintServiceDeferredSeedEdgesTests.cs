@@ -341,6 +341,29 @@ public class BlueprintServiceDeferredSeedEdgesTests
         Assert.Equal(V1.ToString(), scope["BlueprintId"]);
     }
 
+    [Fact]
+    public async Task Update_EveryLogLineOfTheUpdate_CarriesTenantAndBlueprintId()
+    {
+        GivenInstalled(V1);
+        _seedBodies[V1.FullName] = "old";
+        _seedBodies[V2.FullName] = "new";
+        GivenSkipped();
+        var sink = new ScopeCapturingProvider();
+        using var loggerFactory = LoggerFactory.Create(b => b.AddProvider(sink));
+
+        await CreateService(logger: loggerFactory.CreateLogger<BlueprintService>())
+            .ApplyUpdateAsync(TenantId, V2, BlueprintUpdateMode.Merge,
+                cancellationToken: TestContext.Current.CancellationToken);
+
+        // Also the lines outside the diff import (start of the update, migration steps) carry the scope.
+        Assert.NotEmpty(sink.Lines);
+        Assert.All(sink.Lines, l =>
+        {
+            Assert.Equal(TenantId, l.Scope["TenantId"]);
+            Assert.Equal(V2.ToString(), l.Scope["BlueprintId"]);
+        });
+    }
+
     private sealed class ScopeCapturingProvider : ILoggerProvider, ISupportExternalScope
     {
         private IExternalScopeProvider _scopes = new LoggerExternalScopeProvider();

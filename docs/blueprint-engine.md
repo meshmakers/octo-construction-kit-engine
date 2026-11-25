@@ -27,7 +27,8 @@ a new command for every import from `Func<IImportRtModelCommand>` (registered by
 the results of the import from that command only. A host that imports for several tenants itself does the same. Every
 log line of a blueprint apply carries `TenantId` and `BlueprintId` in a log scope, so the lines of parallel applies can be
 told apart. Tests: `BlueprintServiceDeferredSeedEdgesTests` (`Install_TakesANewImportCommand_*`,
-`ConcurrentInstalls_OnOneService_ImportOnSeparateCommands`, `Install_LogLinesOfTheImport_CarryTenantAndBlueprintId`),
+`ConcurrentInstalls_OnOneService_ImportOnSeparateCommands`, `Install_LogLinesOfTheImport_CarryTenantAndBlueprintId`,
+`Update_EveryLogLineOfTheUpdate_CarriesTenantAndBlueprintId`),
 `ImportRtModelCommandFactoryRegistrationTests`; end to end over the parallel tenant setup:
 `ConcurrentTenantSeedImportIntegrationTests` in the identity service.
 

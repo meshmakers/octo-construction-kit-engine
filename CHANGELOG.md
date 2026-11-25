@@ -7,6 +7,16 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ## Unreleased
 
+### Added
+
+- **Partial updates can be validated before they are written (AB#9755).** New hook
+  `IPreDocumentUpdateValidation<RtEntity>` (`Runtime.Contracts.Repositories`): `BulkRtMutation` hands it the partial
+  entities of a batch's updates (with `RtId` and `CkTypeId`) before anything of the batch is written - deletes, inserts
+  and replaces included - so an implementation that throws refuses the whole batch. The pre-document modifications run
+  on insert and replace only; this closes the gap for rules a stored entity must keep (engine-mongodb uses it for the
+  number-range rules). Skipped, like the modifications, when `DisablePreDocumentModifications` is set; without a
+  registered implementation nothing changes. Tests: `BulkRtMutationUpdateValidationTests`.
+
 ### Fixed
 
 - **Blueprint applies of several tenants at the same time no longer share one import state (AB#9803, security).** The
@@ -21,6 +31,12 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   stays, and no lock can deadlock. Every log line of a blueprint apply (also the import's) carries `TenantId` and
   `BlueprintId` in a log scope, and the duplicate warning names the tenant. No CK model change; `IImportRtModelCommand`
   is unchanged.
+
+- **The entity rule engine keeps the order of the input for inserts and replaces (AB#9753).** `EntityRuleEngine`
+  validates a batch in parallel and collected the inserts in a `ConcurrentBag`, so `RtEntitiesToInsert` (and the
+  replaces) came out in an unspecified order and auto-increment numbers of one batch were not handed out in batch
+  order. Inserts and replaces are now returned in the order of the `IEntityUpdateInfo` list; the validation still runs
+  in parallel. Test: `EntityRuleEngineTests.ValidateAsync_InsertsAndReplaces_KeepTheInputOrder`.
 
 - **Parallel CK model builds no longer fail writing the catalog cache (AB#9305).** Two CK compile tasks of one solution
   (parallel MSBuild nodes) or parallel `octo-ckc` runs that wrote the same catalog cache at the same time failed about

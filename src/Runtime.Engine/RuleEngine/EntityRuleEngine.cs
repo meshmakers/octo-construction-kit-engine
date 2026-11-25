@@ -21,16 +21,19 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
         IReadOnlyList<IEntityUpdateInfo<TEntity>> entityUpdateInfos, IOriginFileResolver originFileResolver,
         OperationResult operationResult) where TEntity : RtEntity
     {
-        var entitiesToCreate = new ConcurrentBag<TEntity>();
+        // AB#9753: inserts and replaces keep the order of the input (keyed by their position), so that numbers from an
+        // auto-increment counter are handed out in batch order. The validation itself still runs in parallel.
+        var entitiesToCreate = new ConcurrentDictionary<int, TEntity>();
         var entitiesToUpdate = new ConcurrentDictionary<RtEntityId, TEntity>();
-        var entitiesToReplace = new ConcurrentDictionary<RtEntityId, TEntity>();
+        var entitiesToReplace = new ConcurrentDictionary<RtEntityId, (int Index, TEntity Entity)>();
         var entitiesToDelete = new ConcurrentBag<RtEntityId>();
         var updateGuards = new ConcurrentDictionary<RtEntityId, AttributeNewerThanGuard>();
         var recordArrayItemUpdates = new ConcurrentDictionary<RtEntityId, IReadOnlyList<RtRecordArrayItemUpdate>>();
         var expectedRtVersions = new ConcurrentDictionary<RtEntityId, ulong>();
 
-        await Parallel.ForEachAsync(entityUpdateInfos, (info, token) =>
+        await Parallel.ForEachAsync(entityUpdateInfos.Select((info, index) => (info, index)), (item, token) =>
         {
+            var (info, index) = item;
             if (!ckCache.TryGetRtCkType(tenantId, info.CkTypeId, out var ckTypeGraph))
             {
                 operationResult.AddMessage(MessageCodes.CkTypeIdNotFound(originFileResolver.Resolve(tenantId), tenantId,
@@ -111,7 +114,7 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                         return ValueTask.CompletedTask;
                     }
 
-                    entitiesToCreate.Add(info.RtEntity);
+                    entitiesToCreate.TryAdd(index, info.RtEntity);
                     break;
                 case EntityModOptions.Update:
                     if (info.RtEntity == null)
@@ -162,7 +165,7 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                         return ValueTask.CompletedTask;
                     }
 
-                    if (!entitiesToReplace.TryAdd(info.GetRtEntityId(), info.RtEntity))
+                    if (!entitiesToReplace.TryAdd(info.GetRtEntityId(), (index, info.RtEntity)))
                     {
                         operationResult.AddMessage(MessageCodes.RtEntityIdAlreadyExistInUpdateList(
                             originFileResolver.Resolve(tenantId),
@@ -188,9 +191,9 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
         }).ConfigureAwait(false);
 
         var entityValidatorResult =
-            new EntityRuleEngineResult<TEntity>(entitiesToCreate.ToList(),
+            new EntityRuleEngineResult<TEntity>(entitiesToCreate.OrderBy(e => e.Key).Select(e => e.Value).ToList(),
                 entitiesToUpdate.ToDictionary(k => k.Key, v => v.Value),
-                entitiesToReplace.ToDictionary(k => k.Key, v => v.Value),
+                entitiesToReplace.OrderBy(e => e.Value.Index).ToDictionary(k => k.Key, v => v.Value.Entity),
                 entitiesToDelete.ToList(),
                 updateGuards.ToDictionary(k => k.Key, v => v.Value),
                 recordArrayItemUpdates.ToDictionary(k => k.Key, v => v.Value),

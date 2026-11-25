@@ -9,7 +9,8 @@ namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 public record BulkRtMutationOptions
 {
     /// <summary>
-    /// Disable pre-document modifications when performing insert or replace operations.
+    /// Disable the pre-document modifications of insert and replace operations and the partial-update validations
+    /// (<see cref="IPreDocumentUpdateValidation{TDocument}" />) of update operations.
     /// </summary>
     public bool DisablePreDocumentModifications { get; init; } = false;
 

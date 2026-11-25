@@ -1,0 +1,24 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+records:
+  - recordId: AutoIncrementPeriod
+    derivable: Any
+    description: "The counter of one period (fiscal year) of a System/AutoIncrement number range."
+    attributes:
+      - id: ${this}/AutoIncrementPeriod.FiscalYear
+        name: FiscalYear
+      - id: ${this}/AutoIncrementPeriod.CurrentValue
+        name: CurrentValue
+  - recordId: NumberRangeRelease
+    derivable: Any
+    description: "When a document numbered by a System/AutoIncrement range counts as released, what stays changeable afterwards and which type is its storno."
+    attributes:
+      - id: ${this}/NumberRangeRelease.StateAttribute
+        name: StateAttribute
+      - id: ${this}/NumberRangeRelease.ReleasedValues
+        name: ReleasedValues
+      - id: ${this}/NumberRangeRelease.ChangeableAttributes
+        name: ChangeableAttributes
+        isOptional: true
+      - id: ${this}/NumberRangeRelease.StornoCkTypeId
+        name: StornoCkTypeId
+        isOptional: true

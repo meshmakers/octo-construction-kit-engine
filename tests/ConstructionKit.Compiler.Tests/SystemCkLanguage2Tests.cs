@@ -129,7 +129,7 @@ public sealed class SystemCkLanguage2Tests : IDisposable
         Assert.True(CkCatalogLayout.RequiresV3(compiled));
         Assert.Equal(CkCatalogLayout.V3Root, CkCatalogLayout.GetPublishRoot(compiled));
         Assert.Equal("System", compiled.ModelId.Name);
-        Assert.Equal(new Version(2, 8, 0), new Version(compiled.ModelId.Version.ToString()));
+        Assert.Equal(new Version(2, 9, 0), new Version(compiled.ModelId.Version.ToString()));
     }
 
     [Fact]
@@ -253,13 +253,13 @@ public sealed class SystemCkLanguage2Tests : IDisposable
     public async Task AUniqueIndexOnEntity_IsAMajorWithAcknowledgement_BecauseEntityIsAStableBaseByDeclaration()
     {
         // Row B4 against the real v2 System (not the v1 name branch of the classifier): the current System is the baseline,
-        // a unique index on System/Entity in 2.8.0 is Major and needs an acknowledgement.
+        // a unique index on System/Entity in 2.9.0 is Major and needs an acknowledgement.
         await PublishAsync(RealSystemSource(), InMemoryPublishedCatalog.Name);
-        var next = CopySystem("system-2.8.0", (path, yaml) =>
+        var next = CopySystem("system-2.9.0", (path, yaml) =>
         {
             if (path == "ckModel.yaml")
             {
-                return SetVersion(yaml, "2.8.0");
+                return SetVersion(yaml, "2.9.0");
             }
 
             return path == "types/entity.yaml"

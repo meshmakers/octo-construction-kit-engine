@@ -1,0 +1,49 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: DocumentAuditEntry
+    derivable: Any
+    description: "Append-only audit entry of a released document (Feature AB#8676): release, storno and every refused change attempt. Stored in the tenant, never updated or deleted."
+    derivedFromCkTypeId: ${this}/Entity
+    isFinal: true
+    attributes:
+      - id: ${this}/DocumentAuditEntry.DocumentRtId
+        name: DocumentRtId
+      - id: ${this}/DocumentAuditEntry.DocumentCkTypeId
+        name: DocumentCkTypeId
+      - id: ${this}/DocumentAuditEntry.Action
+        name: Action
+      - id: ${this}/DocumentAuditEntry.Timestamp
+        name: Timestamp
+      - id: ${this}/DocumentAuditEntry.SubjectId
+        name: SubjectId
+        isOptional: true
+      - id: ${this}/DocumentAuditEntry.ClientId
+        name: ClientId
+        isOptional: true
+      - id: ${this}/DocumentAuditEntry.DocumentNumber
+        name: DocumentNumber
+        isOptional: true
+      - id: ${this}/DocumentAuditEntry.FiscalYear
+        name: FiscalYear
+        isOptional: true
+      - id: ${this}/DocumentAuditEntry.SequenceValue
+        name: SequenceValue
+        isOptional: true
+      - id: ${this}/DocumentAuditEntry.ReferenceRtId
+        name: ReferenceRtId
+        isOptional: true
+      - id: ${this}/DocumentAuditEntry.Source
+        name: Source
+        isOptional: true
+      - id: ${this}/DocumentAuditEntry.AttributeNames
+        name: AttributeNames
+        isOptional: true
+      - id: ${this}/DocumentAuditEntry.Message
+        name: Message
+        isOptional: true
+    indexes:
+      - indexType: "Ascending"
+        fields:
+          - attributePaths:
+              - DocumentRtId
+              - Timestamp

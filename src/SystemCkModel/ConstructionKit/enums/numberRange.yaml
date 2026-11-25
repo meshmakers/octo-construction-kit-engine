@@ -1,0 +1,23 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+enums:
+  - enumId: AutoIncrementPeriodKinds
+    description: "Whether a System/AutoIncrement number range restarts its counter per period."
+    values:
+      - key: 0
+        name: None
+        description: "One counter for the whole range (CurrentValue), as before System 2.9.0."
+      - key: 1
+        name: FiscalYear
+        description: "One counter per fiscal year (Periods); the counter restarts at StartValue (or 1) when a fiscal year starts."
+  - enumId: DocumentAuditActions
+    description: "What a System/DocumentAuditEntry records about a released document."
+    values:
+      - key: 0
+        name: Release
+        description: "The document was released and got its number."
+      - key: 1
+        name: Storno
+        description: "A storno document referencing the document was released (stored for the original and for the storno)."
+      - key: 2
+        name: Denied
+        description: "A change or deletion of the released document was refused."

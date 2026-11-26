@@ -212,6 +212,16 @@ internal class BulkRtMutation(
         IReadOnlyDictionary<RtEntityId, RtEntity> rtEntities,
         IReadOnlyDictionary<RtEntityId, ulong> expectedRtVersions, BulkRtMutationOptions options)
     {
+        // AB#6209: the target key decides which document a replace writes, never the payload. Its RtId and CkTypeId go
+        // into the payload BEFORE the pre-document modifications run: a payload with an empty or another RtId would
+        // otherwise look like a new entity to them (the AutoIncrement modifier would take a new number and overwrite
+        // the stored one).
+        foreach (var (rtEntityId, rtEntity) in rtEntities)
+        {
+            rtEntity.RtId = rtEntityId.RtId;
+            rtEntity.CkTypeId = rtEntityId.CkTypeId;
+        }
+
         if (!options.DisablePreDocumentModifications)
         {
             foreach (var preDocumentModification in _preDocumentModifications)
@@ -462,10 +472,9 @@ internal class BulkRtMutation(
         var ckTypeGraph = ckCacheService.GetRtCkType(repositoryDataSource.TenantId, ckTypeId);
         var collection = repositoryDataSource.GetRtCollection<RtEntity>(ckTypeGraph);
 
+        // RtId and CkTypeId of the target key are already in the payload (ReplaceRtEntities, AB#6209).
         foreach (var keyValuePair in rtEntityGrouping)
         {
-            keyValuePair.Value.RtId = keyValuePair.Key.RtId;
-            keyValuePair.Value.CkTypeId = keyValuePair.Key.CkTypeId;
             keyValuePair.Value.RtChangedDateTime = DateTime.UtcNow;
         }
 

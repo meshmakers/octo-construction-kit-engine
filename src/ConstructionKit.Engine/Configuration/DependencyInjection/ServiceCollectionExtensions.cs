@@ -108,6 +108,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IBlueprintSchemaValidator, BlueprintSchemaValidator>();
         services.AddTransient<IBlueprintSecretAttributeResolver, CatalogBlueprintSecretAttributeResolver>();
         services.AddTransient<IBlueprintCompilerService, BlueprintCompilerService>();
+        services.AddTransient<IBlueprintDraftValidator, BlueprintDraftValidator>();
 
         return services;
     }

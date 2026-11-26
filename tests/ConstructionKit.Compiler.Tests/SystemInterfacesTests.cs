@@ -118,16 +118,55 @@ public sealed class SystemInterfacesTests : IDisposable
         return yaml[..(yaml.LastIndexOf('\n', marker) + 1)];
     }
 
-    /// <summary>The real sources without the 2.9.0 additions, at <paramref name="version"/>, then <paramref name="transform"/>.</summary>
-    private string CopySystemBefore29(string name, string version, Func<string, string, string> transform)
+    private const string RtSyncOriginOnEntity =
+        "      - id: ${this}/RtSyncOrigin\n        name: RtSyncOrigin\n        isOptional: true\n";
+
+    /// <summary>The files of the <c>System/SyncOrigin</c> record (AB#9770).</summary>
+    private static readonly string[] SyncOriginFiles = ["records/syncOrigin.yaml", "attributes/syncOrigin.yaml"];
+
+    /// <summary>
+    ///     Removes the <c>System/SyncOrigin</c> record (AB#9770) from a copy of the sources: the optional
+    ///     <c>RtSyncOrigin</c> attribute of <c>System/Entity</c> here, its two files in <see cref="SyncOriginFiles" />.
+    /// </summary>
+    private static string WithoutSyncOrigin(string path, string yaml)
     {
-        var dir = CopySystem(name, (path, yaml) =>
-            transform(path, path == "ckModel.yaml" ? SetVersion(yaml, version) : WithoutSystem29(path, yaml)));
-        foreach (var file in System29Files)
+        if (path != "types/entity.yaml")
+        {
+            return yaml;
+        }
+
+        Assert.Contains(RtSyncOriginOnEntity, yaml, StringComparison.Ordinal);
+        return yaml.Replace(RtSyncOriginOnEntity, "", StringComparison.Ordinal);
+    }
+
+    private static void DeleteFiles(string dir, IEnumerable<string> files)
+    {
+        foreach (var file in files)
         {
             File.Delete(Path.Combine(dir, file));
         }
+    }
 
+    /// <summary>
+    ///     The real sources without the 2.9.0 additions (and the later <c>SyncOrigin</c> record), at
+    ///     <paramref name="version"/>, then <paramref name="transform"/>.
+    /// </summary>
+    private string CopySystemBefore29(string name, string version, Func<string, string, string> transform)
+    {
+        var dir = CopySystem(name, (path, yaml) =>
+            transform(path, path == "ckModel.yaml" ? SetVersion(yaml, version) : WithoutSyncOrigin(path, WithoutSystem29(path, yaml))));
+        DeleteFiles(dir, System29Files);
+        DeleteFiles(dir, SyncOriginFiles);
+        return dir;
+    }
+
+    /// <summary>System 2.9.0 as it was published: the 2.10.0 sources without the <c>SyncOrigin</c> record (AB#9770).</summary>
+    private string CopySystem290()
+    {
+        var dir = CopySystem("system-2.9.0", (path, yaml) => path == "ckModel.yaml"
+            ? SetVersion(yaml, "2.9.0")
+            : WithoutSyncOrigin(path, yaml));
+        DeleteFiles(dir, SyncOriginFiles);
         return dir;
     }
 
@@ -267,7 +306,7 @@ public sealed class SystemInterfacesTests : IDisposable
         // Every change is an addition (optional attributes on AutoIncrement, new records, enums, a type and an
         // association role), so 2.8.0 -> 2.9.0 is a Minor, needs no migration and dependents need no re-pin.
         await PublishAsync(CopySystem280(), InMemoryPublishedCatalog.Name);
-        var against280 = await RunGateAsync(RealSystemSource());
+        var against280 = await RunGateAsync(CopySystem290());
 
         Assert.Empty(Errors(against280));
         Assert.Equal(CkSemVerLevel.Minor, against280.Verdict!.RequiredLevel);
@@ -284,11 +323,63 @@ public sealed class SystemInterfacesTests : IDisposable
     }
 
     [Fact]
+    public async Task System210_AgainstSystem290_IsAMinor_WithOnlyTheSyncOriginRecordAndItsOptionalEntityAttributeAdded()
+    {
+        // AB#9770: System/SyncOrigin (source tenant, source RtId, sync time) and the optional System/Entity attribute
+        // RtSyncOrigin. Purely additive: no element is removed or changed, nothing is required, so no data migration.
+        await PublishAsync(CopySystem290(), InMemoryPublishedCatalog.Name);
+        var against290 = await RunGateAsync(RealSystemSource());
+
+        Assert.Empty(Errors(against290));
+        Assert.Equal(CkSemVerLevel.Minor, against290.Verdict!.RequiredLevel);
+        Assert.Contains("2.9.0", against290.Verdict.BaselineId.ToString());
+        var structural = against290.Verdict.ClassifiedChanges
+            .Where(c => c.Change.ElementKind != CkModelElementKind.Model)
+            .ToList();
+        Assert.NotEmpty(structural);
+        Assert.All(structural, c =>
+        {
+            Assert.Equal(CkModelChangeKind.Added, c.Change.ChangeKind);
+            Assert.True(c.Level <= CkSemVerLevel.Minor, $"{c.Change.ElementKind} {c.Change.ElementId}: {c.Level}");
+            Assert.False(c.RequiresAcknowledge, c.Change.ElementId);
+        });
+        Assert.Contains(structural, c => c.Change.ElementKind == CkModelElementKind.Record &&
+                                         c.Change.ElementId.Contains("SyncOrigin", StringComparison.Ordinal));
+        Assert.Contains(structural, c => c.Change.ElementKind == CkModelElementKind.TypeAttribute &&
+                                         c.Change.ElementId.Contains("Entity", StringComparison.Ordinal) &&
+                                         c.Change.ElementId.Contains("RtSyncOrigin", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task SyncOrigin_IsAnOptionalRecordAttributeOfEntity_WithSourceTenantSourceRtIdAndSyncTime()
+    {
+        var compiled = await _fixture.CompileAsync(RealSystemSource());
+
+        var record = Assert.Single(compiled.Records!, r => r.RecordId.Name == "SyncOrigin");
+        Assert.Equal(CkDerivableDto.Any, record.Derivable);
+        Assert.Equal(["SourceRtId", "SourceTenantId", "SyncedAt"],
+            record.Attributes!.Select(a => a.AttributeName).Order(StringComparer.Ordinal));
+
+        var attributes = compiled.Attributes!.ToDictionary(a => a.AttributeId.Name, StringComparer.Ordinal);
+        Assert.Equal(AttributeValueTypesDto.String, attributes["SyncOrigin.SourceTenantId"].ValueType);
+        Assert.Equal(AttributeValueTypesDto.String, attributes["SyncOrigin.SourceRtId"].ValueType);
+        Assert.Equal(AttributeValueTypesDto.DateTime, attributes["SyncOrigin.SyncedAt"].ValueType);
+        Assert.Equal(AttributeValueTypesDto.Record, attributes["RtSyncOrigin"].ValueType);
+        Assert.Equal("SyncOrigin", attributes["RtSyncOrigin"].ValueCkRecordId!.ElementId.Name);
+
+        var entity = Assert.Single(compiled.Types!, t => t.TypeId.Name == "Entity");
+        var onEntity = Assert.Single(entity.Attributes!, a => a.AttributeName == "RtSyncOrigin");
+        Assert.True(onEntity.IsOptional);
+        // Nothing else of Entity changed: the three blueprint attributes stay optional, no attribute became required.
+        Assert.All(entity.Attributes!, a => Assert.True(a.IsOptional, a.AttributeName));
+    }
+
+    [Fact]
     public async Task System29_NumberRangeAndAuditAdditions_AreOptional_SoExistingCountersStayValid()
     {
         // AB#9752: an existing counter (End, Format, CurrentValue only - the shape of the Basic and
         // energy-community seeds) must stay valid, so every new AutoIncrement attribute is optional.
-        var compiled = await _fixture.CompileAsync(RealSystemSource());
+        var compiled = await _fixture.CompileAsync(CopySystem290());
         Assert.Contains("2.9.0", compiled.ModelId.ToString());
 
         var autoIncrement = Assert.Single(compiled.Types!, t => t.TypeId.Name == "AutoIncrement");

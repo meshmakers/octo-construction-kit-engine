@@ -1,5 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
+using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 using YamlDotNet.RepresentationModel;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
@@ -21,14 +22,14 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
 public static class BlueprintSeedSecretLint
 {
     /// <summary>
-    ///     Message number of a seed that carries a value for a Secret attribute (error).
+    ///     Message number of a seed that carries a value for a Secret attribute (error, catalog code 160).
     /// </summary>
-    public const int SecretSeedValueMessageNumber = 10;
+    public const int SecretSeedValueMessageNumber = 160;
 
     /// <summary>
-    ///     Message number of a lint that could not resolve a CK model (warning).
+    ///     Message number of a lint that could not resolve a CK model (warning, catalog code 161).
     /// </summary>
-    public const int UnresolvedModelMessageNumber = 11;
+    public const int UnresolvedModelMessageNumber = 161;
 
     /// <summary>
     ///     Normalised attribute id <c>Model/Attribute-Version</c>: a model version suffix
@@ -151,14 +152,8 @@ public static class BlueprintSeedSecretLint
                 {
                     violations++;
                     // Never echo the value - it is a credential.
-                    operationResult.AddMessage(new OperationMessage(
-                        MessageLevel.Error,
-                        seedDataPath,
-                        SecretSeedValueMessageNumber,
-                        $"Seed entity '{identity}' sets Secret attribute '{attributeId}' to a value. Seeds may only "
-                        + "leave Secret attributes empty or omit them; placeholders such as '<...>' or 'TODO_SET_<NAME>' "
-                        + "are values and not allowed either. Set the secret after "
-                        + "installation (Studio, octo-cli) and rotate any credential that was committed."));
+                    operationResult.AddMessage(
+                        MessageCodes.BlueprintSeedSecretValue(seedDataPath, identity, attributeId ?? string.Empty));
                 }
 
                 continue;

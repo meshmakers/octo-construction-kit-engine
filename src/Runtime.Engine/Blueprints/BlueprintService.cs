@@ -43,6 +43,7 @@ internal class BlueprintService : IBlueprintService
     private readonly IBlueprintDependencyResolver _dependencyResolver;
     private readonly ITenantBlueprintInstallations _installations;
     private readonly IBlueprintVariableProvider _variableProvider;
+    private readonly IBlueprintDraftValidator? _draftValidator;
     private readonly IBlueprintCkUpgradeGuard? _ckUpgradeGuard;
     private readonly BlueprintArchiveActivator _archiveActivator;
     private readonly ILogger<BlueprintService> _logger;
@@ -80,7 +81,8 @@ internal class BlueprintService : IBlueprintService
         IBlueprintVariableProvider variableProvider,
         ILogger<BlueprintService> logger,
         IBlueprintCkUpgradeGuard? ckUpgradeGuard = null,
-        IStreamDataTenantServicesProvider? streamDataServices = null)
+        IStreamDataTenantServicesProvider? streamDataServices = null,
+        IBlueprintDraftValidator? draftValidator = null)
     {
         _ckCacheService = ckCacheService;
         _blueprintCatalogManager = blueprintCatalogManager;
@@ -97,6 +99,7 @@ internal class BlueprintService : IBlueprintService
         _variableProvider = variableProvider;
         _logger = logger;
         _ckUpgradeGuard = ckUpgradeGuard;
+        _draftValidator = draftValidator;
         // AB#7991: without a stream-data backend new archives of a seed stay Created, reported per archive.
         _archiveActivator = new BlueprintArchiveActivator(streamDataServices, logger);
     }
@@ -352,6 +355,17 @@ internal class BlueprintService : IBlueprintService
             }
 
             loadedCkModels.AddRange(aggregatedCkDeps);
+
+            // 2a'. The shared draft validator judges the root blueprint before anything is installed. Only
+            //      findings that would make the install fail anyway refuse it (manifest, seed files, CK ranges without
+            //      a floor); every other finding - also a CK range no catalog offers - is a warning in the result, so a
+            //      blueprint that installed before still installs.
+            await AddDraftValidationFindingsAsync(blueprintId, operationResult, cancellationToken).ConfigureAwait(false);
+            if (operationResult.HasErrors)
+            {
+                await NotifyApplyFailedAsync(tenantId, blueprintId, operationResult, correlationId).ConfigureAwait(false);
+                return BlueprintApplicationResult.Failed(operationResult);
+            }
 
             // 2b. AB#6672: a CK model the tenant runs in a version OUTSIDE the declared range (e.g. System 3.0.0
             //     against [2.4,3.0)) stops the apply before anything is installed. A newer version inside the range
@@ -890,6 +904,44 @@ internal class BlueprintService : IBlueprintService
         }
     }
 
+    /// <summary>
+    /// Runs <see cref="IBlueprintDraftValidator" /> over the catalog blueprint <paramref name="blueprintId" />
+    /// with the CK catalog check. Install-blocking findings (<see cref="BlueprintDraftValidationCodes.InstallBlockingCodes" />)
+    /// stay errors; everything else is added as a warning with the same code. Read-only.
+    /// </summary>
+    private async Task AddDraftValidationFindingsAsync(BlueprintId blueprintId, OperationResult operationResult,
+        CancellationToken cancellationToken)
+    {
+        if (_draftValidator == null)
+        {
+            return;
+        }
+
+        var validation = await _draftValidator.ValidateAsync(
+                new CatalogBlueprintFileSource(_blueprintCatalogManager, blueprintId),
+                new BlueprintValidationOptions { CkModelCatalogs = [] },
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (var finding in validation.Findings)
+        {
+            var blocking = finding.MessageLevel is MessageLevel.Error or MessageLevel.FatalError
+                           && BlueprintDraftValidationCodes.InstallBlockingCodes.Contains(finding.MessageNumber);
+            if (blocking || finding.MessageLevel is MessageLevel.Info or MessageLevel.Warning)
+            {
+                if (finding.MessageNumber != BlueprintDraftValidationCodes.CkModelDependenciesNotChecked)
+                {
+                    operationResult.AddMessage(finding);
+                }
+
+                continue;
+            }
+
+            operationResult.AddMessage(new OperationMessage(MessageLevel.Warning, finding.Location,
+                finding.MessageNumber, finding.MessageText, finding.Parameters));
+        }
+    }
+
     /// <inheritdoc />
     public async Task<BlueprintValidationResult> ValidateBlueprintAsync(
         BlueprintId blueprintId,
@@ -921,9 +973,45 @@ internal class BlueprintService : IBlueprintService
             var blueprint = await _blueprintCatalogManager.GetAsync(blueprintId, operationResult)
                 .ConfigureAwait(false);
 
-            // Validate CK model dependencies exist
-            // Note: This would check against the CK catalog
-            // For now, we just collect the dependencies for validation
+            // The shared draft validator judges manifest, seed data, Secret seed lint and the CK model
+            // dependency ranges against the CK model catalogs - the same checks as octo-bpm validate and
+            // POST {tenantId}/v1/blueprints/validate.
+            if (_draftValidator != null)
+            {
+                var validation = await _draftValidator.ValidateAsync(
+                        new CatalogBlueprintFileSource(_blueprintCatalogManager, blueprintId),
+                        new BlueprintValidationOptions { CkModelCatalogs = [] },
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                validation.CopyTo(operationResult);
+                foreach (var finding in validation.Findings)
+                {
+                    if (finding.MessageNumber == BlueprintDraftValidationCodes.CkModelDependencyNotInCatalogs)
+                    {
+                        var dependency = (validation.BlueprintMeta ?? blueprint).CkModelDependencies?.FirstOrDefault(d =>
+                            finding.Parameters.TryGetValue("modelId", out var name) && d.Name == name);
+                        if (dependency != null)
+                        {
+                            missingCkModels.Add(dependency);
+                        }
+                    }
+                    else if (finding.MessageNumber is BlueprintDraftValidationCodes.SeedDataFileMissing
+                             or BlueprintDraftValidationCodes.SeedDataFileOfSeveralMissing
+                             && finding.Parameters.TryGetValue("seedDataPath", out var seedPath))
+                    {
+                        missingSeedDataFiles.Add(BlueprintFileDescription(blueprintId, seedPath));
+                    }
+                }
+
+                if (!validation.IsValid || missingSeedDataFiles.Count > 0)
+                {
+                    return BlueprintValidationResult.Invalid(
+                        blueprintId, missingCkModels, missingBlueprints, missingSeedDataFiles, operationResult);
+                }
+
+                _logger.LogInformation("Blueprint {BlueprintId} is valid", blueprintId);
+                return BlueprintValidationResult.Valid(blueprintId, operationResult);
+            }
 
             // Validate every declared seed data file exists. A blueprint may split its seed across
             // several files (AB#4758), and each of them has to be reachable — a partially available

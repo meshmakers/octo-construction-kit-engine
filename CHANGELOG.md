@@ -16,6 +16,19 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   on insert and replace only; this closes the gap for rules a stored entity must keep (engine-mongodb uses it for the
   number-range rules). Skipped, like the modifications, when `DisablePreDocumentModifications` is set; without a
   registered implementation nothing changes. Tests: `BulkRtMutationUpdateValidationTests`.
+- **One blueprint draft validator for octo-bpm, the asset repository, the install path and MCP (AB#9371).**
+  `IBlueprintDraftValidator` (`BlueprintCatalogs/`) checks manifest, seed data, the Secret seed lint and the CK model
+  dependencies incl. their version ranges against the CK model catalogs; file sources for a directory, a zip/inline files
+  and a catalog blueprint. Findings carry stable catalog codes 149-167 (`BlueprintDraftValidationCodes`); the texts of the
+  former octo-bpm messages are unchanged, the Secret lint moves from the ad-hoc numbers 10/11 to 160/161.
+  `octo-bpm validate|pack|publish` print each finding with its code and take `--ck-catalogs all|<names>` (default off,
+  offline). `IBlueprintService.ValidateBlueprintAsync` delegates to the validator (the empty CK dependency check is gone).
+  `ApplyBlueprintAsync` runs it before anything is installed and refuses only on findings that make the install fail
+  anyway (149, 150, 151, 153, 155, 162, 164); every other finding is a warning in the install result. A dependency entry
+  that starts with the version (`-[1.0,2.0)`) counts as nameless (162), not as a model of that name. Regression: of 557
+  catalog blueprint versions (public and private) 554 have no blocking finding; the 3 others (private
+  MeshmakersAccounting 3.10.0, 3.15.0, MeshmakersAccounting.Tesla 3.1.15) miss declared seed files and fail today already.
+  A draft with an error still ends `octo-bpm publish` with a non-zero exit code (exit code -100, nothing published).
 
 ### Fixed
 
@@ -66,6 +79,14 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   No interface change. Builds pick the fix up with the next `Meshmakers.Octo.ConstructionKit.MsBuildTasks` package.
 
 ### Added
+
+- **Catalog numbers for the CK model validation refusals (AB#8502).** The message catalog (`MessageCodes.json`) has four
+  new entries, so a tool branches on the number instead of a work item id plus a free-text `reason`:
+  145 `CkModelSystemReferenceMismatch` (`modelId`, `referencedModelId`, `installedModelId`), 146
+  `CkModelDependencyNotResolvable` (`modelId`, `detail`), 147 `CkModelDraftUnreadable` (`detail`) and 148
+  `CkModelInlineDraftTooLarge` (`detail`). The tenant validation of engine-mongodb, the draft validation of the asset
+  repository and the MCP service use them instead of 8492 and 9005; the import's `ModelValidationException` texts stay
+  unchanged.
 
 - **Seed associations to entities the tenant does not hold yet are kept and written later (AB#9651).** A blueprint seed
   edge whose target (or origin) exists neither in the seed nor in the tenant used to be dropped for good (AB#5005); the

@@ -3,6 +3,7 @@ using Meshmakers.Octo.BlueprintManager.Commands.Implementations;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -28,7 +29,7 @@ public class PublishCommandTests
         A.CallTo(() => manager.IsExistingAsync(A<string>._, A<BlueprintId>._, A<object?>._)).Returns(false);
 
         var cmd = new PublishCommand(NullLogger<PublishCommand>.Instance, Options.Create(new BpmToolOptions()),
-            manager, compiler);
+            manager, compiler, ValidatorFor(meta));
         cmd.CommandArgumentValue.ParseLayer(["-p", "/tmp/does-not-need-to-exist"]); // no -c
 
         await cmd.Execute();
@@ -89,6 +90,30 @@ public class PublishCommandTests
             A<CancellationToken?>._)).MustHaveHappenedOnceExactly();
     }
 
+    // ---- A draft with a validation error fails the command (non-zero exit code) ----------------------
+
+    [Fact]
+    public async Task Execute_WhenDraftValidationFails_ThrowsAndPublishesNothing()
+    {
+        var manager = A.Fake<IBlueprintCatalogManager>();
+        var compiler = A.Fake<IBlueprintCompilerService>();
+        var validator = A.Fake<IBlueprintDraftValidator>();
+        A.CallTo(() => validator.ValidateAsync(A<IBlueprintFileSource>._, A<BlueprintValidationOptions?>._,
+                A<CancellationToken>._))
+            .Returns(new BlueprintDraftValidationResult(null,
+                [new OperationMessage(MessageLevel.Error, "seed/entities.yaml", 153, "Seed file cannot be parsed")]));
+
+        var cmd = new PublishCommand(NullLogger<PublishCommand>.Instance, Options.Create(new BpmToolOptions()),
+            manager, compiler, validator);
+        cmd.CommandArgumentValue.ParseLayer(["-p", "/tmp/does-not-need-to-exist", "-c", PublicName]);
+
+        // Program.Main maps the escaping exception to exit code -100; a swallowed one ended with exit code 0.
+        await Assert.ThrowsAsync<BlueprintCatalogException>(() => cmd.Execute());
+
+        A.CallTo(() => manager.PublishAsync(A<string>._, A<BlueprintMetaRootDto>._, A<string>._, A<bool>._,
+            A<object?>._, A<CancellationToken?>._)).MustNotHaveHappened();
+    }
+
     private static async Task RunPublish(IBlueprintCatalogManager manager, BlueprintMetaRootDto meta,
         string catalogName, bool force)
     {
@@ -96,11 +121,21 @@ public class PublishCommandTests
         A.CallTo(() => compiler.ValidateAsync(A<string>._, A<OperationResult>._, A<CancellationToken>._)).Returns(meta);
 
         var cmd = new PublishCommand(NullLogger<PublishCommand>.Instance, Options.Create(new BpmToolOptions()),
-            manager, compiler);
+            manager, compiler, ValidatorFor(meta));
         cmd.CommandArgumentValue.ParseLayer(force
             ? ["-p", "/tmp/does-not-need-to-exist", "-c", catalogName, "-f"]
             : ["-p", "/tmp/does-not-need-to-exist", "-c", catalogName]);
 
         await cmd.Execute();
+    }
+
+    /// <summary>Publish validates with the shared draft validator; a valid draft returns its manifest.</summary>
+    private static IBlueprintDraftValidator ValidatorFor(BlueprintMetaRootDto meta)
+    {
+        var validator = A.Fake<IBlueprintDraftValidator>();
+        A.CallTo(() => validator.ValidateAsync(A<IBlueprintFileSource>._, A<BlueprintValidationOptions?>._,
+                A<CancellationToken>._))
+            .Returns(new BlueprintDraftValidationResult(meta, []));
+        return validator;
     }
 }

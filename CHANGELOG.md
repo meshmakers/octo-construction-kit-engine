@@ -102,8 +102,8 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   numbered types and their ranges from the subtree of the collection root and judges a target by its stored type, so an
   update, delete, import or association change that names a sibling type with the id of a released document is refused
   like one that names its own type (tenants without data policies and system sessions included). A write to a numbered
-  range after which it has not numbered any more (a lower `CurrentValue`, cleared `Periods`, a raised `StartValue`) and
-  a change or removal of its `RtWellKnownName` (update, replace, import) are refused with message 168. New
+  range that moves a counter back (a lower `CurrentValue`, a lower or removed period, a `StartValue` above the next
+  number, or anything after which it has not numbered any more) and a change or removal of its `RtWellKnownName` (update, replace, import) are refused with message 168. New
   `ReleasedDocumentNumberRefusal` (`Runtime.Engine.Repositories`, message 174 `RtReleasedDocumentNumberSupplied`,
   thrown as `ReleasedDocumentLockedException`) for a number a caller supplies on a range that numbers on release. Tests:
   `ReleasedDocumentSharedCollectionTests`, `NumberRangeReleaseLockTests`.

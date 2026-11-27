@@ -24,6 +24,7 @@ internal static class NumberRangeReleaseLock
     internal const string CurrentValueAttribute = "CurrentValue";
     internal const string StartValueAttribute = "StartValue";
     internal const string PeriodsAttribute = "Periods";
+    internal const string FiscalYearAttribute = "FiscalYear";
 
     /// <summary>Pseudo attribute name of a write that renames or clears the range's <c>RtWellKnownName</c>.</summary>
     internal const string RtWellKnownNameChange = "rtWellKnownName";
@@ -111,12 +112,20 @@ internal static class NumberRangeReleaseLock
             changes.Add(RtWellKnownNameChange);
         }
 
-        // A numbered range stays numbered: moving its counter back to before the first number (a lower counter,
-        // cleared periods, a raised start value) would unlock its documents and hand out the issued numbers again.
-        // The allocator only raises a counter and writes it outside this funnel.
+        // A numbered range's counter only moves up: a lower counter, a lower or removed period, or a start value
+        // raised above the next number would hand out issued numbers again (or unlock its documents once the range
+        // counts as not numbered). The allocator only raises a counter and writes it outside this funnel.
+        foreach (var change in CounterMovesBack(stored, resulting))
+        {
+            AddOnce(changes, change);
+        }
+
         if (!HasNumbered(resulting))
         {
-            changes.AddRange(CounterChanges(stored, resulting));
+            foreach (var change in CounterChanges(stored, resulting))
+            {
+                AddOnce(changes, change);
+            }
         }
 
         if (!NumberRangeRelease.TryCreate(resulting, out var after, out _) || after == null)
@@ -146,6 +155,71 @@ internal static class NumberRangeReleaseLock
         }
 
         return changes;
+    }
+
+    /// <summary>
+    ///     The counter attributes a write moves back: <c>CurrentValue</c> lowered, a period's counter lowered or the
+    ///     period removed, <c>StartValue</c> raised above the next number of the range.
+    /// </summary>
+    private static List<string> CounterMovesBack(RtEntity stored, RtEntity resulting)
+    {
+        var changes = new List<string>();
+        var storedCurrent = ToLong(stored.GetAttributeValueOrDefault(CurrentValueAttribute)) ?? 0;
+        if ((ToLong(resulting.GetAttributeValueOrDefault(CurrentValueAttribute)) ?? 0) < storedCurrent)
+        {
+            changes.Add(CurrentValueAttribute);
+        }
+
+        var storedPeriods = PeriodValues(stored);
+        var resultingPeriods = PeriodValues(resulting);
+        if (storedPeriods.Any(p => !resultingPeriods.TryGetValue(p.Key, out var value) || value < p.Value))
+        {
+            changes.Add(PeriodsAttribute);
+        }
+
+        var storedStart = ToLong(stored.GetAttributeValueOrDefault(StartValueAttribute));
+        var resultingStart = ToLong(resulting.GetAttributeValueOrDefault(StartValueAttribute));
+        var highest = Math.Max(storedCurrent, storedPeriods.Count > 0 ? storedPeriods.Values.Max() : 0);
+        var nextNumber = Math.Max(highest, (storedStart ?? 1) - 1) + 1;
+        if (resultingStart is { } start && start != storedStart && start > nextNumber)
+        {
+            changes.Add(StartValueAttribute);
+        }
+
+        return changes;
+    }
+
+    /// <summary>The counter of every period of the range, by fiscal year (a period without a year is keyed by its position).</summary>
+    private static Dictionary<string, long> PeriodValues(RtEntity range)
+    {
+        var values = new Dictionary<string, long>(StringComparer.Ordinal);
+        if (range.GetAttributeValueOrDefault(PeriodsAttribute) is IEnumerable periods and not string)
+        {
+            var position = 0;
+            foreach (var period in periods)
+            {
+                if (period is RtTypeWithAttributes record)
+                {
+                    var year = record.GetAttributeValueOrDefault(FiscalYearAttribute);
+                    var key = year == null
+                        ? $"#{position}"
+                        : Convert.ToString(year, CultureInfo.InvariantCulture) ?? $"#{position}";
+                    values[key] = ToLong(record.GetAttributeValueOrDefault(CurrentValueAttribute)) ?? 0;
+                }
+
+                position++;
+            }
+        }
+
+        return values;
+    }
+
+    private static void AddOnce(List<string> changes, string change)
+    {
+        if (!changes.Contains(change, StringComparer.Ordinal))
+        {
+            changes.Add(change);
+        }
     }
 
     /// <summary>The counter attributes whose written value leaves the range without a handed-out number.</summary>

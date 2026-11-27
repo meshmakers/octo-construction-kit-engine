@@ -239,6 +239,72 @@ public class NumberRangeReleaseLockTests
         Assert.Empty(NumberRangeReleaseLock.ForbiddenChanges(Range(3, Stored), Range(4, Stored)));
     }
 
+    private static List<RtRecord> Periods(params (int Year, long Value)[] periods) =>
+        periods.Select(p => new RtRecord(new RtCkId<CkRecordId>("System/AutoIncrementPeriod"),
+            new Dictionary<string, object?> { ["FiscalYear"] = p.Year, ["CurrentValue"] = p.Value })).ToList();
+
+    private static RtEntity With(RtEntity range, string attribute, object? value) =>
+        new(range.GetRtCkTypeId(), range.RtId, new Dictionary<string, object?>(range.Attributes) { [attribute] = value })
+        {
+            RtWellKnownName = range.RtWellKnownName
+        };
+
+    public static TheoryData<string, string, object?, string> CounterMovesBack => new()
+    {
+        { "period counter 5 -> 1", "Periods", Periods((2026, 1), (2025, 9)), "Periods" },
+        { "a period removed", "Periods", Periods((2026, 5)), "Periods" },
+        { "CurrentValue 5 -> 3", "CurrentValue", 3L, "CurrentValue" },
+        { "StartValue above the next number", "StartValue", 100L, "StartValue" }
+    };
+
+    [Theory]
+    [MemberData(nameof(CounterMovesBack))]
+    public void ANumberedRange_RefusesEveryWriteThatMovesACounterBack(string _, string attribute, object? value,
+        string change)
+    {
+        var stored = Range(5, Stored, startValue: 1, periods: [(2026, 5), (2025, 9)]);
+
+        Assert.Equal([change], NumberRangeReleaseLock.ForbiddenChanges(stored, With(stored, attribute, value)));
+    }
+
+    [Fact]
+    public void ANumberedRange_AllowsTheCountersToMoveUp()
+    {
+        var stored = Range(5, Stored, startValue: 1, periods: [(2026, 5)]);
+
+        Assert.Empty(NumberRangeReleaseLock.ForbiddenChanges(stored, With(stored, "CurrentValue", 6L)));
+        Assert.Empty(NumberRangeReleaseLock.ForbiddenChanges(stored,
+            With(stored, "Periods", Periods((2026, 6), (2027, 1)))));
+        Assert.Empty(NumberRangeReleaseLock.ForbiddenChanges(stored, With(stored, "StartValue", 2L)));
+    }
+
+    /// <summary>
+    ///     The bypass reproduced on the lane stack: (1) the period counter of a numbered range is set to 0, (2) Released is
+    ///     removed from ReleasedValues, (3) a released invoice is changed. Step 1 is refused, so steps 2 and 3 stay refused.
+    /// </summary>
+    [Fact]
+    public async Task TheThreeStepBypass_IsRefusedAtTheFirstStep()
+    {
+        var range = _model.StoreRange(currentValue: 0);
+        range.SetAttributeRawValue("Periods", Periods((2026, 5)));
+        var invoice = _model.StoreInvoice(ReleasedDocumentTestModel.Released);
+
+        var step1 = await Assert.ThrowsAsync<ReleasedDocumentLockedException>(() =>
+            UpdateAsync(range, new Dictionary<string, object?> { ["Periods"] = Periods((2026, 0)) }));
+        Assert.Equal(["Periods"], Assert.Single(step1.Refusals).Changes);
+
+        await Assert.ThrowsAsync<ReleasedDocumentLockedException>(() => UpdateAsync(range,
+            new Dictionary<string, object?> { ["Release"] = Release(["Cancelled"]) }));
+
+        var invoiceId = new RtEntityId(invoice.GetRtCkTypeId(), invoice.RtId);
+        await Assert.ThrowsAsync<ReleasedDocumentLockedException>(() => ReleasedDocumentLock.CheckMutationAsync(
+            _session, _model.DataSource, _model.Cache,
+            new EntityRuleEngineResult<RtEntity>([], new Dictionary<RtEntityId, RtEntity>
+            {
+                [invoiceId] = _model.Partial(invoice, ("Amount", 1.0))
+            }, [], []), new GraphRuleEngineResult(), BulkRtMutationOptions.Default));
+    }
+
     [Fact]
     public async Task ANumberedRange_RefusesRenamingOrClearingItsName_OnUpdateReplaceAndImport()
     {

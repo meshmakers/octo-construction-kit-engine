@@ -34,13 +34,23 @@ public sealed record ReleasedDocumentRefusal(
 public sealed class ReleasedDocumentLockedException : PersistenceException
 {
     /// <summary>
+    ///     The stable, machine-readable code of the refusal. Every API answers it (GraphQL <c>extensions.code</c>, the
+    ///     pipeline node's error) and the exception message starts with it, so a job status that only carries the
+    ///     message carries the code too.
+    /// </summary>
+    public const string ErrorCode = "RELEASED_DOCUMENT_LOCKED";
+
+    /// <summary>The engine message number of one refused document (<c>RtReleasedDocumentLocked</c>).</summary>
+    public const int MessageNumber = 168;
+
+    /// <summary>
     ///     Creates a new instance of <see cref="ReleasedDocumentLockedException" />.
     /// </summary>
     /// <param name="operationResult">One error message per refused document</param>
     /// <param name="refusals">The refused writes</param>
     public ReleasedDocumentLockedException(OperationResult operationResult,
         IReadOnlyList<ReleasedDocumentRefusal> refusals)
-        : base($"Released documents cannot be changed or deleted.{Environment.NewLine}{operationResult.GetMessages()}")
+        : base($"{ErrorCode}: Released documents cannot be changed or deleted.{Environment.NewLine}{operationResult.GetMessages()}")
     {
         OperationResult = operationResult;
         Refusals = refusals;

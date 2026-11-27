@@ -48,8 +48,9 @@ public class ReleasedDocumentLockTests
         Assert.Equal(0, _model.Writes);
         Assert.Equal(before, released.Attributes);
         var message = Assert.Single(refused.OperationResult.Messages);
-        Assert.Equal(168, message.MessageNumber);
+        Assert.Equal(ReleasedDocumentLockedException.MessageNumber, message.MessageNumber);
         Assert.Contains(released.RtId.ToString(), message.MessageText);
+        Assert.StartsWith($"{ReleasedDocumentLockedException.ErrorCode}: ", refused.Message, StringComparison.Ordinal);
         return refused;
     }
 

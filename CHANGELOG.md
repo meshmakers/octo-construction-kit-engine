@@ -9,6 +9,13 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Added
 
+- **Stable error codes of the released-document refusals (AB#9760).** `ReleasedDocumentLockedException.ErrorCode`
+  `RELEASED_DOCUMENT_LOCKED` (with `MessageNumber` 168), `StornoRefusedException.ErrorCode` `STORNO_REFUSED` (messages
+  169 to 172) and `DocumentAuditEntryAppendOnlyException.ErrorCode` `DOCUMENT_AUDIT_ENTRY_APPEND_ONLY` (with
+  `MessageNumber` 173) are the one source of the code every API answers (asset repository GraphQL, mesh adapter
+  pipeline nodes). The exception message now starts with the code (`RELEASED_DOCUMENT_LOCKED: Released documents ...`),
+  so a caller that only sees the message - the job status of an asynchronous RT import - sees the code too. Tests:
+  `LockRefusalErrorCodeTests`.
 - **Document audit trail (AB#9762).** The engine writes the `System/DocumentAuditEntry` entries of a document itself:
   `Storno` - one entry on the original and one on the storno, `ReferenceRtId` crosswise - after the writes of a
   `BulkRtMutation` batch that releases a storno, in the session (and transaction) of the batch; the `Release` entry

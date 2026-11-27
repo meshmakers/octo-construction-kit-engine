@@ -39,6 +39,7 @@ public class StornoRulesTests
     private static async Task<int> RefusedAsync(Func<Task> check)
     {
         var refused = await Assert.ThrowsAsync<StornoRefusedException>(check);
+        Assert.StartsWith($"{StornoRefusedException.ErrorCode}: ", refused.Message, StringComparison.Ordinal);
         return Assert.Single(refused.OperationResult.Messages).MessageNumber;
     }
 

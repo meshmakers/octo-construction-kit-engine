@@ -13,11 +13,17 @@ namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
 public sealed class StornoRefusedException : PersistenceException
 {
     /// <summary>
+    ///     The stable, machine-readable code of the refusal. Every API answers it and the exception message starts with
+    ///     it; the message numbers (169 to 172) in <see cref="OperationResult" /> say which storno rule refused.
+    /// </summary>
+    public const string ErrorCode = "STORNO_REFUSED";
+
+    /// <summary>
     ///     Creates a new instance of <see cref="StornoRefusedException" />.
     /// </summary>
     /// <param name="operationResult">One error message per refused storno</param>
     public StornoRefusedException(OperationResult operationResult)
-        : base($"Storno refused.{Environment.NewLine}{operationResult.GetMessages()}")
+        : base($"{ErrorCode}: Storno refused.{Environment.NewLine}{operationResult.GetMessages()}")
     {
         OperationResult = operationResult;
     }

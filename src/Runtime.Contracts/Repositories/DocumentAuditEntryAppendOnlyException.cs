@@ -12,11 +12,20 @@ namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
 public sealed class DocumentAuditEntryAppendOnlyException : PersistenceException
 {
     /// <summary>
+    ///     The stable, machine-readable code of the refusal. Every API answers it and the exception message starts with
+    ///     it.
+    /// </summary>
+    public const string ErrorCode = "DOCUMENT_AUDIT_ENTRY_APPEND_ONLY";
+
+    /// <summary>The engine message number of one refused audit entry (<c>RtDocumentAuditEntryAppendOnly</c>).</summary>
+    public const int MessageNumber = 173;
+
+    /// <summary>
     ///     Creates a new instance of <see cref="DocumentAuditEntryAppendOnlyException" />.
     /// </summary>
     /// <param name="operationResult">One error message per refused audit entry</param>
     public DocumentAuditEntryAppendOnlyException(OperationResult operationResult)
-        : base($"Document audit entries are append-only.{Environment.NewLine}{operationResult.GetMessages()}")
+        : base($"{ErrorCode}: Document audit entries are append-only.{Environment.NewLine}{operationResult.GetMessages()}")
     {
         OperationResult = operationResult;
     }

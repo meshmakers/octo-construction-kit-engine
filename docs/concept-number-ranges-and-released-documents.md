@@ -209,7 +209,11 @@ document of its types (fail closed).
 
 A refused batch is refused as a whole (D3) with one `ReleasedDocumentLockedException` (`Runtime.Contracts.Repositories`):
 engine message 168 `RtReleasedDocumentLocked` per refused document (document, type, state, range, operation, what it
-would change, the changeable attributes) and the structured refusals. The RT import passes it on unwrapped. For each
+would change, the changeable attributes) and the structured refusals. The RT import passes it on unwrapped. The
+stable code of the refusal is `ReleasedDocumentLockedException.ErrorCode` = `RELEASED_DOCUMENT_LOCKED` (storno:
+`STORNO_REFUSED`, messages 169 to 172; audit trail: `DOCUMENT_AUDIT_ENTRY_APPEND_ONLY`, message 173); every API answers
+it - the asset repository's GraphQL error (`extensions.code`), the failed job of the asynchronous RT import (its
+message starts with the code) and the pipeline node's error of `ApplyChanges@1`/`@2`. For each
 refused document the repository writes one `DocumentAuditEntry` with `Action = Denied` (document, UTC time, the caller's
 subject, `AttributeNames`, the message number; `Source` stays empty, because the engine does not know through which API
 path the write came) in a session of its own, outside the refused write's transaction, so the entry stays when the caller

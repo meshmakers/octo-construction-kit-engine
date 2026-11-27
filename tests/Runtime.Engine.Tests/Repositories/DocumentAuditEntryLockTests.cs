@@ -35,7 +35,10 @@ public class DocumentAuditEntryLockTests
     private static async Task AssertRefusedAsync(Func<Task> write)
     {
         var refused = await Assert.ThrowsAsync<DocumentAuditEntryAppendOnlyException>(write);
-        Assert.Equal(173, Assert.Single(refused.OperationResult.Messages).MessageNumber);
+        Assert.Equal(DocumentAuditEntryAppendOnlyException.MessageNumber,
+            Assert.Single(refused.OperationResult.Messages).MessageNumber);
+        Assert.StartsWith($"{DocumentAuditEntryAppendOnlyException.ErrorCode}: ", refused.Message,
+            StringComparison.Ordinal);
     }
 
     [Fact]

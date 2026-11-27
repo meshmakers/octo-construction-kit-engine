@@ -9,6 +9,10 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Added
 
+- **Document audit entries are append-only (AB#9762).** The write funnel and the bulk import refuse every update,
+  replace, delete and archive of a `System/DocumentAuditEntry` and an insert or import over a stored one with the new
+  `DocumentAuditEntryAppendOnlyException` (`Runtime.Contracts.Repositories`, message 173, design note D9), whatever the
+  options and the identity; an import of the stored content is a no-op. Tests: `DocumentAuditEntryLockTests`.
 - **Storno rules (AB#9761).** A storno is a document with an outbound `System/Cancels` association to the original it
   cancels; the original is not written and stays locked. The write funnel and the association import refuse a batch
   with the new `StornoRefusedException` (`Runtime.Contracts.Repositories`) when a `Cancels` association is created to

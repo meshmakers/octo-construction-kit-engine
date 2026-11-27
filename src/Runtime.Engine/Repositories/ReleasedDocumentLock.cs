@@ -86,6 +86,10 @@ internal static partial class ReleasedDocumentLock
         targets.AddRange(associations.RtAssociationsToCreate.Concat(associations.RtAssociationsToDelete)
             .Select(a => new RtEntityId(a.OriginCkTypeId, a.OriginRtId)));
 
+        // D9: audit entries are append-only.
+        await DocumentAuditEntryLock.CheckMutationAsync(session, repositoryDataSource, ckCacheService, entities)
+            .ConfigureAwait(false);
+
         // D11: a numbered range keeps its release configuration.
         var rangeWrites = new List<NumberRangeReleaseLock.RangeWrite>();
         rangeWrites.AddRange(entities.RtEntitiesToDelete.Select(id =>
@@ -173,6 +177,10 @@ internal static partial class ReleasedDocumentLock
     public static async Task<IReadOnlyList<RtEntity>> FilterImportAsync(IOctoSession session,
         IRepositoryDataSource repositoryDataSource, ICkCacheService ckCacheService, IReadOnlyList<RtEntity> entities)
     {
+        // D9: an import never overwrites an audit entry.
+        entities = await DocumentAuditEntryLock.FilterImportAsync(session, repositoryDataSource, ckCacheService, entities)
+            .ConfigureAwait(false);
+
         var targets = entities.Where(e => e.RtId != OctoObjectId.Empty)
             .Select(e => new RtEntityId(e.GetRtCkTypeId(), e.RtId)).ToList();
 

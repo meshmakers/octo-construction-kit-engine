@@ -490,6 +490,9 @@ internal static class MessageCodes
     internal static OperationMessage RtStornoTypeNotConfigured(string? location, object stornoRtId, object stornoCkTypeId, object originalRtId, object originalCkTypeId, object configuredStornoCkTypeId) =>
         GetMessage("RtStornoTypeNotConfigured", location, stornoRtId, stornoCkTypeId, originalRtId, originalCkTypeId, configuredStornoCkTypeId);
 
+    internal static OperationMessage RtDocumentAuditEntryAppendOnly(string? location, object rtId, object ckTypeId, object operation) =>
+        GetMessage("RtDocumentAuditEntryAppendOnly", location, rtId, ckTypeId, operation);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1421,6 +1424,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  172, "Storno refused: '{stornoRtId}' of type '{stornoCkTypeId}' cannot cancel '{originalRtId}' of type '{originalCkTypeId}': the number range of the original configures the storno type '{configuredStornoCkTypeId}'",
                  new string[] {"stornoRtId", "stornoCkTypeId", "originalRtId", "originalCkTypeId", "configuredStornoCkTypeId"})
+        },
+        {
+            "RtDocumentAuditEntryAppendOnly",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 173, "Write refused: '{rtId}' of type '{ckTypeId}' is an entry of the document audit trail; the {operation} is refused, audit entries are append-only",
+                 new string[] {"rtId", "ckTypeId", "operation"})
         },
     };
 }

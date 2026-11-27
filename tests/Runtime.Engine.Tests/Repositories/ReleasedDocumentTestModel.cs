@@ -225,7 +225,7 @@ internal sealed class ReleasedDocumentTestModel
         };
     }
 
-    private void Store(RtEntity entity) => StoredList(entity.GetRtCkTypeId().FullName).Add(entity);
+    public void Store(RtEntity entity) => StoredList(entity.GetRtCkTypeId().FullName).Add(entity);
 
     private List<RtEntity> StoredList(string typeFullName)
     {

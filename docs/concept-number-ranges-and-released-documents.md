@@ -221,6 +221,11 @@ restores documents, counters, periods and audit entries 1:1, and numbering goes 
 model migration writes of engine-mongodb (`*ForMigrationAsync`), which rewrite stored documents for a schema change; and
 the display rule sweeper, which writes only `rtDisplayName` and `rtDisplayDescription`.
 
+Audit entries are append-only (D9) at the same places (`DocumentAuditEntryLock`): every update, replace, delete and
+archive of a `System/DocumentAuditEntry` and an insert over a stored entry are refused for every caller with
+`DocumentAuditEntryAppendOnlyException` (message 173); an import that carries a stored entry unchanged is a no-op,
+one that changes it is refused; new entries are written. A tenant restore stays outside (D10).
+
 The storno rules (D6, D7, 1.6) run at the same places, before the lock judges the batch (`ReleasedDocumentLock.Storno`). A
 storno is a document with an outbound `System/Cancels` association to the original; creating it writes only the
 storno and the association (an inbound association of a released document is allowed), so the original stays byte for

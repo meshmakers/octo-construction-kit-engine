@@ -929,6 +929,12 @@
       "number": 172,
       "level": "ERROR",
       "text": "Storno refused: '{stornoRtId}' of type '{stornoCkTypeId}' cannot cancel '{originalRtId}' of type '{originalCkTypeId}': the number range of the original configures the storno type '{configuredStornoCkTypeId}'"
+    },
+    {
+      "key": "RtDocumentAuditEntryAppendOnly",
+      "number": 173,
+      "level": "ERROR",
+      "text": "Write refused: '{rtId}' of type '{ckTypeId}' is an entry of the document audit trail; the {operation} is refused, audit entries are append-only"
     }
   ]
 }

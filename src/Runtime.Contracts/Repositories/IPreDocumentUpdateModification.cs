@@ -1,7 +1,7 @@
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
 
 /// <summary>
-///     Modifies partial updates before they are written (AB#9758). The <see cref="IPreDocumentModification{TDocument}" />
+///     Modifies partial updates before they are written. The <see cref="IPreDocumentModification{TDocument}" />
 ///     pipeline runs on insert and replace only; a modification that must react to an update - numbering a document when
 ///     an update moves it into a released state - runs here. It gets the partial documents of one bulk mutation (only
 ///     the attributes the update sets, with <c>RtId</c> and <c>CkTypeId</c>), reads what it needs itself (in the session,

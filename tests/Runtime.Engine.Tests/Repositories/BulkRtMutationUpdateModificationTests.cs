@@ -12,7 +12,7 @@ using Meshmakers.Octo.Runtime.Engine.Tests.Secrets;
 namespace Meshmakers.Octo.Runtime.Engine.Tests.Repositories;
 
 /// <summary>
-///     AB#9758: partial updates pass the <see cref="IPreDocumentUpdateModification{TDocument}" /> hooks after the
+///     Partial updates pass the <see cref="IPreDocumentUpdateModification{TDocument}" /> hooks after the
 ///     validations and before the write. What a modification sets on a partial document (e.g. the number of a document
 ///     the update releases) is written in the same update statement; inserts and replaces do not reach the hook, and
 ///     disabled pre-document modifications skip it.

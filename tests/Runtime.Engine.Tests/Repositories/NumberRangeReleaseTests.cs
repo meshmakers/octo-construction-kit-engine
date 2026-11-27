@@ -7,7 +7,7 @@ using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 namespace Meshmakers.Octo.Runtime.Engine.Tests.Repositories;
 
 /// <summary>
-///     AB#9758: the release configuration of a number range (<c>System/AutoIncrement.Release</c>) and the one rule of
+///     The release configuration of a number range (<c>System/AutoIncrement.Release</c>) and the one rule of
 ///     design note D8 - a document is released when its state value is one of <c>ReleasedValues</c>.
 /// </summary>
 public class NumberRangeReleaseTests

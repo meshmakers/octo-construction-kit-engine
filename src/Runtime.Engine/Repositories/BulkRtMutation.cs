@@ -149,7 +149,7 @@ internal class BulkRtMutation(
 
         if (entityRuleEngineResult.RtEntitiesToUpdate.Any())
         {
-            // AB#9758: e.g. the number of a document the update releases, written in the same statement.
+            // E.g. the number of a document the update releases, written in the same statement.
             await ModifyUpdatesAsync(session, repositoryDataSource, entityRuleEngineResult.RtEntitiesToUpdate, options)
                 .ConfigureAwait(false);
 
@@ -196,7 +196,7 @@ internal class BulkRtMutation(
     }
 
     /// <summary>
-    ///     Runs the <see cref="IPreDocumentUpdateModification{TDocument}" /> hooks over the partial updates (AB#9758),
+    ///     Runs the <see cref="IPreDocumentUpdateModification{TDocument}" /> hooks over the partial updates,
     ///     after the validations and before the write: what they set on a partial document is written in the same
     ///     statement. Skipped like the other modifications when they are disabled (restore, raw import).
     /// </summary>

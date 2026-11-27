@@ -11,7 +11,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
 ///     <c>System/NumberRangeRelease</c>, System 2.9.0): which attribute of the document type holds its state and which
 ///     state values mean released. A document whose state value is one of <see cref="ReleasedValues" /> is released
 ///     (design note <c>docs/concept-number-ranges-and-released-documents.md</c>, D8): it gets its number when it reaches
-///     that state (AB#9758), and it is locked. One rule for the numbering and the lock.
+///     that state, and it is locked. One rule for the numbering and the lock.
 /// </summary>
 public sealed class NumberRangeRelease
 {

@@ -360,11 +360,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         RtEntity rtEntity)
     {
         var ckTypeId = rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet();
-        await ThrowIfFilterWriteRestrictedAsync(session, ckTypeId, TypeWriteAccessGuard.OperationReplace)
-            .ConfigureAwait(false);
-        await ReplaceOneRtEntityAsync(session, ckTypeId,
-                fieldFilterCriteria, rtEntity)
-            .ConfigureAwait(false);
+        await GuardFilterWriteAsync(session, ckTypeId, TypeWriteAccessGuard.OperationReplace,
+            () => ReplaceOneRtEntityAsync(session, ckTypeId, fieldFilterCriteria, rtEntity)).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -374,9 +371,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
-        await ThrowIfFilterWriteRestrictedAsync(session, ckTypeId, TypeWriteAccessGuard.OperationReplace)
-            .ConfigureAwait(false);
-        await ReplaceOneRtEntityAsync(session, ckTypeId, fieldFilterCriteria, rtEntity).ConfigureAwait(false);
+        await GuardFilterWriteAsync(session, ckTypeId, TypeWriteAccessGuard.OperationReplace,
+            () => ReplaceOneRtEntityAsync(session, ckTypeId, fieldFilterCriteria, rtEntity)).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -399,11 +395,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         RtEntity rtEntity)
     {
         var ckTypeId = rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet();
-        await ThrowIfFilterWriteRestrictedAsync(session, ckTypeId, TypeWriteAccessGuard.OperationUpdate)
-            .ConfigureAwait(false);
-        await UpdateOneRtEntityAsync(session, ckTypeId,
-                fieldFilterCriteria, rtEntity)
-            .ConfigureAwait(false);
+        await GuardFilterWriteAsync(session, ckTypeId, TypeWriteAccessGuard.OperationUpdate,
+            () => UpdateOneRtEntityAsync(session, ckTypeId, fieldFilterCriteria, rtEntity)).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -413,9 +406,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
-        await ThrowIfFilterWriteRestrictedAsync(session, ckTypeId, TypeWriteAccessGuard.OperationUpdate)
-            .ConfigureAwait(false);
-        await UpdateOneRtEntityAsync(session, ckTypeId, fieldFilterCriteria, rtEntity).ConfigureAwait(false);
+        await GuardFilterWriteAsync(session, ckTypeId, TypeWriteAccessGuard.OperationUpdate,
+            () => UpdateOneRtEntityAsync(session, ckTypeId, fieldFilterCriteria, rtEntity)).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -423,11 +415,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         RtEntity rtEntity)
     {
         var ckTypeId = rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet();
-        await ThrowIfFilterWriteRestrictedAsync(session, ckTypeId, TypeWriteAccessGuard.OperationUpdate)
-            .ConfigureAwait(false);
-        await UpdateManyRtEntityAsync(session, ckTypeId,
-                fieldFilterCriteria, rtEntity)
-            .ConfigureAwait(false);
+        await GuardFilterWriteAsync(session, ckTypeId, TypeWriteAccessGuard.OperationUpdate,
+            () => UpdateManyRtEntityAsync(session, ckTypeId, fieldFilterCriteria, rtEntity)).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -437,9 +426,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
-        await ThrowIfFilterWriteRestrictedAsync(session, ckTypeId, TypeWriteAccessGuard.OperationUpdate)
-            .ConfigureAwait(false);
-        await UpdateManyRtEntityAsync(session, ckTypeId, fieldFilterCriteria, rtEntity).ConfigureAwait(false);
+        await GuardFilterWriteAsync(session, ckTypeId, TypeWriteAccessGuard.OperationUpdate,
+            () => UpdateManyRtEntityAsync(session, ckTypeId, fieldFilterCriteria, rtEntity)).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -644,8 +632,9 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
                 .ConfigureAwait(false);
         }
 
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entityUpdateInfoList,
-                associationUpdateInfoList, mutationOptions, operationResult ?? new OperationResult())
+        await AuditReleasedDocumentRefusalsAsync(session, () => BulkRtMutation.ApplyChangesAsync(session,
+                RepositoryDataSource, cacheService, entityUpdateInfoList, associationUpdateInfoList, mutationOptions,
+                operationResult ?? new OperationResult()))
             .ConfigureAwait(false);
     }
 
@@ -1269,8 +1258,15 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         IEnumerable<RtEntity> rtEntityList, BulkOperationOptions options)
     {
         var results = new List<IBulkImportResult>();
-        var rtEntities = rtEntityList as IReadOnlyCollection<RtEntity> ?? rtEntityList.ToList();
+        var rtEntities = rtEntityList as IReadOnlyList<RtEntity> ?? rtEntityList.ToList();
         await ThrowIfTypeWriteRestrictedAsync(session, TypeWriteAccessGuard.TargetsOf(rtEntities)).ConfigureAwait(false);
+
+        // The bulk import bypasses BulkRtMutation, so it meets the released-document lock here, for the whole import
+        // batch before anything of it is written (design note D10): an entity that changes a released document refuses
+        // the batch, one that carries its stored content is left out (no write).
+        var lockCacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
+        rtEntities = await AuditReleasedDocumentRefusalsAsync(session, () => ReleasedDocumentLock.FilterImportAsync(
+            session, RepositoryDataSource, lockCacheService, rtEntities)).ConfigureAwait(false);
         foreach (var groupedEntities in rtEntities.GroupBy(x => x.CkTypeId))
         {
             if (groupedEntities.Key == null)
@@ -1314,8 +1310,12 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public async Task<IBulkImportResult> BulkRtAssociationsAsync(IOctoSession session,
         IEnumerable<RtAssociation> rtAssociations, BulkOperationOptions options)
     {
-        var associations = rtAssociations as IReadOnlyCollection<RtAssociation> ?? rtAssociations.ToList();
+        IReadOnlyList<RtAssociation> associations = rtAssociations as IReadOnlyList<RtAssociation> ?? rtAssociations.ToList();
         await ThrowIfTypeWriteRestrictedAsync(session, TypeWriteAccessGuard.TargetsOf(associations)).ConfigureAwait(false);
+        var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
+        associations = await AuditReleasedDocumentRefusalsAsync(session,
+            () => ReleasedDocumentLock.FilterAssociationImportAsync(session, RepositoryDataSource, cacheService,
+                associations)).ConfigureAwait(false);
         return await RepositoryDataSource.RtAssociations.BulkImportAsync(session, associations, options)
             .ConfigureAwait(false);
     }
@@ -1332,7 +1332,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         Func<Task> write)
     {
         await ThrowIfFilterWriteRestrictedAsync(session, ckTypeId, operation).ConfigureAwait(false);
-        await write().ConfigureAwait(false);
+        await AuditReleasedDocumentRefusalsAsync(session, write).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1362,7 +1362,71 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <inheritdoc />
     public async Task DeleteRtAssociationsByIdAsync(IOctoSession session, IEnumerable<OctoObjectId> associationIds)
     {
-        await RepositoryDataSource.RtAssociations.DeleteOneAsync(session, associationIds).ConfigureAwait(false);
+        var ids = associationIds as IReadOnlyCollection<OctoObjectId> ?? associationIds.ToList();
+        var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
+        await AuditReleasedDocumentRefusalsAsync(session, () => ReleasedDocumentLock.CheckAssociationDeleteAsync(
+            session, RepositoryDataSource, cacheService, ids)).ConfigureAwait(false);
+        await RepositoryDataSource.RtAssociations.DeleteOneAsync(session, ids).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     Runs a write and, when the released-document lock refuses it, records one <c>Denied</c> audit entry per refused
+    ///     document (<c>System/DocumentAuditEntry</c>, design note D10) before the refusal is passed on. The entries are
+    ///     written in a session of their own, outside the transaction of the refused write, so they stay when the caller
+    ///     aborts it.
+    /// </summary>
+    private async Task AuditReleasedDocumentRefusalsAsync(IOctoSession session, Func<Task> write)
+    {
+        try
+        {
+            await write().ConfigureAwait(false);
+        }
+        catch (ReleasedDocumentLockedException refused)
+        {
+            await WriteDeniedAuditEntriesAsync(session, refused).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private async Task<TResult> AuditReleasedDocumentRefusalsAsync<TResult>(IOctoSession session,
+        Func<Task<TResult>> write)
+    {
+        try
+        {
+            return await write().ConfigureAwait(false);
+        }
+        catch (ReleasedDocumentLockedException refused)
+        {
+            await WriteDeniedAuditEntriesAsync(session, refused).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private async Task WriteDeniedAuditEntriesAsync(IOctoSession session, ReleasedDocumentLockedException refused)
+    {
+        try
+        {
+            var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
+            var entries = ReleasedDocumentDeniedAudit.CreateEntries(cacheService, TenantId,
+                session.GetSecurityContext(), refused.Refusals, DateTime.UtcNow, out var auditGraph);
+            if (auditGraph == null)
+            {
+                _logger?.LogWarning(
+                    "Tenant '{TenantId}' has no System/DocumentAuditEntry type; {Count} refused write(s) of released " +
+                    "documents are not audited", TenantId, refused.Refusals.Count);
+                return;
+            }
+
+            using var auditSession = await GetSessionAsync().ConfigureAwait(false);
+            await RepositoryDataSource.GetRtCollection<RtEntity>(auditGraph).InsertManyAsync(auditSession, entries)
+                .ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            // The refusal stands either way; a failed audit write must not replace the refusal the caller gets.
+            _logger?.LogError(e, "Writing the Denied audit entries of {Count} refused write(s) of released documents " +
+                                 "in tenant '{TenantId}' failed", refused.Refusals.Count, TenantId);
+        }
     }
 
     #endregion Advanced functionality

@@ -899,6 +899,12 @@
       "number": 167,
       "level": "ERROR",
       "text": "The blueprint draft cannot be read: {detail}"
+    },
+    {
+      "key": "RtReleasedDocumentLocked",
+      "number": 168,
+      "level": "ERROR",
+      "text": "Write refused: entity '{rtId}' of type '{ckTypeId}' is a released document (state '{state}' of number range '{numberRange}'); the {operation} would change {changes}. A released document is never changed or deleted; only the attributes [{changeableAttributes}] may still change"
     }
   ]
 }

@@ -981,8 +981,9 @@ internal class ImportRtModelCommand(
 
             logger.LogInformation("Add to database completed");
         }
-        catch (Exception e)
+        catch (Exception e) when (e is not ReleasedDocumentLockedException)
         {
+            // A refusal of the released-document lock reaches the caller as it is: the same error as on every API.
             throw ExchangeException.BulkImportError(e);
         }
     }

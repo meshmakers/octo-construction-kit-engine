@@ -177,6 +177,47 @@ allocation statement (it now also matches only ranges without `Release`), so its
 before. The range rules refuse a `Release` without `StateAttribute` or `ReleasedValues` when the range is configured, and
 a `StateAttribute` the document type does not have when a document is numbered.
 
+The lock of released documents (D3, D8, D10) is enforced by the engine itself, not by a hook, and has no switch.
+`ReleasedDocumentLock` (`Runtime.Engine/Repositories`) judges a write against the stored document: a document is
+locked when its stored state value is in the `ReleasedValues` of a number range one of its attributes is numbered from.
+It is called where every write path passes:
+
+| Write path | Check |
+|------------|-------|
+| `BulkRtMutation.ApplyChangesAsync`: every insert, update, replace, delete and archive of the repository by id, by filter (engine-mongodb `Mutation`) and in `ApplyChanges`, and the association changes of the batch (the cascade of a deleted entity included) | `CheckMutationAsync`, after the rule validation and the not-found answer of the write funnel, before anything of the batch is written; whatever `BulkRtMutationOptions` say (also `DisablePreDocumentModifications`) and whatever the identity (also a System session) |
+| `RuntimeRepositoryBase.BulkInsertRtEntitiesAsync`: RT import (`importrt`), blueprint seed install, update and nightly re-apply | `FilterImportAsync`, for the whole import batch before its first write |
+| `RuntimeRepositoryBase.BulkRtAssociationsAsync`: the associations of an import | `FilterAssociationImportAsync` |
+| `RuntimeRepositoryBase.DeleteRtAssociationsByIdAsync`: the to-one replacement of an import | `CheckAssociationDeleteAsync` |
+
+Rules: a released document changes no attribute, not its number (never, also when `ChangeableAttributes` lists it),
+not its state out of `ReleasedValues` (from one released value to another only when the state attribute is listed
+there), and no outbound association (the document is the origin; associations to it, such as a storno's `Cancels`,
+stay possible); it is never deleted or archived. Only `ChangeableAttributes` may change, and a write that changes a
+changeable and another attribute is refused as a whole. A write is judged by its values: an attribute set to its stored
+value is no change (strict comparison: strings ordinal, numbers by value, times by UTC ticks, records by type and
+members, lists in order; a written linked binary is always a change), so a form that saves the unchanged values with a
+changeable one passes. A replace without the number keeps the stored one (the number modifier carries it over); with
+`DisablePreDocumentModifications` it would clear it and is refused. An import that carries the stored content is a
+no-op: the entity is not written and no audit entry is made. An import of a document the tenant does not hold yet is
+written with the number of the file; the counter is not touched. The blueprint bookkeeping attributes of
+`System/Entity` (`RtBlueprintSource`, `RtBlueprintLocked`, `RtBlueprintAppliedAt`) are not business data: a re-apply
+that only stamps a released document anew is that no-op. A range whose `Release` cannot be read locks every stored
+document of its types (fail closed).
+
+A refused batch is refused as a whole (D3) with one `ReleasedDocumentLockedException` (`Runtime.Contracts.Repositories`):
+engine message 168 `RtReleasedDocumentLocked` per refused document (document, type, state, range, operation, what it
+would change, the changeable attributes) and the structured refusals. The RT import passes it on unwrapped. For each
+refused document the repository writes one `DocumentAuditEntry` with `Action = Denied` (document, UTC time, the caller's
+subject, the write channel as `Source`, `AttributeNames`, the message number) in a session of its own, outside the
+refused write's transaction, so the entry stays when the caller aborts it. The lock reads only for writes that target a
+stored entity of a type with an auto-increment attribute: one read of the ranges and one of the stored documents per
+type and batch, in the session of the write.
+
+Outside the lock, by design: the tenant dump restore (mongorestore into an unregistered database and attach, D10)
+restores documents, counters, periods and audit entries 1:1, and numbering goes on from the restored counter; the CK
+model migration writes of engine-mongodb (`*ForMigrationAsync`), which rewrite stored documents for a schema change; and
+the display rule sweeper, which writes only `rtDisplayName` and `rtDisplayDescription`.
+
 ## 5. Outside System
 
 - The storno type of a document model declares the `Cancels` association (Basic `Document` minor version).

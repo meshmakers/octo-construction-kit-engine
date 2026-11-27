@@ -79,6 +79,12 @@ internal class BulkRtMutation(
             await options.BeforeApplyAsync().ConfigureAwait(false);
         }
 
+        // Released documents are locked for every write of the batch: before anything is written, after the write
+        // funnel answered a target the caller may not see as missing. Not a hook and not skipped by any option or
+        // identity: a batch that changes a released document is refused as a whole.
+        await ReleasedDocumentLock.CheckMutationAsync(session, repositoryDataSource, ckCacheService,
+            entityValidatorResult, graphValidationResult, options).ConfigureAwait(false);
+
         await ApplyRtEntityChangesAsync(session, repositoryDataSource, ckCacheService, entityValidatorResult, options,
                 callerResult)
             .ConfigureAwait(false);

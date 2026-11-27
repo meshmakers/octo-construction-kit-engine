@@ -475,6 +475,9 @@ internal static class MessageCodes
     internal static OperationMessage BlueprintDraftUnreadable(string? location, object detail) =>
         GetMessage("BlueprintDraftUnreadable", location, detail);
 
+    internal static OperationMessage RtReleasedDocumentLocked(string? location, object rtId, object ckTypeId, object state, object numberRange, object operation, object changes, object changeableAttributes) =>
+        GetMessage("RtReleasedDocumentLocked", location, rtId, ckTypeId, state, numberRange, operation, changes, changeableAttributes);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1376,6 +1379,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  167, "The blueprint draft cannot be read: {detail}",
                  new string[] {"detail"})
+        },
+        {
+            "RtReleasedDocumentLocked",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 168, "Write refused: entity '{rtId}' of type '{ckTypeId}' is a released document (state '{state}' of number range '{numberRange}'); the {operation} would change {changes}. A released document is never changed or deleted; only the attributes [{changeableAttributes}] may still change",
+                 new string[] {"rtId", "ckTypeId", "state", "numberRange", "operation", "changes", "changeableAttributes"})
         },
     };
 }

@@ -9,6 +9,20 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Added
 
+- **Released documents are locked (AB#9759).** A document whose stored state is one of the `ReleasedValues` of its
+  number range (`System/AutoIncrement.Release`, design note D8) can no longer be changed or deleted by any write path:
+  `BulkRtMutation` (every insert, update, replace, delete, archive and association change by id, by filter and in
+  `ApplyChanges`, whatever the options and the identity, System sessions included) and the bulk import
+  (`BulkInsertRtEntitiesAsync`: `importrt`, blueprint seed install and re-apply; `BulkRtAssociationsAsync`,
+  `DeleteRtAssociationsByIdAsync`) refuse the whole batch with the new `ReleasedDocumentLockedException`
+  (`Runtime.Contracts.Repositories`, engine message 168 `RtReleasedDocumentLocked`; the RT import passes it on
+  unwrapped) and write one `System/DocumentAuditEntry` with `Action = Denied` per refused document outside the
+  transaction. Only the range's `ChangeableAttributes` may change (never the number; the state only to another released
+  value); an attribute written with its stored value is no change; outbound associations are locked, inbound ones are
+  not. An import that carries the stored content is a no-op (not written); an import of a document the tenant does not
+  hold yet keeps the number of the file. Drafts and ranges without `Release` behave as before. Behaviour change for
+  callers that edited released documents: such writes now fail with message 168. Tests: `ReleasedDocumentLockTests`,
+  `ReleasedDocumentImportLockTests`, `ReleasedDocumentDeniedAuditTests`, `RtAttributeValueEqualityTests`.
 - **Partial updates can be modified before they are written (AB#9758).** New hook
   `IPreDocumentUpdateModification<RtEntity>` (`Runtime.Contracts.Repositories`, method `ModifyUpdatesAsync`):
   `BulkRtMutation` hands it the partial entities of a batch's updates (with `RtId` and `CkTypeId`) after the

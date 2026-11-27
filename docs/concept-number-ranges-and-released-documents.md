@@ -151,8 +151,8 @@ side is N in the schema; a second released storno of one original is refused in 
 
 AB#9754 implements `PeriodKind`, `FiscalYearStartMonth`, `ReferenceTimeZone`, `Periods`, the format tokens and the
 first number of a new fiscal year (`StartValue`, or 1) in engine-mongodb (`AutoIncrementModifier`, rules in
-`AutoIncrementRangeSettings`): the fiscal year is read from the entity's creation time until AB#9758 switches ranges with
-`Release` to the release time. AB#9755 adds the `StartValue` floor of D5: every allocation (with and without periods)
+`AutoIncrementRangeSettings`): the fiscal year is read from the time the document is numbered - its creation time on a
+range without `Release`, its release time on a range with `Release` (AB#9758, D2). AB#9755 adds the `StartValue` floor of D5: every allocation (with and without periods)
 takes its block from `max(counter, StartValue - 1) + 1` on, in the same single atomic statement (a pipeline update), so
 a start value continues an external range and one set below a counter in use is ignored. The range rules also refuse a
 `StartValue` below 1 or above `End`, and they are checked for partial updates of a range too (engine hook
@@ -164,6 +164,18 @@ Counters are entities of the tenant database, so company tenants under one group
 `CurrentValue`, `Periods` and the configuration attributes are `TenantOwned`, so a seed re-apply keeps them. A service
 built before AB#9754 ignores the new attributes and numbers a fiscal-year range like a legacy counter, so configure them
 only on an installation whose services contain the implementation.
+
+AB#9758 implements the numbering on release. The engine reads the release configuration with `NumberRangeRelease`
+(`Runtime.Contracts`, the one rule of D8 for the numbering and the lock: a state value is released when it is in
+`ReleasedValues`, an enum value by the name of its CK enum value). In engine-mongodb `AutoIncrementModifier` numbers a
+document of a range with `Release` only in the write that puts it into a released state: an insert directly in that
+state, a replace, or a partial update that sets the state attribute (engine hook `IPreDocumentUpdateModification`,
+called by `BulkRtMutation` after the update validations; the number is written in the same update statement and, in a
+transaction, together with the counter). A draft is written without a number and leaves the counter alone, so a deleted
+draft leaves no gap; a document that already has a number keeps it. A range without `Release` keeps its single
+allocation statement (it now also matches only ranges without `Release`), so its documents are numbered on insert as
+before. The range rules refuse a `Release` without `StateAttribute` or `ReleasedValues` when the range is configured, and
+a `StateAttribute` the document type does not have when a document is numbered.
 
 ## 5. Outside System
 

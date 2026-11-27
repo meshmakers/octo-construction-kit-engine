@@ -19,7 +19,8 @@ internal class BulkRtMutation(
     IGraphRuleEngine graphRuleEngine,
     IEnumerable<IPreDocumentModification<RtEntity>> preDocumentModifications,
     ISecretWriteNormalizer secretWriteNormalizer,
-    IEnumerable<IPreDocumentUpdateValidation<RtEntity>>? preDocumentUpdateValidations = null)
+    IEnumerable<IPreDocumentUpdateValidation<RtEntity>>? preDocumentUpdateValidations = null,
+    IEnumerable<IPreDocumentUpdateModification<RtEntity>>? preDocumentUpdateModifications = null)
     : IBulkRtMutation
 {
     private readonly List<IPreDocumentModification<RtEntity>> _preDocumentModifications =
@@ -27,6 +28,9 @@ internal class BulkRtMutation(
 
     private readonly List<IPreDocumentUpdateValidation<RtEntity>> _preDocumentUpdateValidations =
         preDocumentUpdateValidations?.ToList() ?? [];
+
+    private readonly List<IPreDocumentUpdateModification<RtEntity>> _preDocumentUpdateModifications =
+        preDocumentUpdateModifications?.ToList() ?? [];
 
     /// <inheritdoc />
     public ISecretWriteNormalizer SecretWriteNormalizer => secretWriteNormalizer;
@@ -100,6 +104,10 @@ internal class BulkRtMutation(
 
         if (entityRuleEngineResult.RtEntitiesToUpdate.Any())
         {
+            // AB#9758: e.g. the number of a document the update releases, written in the same statement.
+            await ModifyUpdatesAsync(session, repositoryDataSource, entityRuleEngineResult.RtEntitiesToUpdate, options)
+                .ConfigureAwait(false);
+
             await UpdateRtEntities(session, repositoryDataSource, ckCacheService,
                 entityRuleEngineResult.RtEntitiesToUpdate, entityRuleEngineResult.UpdateGuards,
                 entityRuleEngineResult.RecordArrayItemUpdates, entityRuleEngineResult.ExpectedRtVersions,
@@ -135,6 +143,38 @@ internal class BulkRtMutation(
             return;
         }
 
+        var partialEntities = ToPartialEntities(rtEntitiesToUpdate);
+        foreach (var validation in _preDocumentUpdateValidations)
+        {
+            await validation.RunAsync(session, repositoryDataSource, partialEntities).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    ///     Runs the <see cref="IPreDocumentUpdateModification{TDocument}" /> hooks over the partial updates (AB#9758),
+    ///     after the validations and before the write: what they set on a partial document is written in the same
+    ///     statement. Skipped like the other modifications when they are disabled (restore, raw import).
+    /// </summary>
+    private async Task ModifyUpdatesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        IReadOnlyDictionary<RtEntityId, RtEntity> rtEntitiesToUpdate, BulkRtMutationOptions options)
+    {
+        if (_preDocumentUpdateModifications.Count == 0 || rtEntitiesToUpdate.Count == 0 ||
+            options.DisablePreDocumentModifications)
+        {
+            return;
+        }
+
+        var partialEntities = ToPartialEntities(rtEntitiesToUpdate);
+        foreach (var modification in _preDocumentUpdateModifications)
+        {
+            await modification.ModifyUpdatesAsync(session, repositoryDataSource, partialEntities)
+                .ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>The partial documents of the updates, each with the <c>RtId</c> and <c>CkTypeId</c> of its target key.</summary>
+    private static List<RtEntity> ToPartialEntities(IReadOnlyDictionary<RtEntityId, RtEntity> rtEntitiesToUpdate)
+    {
         var partialEntities = new List<RtEntity>(rtEntitiesToUpdate.Count);
         foreach (var (rtEntityId, rtEntity) in rtEntitiesToUpdate)
         {
@@ -143,10 +183,7 @@ internal class BulkRtMutation(
             partialEntities.Add(rtEntity);
         }
 
-        foreach (var validation in _preDocumentUpdateValidations)
-        {
-            await validation.RunAsync(session, repositoryDataSource, partialEntities).ConfigureAwait(false);
-        }
+        return partialEntities;
     }
 
     private async Task InsertRtEntitiesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,

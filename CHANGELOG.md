@@ -9,6 +9,19 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Added
 
+- **Partial updates can be modified before they are written (AB#9758).** New hook
+  `IPreDocumentUpdateModification<RtEntity>` (`Runtime.Contracts.Repositories`, method `ModifyUpdatesAsync`):
+  `BulkRtMutation` hands it the partial entities of a batch's updates (with `RtId` and `CkTypeId`) after the
+  `IPreDocumentUpdateValidation` hooks and before the write; attributes it sets on them are written in the same update
+  statement. `IPreDocumentModification` (insert and replace) is unchanged. `BulkRtMutation` takes the hooks as a new
+  optional constructor parameter; skipped, like the other modifications, when `DisablePreDocumentModifications` is set;
+  without a registered implementation nothing changes. engine-mongodb uses it to number a document when an update
+  releases it. Implementers of the engine interfaces: nothing to change. Tests: `BulkRtMutationUpdateModificationTests`.
+- **`NumberRangeRelease` reads the release configuration of a number range (AB#9758).** `Runtime.Contracts.Repositories`:
+  `TryCreate` reads `System/AutoIncrement.Release` (null when absent, an error when `StateAttribute` or `ReleasedValues`
+  is missing) and `IsReleased` tells whether a state value is in `ReleasedValues` (an enum value by the name of its CK
+  enum value, a string as it is, case-sensitive) - the one rule of design note D8 for the numbering on release and the
+  lock of released documents. Tests: `NumberRangeReleaseTests`.
 - **Partial updates can be validated before they are written (AB#9755).** New hook
   `IPreDocumentUpdateValidation<RtEntity>` (`Runtime.Contracts.Repositories`): `BulkRtMutation` hands it the partial
   entities of a batch's updates (with `RtId` and `CkTypeId`) before anything of the batch is written - deletes, inserts

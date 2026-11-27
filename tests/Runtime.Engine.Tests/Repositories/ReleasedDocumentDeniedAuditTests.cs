@@ -9,8 +9,8 @@ namespace Meshmakers.Octo.Runtime.Engine.Tests.Repositories;
 
 /// <summary>
 ///     The <c>Denied</c> audit entries of refused writes of released documents: one per refused document with the
-///     document, the time, the caller, the write channel, the attributes and the message number; none on a tenant
-///     without the audit type.
+///     document, the time, the caller, the attributes and the message number, and no <c>Source</c> (the engine does not
+///     know the API path); none on a tenant without the audit type.
 /// </summary>
 public class ReleasedDocumentDeniedAuditTests
 {
@@ -35,10 +35,11 @@ public class ReleasedDocumentDeniedAuditTests
         var entry = Assert.Single(entries);
         Assert.Equal(refusal.DocumentId.RtId.ToString(), entry.GetAttributeValueOrDefault("DocumentRtId"));
         Assert.Equal(model.InvoiceId.FullName, entry.GetAttributeValueOrDefault("DocumentCkTypeId"));
-        Assert.Equal(ReleasedDocumentDeniedAudit.DeniedAction, entry.GetAttributeValueOrDefault("Action"));
+        Assert.Equal(DocumentAuditTrail.DeniedAction, entry.GetAttributeValueOrDefault("Action"));
         Assert.Equal(now, entry.GetAttributeValueOrDefault("Timestamp"));
         Assert.Equal("user-1", entry.GetAttributeValueOrDefault("SubjectId"));
-        Assert.Equal("pipeline", entry.GetAttributeValueOrDefault("Source"));
+        // The write channel is no API path: Source stays empty.
+        Assert.False(entry.Attributes.ContainsKey("Source"));
         Assert.Equal(new List<string> { "Title" }, entry.GetAttributeValueOrDefault("AttributeNames"));
         Assert.StartsWith("168:", (string)entry.GetAttributeValueOrDefault("Message")!);
     }

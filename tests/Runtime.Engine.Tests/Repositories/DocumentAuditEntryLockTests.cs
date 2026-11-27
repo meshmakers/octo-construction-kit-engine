@@ -9,9 +9,9 @@ using Meshmakers.Octo.Runtime.Engine.Repositories;
 namespace Meshmakers.Octo.Runtime.Engine.Tests.Repositories;
 
 /// <summary>
-///     Decision D9: entries of the document audit trail are append-only. Update, replace, delete and an insert or import
-///     over a stored entry are refused (message 173) on the write funnel and the bulk import, whatever the options; an
-///     import of the stored content is a no-op; new entries are written.
+///     Decision D9: entries of the document audit trail are append-only and only the engine creates them. Update, replace,
+///     delete, every insert and an import of a new or changed entry are refused (message 173) on the write funnel and the
+///     bulk import, whatever the options and the identity; an import of the stored content is a no-op.
 /// </summary>
 public class DocumentAuditEntryLockTests
 {
@@ -67,26 +67,53 @@ public class DocumentAuditEntryLockTests
     }
 
     [Fact]
-    public async Task InsertOverAStoredEntry_IsRefused_ANewEntryIsWritten()
+    public async Task InsertOverAStoredEntry_IsRefused()
     {
         var entry = StoredEntry();
         var copy = new RtEntity(entry.GetRtCkTypeId(), entry.RtId, entry.Attributes);
 
         await AssertRefusedAsync(() => CheckAsync(new EntityRuleEngineResult<RtEntity>([copy], [], [], [])));
-        await CheckAsync(new EntityRuleEngineResult<RtEntity>(
-            [new RtEntity(entry.GetRtCkTypeId(), OctoObjectId.GenerateNewId(), entry.Attributes)], [], [], []));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task InsertOfANewEntry_IsRefused_WithAndWithoutAnId(bool withId)
+    {
+        var entry = new RtEntity(_model.AuditEntry.CkTypeId.ToRtCkId(),
+            withId ? OctoObjectId.GenerateNewId() : OctoObjectId.Empty,
+            new Dictionary<string, object?> { ["DocumentRtId"] = OctoObjectId.GenerateNewId().ToString() });
+
+        await AssertRefusedAsync(() => CheckAsync(new EntityRuleEngineResult<RtEntity>([entry], [], [], [])));
     }
 
     [Fact]
-    public async Task Import_OfTheStoredContentIsANoOp_AChangeIsRefused()
+    public async Task InsertOfANewEntry_IsRefused_AlsoForASystemSession()
+    {
+        // A plain session (not an IOctoSecureSession) acts as the system context.
+        var systemSession = A.Fake<IOctoSession>();
+        Assert.True(systemSession.GetSecurityContext().IsSystem);
+        var entry = new RtEntity(_model.AuditEntry.CkTypeId.ToRtCkId(), OctoObjectId.GenerateNewId(),
+            new Dictionary<string, object?> { ["DocumentRtId"] = OctoObjectId.GenerateNewId().ToString() });
+
+        await AssertRefusedAsync(() => ReleasedDocumentLock.CheckMutationAsync(systemSession, _model.DataSource,
+            _model.Cache, new EntityRuleEngineResult<RtEntity>([entry], [], [], []), new GraphRuleEngineResult(),
+            BulkRtMutationOptions.Default));
+    }
+
+    [Fact]
+    public async Task Import_OfTheStoredContentIsANoOp_AChangeAndANewEntryAreRefused()
     {
         var entry = StoredEntry();
         var same = new RtEntity(entry.GetRtCkTypeId(), entry.RtId, entry.Attributes);
         var changed = new RtEntity(entry.GetRtCkTypeId(), entry.RtId,
             new Dictionary<string, object?> { ["DocumentRtId"] = "forged" });
+        var created = new RtEntity(entry.GetRtCkTypeId(), OctoObjectId.GenerateNewId(), entry.Attributes);
 
         Assert.Empty(await ReleasedDocumentLock.FilterImportAsync(_session, _model.DataSource, _model.Cache, [same]));
         await AssertRefusedAsync(() =>
             ReleasedDocumentLock.FilterImportAsync(_session, _model.DataSource, _model.Cache, [changed]));
+        await AssertRefusedAsync(() =>
+            ReleasedDocumentLock.FilterImportAsync(_session, _model.DataSource, _model.Cache, [created]));
     }
 }

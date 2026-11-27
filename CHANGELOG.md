@@ -9,10 +9,18 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Added
 
-- **Document audit entries are append-only (AB#9762).** The write funnel and the bulk import refuse every update,
-  replace, delete and archive of a `System/DocumentAuditEntry` and an insert or import over a stored one with the new
-  `DocumentAuditEntryAppendOnlyException` (`Runtime.Contracts.Repositories`, message 173, design note D9), whatever the
-  options and the identity; an import of the stored content is a no-op. Tests: `DocumentAuditEntryLockTests`.
+- **Document audit trail (AB#9762).** The engine writes the `System/DocumentAuditEntry` entries of a document itself:
+  `Storno` - one entry on the original and one on the storno, `ReferenceRtId` crosswise - after the writes of a
+  `BulkRtMutation` batch that releases a storno, in the session (and transaction) of the batch; the `Release` entry
+  comes from the number modifier of engine-mongodb. Entries carry the caller's subject (a client's id for a
+  client-credentials caller, none for a system session) and the UTC time; `Denied` entries no longer put the session's
+  write channel into `Source` (the engine does not know the API path, so `Source` stays empty). Entries are append-only
+  and only the engine creates them (design note D9): the write funnel and the bulk import refuse every insert, update,
+  replace, delete and archive of an entry and an import of a new or changed one with the new
+  `DocumentAuditEntryAppendOnlyException` (`Runtime.Contracts.Repositories`, message 173), whatever the options and the
+  identity, system sessions included; an import of the stored content is a no-op. Consequence: `importrt` does not
+  carry audit entries into another tenant; a tenant restore (mongorestore and attach) does. Tests:
+  `DocumentAuditEntryLockTests`, `DocumentAuditTrailTests`, `StornoRulesTests`, `ReleasedDocumentDeniedAuditTests`.
 - **Storno rules (AB#9761).** A storno is a document with an outbound `System/Cancels` association to the original it
   cancels; the original is not written and stays locked. The write funnel and the association import refuse a batch
   with the new `StornoRefusedException` (`Runtime.Contracts.Repositories`) when a `Cancels` association is created to

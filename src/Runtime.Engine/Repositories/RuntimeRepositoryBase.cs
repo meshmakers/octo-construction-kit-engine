@@ -1422,7 +1422,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             }
 
             using var auditSession = await GetSessionAsync().ConfigureAwait(false);
-            await RepositoryDataSource.GetRtCollection<RtEntity>(auditGraph).InsertManyAsync(auditSession, entries)
+            await DocumentAuditTrail.InsertAsync(auditSession, RepositoryDataSource, auditGraph, entries)
                 .ConfigureAwait(false);
         }
         catch (Exception e)

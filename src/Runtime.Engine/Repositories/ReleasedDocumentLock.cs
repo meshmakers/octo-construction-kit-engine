@@ -73,7 +73,8 @@ internal static partial class ReleasedDocumentLock
     /// <param name="entities">The validated entity changes</param>
     /// <param name="associations">The validated association changes, the cascade of deleted entities included</param>
     /// <param name="options">The options of the batch</param>
-    public static async Task CheckMutationAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+    /// <returns>The stornos the batch releases, for the <c>Storno</c> entries of the audit trail</returns>
+    public static async Task<IReadOnlyList<StornoRelease>> CheckMutationAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         ICkCacheService ckCacheService, EntityRuleEngineResult<RtEntity> entities, GraphRuleEngineResult associations,
         BulkRtMutationOptions options)
     {
@@ -86,9 +87,8 @@ internal static partial class ReleasedDocumentLock
         targets.AddRange(associations.RtAssociationsToCreate.Concat(associations.RtAssociationsToDelete)
             .Select(a => new RtEntityId(a.OriginCkTypeId, a.OriginRtId)));
 
-        // D9: audit entries are append-only.
-        await DocumentAuditEntryLock.CheckMutationAsync(session, repositoryDataSource, ckCacheService, entities)
-            .ConfigureAwait(false);
+        // D9: audit entries are append-only and created only by the engine.
+        DocumentAuditEntryLock.CheckMutation(entities);
 
         // D11: a numbered range keeps its release configuration.
         var rangeWrites = new List<NumberRangeReleaseLock.RangeWrite>();
@@ -106,13 +106,13 @@ internal static partial class ReleasedDocumentLock
             .ConfigureAwait(false);
 
         // D6, D7: the storno rules.
-        await CheckStornosAsync(session, repositoryDataSource, ckCacheService, entities,
+        var stornoReleases = await CheckStornosAsync(session, repositoryDataSource, ckCacheService, entities,
             associations.RtAssociationsToCreate, associations.RtAssociationsToDelete).ConfigureAwait(false);
 
         var scope = new LockScope(session, repositoryDataSource, ckCacheService);
         if (!await scope.LoadAsync(targets).ConfigureAwait(false))
         {
-            return;
+            return stornoReleases;
         }
 
         var refusals = new Refusals();
@@ -166,6 +166,7 @@ internal static partial class ReleasedDocumentLock
         }
 
         refusals.ThrowIfAny();
+        return stornoReleases;
     }
 
     /// <summary>
@@ -177,7 +178,7 @@ internal static partial class ReleasedDocumentLock
     public static async Task<IReadOnlyList<RtEntity>> FilterImportAsync(IOctoSession session,
         IRepositoryDataSource repositoryDataSource, ICkCacheService ckCacheService, IReadOnlyList<RtEntity> entities)
     {
-        // D9: an import never overwrites an audit entry.
+        // D9: an import never creates or overwrites an audit entry.
         entities = await DocumentAuditEntryLock.FilterImportAsync(session, repositoryDataSource, ckCacheService, entities)
             .ConfigureAwait(false);
 

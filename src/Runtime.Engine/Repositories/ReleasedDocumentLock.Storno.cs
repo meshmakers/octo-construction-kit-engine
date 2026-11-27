@@ -24,7 +24,11 @@ internal static partial class ReleasedDocumentLock
     ///     that releases a storno). Reads only when the batch creates a <c>Cancels</c> association or writes a document of
     ///     a numbered type.
     /// </summary>
-    public static async Task CheckStornosAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+    /// <returns>
+    ///     The stornos the batch releases (not released before, released after the batch), each with its original, for
+    ///     the <c>Storno</c> entries of the audit trail.
+    /// </returns>
+    public static async Task<IReadOnlyList<StornoRelease>> CheckStornosAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         ICkCacheService ckCacheService, EntityRuleEngineResult<RtEntity> entities,
         IReadOnlyList<RtAssociation> createdAssociations, IReadOnlyList<RtAssociation> deletedAssociations)
     {
@@ -57,7 +61,7 @@ internal static partial class ReleasedDocumentLock
 
         if (created.Count == 0 && resulting.Count == 0)
         {
-            return;
+            return [];
         }
 
         var edges = new List<RtAssociation>(created);
@@ -71,7 +75,7 @@ internal static partial class ReleasedDocumentLock
 
         if (edges.Count == 0)
         {
-            return;
+            return [];
         }
 
         var originalIds = edges.Select(e => e.TargetRtId).Distinct().ToList();
@@ -148,7 +152,24 @@ internal static partial class ReleasedDocumentLock
         {
             throw new StornoRefusedException(result);
         }
+
+        // The stornos this batch releases: written by it, released after it and not released before.
+        return allEdges.Where(e => resulting.ContainsKey(e.OriginRtId))
+            .DistinctBy(e => (e.OriginRtId, e.TargetRtId))
+            .Where(e => IsReleased(e.OriginRtId, e.OriginCkTypeId))
+            .Where(e =>
+            {
+                var storedStorno = scope.Stored(e.OriginRtId);
+                return storedStorno == null ||
+                       !scope.IsReleasedState(storedStorno, storedStorno.CkTypeId ?? e.OriginCkTypeId);
+            })
+            .Select(e => new StornoRelease(new RtEntityId(e.OriginCkTypeId, e.OriginRtId),
+                new RtEntityId(e.TargetCkTypeId, e.TargetRtId)))
+            .ToList();
     }
+
+    /// <summary>A storno a batch releases and the original it cancels.</summary>
+    internal sealed record StornoRelease(RtEntityId Storno, RtEntityId Original);
 
     private static bool IsCancels(RtAssociation association) =>
         string.Equals(association.AssociationRoleId?.FullName, CancelsRoleId.FullName, StringComparison.Ordinal);

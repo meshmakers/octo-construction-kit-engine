@@ -72,13 +72,13 @@ the zero-padded counter, everything else is literal text (the prefix). Any other
 | `DocumentCkTypeId` | String (required) | its CK type |
 | `Action` | Enum `DocumentAuditActions` (`Release` = 0, `Storno` = 1, `Denied` = 2) (required) | what happened |
 | `Timestamp` | DateTime UTC (required) | when |
-| `SubjectId` | String | user id of the caller |
-| `ClientId` | String | OAuth client id of the caller |
+| `SubjectId` | String | the caller: a user's subject, or a client's id for a client-credentials caller; empty for a system session |
+| `ClientId` | String | not written by the engine: a client's id is in `SubjectId` |
 | `DocumentNumber` | String | the formatted number |
 | `FiscalYear` | Int | fiscal year of the number |
 | `SequenceValue` | Int | the unformatted counter value |
 | `ReferenceRtId` | String | storno: on the original the storno, on the storno the original |
-| `Source` | String | denied: GraphQL, REST path or pipeline, if known |
+| `Source` | String | denied: GraphQL, REST path or pipeline, if known; the engine does not know the path and leaves it empty |
 | `AttributeNames` | StringArray | denied: the attributes the refused write tried to change |
 | `Message` | String | detail, e.g. the error code of a refused write |
 
@@ -104,7 +104,7 @@ D6).
 | D6 | **A second storno of an original that already has a released storno is refused.** | A cancelled document is cancelled once; a correction of the correction is a new document. |
 | D7 | **A storno of a draft is refused** (drafts are edited or deleted). | Only a released document needs a storno. |
 | D8 | **Locked state = the document's state value is in `ReleasedValues`** (a cancelled original is listed there too, so it stays locked). | One rule for the lock and the numbering. |
-| D9 | **Audit entries are append-only**: the engine refuses every update and delete of a `DocumentAuditEntry` (AB#9762); they are readable only by callers who may read the document. | Audit evidence. |
+| D9 | **Audit entries are append-only**: the engine refuses every update and delete of a `DocumentAuditEntry` (AB#9762), and every insert or import of a new one - only the engine creates entries; they are readable only by callers who may read the document. | Audit evidence; a caller who could create entries could forge a trail. |
 | D10 | **Restore and import meet the lock as follows.** A tenant dump restore (mongorestore into an unregistered database, then attach) is outside the lock by design: it restores documents, counters, periods and audit entries 1:1 to a consistent prior state; there is no named bypass switch. An RT import of a released document that does not exist yet in the tenant is allowed and keeps the number from the file (no renumbering). An RT import with Upsert, a blueprint seed install or the nightly re-apply onto an existing released document is refused with the same forbidden error as the API and writes a `Denied` audit entry; carrying identical content (the usual nightly re-apply) is a no-op without a write and without an audit entry - only a change is refused. The lock check sits where both write paths reach it - the repository write methods, or one shared check that `BulkRtMutation` and the import (before `BulkInsertRtEntitiesAsync`) both call - not only in `BulkRtMutation`, because the import writes through `BulkInsertRtEntitiesAsync` and skips the mutation hooks. Only outbound associations of a released document (the document is the origin) are locked; inbound ones (a storno's `Cancels`, a payment pointing at the invoice) stay possible. The blueprint bookkeeping attributes `RtBlueprintSource`, `RtBlueprintLocked` and `RtBlueprintAppliedAt` are not business data, so a re-apply that only stamps a released document anew is the no-op. Deliberate exceptions: the CK model migration writes (`*ForMigrationAsync`) are a platform-run schema transformation that no API caller can reach; the display rule sweeper writes only `rtDisplayName` and `rtDisplayDescription`. | The import path is the admin bypass the lock must not have; a restore needs no bypass because it never passes the engine. |
 | D11 | **A numbered range keeps its release configuration** (decided by Reimar; "ja, ChangeableAttributes streng lassen"). Once a range with `Release` has handed out its first number - its `CurrentValue` reached `StartValue` (without a start value: is above 0), or a period's counter reached the first number of a period - a write to that `System/AutoIncrement` entity is refused with the same forbidden error (message 168) and a `Denied` entry when it removes `Release` or leaves it unreadable, changes `StateAttribute` or `StornoCkTypeId`, removes a value from `ReleasedValues` or adds a value to `ChangeableAttributes`; the range itself is never deleted. Adding a released value and removing a changeable attribute are allowed (they lock more). Before the first number everything stays configurable. The check runs with the lock, on every write of `BulkRtMutation` and of the bulk import, so neither `DisablePreDocumentModifications` nor an import skips it; a seed re-apply or `importrt` Upsert of a range keeps the tenant's configuration anyway, because its attributes are `TenantOwned`. | Removing or loosening the configuration would unlock every document of the range; the lock would have a switch. |
 | D12 | **`System/Cancels` is declared on a dedicated storno type of the document model** (e.g. a credit note type), never on a shared base document type such as Basic `Document`. Basic and System stay unchanged. The first consumer is a document model that brings its own storno type; as a new model it has no published baseline, so the dependency floor rule of the version check does not apply to it. | `Cancels` is `outboundMultiplicity: One`: on a shared base every invoice would need an original; on a storno type One is correct. |
@@ -211,8 +211,9 @@ A refused batch is refused as a whole (D3) with one `ReleasedDocumentLockedExcep
 engine message 168 `RtReleasedDocumentLocked` per refused document (document, type, state, range, operation, what it
 would change, the changeable attributes) and the structured refusals. The RT import passes it on unwrapped. For each
 refused document the repository writes one `DocumentAuditEntry` with `Action = Denied` (document, UTC time, the caller's
-subject, the write channel as `Source`, `AttributeNames`, the message number) in a session of its own, outside the
-refused write's transaction, so the entry stays when the caller aborts it. The lock reads only for writes that target an
+subject, `AttributeNames`, the message number; `Source` stays empty, because the engine does not know through which API
+path the write came) in a session of its own, outside the refused write's transaction, so the entry stays when the caller
+aborts it. The lock reads only for writes that target an
 entity of a type with an auto-increment attribute: one read of the stored documents per type and batch and, only when
 one of them is stored, one read of the ranges, in the session of the write; a batch of new documents reads no range.
 
@@ -221,10 +222,26 @@ restores documents, counters, periods and audit entries 1:1, and numbering goes 
 model migration writes of engine-mongodb (`*ForMigrationAsync`), which rewrite stored documents for a schema change; and
 the display rule sweeper, which writes only `rtDisplayName` and `rtDisplayDescription`.
 
-Audit entries are append-only (D9) at the same places (`DocumentAuditEntryLock`): every update, replace, delete and
-archive of a `System/DocumentAuditEntry` and an insert over a stored entry are refused for every caller with
-`DocumentAuditEntryAppendOnlyException` (message 173); an import that carries a stored entry unchanged is a no-op,
-one that changes it is refused; new entries are written. A tenant restore stays outside (D10).
+The audit trail of a document is written by the engine itself, in the session of the write:
+
+| Action | Written | Content |
+|--------|---------|---------|
+| `Release` | by the number modifier of engine-mongodb (`AutoIncrementModifier`) when a document gets its number on release (insert in a released state, replace, or a partial update that sets the state), one entry per number, before the document is written | document, caller's subject, UTC time of the numbering, `DocumentNumber` as written, `FiscalYear`, `SequenceValue` |
+| `Storno` | by `BulkRtMutation` after the writes of a batch that releases a storno (the storno was not released before and is after the batch), two entries | on the original `ReferenceRtId` = the storno, on the storno `ReferenceRtId` = the original; caller's subject, UTC time |
+| `Denied` | by the repository after the lock refused a write, in a session of its own (above) | see above |
+
+`Release` and `Storno` entries are part of the transaction of the write: an abort leaves no entry (outside a transaction
+they are committed at once, like the counter). A range without `Release` numbers on insert and writes no entry.
+
+Audit entries are append-only (D9) at the same places (`DocumentAuditEntryLock`), and only the engine creates them: every
+insert, update, replace, delete and archive of a `System/DocumentAuditEntry` through the write funnel is refused for
+every caller, a system session included, with `DocumentAuditEntryAppendOnlyException` (message 173); an RT import of an
+entry the tenant does not hold, or of one that changes a stored entry, is refused the same way; an import that carries a
+stored entry unchanged is a no-op. There is no switch: the engine writes its own entries straight into the collection
+(`DocumentAuditTrail`, internal to the engine assemblies), past the write funnel. Consequence: `importrt` does not carry
+audit entries into another tenant (an export of a tenant's entries cannot be imported elsewhere), and an imported
+released document has no `Release` entry in the target tenant, because the import keeps its number and does not number
+it. A tenant restore (mongorestore and attach, D10) stays outside and brings the entries back 1:1.
 
 The storno rules (D6, D7, 1.6) run at the same places, before the lock judges the batch (`ReleasedDocumentLock.Storno`). A
 storno is a document with an outbound `System/Cancels` association to the original; creating it writes only the

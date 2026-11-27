@@ -10,17 +10,18 @@ namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 
 /// <summary>
 ///     Decision D9 of the design note <c>docs/concept-number-ranges-and-released-documents.md</c>: entries of the document
-///     audit trail (<c>System/DocumentAuditEntry</c>) are append-only. Every update, replace, delete and archive of an
-///     entry is refused, and so is an insert or an import over a stored entry - an import that carries the stored content
-///     is a no-op (the entry is not written). New entries are written. Called with the released-document lock from
-///     <see cref="BulkRtMutation" /> and the bulk import, so no option and no identity skips it. A tenant restore stays
-///     outside (D10).
+///     audit trail (<c>System/DocumentAuditEntry</c>) are append-only, and only the engine creates them. Every insert,
+///     update, replace, delete and archive of an entry through the write funnel is refused, and so is an import of an
+///     entry the tenant does not hold or one that changes a stored entry; an import that carries a stored entry unchanged
+///     is a no-op (the entry is not written). Called with the released-document lock from <see cref="BulkRtMutation" />
+///     and the bulk import, so no option and no identity (also no system session) skips it. The engine writes its own
+///     entries past it, straight into the collection (<see cref="DocumentAuditTrail" />). A tenant restore stays outside
+///     (D10).
 /// </summary>
 internal static class DocumentAuditEntryLock
 {
-    /// <summary>Refuses the changes of one write batch that touch a stored audit entry.</summary>
-    public static async Task CheckMutationAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
-        ICkCacheService ckCacheService, EntityRuleEngineResult<RtEntity> entities)
+    /// <summary>Refuses the changes of one write batch that create or touch an audit entry.</summary>
+    public static void CheckMutation(EntityRuleEngineResult<RtEntity> entities)
     {
         var result = new OperationResult();
         foreach (var id in entities.RtEntitiesToDelete.Where(IsAuditEntry))
@@ -38,31 +39,23 @@ internal static class DocumentAuditEntryLock
             Refuse(result, id, ReleasedDocumentLock.OperationReplace);
         }
 
-        var inserted = entities.RtEntitiesToInsert
-            .Where(e => e.RtId != OctoObjectId.Empty && IsAuditEntry(new RtEntityId(e.GetRtCkTypeId(), e.RtId)))
-            .ToList();
-        if (inserted.Count > 0)
+        foreach (var entity in entities.RtEntitiesToInsert.Where(e => DocumentAuditTrail.IsAuditEntryType(e.GetRtCkTypeId())))
         {
-            var stored = await ReadStoredAsync(session, repositoryDataSource, ckCacheService, inserted)
-                .ConfigureAwait(false);
-            foreach (var entity in inserted.Where(e => stored.ContainsKey(e.RtId)))
-            {
-                Refuse(result, new RtEntityId(entity.GetRtCkTypeId(), entity.RtId), ReleasedDocumentLock.OperationInsert);
-            }
+            Refuse(result, new RtEntityId(entity.GetRtCkTypeId(), entity.RtId), ReleasedDocumentLock.OperationInsert);
         }
 
         ThrowIfAny(result);
     }
 
     /// <summary>
-    ///     The entities of a bulk import that are written: an audit entry over a stored one is left out when it carries
-    ///     the stored content and refused otherwise; every other entity is written as given.
+    ///     The entities of a bulk import that are written: an audit entry that carries a stored entry unchanged is left
+    ///     out, every other audit entry (a new one, or one that changes a stored entry) is refused; every other entity is
+    ///     written as given.
     /// </summary>
     public static async Task<IReadOnlyList<RtEntity>> FilterImportAsync(IOctoSession session,
         IRepositoryDataSource repositoryDataSource, ICkCacheService ckCacheService, IReadOnlyList<RtEntity> entities)
     {
-        var auditEntries = entities.Where(e =>
-            e.RtId != OctoObjectId.Empty && IsAuditEntry(new RtEntityId(e.GetRtCkTypeId(), e.RtId))).ToList();
+        var auditEntries = entities.Where(e => DocumentAuditTrail.IsAuditEntryType(e.GetRtCkTypeId())).ToList();
         if (auditEntries.Count == 0)
         {
             return entities;
@@ -71,18 +64,12 @@ internal static class DocumentAuditEntryLock
         var stored = await ReadStoredAsync(session, repositoryDataSource, ckCacheService, auditEntries)
             .ConfigureAwait(false);
         var result = new OperationResult();
-        var written = new List<RtEntity>(entities.Count);
-        foreach (var entity in entities)
+        foreach (var entity in auditEntries)
         {
-            if (!auditEntries.Contains(entity) || !stored.TryGetValue(entity.RtId, out var storedEntry))
-            {
-                written.Add(entity);
-                continue;
-            }
-
-            var unchanged = storedEntry.Attributes.Keys.Union(entity.Attributes.Keys, StringComparer.Ordinal)
-                .All(name => RtAttributeValueEquality.AreEqual(entity.GetAttributeValueOrDefault(name),
-                    storedEntry.GetAttributeValueOrDefault(name)));
+            var unchanged = entity.RtId != OctoObjectId.Empty && stored.TryGetValue(entity.RtId, out var storedEntry) &&
+                            storedEntry.Attributes.Keys.Union(entity.Attributes.Keys, StringComparer.Ordinal)
+                                .All(name => RtAttributeValueEquality.AreEqual(entity.GetAttributeValueOrDefault(name),
+                                    storedEntry.GetAttributeValueOrDefault(name)));
             if (!unchanged)
             {
                 Refuse(result, new RtEntityId(entity.GetRtCkTypeId(), entity.RtId), ReleasedDocumentLock.OperationImport);
@@ -90,23 +77,25 @@ internal static class DocumentAuditEntryLock
         }
 
         ThrowIfAny(result);
-        return written;
+        return entities.Where(e => !DocumentAuditTrail.IsAuditEntryType(e.GetRtCkTypeId())).ToList();
     }
 
-    private static bool IsAuditEntry(RtEntityId id) =>
-        id.CkTypeId != null && string.Equals(id.CkTypeId.FullName,
-            ReleasedDocumentDeniedAudit.DocumentAuditEntryCkTypeId.FullName, StringComparison.Ordinal);
+    private static bool IsAuditEntry(RtEntityId id) => DocumentAuditTrail.IsAuditEntryType(id.CkTypeId);
 
     private static async Task<Dictionary<OctoObjectId, RtEntity>> ReadStoredAsync(IOctoSession session,
         IRepositoryDataSource repositoryDataSource, ICkCacheService ckCacheService, IReadOnlyList<RtEntity> entries)
     {
-        if (!ckCacheService.TryGetRtCkType(repositoryDataSource.TenantId,
-                ReleasedDocumentDeniedAudit.DocumentAuditEntryCkTypeId, out var graph))
+        if (!DocumentAuditTrail.TryGetGraph(ckCacheService, repositoryDataSource.TenantId, out var graph))
         {
             return [];
         }
 
-        var ids = entries.Select(e => e.RtId).Distinct().ToList();
+        var ids = entries.Select(e => e.RtId).Where(id => id != OctoObjectId.Empty).Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
         return (await repositoryDataSource.GetRtCollection<RtEntity>(graph)
                 .FindManyAsync(session, e => ids.Contains(e.RtId)).ConfigureAwait(false))
             .ToDictionary(e => e.RtId);

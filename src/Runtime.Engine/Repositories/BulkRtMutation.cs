@@ -82,14 +82,53 @@ internal class BulkRtMutation(
         // Released documents are locked for every write of the batch: before anything is written, after the write
         // funnel answered a target the caller may not see as missing. Not a hook and not skipped by any option or
         // identity: a batch that changes a released document is refused as a whole.
-        await ReleasedDocumentLock.CheckMutationAsync(session, repositoryDataSource, ckCacheService,
-            entityValidatorResult, graphValidationResult, options).ConfigureAwait(false);
+        var stornoReleases = await ReleasedDocumentLock.CheckMutationAsync(session, repositoryDataSource,
+            ckCacheService, entityValidatorResult, graphValidationResult, options).ConfigureAwait(false);
 
         await ApplyRtEntityChangesAsync(session, repositoryDataSource, ckCacheService, entityValidatorResult, options,
                 callerResult)
             .ConfigureAwait(false);
         await ApplyRtAssociationChangesAsync(session, repositoryDataSource, graphValidationResult)
             .ConfigureAwait(false);
+
+        await WriteStornoAuditEntriesAsync(session, repositoryDataSource, ckCacheService, stornoReleases)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     The <c>Storno</c> entries of the document audit trail (design note 1.5): for every storno the batch released,
+    ///     one entry on the original and one on the storno, each referencing the other. Written in the session of the
+    ///     batch, after its writes, so inside a transaction an abort leaves none; past the write funnel, because the
+    ///     append-only lock refuses every insert of an audit entry that does not come from the engine.
+    /// </summary>
+    private static async Task WriteStornoAuditEntriesAsync(IOctoSession session,
+        IRepositoryDataSource repositoryDataSource, ICkCacheService ckCacheService,
+        IReadOnlyList<ReleasedDocumentLock.StornoRelease> stornoReleases)
+    {
+        if (stornoReleases.Count == 0 ||
+            !DocumentAuditTrail.TryGetGraph(ckCacheService, repositoryDataSource.TenantId, out var auditGraph))
+        {
+            return;
+        }
+
+        var caller = session.GetSecurityContext();
+        var utcNow = DateTime.UtcNow;
+        var entries = new List<RtEntity>(stornoReleases.Count * 2);
+        foreach (var release in stornoReleases)
+        {
+            entries.Add(DocumentAuditTrail.CreateEntry(auditGraph, caller, release.Original,
+                DocumentAuditTrail.StornoAction, utcNow, new Dictionary<string, object?>
+                {
+                    [DocumentAuditTrail.ReferenceRtIdAttribute] = release.Storno.RtId.ToString()
+                }));
+            entries.Add(DocumentAuditTrail.CreateEntry(auditGraph, caller, release.Storno,
+                DocumentAuditTrail.StornoAction, utcNow, new Dictionary<string, object?>
+                {
+                    [DocumentAuditTrail.ReferenceRtIdAttribute] = release.Original.RtId.ToString()
+                }));
+        }
+
+        await DocumentAuditTrail.InsertAsync(session, repositoryDataSource, auditGraph, entries).ConfigureAwait(false);
     }
 
     private async Task ApplyRtEntityChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,

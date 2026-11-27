@@ -103,6 +103,55 @@ public class StornoRulesTests
                 [], []), [], []);
     }
 
+    // The Storno entries of the audit trail: the check names the stornos the batch releases.
+    [Fact]
+    public async Task ReleasingAStorno_NamesItWithItsOriginal()
+    {
+        var invoice = _model.StoreInvoice(ReleasedDocumentTestModel.Released);
+        var creditNote = _model.StoreCreditNote(ReleasedDocumentTestModel.Draft);
+        _model.StoredAssociations.Add(Cancels(creditNote, invoice));
+        var release = _model.Partial(creditNote, ("DocumentState", ReleasedDocumentTestModel.Released));
+
+        var released = await ReleasedDocumentLock.CheckStornosAsync(_session, _model.DataSource, _model.Cache,
+            new EntityRuleEngineResult<RtEntity>([], new Dictionary<RtEntityId, RtEntity> { [Id(creditNote)] = release },
+                [], []), [], []);
+
+        var storno = Assert.Single(released);
+        Assert.Equal(Id(creditNote), storno.Storno);
+        Assert.Equal(Id(invoice), storno.Original);
+    }
+
+    [Fact]
+    public async Task InsertingAReleasedStornoWithItsCancels_NamesIt()
+    {
+        var invoice = _model.StoreInvoice(ReleasedDocumentTestModel.Released);
+        var creditNote = new RtEntity(_model.CreditNoteId, OctoObjectId.GenerateNewId(),
+            new Dictionary<string, object?>
+                { ["Title"] = "credit note", ["DocumentState"] = ReleasedDocumentTestModel.Released });
+
+        var released = await ReleasedDocumentLock.CheckStornosAsync(_session, _model.DataSource, _model.Cache,
+            new EntityRuleEngineResult<RtEntity>([creditNote], [], [], []), [Cancels(creditNote, invoice)], []);
+
+        Assert.Equal(Id(creditNote), Assert.Single(released).Storno);
+    }
+
+    [Fact]
+    public async Task ADraftStorno_OrAStornoReleasedBefore_IsNotNamed()
+    {
+        var invoice = _model.StoreInvoice(ReleasedDocumentTestModel.Released);
+        var draft = _model.StoreCreditNote(ReleasedDocumentTestModel.Draft);
+        Assert.Empty(await ReleasedDocumentLock.CheckStornosAsync(_session, _model.DataSource, _model.Cache,
+            new EntityRuleEngineResult<RtEntity>(), [Cancels(draft, invoice)], []));
+
+        var other = _model.StoreInvoice(ReleasedDocumentTestModel.Released, "another invoice");
+        var releasedBefore = _model.StoreCreditNote(ReleasedDocumentTestModel.Released);
+        _model.StoredAssociations.Add(Cancels(releasedBefore, other));
+        var changeable = _model.Partial(releasedBefore, ("Title", "credit note, corrected title"));
+        Assert.Empty(await ReleasedDocumentLock.CheckStornosAsync(_session, _model.DataSource, _model.Cache,
+            new EntityRuleEngineResult<RtEntity>([],
+                new Dictionary<RtEntityId, RtEntity> { [Id(releasedBefore)] = changeable }, [], []), [], []));
+    }
+
     [Fact]
     public async Task Storno_OfAStorno_IsRefused()
     {

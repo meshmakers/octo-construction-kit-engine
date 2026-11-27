@@ -35,7 +35,15 @@ internal class DataPermissionResolver(
             return entry.Table;
         }
 
-        var table = await LoadPolicyTableAsync(runtimeRepository).ConfigureAwait(false);
+        RtDataPolicyTable table;
+        // The policy table is engine-internal: it reads whole System.Identity types on purpose (cached per tenant).
+        // Inside a pipeline node those reads must not be reported as the node's unbounded read (AB#9824): they would
+        // name the wrong CK type and, reported once per node, hide the node's own unbounded read.
+        using (RuntimeReadScope.Suppress())
+        {
+            table = await LoadPolicyTableAsync(runtimeRepository).ConfigureAwait(false);
+        }
+
         _cache[tenantId] = new CacheEntry(table, DateTime.UtcNow.Add(CacheTtl));
         return table;
     }

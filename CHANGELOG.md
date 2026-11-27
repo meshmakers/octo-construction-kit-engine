@@ -59,6 +59,15 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   is missing) and `IsReleased` tells whether a state value is in `ReleasedValues` (an enum value by the name of its CK
   enum value, a string as it is, case-sensitive) - the one rule of design note D8 for the numbering on release and the
   lock of released documents. Tests: `NumberRangeReleaseTests`.
+- **Runtime reads can name their caller (AB#9824).** New ambient scope `RuntimeReadScope`
+  (`Runtime.Contracts.Repositories`, `AsyncLocal`): `BeginExecution(RuntimeReadExecution)` describes one execution
+  (tenant, pipeline, data flow, execution id), `BeginNode(nodeType, nodePath)` the node inside it, `Suppress()` marks
+  deliberate whole-type reads (migrations, exports). The ETL runtime of `octo-communication-sdk` opens the scopes; a
+  repository reads `RuntimeReadScope.Current` to report unbounded reads once per execution and node
+  (`RuntimeReadExecution.TryMarkReported`). Additive: no interface or read method changes, no read changes its result;
+  without a scope `Current` is null. The data-policy table load (`DataPermissionResolver`) runs suppressed, so a
+  node's report names the node's own read, not the engine-internal policy read. Tests: `RuntimeReadScopeTests`,
+  `DataPermissionResolverRuntimeReadScopeTests`.
 - **Partial updates can be validated before they are written (AB#9755).** New hook
   `IPreDocumentUpdateValidation<RtEntity>` (`Runtime.Contracts.Repositories`): `BulkRtMutation` hands it the partial
   entities of a batch's updates (with `RtId` and `CkTypeId`) before anything of the batch is written - deletes, inserts

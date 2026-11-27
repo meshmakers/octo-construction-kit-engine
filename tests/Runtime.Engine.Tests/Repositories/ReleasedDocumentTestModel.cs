@@ -51,6 +51,10 @@ internal sealed class ReleasedDocumentTestModel
             Attr("DocumentState", AttributeValueTypesDto.Enum, enumId: stateEnumId),
             Attr("Number", AttributeValueTypesDto.String, autoIncrementReference: Range));
         Note = BuildType($"{ModelId}/Note", Attr("Title", AttributeValueTypesDto.String));
+        CreditNote = BuildType($"{ModelId}/CreditNote",
+            Attr("Title", AttributeValueTypesDto.String),
+            Attr("DocumentState", AttributeValueTypesDto.Enum, enumId: stateEnumId),
+            Attr("Number", AttributeValueTypesDto.String, autoIncrementReference: "CreditNoteNumber"));
         AutoIncrement = BuildType("System-2.9.0/AutoIncrement",
             Attr("CurrentValue", AttributeValueTypesDto.Int, model: "System-2.9.0"),
             Attr("Release", AttributeValueTypesDto.Record, model: "System-2.9.0"));
@@ -59,8 +63,8 @@ internal sealed class ReleasedDocumentTestModel
 
         Cache = A.Fake<ICkCacheService>();
         A.CallTo(() => Cache.IsTenantLoaded(TenantId)).Returns(true);
-        A.CallTo(() => Cache.GetCkTypes(TenantId)).Returns([Invoice, Note, AutoIncrement, AuditEntry]);
-        foreach (var type in new[] { Invoice, Note, AutoIncrement, AuditEntry })
+        A.CallTo(() => Cache.GetCkTypes(TenantId)).Returns([Invoice, Note, CreditNote, AutoIncrement, AuditEntry]);
+        foreach (var type in new[] { Invoice, Note, CreditNote, AutoIncrement, AuditEntry })
         {
             RegisterType(type);
         }
@@ -98,6 +102,10 @@ internal sealed class ReleasedDocumentTestModel
 
     public CkTypeGraph Note { get; }
 
+    public CkTypeGraph CreditNote { get; }
+
+    public RtCkId<CkTypeId> CreditNoteId => CreditNote.CkTypeId.ToRtCkId();
+
     public CkTypeGraph AutoIncrement { get; }
 
     public CkTypeGraph AuditEntry { get; }
@@ -113,12 +121,13 @@ internal sealed class ReleasedDocumentTestModel
 
     /// <summary>Stores the number range with a release configuration (or without one).</summary>
     public RtEntity StoreRange(IReadOnlyList<string>? releasedValues = null, IReadOnlyList<string>? changeable = null,
-        string stateAttribute = "DocumentState", bool withRelease = true, long currentValue = 7)
+        string stateAttribute = "DocumentState", bool withRelease = true, long currentValue = 7,
+        string wellKnownName = Range, string? storno = null)
     {
         var range = new RtEntity(AutoIncrement.CkTypeId.ToRtCkId(), OctoObjectId.GenerateNewId(),
             new Dictionary<string, object?> { ["CurrentValue"] = currentValue })
         {
-            RtWellKnownName = Range
+            RtWellKnownName = wellKnownName
         };
         if (withRelease)
         {
@@ -129,6 +138,11 @@ internal sealed class ReleasedDocumentTestModel
             if (changeable != null)
             {
                 release.SetAttributeRawValue(NumberRangeRelease.ChangeableAttributesAttribute, changeable.ToList());
+            }
+
+            if (storno != null)
+            {
+                release.SetAttributeRawValue(NumberRangeRelease.StornoCkTypeIdAttribute, storno);
             }
 
             range.SetAttributeRawValue(NumberRangeRelease.ReleaseAttribute, release);
@@ -160,6 +174,20 @@ internal sealed class ReleasedDocumentTestModel
             ["PaymentStatus"] = "Open",
             ["DocumentState"] = state
         });
+
+    /// <summary>Stores a credit note (the storno type) in the given state; released ones with a number.</summary>
+    public RtEntity StoreCreditNote(int state)
+    {
+        var creditNote = new RtEntity(CreditNoteId, OctoObjectId.GenerateNewId(),
+            new Dictionary<string, object?> { ["Title"] = "credit note", ["DocumentState"] = state });
+        if (state != Draft)
+        {
+            creditNote.SetAttributeRawValue("Number", "CN-2026-00001");
+        }
+
+        Store(creditNote);
+        return creditNote;
+    }
 
     public RtEntity StoreNote(string title = "note")
     {

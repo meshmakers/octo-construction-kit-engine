@@ -9,6 +9,13 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Added
 
+- **Storno rules (AB#9761).** A storno is a document with an outbound `System/Cancels` association to the original it
+  cancels; the original is not written and stays locked. The write funnel and the association import refuse a batch
+  with the new `StornoRefusedException` (`Runtime.Contracts.Repositories`) when a `Cancels` association is created to
+  a document that is not released (message 169, design note D7), to a storno (171), or from another type than the
+  original's range configures in `Release.StornoCkTypeId` (172), and when an original would have a second released
+  storno (170, D6; a second storno may exist as a draft, its release is refused). `NumberRangeRelease` exposes
+  `StornoCkTypeId`. The RT import passes the refusal on unwrapped. Tests: `StornoRulesTests`.
 - **Released documents are locked (AB#9759).** A document whose stored state is one of the `ReleasedValues` of its
   number range (`System/AutoIncrement.Release`, design note D8) can no longer be changed or deleted by any write path:
   `BulkRtMutation` (every insert, update, replace, delete, archive and association change by id, by filter and in

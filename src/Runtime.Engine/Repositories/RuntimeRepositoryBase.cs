@@ -9,6 +9,7 @@ using Meshmakers.Octo.Runtime.Contracts.DataPermissions;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
+using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 using Meshmakers.Octo.Runtime.Engine.Repositories.Query;
 using Meshmakers.Octo.Runtime.Engine.Secrets;
 using Meshmakers.Octo.Runtime.Engine.Security;
@@ -1316,6 +1317,9 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         associations = await AuditReleasedDocumentRefusalsAsync(session,
             () => ReleasedDocumentLock.FilterAssociationImportAsync(session, RepositoryDataSource, cacheService,
                 associations)).ConfigureAwait(false);
+        // D6, D7: an imported storno association meets the same storno rules as one of the write funnel.
+        await ReleasedDocumentLock.CheckStornosAsync(session, RepositoryDataSource, cacheService,
+            new EntityRuleEngineResult<RtEntity>(), associations, []).ConfigureAwait(false);
         return await RepositoryDataSource.RtAssociations.BulkImportAsync(session, associations, options)
             .ConfigureAwait(false);
     }

@@ -33,8 +33,9 @@ public sealed class NumberRangeRelease
     private readonly HashSet<string> _releasedValues;
 
     private NumberRangeRelease(string stateAttribute, HashSet<string> releasedValues,
-        IReadOnlyCollection<string> changeableAttributes)
+        IReadOnlyCollection<string> changeableAttributes, string? stornoCkTypeId)
     {
+        StornoCkTypeId = stornoCkTypeId;
         StateAttribute = stateAttribute;
         _releasedValues = releasedValues;
         ChangeableAttributes = changeableAttributes;
@@ -48,6 +49,9 @@ public sealed class NumberRangeRelease
 
     /// <summary>Attributes that may still change on a released document; empty when none.</summary>
     public IReadOnlyCollection<string> ChangeableAttributes { get; }
+
+    /// <summary>CK type id of the storno document of this document type; null when no storno is configured.</summary>
+    public string? StornoCkTypeId { get; }
 
     /// <summary>
     ///     Reads the release configuration of the counter entity <paramref name="counter" />. Returns true with
@@ -95,7 +99,10 @@ public sealed class NumberRangeRelease
         }
 
         release = new NumberRangeRelease(stateAttribute, new HashSet<string>(releasedValues, StringComparer.Ordinal),
-            changeableAttributes);
+            changeableAttributes,
+            record.GetAttributeValueOrDefault(StornoCkTypeIdAttribute) is string storno && !string.IsNullOrWhiteSpace(storno)
+                ? storno
+                : null);
         return true;
     }
 

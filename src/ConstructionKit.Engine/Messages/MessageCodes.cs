@@ -478,6 +478,18 @@ internal static class MessageCodes
     internal static OperationMessage RtReleasedDocumentLocked(string? location, object rtId, object ckTypeId, object state, object numberRange, object operation, object changes, object changeableAttributes) =>
         GetMessage("RtReleasedDocumentLocked", location, rtId, ckTypeId, state, numberRange, operation, changes, changeableAttributes);
 
+    internal static OperationMessage RtStornoOfUnreleasedDocument(string? location, object stornoRtId, object stornoCkTypeId, object originalRtId, object originalCkTypeId) =>
+        GetMessage("RtStornoOfUnreleasedDocument", location, stornoRtId, stornoCkTypeId, originalRtId, originalCkTypeId);
+
+    internal static OperationMessage RtStornoOriginalAlreadyCancelled(string? location, object originalRtId, object originalCkTypeId, object existingStornoRtId, object stornoRtId) =>
+        GetMessage("RtStornoOriginalAlreadyCancelled", location, originalRtId, originalCkTypeId, existingStornoRtId, stornoRtId);
+
+    internal static OperationMessage RtStornoOfStorno(string? location, object originalRtId, object originalCkTypeId, object stornoRtId) =>
+        GetMessage("RtStornoOfStorno", location, originalRtId, originalCkTypeId, stornoRtId);
+
+    internal static OperationMessage RtStornoTypeNotConfigured(string? location, object stornoRtId, object stornoCkTypeId, object originalRtId, object originalCkTypeId, object configuredStornoCkTypeId) =>
+        GetMessage("RtStornoTypeNotConfigured", location, stornoRtId, stornoCkTypeId, originalRtId, originalCkTypeId, configuredStornoCkTypeId);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1385,6 +1397,30 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  168, "Write refused: entity '{rtId}' of type '{ckTypeId}' is a released document (state '{state}' of number range '{numberRange}'); the {operation} would change {changes}. A released document is never changed or deleted; only the attributes [{changeableAttributes}] may still change",
                  new string[] {"rtId", "ckTypeId", "state", "numberRange", "operation", "changes", "changeableAttributes"})
+        },
+        {
+            "RtStornoOfUnreleasedDocument",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 169, "Storno refused: '{stornoRtId}' of type '{stornoCkTypeId}' cancels '{originalRtId}' of type '{originalCkTypeId}', which is not a released document; a draft is edited or deleted instead",
+                 new string[] {"stornoRtId", "stornoCkTypeId", "originalRtId", "originalCkTypeId"})
+        },
+        {
+            "RtStornoOriginalAlreadyCancelled",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 170, "Storno refused: '{originalRtId}' of type '{originalCkTypeId}' is already cancelled by the released storno '{existingStornoRtId}'; '{stornoRtId}' would be a second storno",
+                 new string[] {"originalRtId", "originalCkTypeId", "existingStornoRtId", "stornoRtId"})
+        },
+        {
+            "RtStornoOfStorno",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 171, "Storno refused: '{originalRtId}' of type '{originalCkTypeId}' is itself a storno; '{stornoRtId}' cannot cancel it, a correction of the correction is a new document",
+                 new string[] {"originalRtId", "originalCkTypeId", "stornoRtId"})
+        },
+        {
+            "RtStornoTypeNotConfigured",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 172, "Storno refused: '{stornoRtId}' of type '{stornoCkTypeId}' cannot cancel '{originalRtId}' of type '{originalCkTypeId}': the number range of the original configures the storno type '{configuredStornoCkTypeId}'",
+                 new string[] {"stornoRtId", "stornoCkTypeId", "originalRtId", "originalCkTypeId", "configuredStornoCkTypeId"})
         },
     };
 }

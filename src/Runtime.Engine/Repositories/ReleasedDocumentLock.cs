@@ -37,7 +37,7 @@ namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 ///     session (and so the transaction) of the write. A range whose release configuration cannot be read locks every stored document of its
 ///     types (fail closed).
 /// </summary>
-internal static class ReleasedDocumentLock
+internal static partial class ReleasedDocumentLock
 {
     /// <summary>Version-less id of <c>System/AutoIncrement</c>, the number ranges.</summary>
     internal static readonly RtCkId<CkTypeId> AutoIncrementCkTypeId = new("System", "AutoIncrement");
@@ -100,6 +100,10 @@ internal static class ReleasedDocumentLock
                 _ => e)));
         await NumberRangeReleaseLock.CheckAsync(session, repositoryDataSource, ckCacheService, rangeWrites)
             .ConfigureAwait(false);
+
+        // D6, D7: the storno rules.
+        await CheckStornosAsync(session, repositoryDataSource, ckCacheService, entities,
+            associations.RtAssociationsToCreate, associations.RtAssociationsToDelete).ConfigureAwait(false);
 
         var scope = new LockScope(session, repositoryDataSource, ckCacheService);
         if (!await scope.LoadAsync(targets).ConfigureAwait(false))
@@ -310,7 +314,7 @@ internal static class ReleasedDocumentLock
     };
 
     /// <summary>A release configuration of a number range on a document type, or the error that makes it unreadable.</summary>
-    private sealed record RangeRelease(
+    internal sealed record RangeRelease(
         string Reference,
         NumberRangeRelease? Release,
         CkTypeAttributeGraph? StateAttribute,
@@ -318,11 +322,11 @@ internal static class ReleasedDocumentLock
         string? Error);
 
     /// <summary>The number ranges with a release configuration of one document type and its number attributes.</summary>
-    private sealed record TypeLock(CkTypeGraph CkTypeGraph, IReadOnlyList<RangeRelease> Ranges,
+    internal sealed record TypeLock(CkTypeGraph CkTypeGraph, IReadOnlyList<RangeRelease> Ranges,
         IReadOnlySet<string> NumberAttributes);
 
     /// <summary>What one write may read: the number ranges and the stored documents it targets.</summary>
-    private sealed class LockScope(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+    internal sealed class LockScope(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         ICkCacheService ckCacheService)
     {
         private readonly Dictionary<string, RtEntity> _rangesByReference = new(StringComparer.Ordinal);
@@ -384,6 +388,58 @@ internal static class ReleasedDocumentLock
             }
 
             return _stored.Count > 0 && await LoadRangesAsync(references).ConfigureAwait(false);
+        }
+
+        /// <summary>The stored entity of <paramref name="rtId" /> read by <see cref="LoadAsync" />, or null.</summary>
+        public RtEntity? Stored(OctoObjectId rtId) => _stored.GetValueOrDefault(rtId);
+
+        /// <summary>True when <paramref name="ckTypeId" /> or one of its derived types has an auto-increment attribute.</summary>
+        public bool IsNumberedType(RtCkId<CkTypeId>? ckTypeId) =>
+            ckTypeId != null && ckCacheService.TryGetRtCkType(TenantId, ckTypeId, out var graph) &&
+            CollectSubtreeReferences(graph, []);
+
+        /// <summary>Reads the number ranges of <paramref name="ckTypeIds" /> that are not read yet.</summary>
+        public async Task EnsureRangesAsync(IEnumerable<RtCkId<CkTypeId>> ckTypeIds)
+        {
+            var references = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var ckTypeId in ckTypeIds)
+            {
+                if (ckCacheService.TryGetRtCkType(TenantId, ckTypeId, out var graph))
+                {
+                    CollectSubtreeReferences(graph, references);
+                }
+            }
+
+            references.ExceptWith(_rangesByReference.Keys);
+            if (references.Count > 0)
+            {
+                await LoadRangesAsync(references).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        ///     True when <paramref name="entity" />, a document of <paramref name="ckTypeId" /> as a write leaves it, is in
+        ///     one of the released values of a readable release configuration of its ranges.
+        /// </summary>
+        public bool IsReleasedState(RtEntity entity, RtCkId<CkTypeId> ckTypeId)
+        {
+            var typeLock = GetTypeLock(ckTypeId);
+            return typeLock != null && typeLock.Ranges.Any(r => r.Release != null &&
+                r.Release.IsReleased(entity.GetAttributeValueOrDefault(r.StateAttribute!.AttributeName),
+                    r.StateAttribute, r.StateEnum));
+        }
+
+        /// <summary>True when <paramref name="ckTypeId" /> is <paramref name="configured" /> or derived from it.</summary>
+        public bool IsTypeOrDerived(RtCkId<CkTypeId> ckTypeId, string configured)
+        {
+            if (string.Equals(ckTypeId.FullName, new RtCkId<CkTypeId>(configured).FullName, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            return ckCacheService.TryGetRtCkType(TenantId, new RtCkId<CkTypeId>(configured), out var graph) &&
+                   graph.GetAllDerivedTypes(true).Any(t =>
+                       string.Equals(t.ToRtCkId().FullName, ckTypeId.FullName, StringComparison.Ordinal));
         }
 
         /// <summary>True with the released document when <paramref name="rtId" /> is a stored released document.</summary>
@@ -464,9 +520,10 @@ internal static class ReleasedDocumentLock
             foreach (var range in ranges)
             {
                 if (range.RtWellKnownName != null &&
-                    range.GetAttributeValueOrDefault(NumberRangeRelease.ReleaseAttribute) != null)
+                    range.GetAttributeValueOrDefault(NumberRangeRelease.ReleaseAttribute) != null &&
+                    _rangesByReference.TryAdd(range.RtWellKnownName, range))
                 {
-                    _rangesByReference.TryAdd(range.RtWellKnownName, range);
+                    _typeLocks.Clear();
                 }
             }
 
@@ -532,7 +589,7 @@ internal static class ReleasedDocumentLock
     }
 
     /// <summary>A stored document in a released state, with the rules of the ranges that release it.</summary>
-    private sealed class ReleasedDocument
+    internal sealed class ReleasedDocument
     {
         private readonly ICkCacheService _ckCacheService;
         private readonly string _tenantId;
@@ -563,6 +620,11 @@ internal static class ReleasedDocumentLock
         public RtEntity Stored { get; }
 
         public IReadOnlySet<string> Changeable { get; }
+
+        /// <summary>The storno types the releasing ranges configure (<c>Release.StornoCkTypeId</c>).</summary>
+        public IReadOnlyList<string> StornoCkTypeIds =>
+            _releasedBy.Select(r => r.Release?.StornoCkTypeId).OfType<string>().Distinct(StringComparer.Ordinal)
+                .ToList();
 
         public RtEntityId Id => new(Stored.CkTypeId ?? _typeLock.CkTypeGraph.CkTypeId.ToRtCkId(), Stored.RtId);
 

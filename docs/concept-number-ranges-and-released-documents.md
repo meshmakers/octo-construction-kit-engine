@@ -219,6 +219,19 @@ restores documents, counters, periods and audit entries 1:1, and numbering goes 
 model migration writes of engine-mongodb (`*ForMigrationAsync`), which rewrite stored documents for a schema change; and
 the display rule sweeper, which writes only `rtDisplayName` and `rtDisplayDescription`.
 
+The storno rules (D6, D7, 1.6) run at the same places, before the lock judges the batch (`ReleasedDocumentLock.Storno`). A
+storno is a document with an outbound `System/Cancels` association to the original; creating it writes only the
+storno and the association (an inbound association of a released document is allowed), so the original stays byte for
+byte unchanged and finds its storno through `CancelledBy`. The storno is numbered from its own range when it is
+released, like any document. When a batch creates a `Cancels` association it is refused with `StornoRefusedException`
+(`Runtime.Contracts.Repositories`) when the original is not released (D7, message 169), when the original is itself a
+storno (message 171: a correction of the correction is a new document; the default of the storno story) or when the
+storno is not of the type `Release.StornoCkTypeId` of the original's range names, or of a type derived from it (message
+172; no configured storno type refuses every storno). After every batch that creates a `Cancels` association or writes
+a document that has one, an original has at most one released storno (D6, message 170): a second storno may exist as a
+draft, but its release is refused. The association import (`BulkRtAssociationsAsync`) checks imported `Cancels`
+associations the same way; the RT import passes the refusal on unwrapped.
+
 ## 5. Outside System
 
 - The storno type of a document model declares the `Cancels` association (Basic `Document` minor version).

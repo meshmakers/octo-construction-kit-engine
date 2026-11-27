@@ -905,6 +905,30 @@
       "number": 168,
       "level": "ERROR",
       "text": "Write refused: entity '{rtId}' of type '{ckTypeId}' is a released document (state '{state}' of number range '{numberRange}'); the {operation} would change {changes}. A released document is never changed or deleted; only the attributes [{changeableAttributes}] may still change"
+    },
+    {
+      "key": "RtStornoOfUnreleasedDocument",
+      "number": 169,
+      "level": "ERROR",
+      "text": "Storno refused: '{stornoRtId}' of type '{stornoCkTypeId}' cancels '{originalRtId}' of type '{originalCkTypeId}', which is not a released document; a draft is edited or deleted instead"
+    },
+    {
+      "key": "RtStornoOriginalAlreadyCancelled",
+      "number": 170,
+      "level": "ERROR",
+      "text": "Storno refused: '{originalRtId}' of type '{originalCkTypeId}' is already cancelled by the released storno '{existingStornoRtId}'; '{stornoRtId}' would be a second storno"
+    },
+    {
+      "key": "RtStornoOfStorno",
+      "number": 171,
+      "level": "ERROR",
+      "text": "Storno refused: '{originalRtId}' of type '{originalCkTypeId}' is itself a storno; '{stornoRtId}' cannot cancel it, a correction of the correction is a new document"
+    },
+    {
+      "key": "RtStornoTypeNotConfigured",
+      "number": 172,
+      "level": "ERROR",
+      "text": "Storno refused: '{stornoRtId}' of type '{stornoCkTypeId}' cannot cancel '{originalRtId}' of type '{originalCkTypeId}': the number range of the original configures the storno type '{configuredStornoCkTypeId}'"
     }
   ]
 }

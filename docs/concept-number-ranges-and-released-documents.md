@@ -88,8 +88,9 @@ is the `Release` entry of the document; no attribute is added to the document ty
 ### 1.6 Association role `System/Cancels`
 
 Outbound `Cancels` (One) from the storno to the original, inbound `CancelledBy` (N). System declares only the role;
-the document model declares it on its storno type (e.g. Basic `Document`, in a Basic minor version). The inbound
-side is N in the schema; a second released storno of one original is refused in code (1.7, decision D6).
+the document model declares it on its dedicated storno type (e.g. a credit note type), never on a shared base document
+type (D12). The inbound side is N in the schema; a second released storno of one original is refused in code (decision
+D6).
 
 ## 2. Decisions
 
@@ -106,6 +107,7 @@ side is N in the schema; a second released storno of one original is refused in 
 | D9 | **Audit entries are append-only**: the engine refuses every update and delete of a `DocumentAuditEntry` (AB#9762); they are readable only by callers who may read the document. | Audit evidence. |
 | D10 | **Restore and import meet the lock as follows.** A tenant dump restore (mongorestore into an unregistered database, then attach) is outside the lock by design: it restores documents, counters, periods and audit entries 1:1 to a consistent prior state; there is no named bypass switch. An RT import of a released document that does not exist yet in the tenant is allowed and keeps the number from the file (no renumbering). An RT import with Upsert, a blueprint seed install or the nightly re-apply onto an existing released document is refused with the same forbidden error as the API and writes a `Denied` audit entry; carrying identical content (the usual nightly re-apply) is a no-op without a write and without an audit entry - only a change is refused. The lock check sits where both write paths reach it - the repository write methods, or one shared check that `BulkRtMutation` and the import (before `BulkInsertRtEntitiesAsync`) both call - not only in `BulkRtMutation`, because the import writes through `BulkInsertRtEntitiesAsync` and skips the mutation hooks. Only outbound associations of a released document (the document is the origin) are locked; inbound ones (a storno's `Cancels`, a payment pointing at the invoice) stay possible. The blueprint bookkeeping attributes `RtBlueprintSource`, `RtBlueprintLocked` and `RtBlueprintAppliedAt` are not business data, so a re-apply that only stamps a released document anew is the no-op. Deliberate exceptions: the CK model migration writes (`*ForMigrationAsync`) are a platform-run schema transformation that no API caller can reach; the display rule sweeper writes only `rtDisplayName` and `rtDisplayDescription`. | The import path is the admin bypass the lock must not have; a restore needs no bypass because it never passes the engine. |
 | D11 | **A numbered range keeps its release configuration** (decided by Reimar; "ja, ChangeableAttributes streng lassen"). Once a range with `Release` has handed out its first number - its `CurrentValue` reached `StartValue` (without a start value: is above 0), or a period's counter reached the first number of a period - a write to that `System/AutoIncrement` entity is refused with the same forbidden error (message 168) and a `Denied` entry when it removes `Release` or leaves it unreadable, changes `StateAttribute` or `StornoCkTypeId`, removes a value from `ReleasedValues` or adds a value to `ChangeableAttributes`; the range itself is never deleted. Adding a released value and removing a changeable attribute are allowed (they lock more). Before the first number everything stays configurable. The check runs with the lock, on every write of `BulkRtMutation` and of the bulk import, so neither `DisablePreDocumentModifications` nor an import skips it; a seed re-apply or `importrt` Upsert of a range keeps the tenant's configuration anyway, because its attributes are `TenantOwned`. | Removing or loosening the configuration would unlock every document of the range; the lock would have a switch. |
+| D12 | **`System/Cancels` is declared on a dedicated storno type of the document model** (e.g. a credit note type), never on a shared base document type such as Basic `Document`. Basic and System stay unchanged. The first consumer is a document model that brings its own storno type; as a new model it has no published baseline, so the dependency floor rule of the version check does not apply to it. | `Cancels` is `outboundMultiplicity: One`: on a shared base every invoice would need an original; on a storno type One is correct. |
 
 ## 3. Acceptance criteria mapped to the schema
 
@@ -234,5 +236,5 @@ associations the same way; the RT import passes the refusal on unwrapped.
 
 ## 5. Outside System
 
-- The storno type of a document model declares the `Cancels` association (Basic `Document` minor version).
+- The storno type of a document model declares the `Cancels` association (D12); Basic is not changed.
 - The gap report (AB#9763) needs an index on the number attribute of the document type, in the document model.

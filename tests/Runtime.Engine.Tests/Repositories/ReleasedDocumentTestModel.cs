@@ -16,7 +16,8 @@ namespace Meshmakers.Octo.Runtime.Engine.Tests.Repositories;
 ///     Released = 1, Cancelled = 2), a changeable <c>PaymentStatus</c> and business attributes <c>Title</c>,
 ///     <c>Amount</c> and <c>Tags</c>. Note has no number. The range is a <c>System/AutoIncrement</c> entity whose
 ///     <c>Release</c> record each test configures. Every write of the data source is counted, so a test can assert that
-///     a refused batch wrote nothing.
+///     a refused batch wrote nothing. With <c>sharedCollection</c> Invoice and the unnumbered Offer derive from the
+///     abstract collection root Document and are stored in its one collection, as MongoDB stores an inheritance tree.
 /// </summary>
 internal sealed class ReleasedDocumentTestModel
 {
@@ -28,9 +29,12 @@ internal sealed class ReleasedDocumentTestModel
     private const string ModelId = "Doc-1.0.0";
 
     private readonly Dictionary<string, List<RtEntity>> _collections = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _collectionRoots = new(StringComparer.Ordinal);
 
-    public ReleasedDocumentTestModel()
+    public ReleasedDocumentTestModel(bool sharedCollection = false)
     {
+        var documentId = new CkId<CkTypeId>($"{ModelId}/Document");
+        var root = sharedCollection ? documentId : null;
         var stateEnumId = new CkId<CkEnumId>($"{ModelId}/DocumentStates");
         StateEnum = new CkEnumGraph(stateEnumId, new CkEnumDto
         {
@@ -50,6 +54,22 @@ internal sealed class ReleasedDocumentTestModel
             Attr("PaymentStatus", AttributeValueTypesDto.String),
             Attr("DocumentState", AttributeValueTypesDto.Enum, enumId: stateEnumId),
             Attr("Number", AttributeValueTypesDto.String, autoIncrementReference: Range));
+        if (root != null)
+        {
+            Invoice = BuildType($"{ModelId}/Invoice", root, Invoice.AllAttributes.Values.ToArray());
+        }
+
+        Offer = BuildType($"{ModelId}/Offer", root, Attr("Title", AttributeValueTypesDto.String));
+        Document = new CkTypeGraph(documentId, true, false, true, [], null, null,
+            [new CkGraphTypeInheritance(Invoice.CkTypeId, documentId, 1), new CkGraphTypeInheritance(Offer.CkTypeId, documentId, 1)],
+            [], new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(), [], new CkGraphDirectedAssociations([]),
+            documentId.FullName, false);
+        if (root != null)
+        {
+            _collectionRoots[Invoice.CkTypeId.ToRtCkId().FullName] = documentId.ToRtCkId().FullName;
+            _collectionRoots[Offer.CkTypeId.ToRtCkId().FullName] = documentId.ToRtCkId().FullName;
+        }
+
         Note = BuildType($"{ModelId}/Note", Attr("Title", AttributeValueTypesDto.String));
         CreditNote = BuildType($"{ModelId}/CreditNote",
             Attr("Title", AttributeValueTypesDto.String),
@@ -63,8 +83,9 @@ internal sealed class ReleasedDocumentTestModel
 
         Cache = A.Fake<ICkCacheService>();
         A.CallTo(() => Cache.IsTenantLoaded(TenantId)).Returns(true);
-        A.CallTo(() => Cache.GetCkTypes(TenantId)).Returns([Invoice, Note, CreditNote, AutoIncrement, AuditEntry]);
-        foreach (var type in new[] { Invoice, Note, CreditNote, AutoIncrement, AuditEntry })
+        A.CallTo(() => Cache.GetCkTypes(TenantId))
+            .Returns([Invoice, Note, CreditNote, AutoIncrement, AuditEntry, Offer, Document]);
+        foreach (var type in new[] { Invoice, Note, CreditNote, AutoIncrement, AuditEntry, Offer, Document })
         {
             RegisterType(type);
         }
@@ -101,6 +122,14 @@ internal sealed class ReleasedDocumentTestModel
     public CkTypeGraph Invoice { get; }
 
     public CkTypeGraph Note { get; }
+
+    /// <summary>An unnumbered type; with <c>sharedCollection</c> a sibling of Invoice in the Document collection.</summary>
+    public CkTypeGraph Offer { get; }
+
+    /// <summary>The abstract collection root of Invoice and Offer (used with <c>sharedCollection</c>).</summary>
+    public CkTypeGraph Document { get; }
+
+    public RtCkId<CkTypeId> OfferId => Offer.CkTypeId.ToRtCkId();
 
     public CkTypeGraph CreditNote { get; }
 
@@ -229,6 +258,7 @@ internal sealed class ReleasedDocumentTestModel
 
     private List<RtEntity> StoredList(string typeFullName)
     {
+        typeFullName = _collectionRoots.GetValueOrDefault(typeFullName, typeFullName);
         if (!_collections.TryGetValue(typeFullName, out var list))
         {
             list = [];
@@ -284,9 +314,14 @@ internal sealed class ReleasedDocumentTestModel
             new CkAttributeGraph(attributeId, definition));
     }
 
-    private static CkTypeGraph BuildType(string id, params CkTypeAttributeGraph[] attributes)
+    private static CkTypeGraph BuildType(string id, params CkTypeAttributeGraph[] attributes) =>
+        BuildType(id, null, attributes);
+
+    private static CkTypeGraph BuildType(string id, CkId<CkTypeId>? collectionRoot,
+        params CkTypeAttributeGraph[] attributes)
     {
-        return new CkTypeGraph(new CkId<CkTypeId>(id), false, false, true, [], null, null, [], [],
-            attributes.ToDictionary(a => a.CkAttributeId, a => a), [], new CkGraphDirectedAssociations([]), id, false);
+        return new CkTypeGraph(new CkId<CkTypeId>(id), false, false, collectionRoot == null, [], collectionRoot,
+            collectionRoot, [], [], attributes.ToDictionary(a => a.CkAttributeId, a => a), [],
+            new CkGraphDirectedAssociations([]), id, false);
     }
 }

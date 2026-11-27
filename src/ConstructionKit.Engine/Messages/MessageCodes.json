@@ -935,6 +935,12 @@
       "number": 173,
       "level": "ERROR",
       "text": "Write refused: '{rtId}' of type '{ckTypeId}' is an entry of the document audit trail; the {operation} is refused, audit entries are append-only"
+    },
+    {
+      "key": "RtReleasedDocumentNumberSupplied",
+      "number": 174,
+      "level": "ERROR",
+      "text": "Write refused: the {operation} of '{rtId}' of type '{ckTypeId}' supplies '{value}' for the number attribute '{attributeName}'; number range '{numberRange}' numbers its documents on release, so the number is never supplied by the caller"
     }
   ]
 }

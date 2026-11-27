@@ -98,6 +98,16 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
 
 ### Fixed
 
+- **The released-document lock can no longer be stepped around (AB#9759, design note D13).** The lock takes the
+  numbered types and their ranges from the subtree of the collection root and judges a target by its stored type, so an
+  update, delete, import or association change that names a sibling type with the id of a released document is refused
+  like one that names its own type (tenants without data policies and system sessions included). A write to a numbered
+  range after which it has not numbered any more (a lower `CurrentValue`, cleared `Periods`, a raised `StartValue`) and
+  a change or removal of its `RtWellKnownName` (update, replace, import) are refused with message 168. New
+  `ReleasedDocumentNumberRefusal` (`Runtime.Engine.Repositories`, message 174 `RtReleasedDocumentNumberSupplied`,
+  thrown as `ReleasedDocumentLockedException`) for a number a caller supplies on a range that numbers on release. Tests:
+  `ReleasedDocumentSharedCollectionTests`, `NumberRangeReleaseLockTests`.
+
 - **A replace no longer looks like a new entity to the pre-document modifications (AB#6209).** `BulkRtMutation` copied
   the target key's `RtId` and `CkTypeId` into the replace payload only after the `IPreDocumentModification<RtEntity>`
   pipeline had run. A replace whose payload carried an empty or another `RtId` (for example an entity from

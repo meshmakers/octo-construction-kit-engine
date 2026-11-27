@@ -13,7 +13,8 @@ namespace Meshmakers.Octo.Runtime.Engine.Tests.Repositories;
 ///     unlock its documents. Removing <c>Release</c>, changing <c>StateAttribute</c> or <c>StornoCkTypeId</c>, removing a
 ///     released value, adding a changeable attribute and deleting the range are refused (message 168); adding a released
 ///     value and removing a changeable attribute are allowed; before the first number everything is allowed. Checked on
-///     every write of the funnel and of the bulk import.
+///     every write of the funnel and of the bulk import. A numbered range also keeps its counter at or after the first
+///     number and its name.
 /// </summary>
 public class NumberRangeReleaseLockTests
 {
@@ -60,7 +61,10 @@ public class NumberRangeReleaseLockTests
     }
 
     private static RtEntity WithRelease(RtEntity range, RtRecord? release) =>
-        new(range.GetRtCkTypeId(), range.RtId, new Dictionary<string, object?>(range.Attributes) { ["Release"] = release });
+        new(range.GetRtCkTypeId(), range.RtId, new Dictionary<string, object?>(range.Attributes) { ["Release"] = release })
+        {
+            RtWellKnownName = range.RtWellKnownName
+        };
 
     private static readonly RtRecord Stored = Release(["Released", "Cancelled"], ["PaymentStatus"],
         storno: "Doc/CreditNote");
@@ -190,6 +194,77 @@ public class NumberRangeReleaseLockTests
             _session, _model.DataSource, _model.Cache,
             new EntityRuleEngineResult<RtEntity>([], [], new Dictionary<RtEntityId, RtEntity> { [id] = replacement },
                 []), new GraphRuleEngineResult(), BulkRtMutationOptions.Default));
+    }
+
+    private Task UpdateAsync(RtEntity range, Dictionary<string, object?> attributes, string? wellKnownName = null)
+    {
+        var id = new RtEntityId(range.GetRtCkTypeId(), range.RtId);
+        var partial = new RtEntity(range.GetRtCkTypeId(), range.RtId, attributes) { RtWellKnownName = wellKnownName };
+        return ReleasedDocumentLock.CheckMutationAsync(_session, _model.DataSource, _model.Cache,
+            new EntityRuleEngineResult<RtEntity>([], new Dictionary<RtEntityId, RtEntity> { [id] = partial }, [], []),
+            new GraphRuleEngineResult(), BulkRtMutationOptions.Default);
+    }
+
+    public static TheoryData<string, Dictionary<string, object?>, string> CounterResets => new()
+    {
+        { "lowers the counter to 0", new() { ["CurrentValue"] = 0L }, "CurrentValue" },
+        { "raises the start value above the counter", new() { ["StartValue"] = 1_000_000_000L, ["End"] = 2_000_000_000L }, "StartValue" }
+    };
+
+    [Theory]
+    [MemberData(nameof(CounterResets))]
+    public async Task ANumberedRange_RefusesACounterReset_SoAReleaseRemovalStaysRefused(string _,
+        Dictionary<string, object?> reset, string change)
+    {
+        var range = _model.StoreRange(currentValue: 3);
+
+        // Step 1: the counter is not moved back before the first number.
+        var refused = await Assert.ThrowsAsync<ReleasedDocumentLockedException>(() => UpdateAsync(range, reset));
+        Assert.Equal([change], Assert.Single(refused.Refusals).Changes);
+
+        // Step 2: so the range is still numbered and keeps its release configuration.
+        await Assert.ThrowsAsync<ReleasedDocumentLockedException>(() =>
+            UpdateAsync(range, new Dictionary<string, object?> { ["Release"] = null }));
+    }
+
+    [Fact]
+    public void ANumberedRange_RefusesClearingItsPeriods_AndAllowsTheAllocatorsIncrement()
+    {
+        var stored = Range(0, Stored, startValue: 1, periods: [(2026, 4)]);
+        var cleared = new RtEntity(stored.GetRtCkTypeId(), stored.RtId,
+            new Dictionary<string, object?>(stored.Attributes) { ["Periods"] = new List<RtRecord>() });
+
+        Assert.Equal(["Periods"], NumberRangeReleaseLock.ForbiddenChanges(stored, cleared));
+        Assert.Empty(NumberRangeReleaseLock.ForbiddenChanges(stored, Range(0, Stored, startValue: 1, periods: [(2026, 5)])));
+        Assert.Empty(NumberRangeReleaseLock.ForbiddenChanges(Range(3, Stored), Range(4, Stored)));
+    }
+
+    [Fact]
+    public async Task ANumberedRange_RefusesRenamingOrClearingItsName_OnUpdateReplaceAndImport()
+    {
+        var range = _model.StoreRange(currentValue: 3);
+        var id = new RtEntityId(range.GetRtCkTypeId(), range.RtId);
+
+        var renamed = await Assert.ThrowsAsync<ReleasedDocumentLockedException>(() =>
+            UpdateAsync(range, new Dictionary<string, object?>(), "X"));
+        Assert.Equal([NumberRangeReleaseLock.RtWellKnownNameChange], Assert.Single(renamed.Refusals).Changes);
+
+        // A replace writes the whole document: without the name it clears it.
+        var replacement = WithRelease(range, range.GetAttributeValueOrDefault("Release") as RtRecord);
+        replacement.RtWellKnownName = null;
+        await Assert.ThrowsAsync<ReleasedDocumentLockedException>(() => ReleasedDocumentLock.CheckMutationAsync(
+            _session, _model.DataSource, _model.Cache,
+            new EntityRuleEngineResult<RtEntity>([], [], new Dictionary<RtEntityId, RtEntity> { [id] = replacement },
+                []), new GraphRuleEngineResult(), BulkRtMutationOptions.Default));
+
+        var imported = WithRelease(range, range.GetAttributeValueOrDefault("Release") as RtRecord);
+        imported.RtWellKnownName = "X";
+        await Assert.ThrowsAsync<ReleasedDocumentLockedException>(() =>
+            ReleasedDocumentLock.FilterImportAsync(_session, _model.DataSource, _model.Cache, [imported]));
+
+        // A partial update without a name keeps it; one with the same name changes nothing.
+        await UpdateAsync(range, new Dictionary<string, object?> { ["CurrentValue"] = 4L });
+        await UpdateAsync(range, new Dictionary<string, object?>(), ReleasedDocumentTestModel.Range);
     }
 
     [Fact]

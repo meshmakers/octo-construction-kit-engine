@@ -27,7 +27,9 @@ public sealed record ReleasedDocumentRefusal(
 ///     the <c>ReleasedValues</c> of its number range keeps its attributes, its number, its released state and its
 ///     outbound associations; only the <c>ChangeableAttributes</c> of the range may still change. The whole batch is
 ///     refused and nothing of it is written. The message of every refused document is in
-///     <see cref="OperationResult" /> (engine message 168, <c>RtReleasedDocumentLocked</c>), the structured refusals in
+///     <see cref="OperationResult" /> (engine message 168, <c>RtReleasedDocumentLocked</c>; 174,
+///     <c>RtReleasedDocumentNumberSupplied</c>, for a number a caller supplies on a range that numbers on release), the
+///     structured refusals in
 ///     <see cref="Refusals" />.
 /// </summary>
 [Serializable]

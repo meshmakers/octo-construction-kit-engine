@@ -348,7 +348,13 @@ internal static partial class ReleasedDocumentLock
         /// <summary>
         ///     Reads the stored documents of <paramref name="targets" /> that may be locked and, only when one is stored,
         ///     their number ranges (so a batch of new documents reads no range). False when nothing can be locked (no
-        ///     stored target of a numbered type, no range with a release configuration).
+        ///     stored target in a collection that holds a numbered type, no range with a release configuration).
+        ///     <para>
+        ///         A whole inheritance tree shares one collection and the writes match on the id alone, so a write that
+        ///         names a sibling type (numbered or not) reaches the stored document all the same. The numbered types and
+        ///         their ranges are therefore taken from the subtree of the collection root, every target in such a
+        ///         collection is read, and <see cref="TryGetReleased" /> judges by the stored type.
+        ///     </para>
         /// </summary>
         public async Task<bool> LoadAsync(IEnumerable<RtEntityId> targets)
         {
@@ -371,13 +377,13 @@ internal static partial class ReleasedDocumentLock
                 if (!groups.TryGetValue(typeName, out var group))
                 {
                     if (!ckCacheService.TryGetRtCkType(TenantId, target.CkTypeId, out var graph) ||
-                        !CollectSubtreeReferences(graph, references))
+                        !CollectCollectionReferences(graph, references, out var collectionGraph))
                     {
                         unnumbered.Add(typeName);
                         continue;
                     }
 
-                    group = (graph, []);
+                    group = (collectionGraph, []);
                     groups[typeName] = group;
                 }
 
@@ -491,6 +497,45 @@ internal static partial class ReleasedDocumentLock
 
             released = new ReleasedDocument(stored, typeLock, releasedBy, ckCacheService, TenantId);
             return true;
+        }
+
+        /// <summary>
+        ///     Collects the number ranges of every type stored in the collection of <paramref name="graph" /> (the subtree
+        ///     of its collection root); <paramref name="collectionGraph" /> is the root, read without a type filter. A root
+        ///     the CK cache cannot resolve counts every numbered type of the tenant (fail closed).
+        /// </summary>
+        private bool CollectCollectionReferences(CkTypeGraph graph, HashSet<string> references,
+            out CkTypeGraph collectionGraph)
+        {
+            collectionGraph = graph;
+            var rootCkTypeId = graph.IsCollectionRoot ? graph.CkTypeId : graph.DefiningCollectionRootCkTypeId;
+            if (rootCkTypeId != null && string.Equals(rootCkTypeId.FullName, graph.CkTypeId.FullName,
+                    StringComparison.Ordinal))
+            {
+                return CollectSubtreeReferences(graph, references);
+            }
+
+            if (rootCkTypeId != null && ckCacheService.TryGetCkType(TenantId, rootCkTypeId, out var rootGraph) &&
+                rootGraph != null)
+            {
+                collectionGraph = rootGraph;
+                return CollectSubtreeReferences(rootGraph, references);
+            }
+
+            var found = false;
+            foreach (var type in ckCacheService.GetCkTypes(TenantId))
+            {
+                foreach (var attribute in type.AllAttributes.Values)
+                {
+                    if (!string.IsNullOrEmpty(attribute.AutoIncrementReference))
+                    {
+                        references.Add(attribute.AutoIncrementReference);
+                        found = true;
+                    }
+                }
+            }
+
+            return found;
         }
 
         private bool CollectSubtreeReferences(CkTypeGraph graph, HashSet<string> references)

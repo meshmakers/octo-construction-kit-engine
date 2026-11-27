@@ -25,6 +25,9 @@ internal static class NumberRangeReleaseLock
     internal const string StartValueAttribute = "StartValue";
     internal const string PeriodsAttribute = "Periods";
 
+    /// <summary>Pseudo attribute name of a write that renames or clears the range's <c>RtWellKnownName</c>.</summary>
+    internal const string RtWellKnownNameChange = "rtWellKnownName";
+
     /// <summary>State shown in the refusal of a range write.</summary>
     internal const string NumberedState = "numbered";
 
@@ -102,6 +105,20 @@ internal static class NumberRangeReleaseLock
             return changes;
         }
 
+        // The lock and the number modifier find the range by its name: renaming or clearing it unlocks its documents.
+        if (!string.Equals(stored.RtWellKnownName, resulting.RtWellKnownName, StringComparison.Ordinal))
+        {
+            changes.Add(RtWellKnownNameChange);
+        }
+
+        // A numbered range stays numbered: moving its counter back to before the first number (a lower counter,
+        // cleared periods, a raised start value) would unlock its documents and hand out the issued numbers again.
+        // The allocator only raises a counter and writes it outside this funnel.
+        if (!HasNumbered(resulting))
+        {
+            changes.AddRange(CounterChanges(stored, resulting));
+        }
+
         if (!NumberRangeRelease.TryCreate(resulting, out var after, out _) || after == null)
         {
             changes.Add(NumberRangeRelease.ReleaseAttribute);
@@ -129,6 +146,50 @@ internal static class NumberRangeReleaseLock
         }
 
         return changes;
+    }
+
+    /// <summary>The counter attributes whose written value leaves the range without a handed-out number.</summary>
+    private static List<string> CounterChanges(RtEntity stored, RtEntity resulting)
+    {
+        var changes = new List<string>();
+        foreach (var name in new[] { CurrentValueAttribute, StartValueAttribute })
+        {
+            if (ToLong(stored.GetAttributeValueOrDefault(name)) != ToLong(resulting.GetAttributeValueOrDefault(name)))
+            {
+                changes.Add(name);
+            }
+        }
+
+        if (MaxPeriodValue(stored) != MaxPeriodValue(resulting))
+        {
+            changes.Add(PeriodsAttribute);
+        }
+
+        if (changes.Count == 0)
+        {
+            changes.Add(CurrentValueAttribute);
+        }
+
+        return changes;
+    }
+
+    private static long? MaxPeriodValue(RtEntity range)
+    {
+        long? max = null;
+        if (range.GetAttributeValueOrDefault(PeriodsAttribute) is IEnumerable periods and not string)
+        {
+            foreach (var period in periods)
+            {
+                if (period is RtTypeWithAttributes record &&
+                    ToLong(record.GetAttributeValueOrDefault(CurrentValueAttribute)) is { } value &&
+                    (max == null || value > max))
+                {
+                    max = value;
+                }
+            }
+        }
+
+        return max;
     }
 
     /// <summary>
@@ -170,7 +231,13 @@ internal static class NumberRangeReleaseLock
     /// </summary>
     public static RtEntity Overlay(RtEntity stored, RtEntity partial)
     {
-        var resulting = new RtEntity(stored.GetRtCkTypeId(), stored.RtId, stored.Attributes);
+        var resulting = new RtEntity(stored.GetRtCkTypeId(), stored.RtId, stored.Attributes)
+        {
+            // A partial update writes the name only when it carries one (MongoDataSourceMapper.ApplyUpdate).
+            RtWellKnownName = string.IsNullOrWhiteSpace(partial.RtWellKnownName)
+                ? stored.RtWellKnownName
+                : partial.RtWellKnownName
+        };
         foreach (var (name, value) in partial.Attributes)
         {
             if (name.StartsWith(NumberRangeRelease.ReleaseAttribute + ".", StringComparison.Ordinal))

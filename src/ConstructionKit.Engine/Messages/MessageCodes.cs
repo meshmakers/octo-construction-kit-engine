@@ -493,6 +493,9 @@ internal static class MessageCodes
     internal static OperationMessage RtDocumentAuditEntryAppendOnly(string? location, object rtId, object ckTypeId, object operation) =>
         GetMessage("RtDocumentAuditEntryAppendOnly", location, rtId, ckTypeId, operation);
 
+    internal static OperationMessage RtReleasedDocumentNumberSupplied(string? location, object operation, object rtId, object ckTypeId, object value, object attributeName, object numberRange) =>
+        GetMessage("RtReleasedDocumentNumberSupplied", location, operation, rtId, ckTypeId, value, attributeName, numberRange);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1430,6 +1433,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  173, "Write refused: '{rtId}' of type '{ckTypeId}' is an entry of the document audit trail; the {operation} is refused, audit entries are append-only",
                  new string[] {"rtId", "ckTypeId", "operation"})
+        },
+        {
+            "RtReleasedDocumentNumberSupplied",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 174, "Write refused: the {operation} of '{rtId}' of type '{ckTypeId}' supplies '{value}' for the number attribute '{attributeName}'; number range '{numberRange}' numbers its documents on release, so the number is never supplied by the caller",
+                 new string[] {"operation", "rtId", "ckTypeId", "value", "attributeName", "numberRange"})
         },
     };
 }

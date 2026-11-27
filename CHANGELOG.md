@@ -20,7 +20,11 @@ release tags (`r<X.Y.Z>`); entries without a release are listed under "Unrelease
   transaction. Only the range's `ChangeableAttributes` may change (never the number; the state only to another released
   value); an attribute written with its stored value is no change; outbound associations are locked, inbound ones are
   not. An import that carries the stored content is a no-op (not written); an import of a document the tenant does not
-  hold yet keeps the number of the file. Drafts and ranges without `Release` behave as before. Behaviour change for
+  hold yet keeps the number of the file. Once a range has handed out its first number its release configuration is
+  locked too (design note D11): removing `Release`, changing `StateAttribute` or `StornoCkTypeId`, removing a released
+  value, adding a changeable attribute and deleting the range are refused the same way (`NumberRangeReleaseLock`);
+  adding a released value and removing a changeable attribute stay allowed. Drafts and ranges without `Release` behave
+  as before. Behaviour change for
   callers that edited released documents: such writes now fail with message 168. Tests: `ReleasedDocumentLockTests`,
   `ReleasedDocumentImportLockTests`, `ReleasedDocumentDeniedAuditTests`, `RtAttributeValueEqualityTests`.
 - **Partial updates can be modified before they are written (AB#9758).** New hook

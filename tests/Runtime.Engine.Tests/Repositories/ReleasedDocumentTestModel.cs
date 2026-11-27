@@ -112,11 +112,11 @@ internal sealed class ReleasedDocumentTestModel
     public int Writes { get; private set; }
 
     /// <summary>Stores the number range with a release configuration (or without one).</summary>
-    public void StoreRange(IReadOnlyList<string>? releasedValues = null, IReadOnlyList<string>? changeable = null,
-        string stateAttribute = "DocumentState", bool withRelease = true)
+    public RtEntity StoreRange(IReadOnlyList<string>? releasedValues = null, IReadOnlyList<string>? changeable = null,
+        string stateAttribute = "DocumentState", bool withRelease = true, long currentValue = 7)
     {
         var range = new RtEntity(AutoIncrement.CkTypeId.ToRtCkId(), OctoObjectId.GenerateNewId(),
-            new Dictionary<string, object?> { ["CurrentValue"] = 7L })
+            new Dictionary<string, object?> { ["CurrentValue"] = currentValue })
         {
             RtWellKnownName = Range
         };
@@ -135,6 +135,7 @@ internal sealed class ReleasedDocumentTestModel
         }
 
         Store(range);
+        return range;
     }
 
     /// <summary>Stores an invoice in the given state (released ones with a number) and returns it.</summary>

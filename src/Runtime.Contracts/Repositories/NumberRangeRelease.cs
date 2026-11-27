@@ -27,6 +27,9 @@ public sealed class NumberRangeRelease
     /// <summary>Name of the <c>ChangeableAttributes</c> attribute of <c>System/NumberRangeRelease</c>.</summary>
     public const string ChangeableAttributesAttribute = "ChangeableAttributes";
 
+    /// <summary>Name of the <c>StornoCkTypeId</c> attribute of <c>System/NumberRangeRelease</c>.</summary>
+    public const string StornoCkTypeIdAttribute = "StornoCkTypeId";
+
     private readonly HashSet<string> _releasedValues;
 
     private NumberRangeRelease(string stateAttribute, HashSet<string> releasedValues,

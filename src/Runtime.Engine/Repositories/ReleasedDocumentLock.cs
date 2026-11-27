@@ -86,6 +86,21 @@ internal static class ReleasedDocumentLock
         targets.AddRange(associations.RtAssociationsToCreate.Concat(associations.RtAssociationsToDelete)
             .Select(a => new RtEntityId(a.OriginCkTypeId, a.OriginRtId)));
 
+        // D11: a numbered range keeps its release configuration.
+        var rangeWrites = new List<NumberRangeReleaseLock.RangeWrite>();
+        rangeWrites.AddRange(entities.RtEntitiesToDelete.Select(id =>
+            new NumberRangeReleaseLock.RangeWrite(id, OperationDelete, _ => null)));
+        rangeWrites.AddRange(entities.RtEntitiesToUpdate.Select(u =>
+            new NumberRangeReleaseLock.RangeWrite(u.Key, OperationUpdate,
+                stored => NumberRangeReleaseLock.Overlay(stored, u.Value))));
+        rangeWrites.AddRange(entities.RtEntitiesToReplace.Select(r =>
+            new NumberRangeReleaseLock.RangeWrite(r.Key, OperationReplace, _ => r.Value)));
+        rangeWrites.AddRange(entities.RtEntitiesToInsert.Where(e => e.RtId != OctoObjectId.Empty).Select(e =>
+            new NumberRangeReleaseLock.RangeWrite(new RtEntityId(e.GetRtCkTypeId(), e.RtId), OperationInsert,
+                _ => e)));
+        await NumberRangeReleaseLock.CheckAsync(session, repositoryDataSource, ckCacheService, rangeWrites)
+            .ConfigureAwait(false);
+
         var scope = new LockScope(session, repositoryDataSource, ckCacheService);
         if (!await scope.LoadAsync(targets).ConfigureAwait(false))
         {
@@ -156,6 +171,13 @@ internal static class ReleasedDocumentLock
     {
         var targets = entities.Where(e => e.RtId != OctoObjectId.Empty)
             .Select(e => new RtEntityId(e.GetRtCkTypeId(), e.RtId)).ToList();
+
+        // D11: an import (seed, re-apply) of a numbered range keeps its release configuration.
+        await NumberRangeReleaseLock.CheckAsync(session, repositoryDataSource, ckCacheService,
+            entities.Where(e => e.RtId != OctoObjectId.Empty).Select(e =>
+                new NumberRangeReleaseLock.RangeWrite(new RtEntityId(e.GetRtCkTypeId(), e.RtId), OperationImport,
+                    _ => e)).ToList()).ConfigureAwait(false);
+
         var scope = new LockScope(session, repositoryDataSource, ckCacheService);
         if (!await scope.LoadAsync(targets).ConfigureAwait(false))
         {

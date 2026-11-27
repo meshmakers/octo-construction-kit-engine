@@ -32,9 +32,9 @@ namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 ///         content is a no-op: the entity is not written. A refusal refuses the whole batch (D3) with one
 ///         <see cref="ReleasedDocumentLockedException" /> that names every refused document (message 168).
 ///     </para>
-///     The lock reads only when a write targets a stored entity of a type with an auto-increment attribute (one read of
-///     the number ranges and one read of the stored documents per type and batch), in the session (and so the
-///     transaction) of the write. A range whose release configuration cannot be read locks every stored document of its
+///     The lock reads only when a write targets an entity of a type with an auto-increment attribute: one read of the
+///     stored documents per type and batch and, only when one of them is stored, one read of the number ranges, in the
+///     session (and so the transaction) of the write. A range whose release configuration cannot be read locks every stored document of its
 ///     types (fail closed).
 /// </summary>
 internal static class ReleasedDocumentLock
@@ -311,12 +311,14 @@ internal static class ReleasedDocumentLock
         private string TenantId => repositoryDataSource.TenantId;
 
         /// <summary>
-        ///     Reads the number ranges and the stored documents of <paramref name="targets" /> that may be locked. False
-        ///     when nothing can be locked (no target of a numbered type, no range with a release configuration).
+        ///     Reads the stored documents of <paramref name="targets" /> that may be locked and, only when one is stored,
+        ///     their number ranges (so a batch of new documents reads no range). False when nothing can be locked (no
+        ///     stored target of a numbered type, no range with a release configuration).
         /// </summary>
         public async Task<bool> LoadAsync(IEnumerable<RtEntityId> targets)
         {
             var groups = new Dictionary<string, (CkTypeGraph Graph, HashSet<OctoObjectId> RtIds)>(StringComparer.Ordinal);
+            var unnumbered = new HashSet<string>(StringComparer.Ordinal);
             var references = new HashSet<string>(StringComparer.Ordinal);
             foreach (var target in targets)
             {
@@ -326,11 +328,17 @@ internal static class ReleasedDocumentLock
                 }
 
                 var typeName = target.CkTypeId.FullName;
+                if (unnumbered.Contains(typeName))
+                {
+                    continue;
+                }
+
                 if (!groups.TryGetValue(typeName, out var group))
                 {
                     if (!ckCacheService.TryGetRtCkType(TenantId, target.CkTypeId, out var graph) ||
                         !CollectSubtreeReferences(graph, references))
                     {
+                        unnumbered.Add(typeName);
                         continue;
                     }
 
@@ -340,11 +348,6 @@ internal static class ReleasedDocumentLock
 
                 group.RtIds.Add(target.RtId);
                 _addressedTypes.TryAdd(target.RtId, typeName);
-            }
-
-            if (groups.Count == 0 || !await LoadRangesAsync(references).ConfigureAwait(false))
-            {
-                return false;
             }
 
             foreach (var (graph, rtIds) in groups.Values)
@@ -358,7 +361,7 @@ internal static class ReleasedDocumentLock
                 }
             }
 
-            return _stored.Count > 0;
+            return _stored.Count > 0 && await LoadRangesAsync(references).ConfigureAwait(false);
         }
 
         /// <summary>True with the released document when <paramref name="rtId" /> is a stored released document.</summary>

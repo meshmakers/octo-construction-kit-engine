@@ -209,9 +209,9 @@ engine message 168 `RtReleasedDocumentLocked` per refused document (document, ty
 would change, the changeable attributes) and the structured refusals. The RT import passes it on unwrapped. For each
 refused document the repository writes one `DocumentAuditEntry` with `Action = Denied` (document, UTC time, the caller's
 subject, the write channel as `Source`, `AttributeNames`, the message number) in a session of its own, outside the
-refused write's transaction, so the entry stays when the caller aborts it. The lock reads only for writes that target a
-stored entity of a type with an auto-increment attribute: one read of the ranges and one of the stored documents per
-type and batch, in the session of the write.
+refused write's transaction, so the entry stays when the caller aborts it. The lock reads only for writes that target an
+entity of a type with an auto-increment attribute: one read of the stored documents per type and batch and, only when
+one of them is stored, one read of the ranges, in the session of the write; a batch of new documents reads no range.
 
 Outside the lock, by design: the tenant dump restore (mongorestore into an unregistered database and attach, D10)
 restores documents, counters, periods and audit entries 1:1, and numbering goes on from the restored counter; the CK

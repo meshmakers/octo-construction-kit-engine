@@ -339,6 +339,44 @@ public class NumberRangeReleaseLockTests
         ReleasedDocumentLock.CheckMutationAsync(_session, _model.DataSource, _model.Cache, entities,
             new GraphRuleEngineResult(), BulkRtMutationOptions.Default);
 
+    private RtEntity NewRangeWithReleaseAndPeriods(params RtRecord[] periods)
+    {
+        var range = NewRange("NewNumber");
+        range.SetAttributeRawValue("Release", Stored);
+        range.SetAttributeRawValue("Periods", periods.ToList());
+        return range;
+    }
+
+    public static TheoryData<string, object?, object?> InvalidNewPeriods => new()
+    {
+        { "2025 twice", 2025, 2025 },
+        { "a text year", 2025, "2026" }
+    };
+
+    [Theory]
+    [MemberData(nameof(InvalidNewPeriods))]
+    public async Task ANewRangeWithRelease_RefusesInvalidFiscalYears_OnInsertAndImport(string _, object? first,
+        object? second)
+    {
+        var inserted = NewRangeWithReleaseAndPeriods(Period(first, 0), Period(second, 10));
+        var refused = await Assert.ThrowsAsync<ReleasedDocumentLockedException>(() =>
+            WriteAsync(new EntityRuleEngineResult<RtEntity>([inserted], [], [], [])));
+        Assert.Equal(["Periods"], Assert.Single(refused.Refusals).Changes);
+
+        var imported = NewRangeWithReleaseAndPeriods(Period(first, 0), Period(second, 10));
+        refused = await Assert.ThrowsAsync<ReleasedDocumentLockedException>(() =>
+            ReleasedDocumentLock.FilterImportAsync(_session, _model.DataSource, _model.Cache, [imported]));
+        Assert.Equal(["Periods"], Assert.Single(refused.Refusals).Changes);
+    }
+
+    [Fact]
+    public async Task ANewRangeWithRelease_AndOneEntryPerFiscalYear_IsWritten()
+    {
+        var inserted = NewRangeWithReleaseAndPeriods(Period(2025, 0), Period(2026, 10));
+
+        await WriteAsync(new EntityRuleEngineResult<RtEntity>([inserted], [], [], []));
+    }
+
     [Fact]
     public async Task ASecondRangeWithTheNameOfARangeWithRelease_IsRefusedOnInsert()
     {

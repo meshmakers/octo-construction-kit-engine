@@ -88,7 +88,9 @@ internal static class NumberRangeReleaseLock
                 .Any(r => r.RtId != write.Target.RtId);
             if (!stored.TryGetValue(write.Target.RtId, out var range))
             {
-                if (!takesAName)
+                // A new range is judged by itself: it must not take the name of a range with Release, and with Release
+                // it must not carry a fiscal year twice or as text (no later write could repair its periods).
+                if (!takesAName && !HasInvalidReleasePeriods(resulting))
                 {
                     continue;
                 }
@@ -123,6 +125,13 @@ internal static class NumberRangeReleaseLock
     }
 
     /// <summary>
+    ///     Whether <paramref name="range" /> has a release configuration and a fiscal year twice or as a non-integer value
+    ///     in its periods.
+    /// </summary>
+    private static bool HasInvalidReleasePeriods(RtEntity? range) =>
+        range?.GetAttributeValueOrDefault(NumberRangeRelease.ReleaseAttribute) != null && HasInvalidPeriodYears(range);
+
+    /// <summary>
     ///     The changes of the release configuration from <paramref name="stored" /> to <paramref name="resulting" /> that
     ///     D11 refuses; empty when the stored range has no readable release configuration or has not numbered yet.
     ///     <paramref name="resulting" /> null is a delete.
@@ -134,8 +143,7 @@ internal static class NumberRangeReleaseLock
         // A range with Release keeps one integer fiscal year per period: the allocator raises every entry of a year and
         // reads the first, and matches the year as a number, so a second entry or a text year would hand out a number
         // again.
-        if (resulting?.GetAttributeValueOrDefault(NumberRangeRelease.ReleaseAttribute) != null &&
-            HasInvalidPeriodYears(resulting))
+        if (HasInvalidReleasePeriods(resulting))
         {
             changes.Add(PeriodsAttribute);
         }

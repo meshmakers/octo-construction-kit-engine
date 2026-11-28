@@ -339,6 +339,7 @@ internal static partial class ReleasedDocumentLock
         ICkCacheService ckCacheService)
     {
         private readonly Dictionary<string, RtEntity> _rangesByReference = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _duplicateNames = new(StringComparer.Ordinal);
         private readonly Dictionary<OctoObjectId, RtEntity> _stored = new();
         private readonly Dictionary<OctoObjectId, string> _addressedTypes = new();
         private readonly Dictionary<string, TypeLock?> _typeLocks = new(StringComparer.Ordinal);
@@ -571,14 +572,23 @@ internal static partial class ReleasedDocumentLock
             var names = references.ToList();
             var ranges = await repositoryDataSource.GetRtCollection<RtEntity>(autoIncrementGraph)
                 .FindManyAsync(session, e => names.Contains(e.RtWellKnownName!)).ConfigureAwait(false);
-            foreach (var range in ranges)
+            foreach (var group in ranges.Where(r => r.RtWellKnownName != null)
+                         .GroupBy(r => r.RtWellKnownName!, StringComparer.Ordinal))
             {
-                if (range.RtWellKnownName != null &&
-                    range.GetAttributeValueOrDefault(NumberRangeRelease.ReleaseAttribute) != null &&
-                    _rangesByReference.TryAdd(range.RtWellKnownName, range))
+                var withRelease = group.FirstOrDefault(r =>
+                    r.GetAttributeValueOrDefault(NumberRangeRelease.ReleaseAttribute) != null);
+                if (withRelease == null || !_rangesByReference.TryAdd(group.Key, withRelease))
                 {
-                    _typeLocks.Clear();
+                    continue;
                 }
+
+                // Fail closed: with two ranges of one name the counter that numbers a document is not known.
+                if (group.Count() > 1)
+                {
+                    _duplicateNames.Add(group.Key);
+                }
+
+                _typeLocks.Clear();
             }
 
             return _rangesByReference.Count > 0;
@@ -604,7 +614,10 @@ internal static partial class ReleasedDocumentLock
                         continue;
                     }
 
-                    ranges.Add(ReadRange(reference, range, graph));
+                    ranges.Add(_duplicateNames.Contains(reference)
+                        ? new RangeRelease(reference, null, null, null,
+                            $"more than one number range is named '{reference}'")
+                        : ReadRange(reference, range, graph));
                 }
 
                 if (ranges.Count > 0)

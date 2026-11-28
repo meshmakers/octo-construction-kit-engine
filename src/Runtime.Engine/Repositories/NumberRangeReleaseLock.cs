@@ -52,27 +52,63 @@ internal static class NumberRangeReleaseLock
         }
 
         var ids = rangeWrites.Select(w => w.Target.RtId).Distinct().ToList();
-        var stored = (await repositoryDataSource.GetRtCollection<RtEntity>(rangeGraph)
-                .FindManyAsync(session, e => ids.Contains(e.RtId)).ConfigureAwait(false))
+        var collection = repositoryDataSource.GetRtCollection<RtEntity>(rangeGraph);
+        var stored = (await collection.FindManyAsync(session, e => ids.Contains(e.RtId)).ConfigureAwait(false))
             .ToDictionary(e => e.RtId);
+
+        // The range every write leaves (null: deleted, or an update of a range that is not stored and writes nothing).
+        var resultingRanges = new Dictionary<RangeWrite, RtEntity?>(ReferenceEqualityComparer.Instance);
+        foreach (var write in rangeWrites)
+        {
+            resultingRanges[write] = stored.TryGetValue(write.Target.RtId, out var storedRange)
+                ? write.Resulting(storedRange)
+                : write.Operation is ReleasedDocumentLock.OperationUpdate or ReleasedDocumentLock.OperationDelete
+                    ? null
+                    : write.Resulting(new RtEntity(write.Target.CkTypeId, write.Target.RtId));
+        }
+
+        // The lock and the number modifier find a range by its name: a second range with the name of a range with
+        // Release would number its documents from another counter.
+        var names = resultingRanges.Values.Select(r => r?.RtWellKnownName).OfType<string>()
+            .Where(n => !string.IsNullOrWhiteSpace(n)).Distinct(StringComparer.Ordinal).ToList();
+        var namedRanges = names.Count == 0
+            ? []
+            : await collection.FindManyAsync(session, e => names.Contains(e.RtWellKnownName!)).ConfigureAwait(false);
+        var releaseRangesByName = namedRanges
+            .Where(r => r.GetAttributeValueOrDefault(NumberRangeRelease.ReleaseAttribute) != null)
+            .ToLookup(r => r.RtWellKnownName!, StringComparer.Ordinal);
 
         var result = new OperationResult();
         var refusals = new List<ReleasedDocumentRefusal>();
         foreach (var write in rangeWrites)
         {
+            var resulting = resultingRanges[write];
+            var resultingName = resulting?.RtWellKnownName;
+            var takesAName = resultingName != null && releaseRangesByName[resultingName]
+                .Any(r => r.RtId != write.Target.RtId);
             if (!stored.TryGetValue(write.Target.RtId, out var range))
             {
-                continue;
+                if (!takesAName)
+                {
+                    continue;
+                }
+
+                range = resulting!;
             }
 
-            var changes = ForbiddenChanges(range, write.Resulting(range));
+            var changes = ForbiddenChanges(range, resulting);
+            if (takesAName && !changes.Contains(RtWellKnownNameChange, StringComparer.Ordinal))
+            {
+                changes.Add(RtWellKnownNameChange);
+            }
+
             if (changes.Count == 0)
             {
                 continue;
             }
 
             var id = new RtEntityId(range.CkTypeId ?? write.Target.CkTypeId, range.RtId);
-            var name = range.RtWellKnownName ?? range.RtId.ToString();
+            var name = (takesAName ? resultingName : range.RtWellKnownName) ?? range.RtId.ToString();
             refusals.Add(new ReleasedDocumentRefusal(id, write.Operation, changes, NumberedState, name));
             NumberRangeRelease.TryCreate(range, out var release, out _);
             result.AddMessage(MessageCodes.RtReleasedDocumentLocked($"{id.CkTypeId.FullName}@{id.RtId}", id.RtId,

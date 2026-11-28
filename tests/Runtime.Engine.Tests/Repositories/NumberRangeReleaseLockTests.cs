@@ -331,6 +331,72 @@ public class NumberRangeReleaseLockTests
             }, [], []), new GraphRuleEngineResult(), BulkRtMutationOptions.Default));
     }
 
+    private RtEntity NewRange(string name, long currentValue = 0) =>
+        new(_model.AutoIncrement.CkTypeId.ToRtCkId(), OctoObjectId.GenerateNewId(),
+            new Dictionary<string, object?> { ["CurrentValue"] = currentValue }) { RtWellKnownName = name };
+
+    private Task WriteAsync(EntityRuleEngineResult<RtEntity> entities) =>
+        ReleasedDocumentLock.CheckMutationAsync(_session, _model.DataSource, _model.Cache, entities,
+            new GraphRuleEngineResult(), BulkRtMutationOptions.Default);
+
+    [Fact]
+    public async Task ASecondRangeWithTheNameOfARangeWithRelease_IsRefusedOnInsert()
+    {
+        _model.StoreRange(currentValue: 3);
+        var duplicate = NewRange(ReleasedDocumentTestModel.Range);
+
+        var refused = await Assert.ThrowsAsync<ReleasedDocumentLockedException>(() =>
+            WriteAsync(new EntityRuleEngineResult<RtEntity>([duplicate], [], [], [])));
+
+        var refusal = Assert.Single(refused.Refusals);
+        Assert.Equal(duplicate.RtId, refusal.DocumentId.RtId);
+        Assert.Equal([NumberRangeReleaseLock.RtWellKnownNameChange], refusal.Changes);
+        Assert.Equal(ReleasedDocumentTestModel.Range, refusal.NumberRange);
+    }
+
+    [Fact]
+    public async Task ASecondRangeWithTheNameOfARangeWithRelease_IsRefusedOnImport()
+    {
+        _model.StoreRange(currentValue: 0);
+
+        var refused = await Assert.ThrowsAsync<ReleasedDocumentLockedException>(() =>
+            ReleasedDocumentLock.FilterImportAsync(_session, _model.DataSource, _model.Cache,
+                [NewRange(ReleasedDocumentTestModel.Range)]));
+
+        Assert.Equal([NumberRangeReleaseLock.RtWellKnownNameChange], Assert.Single(refused.Refusals).Changes);
+    }
+
+    [Fact]
+    public async Task RenamingAnUnnumberedRangeToTheNameOfARangeWithRelease_IsRefused()
+    {
+        _model.StoreRange(currentValue: 3);
+        var other = _model.StoreRange(withRelease: false, currentValue: 0, wellKnownName: "OtherNumber");
+
+        await Assert.ThrowsAsync<ReleasedDocumentLockedException>(() =>
+            UpdateAsync(other, new Dictionary<string, object?>(), ReleasedDocumentTestModel.Range));
+
+        // Another name stays free.
+        await UpdateAsync(other, new Dictionary<string, object?>(), "ThirdNumber");
+    }
+
+    [Fact]
+    public async Task TwoStoredRangesOfOneName_KeepTheirDocumentsLocked()
+    {
+        _model.StoreRange(currentValue: 3);
+        _model.StoreRange(withRelease: false, currentValue: 0);
+        var released = _model.StoreInvoice(ReleasedDocumentTestModel.Released);
+        var draft = _model.StoreInvoice(ReleasedDocumentTestModel.Draft);
+
+        foreach (var document in new[] { released, draft })
+        {
+            var id = new RtEntityId(document.GetRtCkTypeId(), document.RtId);
+            await Assert.ThrowsAsync<ReleasedDocumentLockedException>(() => WriteAsync(
+                new EntityRuleEngineResult<RtEntity>([],
+                    new Dictionary<RtEntityId, RtEntity> { [id] = _model.Partial(document, ("Title", "changed")) },
+                    [], [])));
+        }
+    }
+
     [Fact]
     public async Task ANumberedRange_RefusesRenamingOrClearingItsName_OnUpdateReplaceAndImport()
     {

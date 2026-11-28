@@ -94,6 +94,16 @@ internal static class NumberRangeReleaseLock
     public static List<string> ForbiddenChanges(RtEntity stored, RtEntity? resulting)
     {
         var changes = new List<string>();
+
+        // A range with Release keeps one integer fiscal year per period: the allocator raises every entry of a year and
+        // reads the first, and matches the year as a number, so a second entry or a text year would hand out a number
+        // again.
+        if (resulting?.GetAttributeValueOrDefault(NumberRangeRelease.ReleaseAttribute) != null &&
+            HasInvalidPeriodYears(resulting))
+        {
+            changes.Add(PeriodsAttribute);
+        }
+
         if (stored.GetAttributeValueOrDefault(NumberRangeRelease.ReleaseAttribute) == null ||
             !NumberRangeRelease.TryCreate(stored, out var before, out _) || before == null || !HasNumbered(stored))
         {
@@ -189,30 +199,60 @@ internal static class NumberRangeReleaseLock
         return changes;
     }
 
-    /// <summary>The counter of every period of the range, by fiscal year (a period without a year is keyed by its position).</summary>
-    private static Dictionary<string, long> PeriodValues(RtEntity range)
+    /// <summary>
+    ///     The counter of every period of the range, by its integer fiscal year; of two entries of one year the first
+    ///     counts, as for the allocator. A period without an integer year is left out (refused in a write, see
+    ///     <see cref="HasInvalidPeriodYears" />).
+    /// </summary>
+    private static Dictionary<long, long> PeriodValues(RtEntity range)
     {
-        var values = new Dictionary<string, long>(StringComparer.Ordinal);
-        if (range.GetAttributeValueOrDefault(PeriodsAttribute) is IEnumerable periods and not string)
+        var values = new Dictionary<long, long>();
+        foreach (var period in PeriodsOf(range))
         {
-            var position = 0;
-            foreach (var period in periods)
+            if (period is RtTypeWithAttributes record &&
+                IntegerYear(record.GetAttributeValueOrDefault(FiscalYearAttribute)) is { } year)
             {
-                if (period is RtTypeWithAttributes record)
-                {
-                    var year = record.GetAttributeValueOrDefault(FiscalYearAttribute);
-                    var key = year == null
-                        ? $"#{position}"
-                        : Convert.ToString(year, CultureInfo.InvariantCulture) ?? $"#{position}";
-                    values[key] = ToLong(record.GetAttributeValueOrDefault(CurrentValueAttribute)) ?? 0;
-                }
-
-                position++;
+                values.TryAdd(year, ToLong(record.GetAttributeValueOrDefault(CurrentValueAttribute)) ?? 0);
             }
         }
 
         return values;
     }
+
+    /// <summary>True when a period of the range has no integer fiscal year, or a fiscal year appears twice.</summary>
+    private static bool HasInvalidPeriodYears(RtEntity range)
+    {
+        var years = new HashSet<long>();
+        foreach (var period in PeriodsOf(range))
+        {
+            if (period is not RtTypeWithAttributes record ||
+                IntegerYear(record.GetAttributeValueOrDefault(FiscalYearAttribute)) is not { } year ||
+                !years.Add(year))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<object?> PeriodsOf(RtEntity range) =>
+        range.GetAttributeValueOrDefault(PeriodsAttribute) is IEnumerable periods and not string
+            ? periods.Cast<object?>()
+            : [];
+
+    /// <summary>The fiscal year when it is stored as an integer (a text such as "2025" does not match the allocator).</summary>
+    private static long? IntegerYear(object? value) => value switch
+    {
+        int i => i,
+        long l => l,
+        short s => s,
+        byte b => b,
+        uint u => u,
+        ushort us => us,
+        sbyte sb => sb,
+        _ => null
+    };
 
     private static void AddOnce(List<string> changes, string change)
     {

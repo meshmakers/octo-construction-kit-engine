@@ -278,6 +278,32 @@ public class NumberRangeReleaseLockTests
         Assert.Empty(NumberRangeReleaseLock.ForbiddenChanges(stored, With(stored, "StartValue", 2L)));
     }
 
+    private static RtRecord Period(object? year, long value) =>
+        new(new RtCkId<CkRecordId>("System/AutoIncrementPeriod"),
+            new Dictionary<string, object?> { ["FiscalYear"] = year, ["CurrentValue"] = value });
+
+    [Fact]
+    public void ANumberedRange_RefusesAFiscalYearTwice()
+    {
+        var stored = Range(0, Stored, periods: [(2025, 10)]);
+        var twice = With(stored, "Periods", new List<RtRecord> { Period(2025, 0), Period(2025, 10) });
+
+        Assert.Equal(["Periods"], NumberRangeReleaseLock.ForbiddenChanges(stored, twice));
+    }
+
+    [Fact]
+    public void ANumberedRange_RefusesAFiscalYearThatIsNoInteger()
+    {
+        var stored = Range(0, Stored, periods: [(2025, 10)]);
+        var text = With(stored, "Periods", new List<RtRecord> { Period(2025, 10), Period("2026", 0) });
+        var textOnly = With(stored, "Periods", new List<RtRecord> { Period("2025", 10) });
+
+        Assert.Equal(["Periods"], NumberRangeReleaseLock.ForbiddenChanges(stored, text));
+        Assert.Equal(["Periods"], NumberRangeReleaseLock.ForbiddenChanges(stored, textOnly));
+        Assert.Empty(NumberRangeReleaseLock.ForbiddenChanges(stored,
+            With(stored, "Periods", new List<RtRecord> { Period(2025L, 11), Period(2026, 1) })));
+    }
+
     /// <summary>
     ///     The bypass reproduced on the lane stack: (1) the period counter of a numbered range is set to 0, (2) Released is
     ///     removed from ReleasedValues, (3) a released invoice is changed. Step 1 is refused, so steps 2 and 3 stay refused.
